@@ -256,7 +256,7 @@ func TestDeleteObjectSuccess(t *testing.T) {
 func TestDeleteObjectError(t *testing.T) {
 	ts, store := newFakeS3Server(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		fmt.Fprint(w, s3ErrorResponse("AccessDenied", "Access Denied"))
+		_, _ = fmt.Fprint(w, s3ErrorResponse("AccessDenied", "Access Denied"))
 	})
 	defer ts.Close()
 
@@ -305,7 +305,7 @@ func TestSetCORSSuccess(t *testing.T) {
 func TestSetCORSError(t *testing.T) {
 	ts, store := newFakeS3Server(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, s3ErrorResponse("InternalError", "Internal Server Error"))
+		_, _ = fmt.Fprint(w, s3ErrorResponse("InternalError", "Internal Server Error"))
 	})
 	defer ts.Close()
 
@@ -364,7 +364,7 @@ func TestEnsureBucketCreatesWhenMissing(t *testing.T) {
 
 		if r.Method == http.MethodHead {
 			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprint(w, s3ErrorResponse("NotFound", "Not Found"))
+			_, _ = fmt.Fprint(w, s3ErrorResponse("NotFound", "Not Found"))
 			return
 		}
 		if r.Method == http.MethodPut {
@@ -392,12 +392,12 @@ func TestEnsureBucketCreateFails(t *testing.T) {
 	ts, store := newFakeS3Server(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodHead {
 			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprint(w, s3ErrorResponse("NotFound", "Not Found"))
+			_, _ = fmt.Fprint(w, s3ErrorResponse("NotFound", "Not Found"))
 			return
 		}
 		if r.Method == http.MethodPut {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, s3ErrorResponse("InternalError", "Internal Server Error"))
+			_, _ = fmt.Fprint(w, s3ErrorResponse("InternalError", "Internal Server Error"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)

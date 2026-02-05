@@ -19,11 +19,12 @@ type Storage struct {
 }
 
 type Config struct {
-	Endpoint  string
-	Bucket    string
-	AccessKey string
-	SecretKey string
-	Region    string
+	Endpoint       string
+	PublicEndpoint string // Used for presigned URLs; falls back to Endpoint if empty
+	Bucket         string
+	AccessKey      string
+	SecretKey      string
+	Region         string
 }
 
 func New(ctx context.Context, cfg Config) (*Storage, error) {
@@ -46,7 +47,15 @@ func New(ctx context.Context, cfg Config) (*Storage, error) {
 		o.UsePathStyle = true
 	})
 
-	presigner := s3.NewPresignClient(client)
+	presignEndpoint := cfg.Endpoint
+	if cfg.PublicEndpoint != "" {
+		presignEndpoint = cfg.PublicEndpoint
+	}
+	presignClient := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(presignEndpoint)
+		o.UsePathStyle = true
+	})
+	presigner := s3.NewPresignClient(presignClient)
 
 	return &Storage{
 		client:    client,

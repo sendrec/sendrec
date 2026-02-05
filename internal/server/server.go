@@ -105,9 +105,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if s.pinger != nil {
 		if err := s.pinger.Ping(r.Context()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"status":"unhealthy","error":"database unreachable"}`))
+			_, _ = w.Write([]byte(`{"status":"unhealthy","error":"database unreachable"}`))
 			return
 		}
 	}
-	w.Write([]byte(`{"status":"ok"}`))
+	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }

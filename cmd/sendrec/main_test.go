@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"testing"
 )
 
@@ -9,8 +8,7 @@ func TestGetEnvReturnsValueWhenSet(t *testing.T) {
 	const key = "TEST_GETENV_SET"
 	const expected = "custom-value"
 
-	os.Setenv(key, expected)
-	defer os.Unsetenv(key)
+	t.Setenv(key, expected)
 
 	result := getEnv(key, "fallback")
 	if result != expected {
@@ -22,8 +20,6 @@ func TestGetEnvReturnsFallbackWhenUnset(t *testing.T) {
 	const key = "TEST_GETENV_UNSET"
 	const fallback = "default-value"
 
-	os.Unsetenv(key)
-
 	result := getEnv(key, fallback)
 	if result != fallback {
 		t.Errorf("expected fallback %q, got %q", fallback, result)
@@ -34,8 +30,7 @@ func TestGetEnvReturnsFallbackWhenEmpty(t *testing.T) {
 	const key = "TEST_GETENV_EMPTY"
 	const fallback = "default-value"
 
-	os.Setenv(key, "")
-	defer os.Unsetenv(key)
+	t.Setenv(key, "")
 
 	result := getEnv(key, fallback)
 	if result != fallback {

@@ -2,6 +2,7 @@ package video
 
 import (
 	"html/template"
+	"log"
 	"net/http"
 	"time"
 
@@ -115,10 +116,12 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	watchPageTemplate.Execute(w, watchPageData{
+	if err := watchPageTemplate.Execute(w, watchPageData{
 		Title:    title,
 		VideoURL: videoURL,
 		Creator:  creator,
 		Date:     createdAt.Format("Jan 2, 2006"),
-	})
+	}); err != nil {
+		log.Printf("failed to render watch page: %v", err)
+	}
 }
