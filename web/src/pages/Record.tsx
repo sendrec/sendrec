@@ -41,7 +41,7 @@ export function Record() {
         body: JSON.stringify({ status: "ready" }),
       });
 
-      setShareUrl(`${window.location.origin}/w/${result.shareToken}`);
+      setShareUrl(`${window.location.origin}/watch/${result.shareToken}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
