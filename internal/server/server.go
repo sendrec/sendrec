@@ -41,6 +41,7 @@ func New(cfg Config) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(securityHeaders(cfg.BaseURL))
 
 	s := &Server{router: r, pinger: cfg.Pinger, webFS: cfg.WebFS}
 
@@ -83,7 +84,9 @@ func (s *Server) routes() {
 	}
 
 	if s.videoHandler != nil {
+		videoLimiter := ratelimit.NewLimiter(2, 10)
 		s.router.Route("/api/videos", func(r chi.Router) {
+			r.Use(videoLimiter.Middleware)
 			r.Use(s.authHandler.Middleware)
 			r.Post("/", s.videoHandler.Create)
 			r.Get("/", s.videoHandler.List)

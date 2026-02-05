@@ -25,6 +25,9 @@ type mockStorage struct {
 	downloadErr  error
 	deleteErr    error
 	deleteCalled chan string
+	headSize     int64
+	headType     string
+	headErr      error
 }
 
 func (m *mockStorage) GenerateUploadURL(_ context.Context, _ string, _ string, _ int64, _ time.Duration) (string, error) {
@@ -40,6 +43,13 @@ func (m *mockStorage) DeleteObject(_ context.Context, key string) error {
 		m.deleteCalled <- key
 	}
 	return m.deleteErr
+}
+
+func (m *mockStorage) HeadObject(_ context.Context, _ string) (int64, string, error) {
+	if m.headErr != nil {
+		return 0, "", m.headErr
+	}
+	return m.headSize, m.headType, nil
 }
 
 const testJWTSecret = "test-secret-for-video-tests"
@@ -356,9 +366,15 @@ func TestUpdate_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	storage := &mockStorage{}
+	storage := &mockStorage{headSize: 100000, headType: "video/webm"}
 	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
+	fileKey := "recordings/user/video.webm"
+	fileSize := int64(100000)
+
+	mock.ExpectQuery(`SELECT file_key, file_size FROM videos`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "file_size"}).AddRow(fileKey, fileSize))
 
 	mock.ExpectExec(`UPDATE videos SET status`).
 		WithArgs("ready", videoID, testUserID).
@@ -388,7 +404,7 @@ func TestUpdate_InvalidStatus(t *testing.T) {
 	}
 	defer mock.Close()
 
-	storage := &mockStorage{}
+	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
 	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
 
@@ -417,13 +433,13 @@ func TestUpdate_VideoNotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	storage := &mockStorage{}
+	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
 	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "nonexistent-id"
 
-	mock.ExpectExec(`UPDATE videos SET status`).
-		WithArgs("ready", videoID, testUserID).
-		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+	mock.ExpectQuery(`SELECT file_key, file_size FROM videos`).
+		WithArgs(videoID, testUserID).
+		WillReturnError(pgx.ErrNoRows)
 
 	body, _ := json.Marshal(updateRequest{Status: "ready"})
 
@@ -454,7 +470,7 @@ func TestUpdate_InvalidJSON(t *testing.T) {
 	}
 	defer mock.Close()
 
-	storage := &mockStorage{}
+	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
 	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
 
@@ -481,9 +497,13 @@ func TestUpdate_DatabaseError(t *testing.T) {
 	}
 	defer mock.Close()
 
-	storage := &mockStorage{}
+	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
 	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
+
+	mock.ExpectQuery(`SELECT file_key, file_size FROM videos`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "file_size"}).AddRow("recordings/user/video.webm", int64(1000)))
 
 	mock.ExpectExec(`UPDATE videos SET status`).
 		WithArgs("ready", videoID, testUserID).

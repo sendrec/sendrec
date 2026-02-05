@@ -118,6 +118,25 @@ func (s *Storage) uploadLimit() int64 {
 	return s.maxBytes
 }
 
+func (s *Storage) HeadObject(ctx context.Context, key string) (int64, string, error) {
+	out, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return 0, "", fmt.Errorf("head object: %w", err)
+	}
+	size := int64(0)
+	if out.ContentLength != nil {
+		size = *out.ContentLength
+	}
+	ct := ""
+	if out.ContentType != nil {
+		ct = *out.ContentType
+	}
+	return size, ct, nil
+}
+
 func (s *Storage) SetCORS(ctx context.Context, allowedOrigins []string) error {
 	_, err := s.client.PutBucketCors(ctx, &s3.PutBucketCorsInput{
 		Bucket: aws.String(s.bucket),

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -20,6 +21,7 @@ type ObjectStorage interface {
 	GenerateUploadURL(ctx context.Context, key string, contentType string, contentLength int64, expiry time.Duration) (string, error)
 	GenerateDownloadURL(ctx context.Context, key string, expiry time.Duration) (string, error)
 	DeleteObject(ctx context.Context, key string) error
+	HeadObject(ctx context.Context, key string) (int64, string, error)
 }
 
 type Handler struct {
@@ -27,6 +29,10 @@ type Handler struct {
 	storage        ObjectStorage
 	baseURL        string
 	maxUploadBytes int64
+}
+
+func videoFileKey(userID, shareToken string) string {
+	return fmt.Sprintf("recordings/%s/%s.webm", userID, shareToken)
 }
 
 func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64) *Handler {
@@ -107,7 +113,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fileKey := fmt.Sprintf("recordings/%s/%s.webm", userID, shareToken)
+	fileKey := videoFileKey(userID, shareToken)
 
 	var videoID string
 	err = h.db.QueryRow(r.Context(),
@@ -154,6 +160,36 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Status == "ready" {
+		var fileKey string
+		var fileSize int64
+		err := h.db.QueryRow(r.Context(),
+			`SELECT file_key, file_size FROM videos
+			 WHERE id = $1 AND user_id = $2 AND status = 'uploading'`,
+			videoID, userID,
+		).Scan(&fileKey, &fileSize)
+		if err != nil {
+			httputil.WriteError(w, http.StatusNotFound, "video not found")
+			return
+		}
+
+		size, contentType, err := h.storage.HeadObject(r.Context(), fileKey)
+		if err != nil {
+			httputil.WriteError(w, http.StatusBadRequest, "could not verify upload")
+			return
+		}
+		if size <= 0 || (h.maxUploadBytes > 0 && size > h.maxUploadBytes) {
+			httputil.WriteError(w, http.StatusBadRequest, "uploaded file invalid size")
+			return
+		}
+		if fileSize > 0 && size != fileSize {
+			httputil.WriteError(w, http.StatusBadRequest, "uploaded file size mismatch")
+			return
+		}
+		if contentType != "video/webm" {
+			httputil.WriteError(w, http.StatusBadRequest, "uploaded file invalid type")
+			return
+		}
+
 		tag, err := h.db.Exec(r.Context(),
 			`UPDATE videos SET status = $1, updated_at = now()
 			 WHERE id = $2 AND user_id = $3 AND status = 'uploading'`,
@@ -256,7 +292,9 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
-		_ = h.storage.DeleteObject(context.Background(), fileKey)
+		if err := h.storage.DeleteObject(context.Background(), fileKey); err != nil {
+			log.Printf("async delete failed for %s: %v", fileKey, err)
+		}
 	}()
 
 	w.WriteHeader(http.StatusNoContent)
