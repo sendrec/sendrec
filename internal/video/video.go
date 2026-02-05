@@ -10,19 +10,24 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sendrec/sendrec/internal/auth"
+	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
-	"github.com/sendrec/sendrec/internal/storage"
 )
 
+type ObjectStorage interface {
+	GenerateUploadURL(ctx context.Context, key string, contentType string, contentLength int64, expiry time.Duration) (string, error)
+	GenerateDownloadURL(ctx context.Context, key string, expiry time.Duration) (string, error)
+	DeleteObject(ctx context.Context, key string) error
+}
+
 type Handler struct {
-	db      *pgxpool.Pool
-	storage *storage.Storage
+	db      database.DBTX
+	storage ObjectStorage
 	baseURL string
 }
 
-func NewHandler(db *pgxpool.Pool, s *storage.Storage, baseURL string) *Handler {
+func NewHandler(db database.DBTX, s ObjectStorage, baseURL string) *Handler {
 	return &Handler{db: db, storage: s, baseURL: baseURL}
 }
 

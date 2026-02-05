@@ -67,7 +67,16 @@ func main() {
 		log.Println("no embedded frontend found, SPA serving disabled")
 	}
 
-	srv := server.New(db, store, webFS)
+	jwtSecret := os.Getenv("JWT_SECRET")
+
+	srv := server.New(server.Config{
+		DB:        db.Pool,
+		Pinger:    db,
+		Storage:   store,
+		WebFS:     webFS,
+		JWTSecret: jwtSecret,
+		BaseURL:   baseURL,
+	})
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
