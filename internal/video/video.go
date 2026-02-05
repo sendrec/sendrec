@@ -1,6 +1,7 @@
 package video
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -194,7 +195,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
-		_ = h.storage.DeleteObject(r.Context(), fileKey)
+		_ = h.storage.DeleteObject(context.Background(), fileKey)
 	}()
 
 	w.WriteHeader(http.StatusNoContent)

@@ -28,8 +28,8 @@ async function refreshToken(): Promise<string> {
     throw new ApiError(response.status, "Token refresh failed");
   }
 
-  const data = (await response.json()) as { access_token: string };
-  return data.access_token;
+  const data = (await response.json()) as { accessToken: string };
+  return data.accessToken;
 }
 
 async function apiFetch<T>(
