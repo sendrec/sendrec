@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io/fs"
 	"net/http"
 	"os"
 
@@ -17,14 +18,15 @@ type Server struct {
 	db           *database.DB
 	authHandler  *auth.Handler
 	videoHandler *video.Handler
+	webFS        fs.FS
 }
 
-func New(db *database.DB, store *storage.Storage) *Server {
+func New(db *database.DB, store *storage.Storage, webFS fs.FS) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	s := &Server{router: r, db: db}
+	s := &Server{router: r, db: db, webFS: webFS}
 
 	if db != nil {
 		jwtSecret := os.Getenv("JWT_SECRET")
@@ -67,6 +69,11 @@ func (s *Server) routes() {
 		})
 		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
+	}
+
+	if s.webFS != nil {
+		spa := newSPAFileServer(s.webFS)
+		s.router.NotFound(spa.ServeHTTP)
 	}
 }
 
