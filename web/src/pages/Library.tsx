@@ -10,6 +10,7 @@ interface Video {
   shareToken: string;
   shareUrl: string;
   createdAt: string;
+  shareExpiresAt: string;
 }
 
 function formatDuration(seconds: number): string {
@@ -20,6 +21,20 @@ function formatDuration(seconds: number): string {
 
 function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString();
+}
+
+function expiryLabel(shareExpiresAt: string): { text: string; expired: boolean } {
+  const expiry = new Date(shareExpiresAt);
+  const now = new Date();
+  if (expiry <= now) {
+    return { text: "Expired", expired: true };
+  }
+  const diffMs = expiry.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 1) {
+    return { text: "Expires tomorrow", expired: false };
+  }
+  return { text: `Expires in ${diffDays} days`, expired: false };
 }
 
 export function Library() {
@@ -48,6 +63,12 @@ export function Library() {
 
   function copyLink(shareUrl: string) {
     navigator.clipboard.writeText(shareUrl);
+  }
+
+  async function extendVideo(id: string) {
+    await apiFetch(`/api/videos/${id}/extend`, { method: "POST" });
+    const result = await apiFetch<Video[]>("/api/videos");
+    setVideos(result ?? []);
   }
 
   if (loading) {
@@ -149,24 +170,48 @@ export function Library() {
                     uploading...
                   </span>
                 )}
+                {video.status === "ready" && (() => {
+                  const expiry = expiryLabel(video.shareExpiresAt);
+                  return (
+                    <span style={{ color: expiry.expired ? "var(--color-error)" : "var(--color-text-secondary)", marginLeft: 8 }}>
+                      &middot; {expiry.text}
+                    </span>
+                  );
+                })()}
               </p>
             </div>
 
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
               {video.status === "ready" && (
-                <button
-                  onClick={() => copyLink(video.shareUrl)}
-                  style={{
-                    background: "var(--color-accent)",
-                    color: "var(--color-text)",
-                    borderRadius: 4,
-                    padding: "6px 14px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  Copy link
-                </button>
+                <>
+                  <button
+                    onClick={() => copyLink(video.shareUrl)}
+                    style={{
+                      background: "var(--color-accent)",
+                      color: "var(--color-text)",
+                      borderRadius: 4,
+                      padding: "6px 14px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Copy link
+                  </button>
+                  <button
+                    onClick={() => extendVideo(video.id)}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-accent)",
+                      border: "1px solid var(--color-accent)",
+                      borderRadius: 4,
+                      padding: "6px 14px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Extend
+                  </button>
+                </>
               )}
 
               <button

@@ -82,6 +82,47 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
 </body>
 </html>`))
 
+var expiredPageTemplate = template.Must(template.New("expired").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Link Expired — SendRec</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a1628;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container { text-align: center; padding: 2rem; }
+        h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+        p { color: #94a3b8; margin-bottom: 1.5rem; }
+        a {
+            display: inline-block;
+            background: #00b67a;
+            color: #fff;
+            padding: 0.625rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        a:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>This link has expired</h1>
+        <p>The video owner can extend the link to make it available again.</p>
+        <a href="https://sendrec.eu">Go to SendRec</a>
+    </div>
+</body>
+</html>`))
+
 type watchPageData struct {
 	Title    string
 	VideoURL string
@@ -96,16 +137,26 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var fileKey string
 	var creator string
 	var createdAt time.Time
+	var shareExpiresAt time.Time
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.title, v.file_key, u.name, v.created_at
+		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status = 'ready'`,
 		shareToken,
-	).Scan(&title, &fileKey, &creator, &createdAt)
+	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt)
 	if err != nil {
 		http.NotFound(w, r)
+		return
+	}
+
+	if time.Now().After(shareExpiresAt) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusGone)
+		if err := expiredPageTemplate.Execute(w, nil); err != nil {
+			log.Printf("failed to render expired page: %v", err)
+		}
 		return
 	}
 

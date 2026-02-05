@@ -92,6 +92,7 @@ func (s *Server) routes() {
 			r.Get("/", s.videoHandler.List)
 			r.Patch("/{id}", s.videoHandler.Update)
 			r.Delete("/{id}", s.videoHandler.Delete)
+			r.Post("/{id}/extend", s.videoHandler.Extend)
 		})
 		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
