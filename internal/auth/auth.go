@@ -86,7 +86,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			httputil.WriteError(w, http.StatusConflict, "email already registered")
+			httputil.WriteError(w, http.StatusConflict, "could not create account")
 			return
 		}
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create user")

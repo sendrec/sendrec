@@ -217,7 +217,7 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusConflict, rec.Code)
 	}
 	errMsg := decodeErrorResponse(t, rec)
-	if errMsg != "email already registered" {
+	if errMsg != "could not create account" {
 		t.Errorf("expected duplicate email error, got %q", errMsg)
 	}
 
