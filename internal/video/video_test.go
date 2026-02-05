@@ -16,18 +16,21 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/sendrec/sendrec/internal/auth"
+	"github.com/sendrec/sendrec/internal/httputil"
 )
 
 type mockStorage struct {
-	uploadURL    string
-	uploadErr    error
-	downloadURL  string
-	downloadErr  error
-	deleteErr    error
-	deleteCalled chan string
-	headSize     int64
-	headType     string
-	headErr      error
+	uploadURL       string
+	uploadErr       error
+	downloadURL     string
+	downloadErr     error
+	deleteErr       error
+	deleteCalled    chan string
+	deleteCallCount int
+	deleteFailUntil int
+	headSize        int64
+	headType        string
+	headErr         error
 }
 
 func (m *mockStorage) GenerateUploadURL(_ context.Context, _ string, _ string, _ int64, _ time.Duration) (string, error) {
@@ -39,10 +42,17 @@ func (m *mockStorage) GenerateDownloadURL(_ context.Context, _ string, _ time.Du
 }
 
 func (m *mockStorage) DeleteObject(_ context.Context, key string) error {
+	m.deleteCallCount++
 	if m.deleteCalled != nil {
 		m.deleteCalled <- key
 	}
-	return m.deleteErr
+	if m.deleteFailUntil > 0 && m.deleteCallCount <= m.deleteFailUntil {
+		return m.deleteErr
+	}
+	if m.deleteFailUntil == 0 {
+		return m.deleteErr
+	}
+	return nil
 }
 
 func (m *mockStorage) HeadObject(_ context.Context, _ string) (int64, string, error) {
@@ -1350,6 +1360,234 @@ func TestExtend_DatabaseError(t *testing.T) {
 	if errMsg != "failed to extend share link" {
 		t.Errorf("expected error %q, got %q", "failed to extend share link", errMsg)
 	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- WatchPage Nonce Tests ---
+
+func nonceMiddleware(nonce string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := httputil.ContextWithNonce(r.Context(), nonce)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func TestWatchPage_ContainsNonceInStyleTag(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
+	handler := NewHandler(mock, storage, testBaseURL, 0)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at"}).
+				AddRow("Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, shareExpiresAt),
+		)
+
+	r := chi.NewRouter()
+	r.Use(nonceMiddleware("test-nonce-abc123"))
+	r.Get("/watch/{shareToken}", handler.WatchPage)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/"+shareToken, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `<style nonce="test-nonce-abc123">`) {
+		t.Error("expected watch page to contain <style> tag with nonce attribute")
+	}
+}
+
+func TestWatchPage_ContainsNonceInScriptTag(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
+	handler := NewHandler(mock, storage, testBaseURL, 0)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at"}).
+				AddRow("Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, shareExpiresAt),
+		)
+
+	r := chi.NewRouter()
+	r.Use(nonceMiddleware("test-nonce-abc123"))
+	r.Get("/watch/{shareToken}", handler.WatchPage)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/"+shareToken, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `<script nonce="test-nonce-abc123">`) {
+		t.Error("expected watch page to contain <script> tag with nonce attribute")
+	}
+}
+
+func TestWatchPage_ExpiredContainsNonce(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
+	handler := NewHandler(mock, storage, testBaseURL, 0)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(-1 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at"}).
+				AddRow("Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, shareExpiresAt),
+		)
+
+	r := chi.NewRouter()
+	r.Use(nonceMiddleware("test-nonce-expired"))
+	r.Get("/watch/{shareToken}", handler.WatchPage)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/"+shareToken, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusGone {
+		t.Fatalf("expected status %d, got %d", http.StatusGone, rec.Code)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `<style nonce="test-nonce-expired">`) {
+		t.Error("expected expired page to contain <style> tag with nonce attribute")
+	}
+}
+
+// --- deleteWithRetry Tests ---
+
+func TestDeleteWithRetry_SucceedsFirstAttempt(t *testing.T) {
+	s := &mockStorage{}
+	err := deleteWithRetry(context.Background(), s, "test-key", 3)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if s.deleteCallCount != 1 {
+		t.Errorf("expected 1 call, got %d", s.deleteCallCount)
+	}
+}
+
+func TestDeleteWithRetry_SucceedsOnSecondAttempt(t *testing.T) {
+	s := &mockStorage{
+		deleteErr:       errors.New("transient error"),
+		deleteFailUntil: 1,
+	}
+	err := deleteWithRetry(context.Background(), s, "test-key", 3)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if s.deleteCallCount != 2 {
+		t.Errorf("expected 2 calls, got %d", s.deleteCallCount)
+	}
+}
+
+func TestDeleteWithRetry_FailsAfterAllAttempts(t *testing.T) {
+	s := &mockStorage{
+		deleteErr: errors.New("persistent error"),
+	}
+	err := deleteWithRetry(context.Background(), s, "test-key", 3)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if s.deleteCallCount != 3 {
+		t.Errorf("expected 3 calls, got %d", s.deleteCallCount)
+	}
+}
+
+func TestDeleteWithRetry_RespectsContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	s := &mockStorage{
+		deleteErr: errors.New("fail"),
+	}
+	err := deleteWithRetry(ctx, s, "test-key", 3)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	// Should stop early due to cancelled context
+	if s.deleteCallCount > 2 {
+		t.Errorf("expected early stop, got %d calls", s.deleteCallCount)
+	}
+}
+
+// --- Delete handler with retry and file_purged_at ---
+
+func TestDelete_MarksFilePurgedOnSuccess(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	deleteCalled := make(chan string, 1)
+	storage := &mockStorage{deleteCalled: deleteCalled}
+	handler := NewHandler(mock, storage, testBaseURL, 0)
+	videoID := "video-123"
+	fileKey := "recordings/user-1/abc.webm"
+
+	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"file_key"}).AddRow(fileKey))
+
+	mock.ExpectExec(`UPDATE videos SET file_purged_at`).
+		WithArgs(fileKey).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Delete("/api/videos/{id}", handler.Delete)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodDelete, "/api/videos/"+videoID, nil))
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d", http.StatusNoContent, rec.Code)
+	}
+
+	select {
+	case <-deleteCalled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected delete to be called")
+	}
+
+	// Give goroutine time to execute the UPDATE
+	time.Sleep(100 * time.Millisecond)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet pgxmock expectations: %v", err)

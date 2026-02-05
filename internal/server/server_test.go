@@ -57,11 +57,12 @@ func newServerWithDB(t *testing.T) (*server.Server, pgxmock.PgxPoolIface) {
 	t.Cleanup(func() { mock.Close() })
 
 	srv := server.New(server.Config{
-		DB:        mock,
-		Pinger:    &mockPinger{err: nil},
-		Storage:   &mockStorage{},
-		JWTSecret: "test-secret",
-		BaseURL:   "https://localhost:8080",
+		DB:              mock,
+		Pinger:          &mockPinger{err: nil},
+		Storage:         &mockStorage{},
+		JWTSecret:       "test-secret",
+		BaseURL:         "https://localhost:8080",
+		S3PublicEndpoint: "https://storage.example.com",
 	})
 	return srv, mock
 }

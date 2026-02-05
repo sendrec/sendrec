@@ -26,7 +26,8 @@ type Config struct {
 	WebFS          fs.FS
 	JWTSecret      string
 	BaseURL        string
-	MaxUploadBytes int64
+	MaxUploadBytes  int64
+	S3PublicEndpoint string
 }
 
 type Server struct {
@@ -41,7 +42,10 @@ func New(cfg Config) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(securityHeaders(cfg.BaseURL))
+	r.Use(securityHeaders(SecurityConfig{
+		BaseURL:         cfg.BaseURL,
+		StorageEndpoint: cfg.S3PublicEndpoint,
+	}))
 
 	s := &Server{router: r, pinger: cfg.Pinger, webFS: cfg.WebFS}
 

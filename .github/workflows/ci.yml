@@ -44,6 +44,9 @@ jobs:
       - name: Install frontend dependencies
         run: cd web && pnpm install --frozen-lockfile
 
+      - name: Audit frontend dependencies
+        run: cd web && pnpm audit --prod --audit-level high
+
       - name: Typecheck frontend
         run: cd web && pnpm typecheck
 
@@ -57,6 +60,12 @@ jobs:
 
       - name: Run Go tests
         run: go test ./...
+
+      - name: Verify Go modules
+        run: go mod verify
+
+      - name: Check Go vulnerabilities
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
 
       - name: Build Go binary
         run: go build -o bin/sendrec ./cmd/sendrec

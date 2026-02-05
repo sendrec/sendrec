@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/sendrec/sendrec/internal/httputil"
 )
 
 var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE html>
@@ -20,7 +21,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
     <meta property="og:video" content="{{.VideoURL}}">
     <meta property="og:video:type" content="video/webm">
     <meta property="og:site_name" content="SendRec">
-    <style>
+    <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background: #0a1628;
@@ -71,7 +72,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             <source src="{{.VideoURL}}" type="video/webm">
             Your browser does not support video playback.
         </video>
-        <script>
+        <script nonce="{{.Nonce}}">
             var v = document.getElementById('player');
             v.play().catch(function() { v.muted = true; v.play(); });
         </script>
@@ -88,7 +89,7 @@ var expiredPageTemplate = template.Must(template.New("expired").Parse(`<!DOCTYPE
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Link Expired — SendRec</title>
-    <style>
+    <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background: #0a1628;
@@ -128,6 +129,11 @@ type watchPageData struct {
 	VideoURL string
 	Creator  string
 	Date     string
+	Nonce    string
+}
+
+type expiredPageData struct {
+	Nonce string
 }
 
 func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
@@ -151,10 +157,12 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	nonce := httputil.NonceFromContext(r.Context())
+
 	if time.Now().After(shareExpiresAt) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusGone)
-		if err := expiredPageTemplate.Execute(w, nil); err != nil {
+		if err := expiredPageTemplate.Execute(w, expiredPageData{Nonce: nonce}); err != nil {
 			log.Printf("failed to render expired page: %v", err)
 		}
 		return
@@ -172,6 +180,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		VideoURL: videoURL,
 		Creator:  creator,
 		Date:     createdAt.Format("Jan 2, 2006"),
+		Nonce:    nonce,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}
