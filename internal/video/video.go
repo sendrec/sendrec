@@ -100,7 +100,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), fileKey, "video/webm", 30*time.Minute)
+	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), fileKey, "video/webm", req.FileSize, 30*time.Minute)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to generate upload URL")
 		return

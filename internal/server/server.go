@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/ratelimit"
 	"github.com/sendrec/sendrec/internal/storage"
 	"github.com/sendrec/sendrec/internal/video"
 )
@@ -54,9 +55,14 @@ func (s *Server) routes() {
 	s.router.Get("/api/health", s.handleHealth)
 
 	if s.authHandler != nil {
-		s.router.Post("/api/auth/register", s.authHandler.Register)
-		s.router.Post("/api/auth/login", s.authHandler.Login)
-		s.router.Post("/api/auth/refresh", s.authHandler.Refresh)
+		authLimiter := ratelimit.NewLimiter(0.5, 5)
+		s.router.Route("/api/auth", func(r chi.Router) {
+			r.Use(authLimiter.Middleware)
+			r.Post("/register", s.authHandler.Register)
+			r.Post("/login", s.authHandler.Login)
+			r.Post("/refresh", s.authHandler.Refresh)
+			r.Post("/logout", s.authHandler.Logout)
+		})
 	}
 
 	if s.videoHandler != nil {

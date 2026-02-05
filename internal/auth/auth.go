@@ -3,10 +3,13 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"net/mail"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -55,8 +58,18 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid email address")
+		return
+	}
+
 	if len(req.Password) < 8 {
 		writeError(w, http.StatusBadRequest, "password must be at least 8 characters")
+		return
+	}
+
+	if len(req.Password) > 72 {
+		writeError(w, http.StatusBadRequest, "password must be at most 72 characters")
 		return
 	}
 
@@ -72,7 +85,8 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		req.Email, string(hashedPassword), req.Name,
 	).Scan(&userID)
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key") {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			writeError(w, http.StatusConflict, "email already registered")
 			return
 		}
@@ -151,6 +165,11 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if claims.TokenType != "refresh" {
+		writeError(w, http.StatusUnauthorized, "invalid refresh token")
+		return
+	}
+
 	accessToken, err := GenerateAccessToken(h.jwtSecret, claims.UserID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to generate access token")
@@ -165,6 +184,19 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	setRefreshTokenCookie(w, refreshToken)
 	writeJSON(w, http.StatusOK, tokenResponse{AccessToken: accessToken})
+}
+
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/api/auth",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1,
+	})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) Middleware(next http.Handler) http.Handler {
@@ -187,6 +219,11 @@ func (h *Handler) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
+		if claims.TokenType != "access" {
+			writeError(w, http.StatusUnauthorized, "invalid token type")
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -201,7 +238,7 @@ func setRefreshTokenCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    token,
-		Path:     "/api/auth/refresh",
+		Path:     "/api/auth",
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,

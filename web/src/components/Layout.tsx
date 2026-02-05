@@ -14,7 +14,8 @@ export function Layout({ children }: LayoutProps) {
     return location.pathname === path;
   }
 
-  function signOut() {
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
     setAccessToken(null);
     navigate("/login");
   }

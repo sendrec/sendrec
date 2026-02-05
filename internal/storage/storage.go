@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type Storage struct {
@@ -54,12 +55,16 @@ func New(ctx context.Context, cfg Config) (*Storage, error) {
 	}, nil
 }
 
-func (s *Storage) GenerateUploadURL(ctx context.Context, key string, contentType string, expiry time.Duration) (string, error) {
-	req, err := s.presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+func (s *Storage) GenerateUploadURL(ctx context.Context, key string, contentType string, contentLength int64, expiry time.Duration) (string, error) {
+	input := &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(key),
 		ContentType: aws.String(contentType),
-	}, s3.WithPresignExpires(expiry))
+	}
+	if contentLength > 0 {
+		input.ContentLength = aws.Int64(contentLength)
+	}
+	req, err := s.presigner.PresignPutObject(ctx, input, s3.WithPresignExpires(expiry))
 	if err != nil {
 		return "", fmt.Errorf("presign upload: %w", err)
 	}
@@ -88,6 +93,26 @@ func (s *Storage) DeleteObject(ctx context.Context, key string) error {
 		return fmt.Errorf("delete object: %w", err)
 	}
 
+	return nil
+}
+
+func (s *Storage) SetCORS(ctx context.Context, allowedOrigins []string) error {
+	_, err := s.client.PutBucketCors(ctx, &s3.PutBucketCorsInput{
+		Bucket: aws.String(s.bucket),
+		CORSConfiguration: &types.CORSConfiguration{
+			CORSRules: []types.CORSRule{
+				{
+					AllowedOrigins: allowedOrigins,
+					AllowedMethods: []string{"GET", "PUT"},
+					AllowedHeaders: []string{"*"},
+					MaxAgeSeconds:  aws.Int32(3600),
+				},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("set bucket CORS: %w", err)
+	}
 	return nil
 }
 
