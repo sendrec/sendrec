@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/server"
@@ -65,10 +69,30 @@ func main() {
 
 	srv := server.New(db, store, webFS)
 
-	log.Printf("sendrec listening on :%s", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), srv); err != nil {
-		log.Fatal(err)
+	httpServer := &http.Server{
+		Addr:    fmt.Sprintf(":%s", port),
+		Handler: srv,
 	}
+
+	shutdownCh := make(chan os.Signal, 1)
+	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("sendrec listening on :%s", port)
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+	}()
+
+	<-shutdownCh
+	log.Println("shutting down...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("shutdown failed: %v", err)
+	}
+	log.Println("shutdown complete")
 }
 
 func getEnv(key, fallback string) string {

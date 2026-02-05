@@ -11,26 +11,53 @@ SendRec is an open-source alternative to Loom for teams that need their data to 
 - **Open source** — AGPLv3 licensed, self-host or use our managed platform
 - **No US cloud dependency** — no data transfers to the US, no Schrems II risk
 
-## Status
+## Quick Start
 
-SendRec is in early development. We're building in public and collecting feedback from EU teams.
+```bash
+git clone https://github.com/sendrec/sendrec.git
+cd sendrec
+cp .env.example .env
+docker compose -f docker-compose.dev.yml up --build
+```
 
-**[Join the waitlist](https://sendrec.eu)** to get early access.
+Open http://localhost:8080, register an account, and start recording.
 
-## Planned Features
+## Development
 
-- Screen and camera recording (browser extension + desktop app)
-- Instant video sharing with link
-- Workspace management for teams
-- Comments and reactions on videos
-- Self-hosted and managed deployment options
+**Prerequisites:** Go 1.25+, Node 24+, pnpm, Docker
+
+```bash
+# Run the full stack with Docker
+make docker-up
+
+# Or run services separately:
+make dev-web    # Frontend dev server (port 5173, proxies API to 8080)
+make run        # Go server (requires DATABASE_URL, S3 env vars)
+
+# Build everything
+make build
+
+# Run tests
+make test
+```
 
 ## Tech Stack
 
-- **Frontend:** React, TypeScript, Vite
-- **Backend:** Go microservices
-- **Storage:** PostgreSQL, S3-compatible object storage
-- **Infrastructure:** Docker, Kubernetes
+- **Frontend:** React 19, TypeScript 5.9, Vite 7
+- **Backend:** Go (single binary, chi router)
+- **Database:** PostgreSQL 18
+- **Storage:** S3-compatible object storage (MinIO for dev, Hetzner Object Storage for prod)
+- **Deployment:** Docker Compose
+
+## Architecture
+
+Single Go binary that:
+- Serves the React SPA (embedded at build time)
+- Handles REST API requests (`/api/*`)
+- Renders server-side watch pages with OpenGraph tags (`/watch/:token`)
+- Runs database migrations on startup
+
+Video recordings happen entirely in the browser using `getDisplayMedia` + `MediaRecorder`. Files upload directly to S3 via presigned URLs — the server never touches video bytes.
 
 ## License
 

@@ -37,7 +37,9 @@ async function apiFetch<T>(
   options: RequestInit = {}
 ): Promise<T | undefined> {
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
+  if (options.body) {
+    headers.set("Content-Type", "application/json");
+  }
 
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
@@ -69,4 +71,14 @@ async function apiFetch<T>(
   return (await response.json()) as T;
 }
 
-export { ApiError, setAccessToken, getAccessToken, apiFetch };
+async function tryRefreshToken(): Promise<boolean> {
+  try {
+    const token = await refreshToken();
+    setAccessToken(token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export { ApiError, setAccessToken, getAccessToken, apiFetch, tryRefreshToken };
