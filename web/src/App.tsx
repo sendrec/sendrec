@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { getAccessToken } from "./api/client";
 import { Login } from "./pages/Login";
+import { Record } from "./pages/Record";
 import { Register } from "./pages/Register";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -19,7 +20,7 @@ export function App() {
         path="/"
         element={
           <ProtectedRoute>
-            <div>Dashboard — coming soon</div>
+            <Record />
           </ProtectedRoute>
         }
       />
