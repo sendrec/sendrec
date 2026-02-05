@@ -66,6 +66,7 @@ func (s *Server) routes() {
 			r.Delete("/{id}", s.videoHandler.Delete)
 		})
 		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
+		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 	}
 }
 
