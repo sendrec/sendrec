@@ -3,10 +3,7 @@ package server
 import "net/http"
 
 func securityHeaders(baseURL string) func(http.Handler) http.Handler {
-	strictTransport := false
-	if baseURL != "" && hasHTTPS(baseURL) {
-		strictTransport = true
-	}
+	strictTransport := baseURL != "" && hasHTTPS(baseURL)
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
