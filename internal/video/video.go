@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sendrec/sendrec/internal/auth"
+	"github.com/sendrec/sendrec/internal/httputil"
 	"github.com/sendrec/sendrec/internal/storage"
 )
 
@@ -72,7 +73,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var req createRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -83,7 +84,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	shareToken, err := generateShareToken()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to generate share token")
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate share token")
 		return
 	}
 
@@ -96,17 +97,17 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		userID, title, req.Duration, req.FileSize, fileKey, shareToken,
 	).Scan(&videoID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create video")
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to create video")
 		return
 	}
 
 	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), fileKey, "video/webm", req.FileSize, 30*time.Minute)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to generate upload URL")
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate upload URL")
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, createResponse{
+	httputil.WriteJSON(w, http.StatusCreated, createResponse{
 		ID:         videoID,
 		UploadURL:  uploadURL,
 		ShareToken: shareToken,
@@ -119,12 +120,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var req updateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	if req.Status != "ready" {
-		writeError(w, http.StatusBadRequest, "status can only be set to ready")
+		httputil.WriteError(w, http.StatusBadRequest, "status can only be set to ready")
 		return
 	}
 
@@ -134,12 +135,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		req.Status, videoID, userID,
 	)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update video")
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video")
 		return
 	}
 
 	if tag.RowsAffected() == 0 {
-		writeError(w, http.StatusNotFound, "video not found")
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
 
@@ -157,7 +158,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		userID,
 	)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list videos")
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to list videos")
 		return
 	}
 	defer rows.Close()
@@ -167,7 +168,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var item listItem
 		var createdAt time.Time
 		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt); err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to scan video")
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
 		item.CreatedAt = createdAt.Format(time.RFC3339)
@@ -175,7 +176,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		items = append(items, item)
 	}
 
-	writeJSON(w, http.StatusOK, items)
+	httputil.WriteJSON(w, http.StatusOK, items)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -190,7 +191,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		videoID, userID,
 	).Scan(&fileKey)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "video not found")
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
 
@@ -218,17 +219,17 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		shareToken,
 	).Scan(&title, &duration, &fileKey, &creator, &createdAt)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "video not found")
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to generate video URL")
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate video URL")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, watchResponse{
+	httputil.WriteJSON(w, http.StatusOK, watchResponse{
 		Title:     title,
 		VideoURL:  videoURL,
 		Duration:  duration,
@@ -237,14 +238,3 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, struct {
-		Error string `json:"error"`
-	}{Error: message})
-}

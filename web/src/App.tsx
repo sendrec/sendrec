@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { getAccessToken } from "./api/client";
+import { getAccessToken, tryRefreshToken } from "./api/client";
 import { Layout } from "./components/Layout";
 import { Login } from "./pages/Login";
 import { Library } from "./pages/Library";
@@ -7,9 +8,26 @@ import { Record } from "./pages/Record";
 import { Register } from "./pages/Register";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  if (!getAccessToken()) {
+  const [checking, setChecking] = useState(!getAccessToken());
+  const [authenticated, setAuthenticated] = useState(!!getAccessToken());
+
+  useEffect(() => {
+    if (!getAccessToken()) {
+      tryRefreshToken().then((ok) => {
+        setAuthenticated(ok);
+        setChecking(false);
+      });
+    }
+  }, []);
+
+  if (checking) {
+    return null;
+  }
+
+  if (!authenticated) {
     return <Navigate to="/login" replace />;
   }
+
   return <Layout>{children}</Layout>;
 }
 

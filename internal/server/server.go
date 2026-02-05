@@ -2,8 +2,10 @@ package server
 
 import (
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -33,13 +35,16 @@ func New(db *database.DB, store *storage.Storage, webFS fs.FS) *Server {
 		jwtSecret := os.Getenv("JWT_SECRET")
 		if jwtSecret == "" {
 			jwtSecret = "dev-secret-change-in-production"
+			log.Println("WARNING: using default JWT secret, set JWT_SECRET in production")
 		}
-		s.authHandler = auth.NewHandler(db.Pool, jwtSecret)
 
 		baseURL := os.Getenv("BASE_URL")
 		if baseURL == "" {
 			baseURL = "http://localhost:8080"
 		}
+
+		secureCookies := strings.HasPrefix(baseURL, "https://")
+		s.authHandler = auth.NewHandler(db.Pool, jwtSecret, secureCookies)
 		s.videoHandler = video.NewHandler(db.Pool, store, baseURL)
 	}
 
@@ -85,5 +90,12 @@ func (s *Server) routes() {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	if s.db != nil {
+		if err := s.db.Pool.Ping(r.Context()); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"unhealthy","error":"database unreachable"}`))
+			return
+		}
+	}
 	w.Write([]byte(`{"status":"ok"}`))
 }
