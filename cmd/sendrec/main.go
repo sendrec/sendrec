@@ -48,6 +48,11 @@ func main() {
 	if err := store.EnsureBucket(ctx); err != nil {
 		log.Fatalf("storage bucket check failed: %v", err)
 	}
+
+	baseURL := getEnv("BASE_URL", "http://localhost:8080")
+	if err := store.SetCORS(ctx, []string{baseURL}); err != nil {
+		log.Printf("warning: failed to set storage CORS: %v", err)
+	}
 	log.Println("storage bucket ready")
 
 	var webFS fs.FS
