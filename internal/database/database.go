@@ -33,6 +33,10 @@ func (db *DB) Close() {
 	db.Pool.Close()
 }
 
+func (db *DB) Ping(ctx context.Context) error {
+	return db.Pool.Ping(ctx)
+}
+
 func (db *DB) Migrate(databaseURL string) error {
 	source, err := iofs.New(migrations.FS, ".")
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -20,12 +20,12 @@ type contextKey string
 const userIDKey contextKey = "userID"
 
 type Handler struct {
-	db            *pgxpool.Pool
+	db            database.DBTX
 	jwtSecret     string
 	secureCookies bool
 }
 
-func NewHandler(db *pgxpool.Pool, jwtSecret string, secureCookies bool) *Handler {
+func NewHandler(db database.DBTX, jwtSecret string, secureCookies bool) *Handler {
 	return &Handler{db: db, jwtSecret: jwtSecret, secureCookies: secureCookies}
 }
 

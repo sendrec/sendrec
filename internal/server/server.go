@@ -1,10 +1,10 @@
 package server
 
 import (
+	"context"
 	"io/fs"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -12,40 +12,52 @@ import (
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/ratelimit"
-	"github.com/sendrec/sendrec/internal/storage"
 	"github.com/sendrec/sendrec/internal/video"
 )
 
+type Pinger interface {
+	Ping(ctx context.Context) error
+}
+
+type Config struct {
+	DB        database.DBTX
+	Pinger    Pinger
+	Storage   video.ObjectStorage
+	WebFS     fs.FS
+	JWTSecret string
+	BaseURL   string
+}
+
 type Server struct {
 	router       chi.Router
-	db           *database.DB
+	pinger       Pinger
 	authHandler  *auth.Handler
 	videoHandler *video.Handler
 	webFS        fs.FS
 }
 
-func New(db *database.DB, store *storage.Storage, webFS fs.FS) *Server {
+func New(cfg Config) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	s := &Server{router: r, db: db, webFS: webFS}
+	s := &Server{router: r, pinger: cfg.Pinger, webFS: cfg.WebFS}
 
-	if db != nil {
-		jwtSecret := os.Getenv("JWT_SECRET")
+	if cfg.DB != nil {
+		jwtSecret := cfg.JWTSecret
 		if jwtSecret == "" {
 			jwtSecret = "dev-secret-change-in-production"
 			log.Println("WARNING: using default JWT secret, set JWT_SECRET in production")
 		}
 
-		baseURL := os.Getenv("BASE_URL")
+		baseURL := cfg.BaseURL
 		if baseURL == "" {
 			baseURL = "http://localhost:8080"
 		}
 
 		secureCookies := strings.HasPrefix(baseURL, "https://")
-		s.authHandler = auth.NewHandler(db.Pool, jwtSecret, secureCookies)
-		s.videoHandler = video.NewHandler(db.Pool, store, baseURL)
+		s.authHandler = auth.NewHandler(cfg.DB, jwtSecret, secureCookies)
+		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL)
 	}
 
 	s.routes()
@@ -90,8 +102,8 @@ func (s *Server) routes() {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if s.db != nil {
-		if err := s.db.Pool.Ping(r.Context()); err != nil {
+	if s.pinger != nil {
+		if err := s.pinger.Ping(r.Context()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			w.Write([]byte(`{"status":"unhealthy","error":"database unreachable"}`))
 			return
