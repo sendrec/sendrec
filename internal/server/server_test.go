@@ -34,6 +34,10 @@ func (m *mockStorage) DeleteObject(ctx context.Context, key string) error {
 	return nil
 }
 
+func (m *mockStorage) HeadObject(ctx context.Context, key string) (int64, string, error) {
+	return 1024, "video/webm", nil
+}
+
 // --- Helpers ---
 
 func newServerWithoutDB() *server.Server {
@@ -57,7 +61,7 @@ func newServerWithDB(t *testing.T) (*server.Server, pgxmock.PgxPoolIface) {
 		Pinger:    &mockPinger{err: nil},
 		Storage:   &mockStorage{},
 		JWTSecret: "test-secret",
-		BaseURL:   "http://localhost:8080",
+		BaseURL:   "https://localhost:8080",
 	})
 	return srv, mock
 }
@@ -257,6 +261,21 @@ func TestVideoCreateRouteRequiresAuth(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401 for unauthenticated video create, got %d", rec.Code)
 	}
+}
+
+func TestVideoRoutesRateLimited(t *testing.T) {
+	srv, _ := newServerWithDB(t)
+
+	var lastCode int
+	for i := 0; i < 30; i++ {
+		rec := executeRequestWithBody(srv, http.MethodPost, "/api/videos/", "{}")
+		lastCode = rec.Code
+		if lastCode == http.StatusTooManyRequests {
+			return
+		}
+	}
+
+	t.Errorf("expected 429 after bursts, last status %d", lastCode)
 }
 
 func TestVideoListRouteRequiresAuth(t *testing.T) {
