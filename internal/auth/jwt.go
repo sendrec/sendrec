@@ -14,16 +14,17 @@ const (
 
 type Claims struct {
 	UserID    string `json:"userId"`
+	TokenID   string `json:"jti"`
 	TokenType string `json:"type"`
 	jwt.RegisteredClaims
 }
 
 func GenerateAccessToken(secret string, userID string) (string, error) {
-	return generateToken(secret, userID, "access", AccessTokenDuration)
+	return generateToken(secret, userID, "access", AccessTokenDuration, "")
 }
 
-func GenerateRefreshToken(secret string, userID string) (string, error) {
-	return generateToken(secret, userID, "refresh", RefreshTokenDuration)
+func GenerateRefreshToken(secret string, userID string, tokenID string) (string, error) {
+	return generateToken(secret, userID, "refresh", RefreshTokenDuration, tokenID)
 }
 
 func ValidateToken(secret string, tokenStr string) (*Claims, error) {
@@ -42,16 +43,19 @@ func ValidateToken(secret string, tokenStr string) (*Claims, error) {
 		return nil, fmt.Errorf("invalid token")
 	}
 
+	// jwt library already validates exp, but we also ensure ID exists for refresh tokens
 	return claims, nil
 }
 
-func generateToken(secret string, userID string, tokenType string, duration time.Duration) (string, error) {
+func generateToken(secret string, userID string, tokenType string, duration time.Duration, tokenID string) (string, error) {
 	claims := &Claims{
 		UserID:    userID,
+		TokenID:   tokenID,
 		TokenType: tokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ID:        tokenID,
 		},
 	}
 

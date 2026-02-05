@@ -77,7 +77,9 @@ export function Recorder({ onRecordingComplete }: RecorderProps) {
 
       recorder.start(1000);
       setRecordingState("recording");
-    } catch {
+    } catch (err) {
+      console.error("Screen capture failed", err);
+      alert("Screen recording was blocked or failed. Please allow screen capture and try again.");
       stopAllStreams();
     }
   }

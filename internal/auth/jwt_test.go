@@ -33,7 +33,7 @@ func TestGenerateAccessToken_SetsAccessType(t *testing.T) {
 }
 
 func TestGenerateRefreshToken_SetsRefreshType(t *testing.T) {
-	token, err := GenerateRefreshToken("test-secret", "user-123")
+	token, err := GenerateRefreshToken("test-secret", "user-123", "token-id-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestAccessToken_HasCorrectDuration(t *testing.T) {
 }
 
 func TestRefreshToken_HasCorrectDuration(t *testing.T) {
-	token, _ := GenerateRefreshToken("test-secret", "user-123")
+	token, _ := GenerateRefreshToken("test-secret", "user-123", "token-id-2")
 
 	claims, err := ValidateToken("test-secret", token)
 	if err != nil {

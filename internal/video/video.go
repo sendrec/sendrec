@@ -23,13 +23,14 @@ type ObjectStorage interface {
 }
 
 type Handler struct {
-	db      database.DBTX
-	storage ObjectStorage
-	baseURL string
+	db             database.DBTX
+	storage        ObjectStorage
+	baseURL        string
+	maxUploadBytes int64
 }
 
-func NewHandler(db database.DBTX, s ObjectStorage, baseURL string) *Handler {
-	return &Handler{db: db, storage: s, baseURL: baseURL}
+func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64) *Handler {
+	return &Handler{db: db, storage: s, baseURL: baseURL, maxUploadBytes: maxUploadBytes}
 }
 
 type createRequest struct {
@@ -61,10 +62,10 @@ type updateRequest struct {
 }
 
 type watchResponse struct {
-	Title    string `json:"title"`
-	VideoURL string `json:"videoUrl"`
-	Duration int    `json:"duration"`
-	Creator  string `json:"creator"`
+	Title     string `json:"title"`
+	VideoURL  string `json:"videoUrl"`
+	Duration  int    `json:"duration"`
+	Creator   string `json:"creator"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -82,6 +83,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.FileSize <= 0 {
+		httputil.WriteError(w, http.StatusBadRequest, "fileSize must be positive")
+		return
+	}
+
+	if h.maxUploadBytes > 0 && req.FileSize > h.maxUploadBytes {
+		httputil.WriteError(w, http.StatusBadRequest, "file too large")
 		return
 	}
 
@@ -292,7 +303,6 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: createdAt.Format(time.RFC3339),
 	})
 }
-
 
 func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())

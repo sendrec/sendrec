@@ -20,12 +20,13 @@ type Pinger interface {
 }
 
 type Config struct {
-	DB        database.DBTX
-	Pinger    Pinger
-	Storage   video.ObjectStorage
-	WebFS     fs.FS
-	JWTSecret string
-	BaseURL   string
+	DB             database.DBTX
+	Pinger         Pinger
+	Storage        video.ObjectStorage
+	WebFS          fs.FS
+	JWTSecret      string
+	BaseURL        string
+	MaxUploadBytes int64
 }
 
 type Server struct {
@@ -46,11 +47,7 @@ func New(cfg Config) *Server {
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
 		if jwtSecret == "" {
-			if cfg.BaseURL != "" && strings.HasPrefix(cfg.BaseURL, "https://") {
-				log.Fatal("JWT_SECRET is required in production")
-			}
-			jwtSecret = "dev-secret-change-in-production"
-			log.Println("WARNING: using default JWT secret, set JWT_SECRET in production")
+			log.Fatal("JWT_SECRET is required; set the environment variable")
 		}
 
 		baseURL := cfg.BaseURL
@@ -60,7 +57,7 @@ func New(cfg Config) *Server {
 
 		secureCookies := strings.HasPrefix(baseURL, "https://")
 		s.authHandler = auth.NewHandler(cfg.DB, jwtSecret, secureCookies)
-		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL)
+		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes)
 	}
 
 	s.routes()

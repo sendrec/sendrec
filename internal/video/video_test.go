@@ -134,7 +134,7 @@ func TestCreate_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -193,7 +193,7 @@ func TestCreate_DefaultTitleWhenEmpty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -235,7 +235,7 @@ func TestCreate_InvalidJSONBody(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
@@ -261,7 +261,7 @@ func TestCreate_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -308,7 +308,7 @@ func TestCreate_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadErr: errors.New("s3 unavailable")}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -357,7 +357,7 @@ func TestUpdate_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET status`).
@@ -389,7 +389,7 @@ func TestUpdate_InvalidStatus(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
 
 	body, _ := json.Marshal(updateRequest{Status: "processing"})
@@ -418,7 +418,7 @@ func TestUpdate_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "nonexistent-id"
 
 	mock.ExpectExec(`UPDATE videos SET status`).
@@ -455,7 +455,7 @@ func TestUpdate_InvalidJSON(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
 
 	r := chi.NewRouter()
@@ -482,7 +482,7 @@ func TestUpdate_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET status`).
@@ -521,7 +521,7 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -592,7 +592,7 @@ func TestList_ShareURLIncludesBaseURL(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
@@ -638,7 +638,7 @@ func TestList_EmptyList(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at, share_expires_at`).
 		WithArgs(testUserID, 50, 0).
@@ -683,7 +683,7 @@ func TestList_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at, share_expires_at`).
 		WithArgs(testUserID, 50, 0).
@@ -720,7 +720,7 @@ func TestDelete_Success(t *testing.T) {
 
 	deleteCalled := make(chan string, 1)
 	storage := &mockStorage{deleteCalled: deleteCalled}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
 	fileKey := "recordings/user-1/abc.webm"
 
@@ -760,7 +760,7 @@ func TestDelete_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
@@ -798,7 +798,7 @@ func TestWatch_Success(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -857,7 +857,7 @@ func TestWatch_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	shareToken := "nonexistent12"
 
@@ -894,7 +894,7 @@ func TestWatch_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -937,7 +937,7 @@ func TestWatch_ExpiredLink(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -983,7 +983,7 @@ func TestNewHandler_SetsFields(t *testing.T) {
 	storage := &mockStorage{}
 	baseURL := "https://example.com"
 
-	handler := NewHandler(mock, storage, baseURL)
+	handler := NewHandler(mock, storage, baseURL, 0)
 
 	if handler.db != mock {
 		t.Error("expected db to be set")
@@ -1006,7 +1006,7 @@ func TestCreate_FileKeyContainsUserIDAndShareToken(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -1067,7 +1067,7 @@ func TestWatchPage_Success(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1126,7 +1126,7 @@ func TestWatchPage_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	shareToken := "nonexistent12"
 
@@ -1158,7 +1158,7 @@ func TestWatchPage_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1200,7 +1200,7 @@ func TestWatchPage_ExpiredLink(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1244,7 +1244,7 @@ func TestExtend_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
@@ -1274,7 +1274,7 @@ func TestExtend_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "nonexistent-id"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
@@ -1309,7 +1309,7 @@ func TestExtend_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL)
+	handler := NewHandler(mock, storage, testBaseURL, 0)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).

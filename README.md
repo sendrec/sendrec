@@ -49,6 +49,13 @@ make test
 - **Storage:** S3-compatible object storage (MinIO for dev, Hetzner Object Storage for prod)
 - **Deployment:** Docker Compose
 
+### Key environment variables
+- `DATABASE_URL` – required
+- `JWT_SECRET` – required
+- `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` (defaults to EU region)
+- `BASE_URL` – used for CORS and share links
+- `MAX_UPLOAD_BYTES` – max allowed upload size (bytes), defaults to 500MB
+
 ## Architecture
 
 Single Go binary that:

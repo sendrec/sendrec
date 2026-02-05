@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -26,7 +27,13 @@ func main() {
 		log.Fatal("DATABASE_URL is required")
 	}
 
-	ctx := context.Background()
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET is required")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	db, err := database.Connect(ctx, databaseURL)
 	if err != nil {
@@ -45,6 +52,8 @@ func main() {
 		Bucket:         getEnv("S3_BUCKET", "sendrec"),
 		AccessKey:      getEnv("S3_ACCESS_KEY", "minioadmin"),
 		SecretKey:      getEnv("S3_SECRET_KEY", "minioadmin"),
+		Region:         getEnv("S3_REGION", "eu-central-1"),
+		MaxUploadBytes: getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
 	})
 	if err != nil {
 		log.Fatalf("storage initialization failed: %v", err)
@@ -55,7 +64,14 @@ func main() {
 	}
 
 	baseURL := getEnv("BASE_URL", "http://localhost:8080")
-	if err := store.SetCORS(ctx, []string{baseURL}); err != nil {
+
+	corsOrigins := []string{baseURL}
+	// Allow Vite dev server uploads during local development.
+	if baseURL == "http://localhost:8080" {
+		corsOrigins = append(corsOrigins, "http://localhost:5173")
+	}
+
+	if err := store.SetCORS(ctx, corsOrigins); err != nil {
 		log.Printf("warning: failed to set storage CORS: %v", err)
 	}
 	log.Println("storage bucket ready")
@@ -68,15 +84,14 @@ func main() {
 		log.Println("no embedded frontend found, SPA serving disabled")
 	}
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-
 	srv := server.New(server.Config{
-		DB:        db.Pool,
-		Pinger:    db,
-		Storage:   store,
-		WebFS:     webFS,
-		JWTSecret: jwtSecret,
-		BaseURL:   baseURL,
+		DB:             db.Pool,
+		Pinger:         db,
+		Storage:        store,
+		WebFS:          webFS,
+		JWTSecret:      jwtSecret,
+		BaseURL:        baseURL,
+		MaxUploadBytes: getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
 	})
 
 	httpServer := &http.Server{
@@ -108,6 +123,15 @@ func main() {
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return fallback
+}
+
+func getEnvInt64(key string, fallback int64) int64 {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return parsed
+		}
 	}
 	return fallback
 }
