@@ -294,7 +294,7 @@ func TestVideoListRouteRequiresAuth(t *testing.T) {
 func TestWatchRouteRegisteredWithDB(t *testing.T) {
 	srv, mock := newServerWithDB(t)
 
-	mock.ExpectQuery("SELECT v.title, v.duration, v.file_key").
+	mock.ExpectQuery("SELECT v.id, v.title, v.duration, v.file_key").
 		WithArgs("some-token").
 		WillReturnError(errors.New("no rows"))
 

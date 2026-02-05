@@ -3,12 +3,14 @@ package video
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -59,7 +61,9 @@ type listItem struct {
 	ShareToken     string `json:"shareToken"`
 	ShareURL       string `json:"shareUrl"`
 	CreatedAt      string `json:"createdAt"`
-	ShareExpiresAt string `json:"shareExpiresAt"`
+	ShareExpiresAt  string `json:"shareExpiresAt"`
+	ViewCount       int64  `json:"viewCount"`
+	UniqueViewCount int64  `json:"uniqueViewCount"`
 }
 
 type updateRequest struct {
@@ -244,10 +248,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.Query(r.Context(),
-		`SELECT id, title, status, duration, share_token, created_at, share_expires_at
-		 FROM videos
-		 WHERE user_id = $1 AND status != 'deleted'
-		 ORDER BY created_at DESC
+		`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at,
+		    (SELECT COUNT(*) FROM video_views vv WHERE vv.video_id = v.id) AS view_count,
+		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count
+		 FROM videos v
+		 WHERE v.user_id = $1 AND v.status != 'deleted'
+		 ORDER BY v.created_at DESC
 		 LIMIT $2 OFFSET $3`,
 		userID, limit, offset,
 	)
@@ -262,7 +268,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var item listItem
 		var createdAt time.Time
 		var shareExpiresAt time.Time
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -331,6 +337,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	shareToken := chi.URLParam(r, "shareToken")
 
+	var videoID string
 	var title string
 	var duration int
 	var fileKey string
@@ -339,12 +346,12 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var shareExpiresAt time.Time
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at
+		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status = 'ready'`,
 		shareToken,
-	).Scan(&title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt)
+	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -354,6 +361,17 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
 	}
+
+	go func() {
+		ip := clientIP(r)
+		hash := viewerHash(ip, r.UserAgent())
+		if _, err := h.db.Exec(context.Background(),
+			`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
+			videoID, hash,
+		); err != nil {
+			log.Printf("failed to record view for %s: %v", videoID, err)
+		}
+	}()
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)
 	if err != nil {
@@ -368,6 +386,21 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		Creator:   creator,
 		CreatedAt: createdAt.Format(time.RFC3339),
 	})
+}
+
+func viewerHash(ip, userAgent string) string {
+	h := sha256.Sum256([]byte(ip + "|" + userAgent))
+	return fmt.Sprintf("%x", h[:8])
+}
+
+func clientIP(r *http.Request) string {
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		if first, _, ok := strings.Cut(forwarded, ","); ok {
+			return strings.TrimSpace(first)
+		}
+		return strings.TrimSpace(forwarded)
+	}
+	return r.RemoteAddr
 }
 
 func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
