@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 
 interface Video {
@@ -60,22 +61,46 @@ export function Library() {
   if (videos.length === 0) {
     return (
       <div style={{ maxWidth: 800, margin: "80px auto", padding: 24, textAlign: "center" }}>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>No recordings yet.</p>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 16, marginBottom: 16 }}>No recordings yet.</p>
+        <Link
+          to="/"
+          style={{
+            background: "var(--color-accent)",
+            color: "var(--color-text)",
+            borderRadius: 8,
+            padding: "10px 24px",
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: "none",
+          }}
+        >
+          Create your first recording
+        </Link>
       </div>
     );
   }
 
   return (
     <div style={{ maxWidth: 800, margin: "40px auto", padding: 24 }}>
-      <h1
-        style={{
-          color: "var(--color-text)",
-          fontSize: 24,
-          marginBottom: 24,
-        }}
-      >
-        Library
-      </h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
+          Library
+        </h1>
+        <Link
+          to="/"
+          style={{
+            background: "var(--color-accent)",
+            color: "var(--color-text)",
+            borderRadius: 8,
+            padding: "8px 20px",
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: "none",
+          }}
+        >
+          New Recording
+        </Link>
+      </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {videos.map((video) => (
@@ -93,7 +118,10 @@ export function Library() {
             }}
           >
             <div style={{ minWidth: 0, flex: 1 }}>
-              <p
+              <a
+                href={`/watch/${video.shareToken}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   fontWeight: 600,
                   fontSize: 15,
@@ -102,10 +130,12 @@ export function Library() {
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
+                  display: "block",
+                  textDecoration: "none",
                 }}
               >
                 {video.title}
-              </p>
+              </a>
               <p
                 style={{
                   color: "var(--color-text-secondary)",

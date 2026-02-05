@@ -66,10 +66,14 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
 </head>
 <body>
     <div class="container">
-        <video controls autoplay>
+        <video id="player" controls>
             <source src="{{.VideoURL}}" type="video/webm">
             Your browser does not support video playback.
         </video>
+        <script>
+            var v = document.getElementById('player');
+            v.play().catch(function() { v.muted = true; v.play(); });
+        </script>
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
         <p class="branding">Shared via <a href="https://sendrec.eu">SendRec</a> — open-source video messaging</p>
