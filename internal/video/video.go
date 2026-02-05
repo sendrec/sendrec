@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -55,6 +56,7 @@ type listItem struct {
 
 type updateRequest struct {
 	Status string `json:"status"`
+	Title  string `json:"title"`
 }
 
 type watchResponse struct {
@@ -129,38 +131,77 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Status != "ready" {
+	if req.Status != "" && req.Status != "ready" {
 		httputil.WriteError(w, http.StatusBadRequest, "status can only be set to ready")
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET status = $1, updated_at = now()
-		 WHERE id = $2 AND user_id = $3 AND status = 'uploading'`,
-		req.Status, videoID, userID,
-	)
-	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video")
+	if req.Status == "" && req.Title == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "nothing to update")
 		return
 	}
 
-	if tag.RowsAffected() == 0 {
-		httputil.WriteError(w, http.StatusNotFound, "video not found")
-		return
+	if req.Status == "ready" {
+		tag, err := h.db.Exec(r.Context(),
+			`UPDATE videos SET status = $1, updated_at = now()
+			 WHERE id = $2 AND user_id = $3 AND status = 'uploading'`,
+			req.Status, videoID, userID,
+		)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update video")
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			httputil.WriteError(w, http.StatusNotFound, "video not found")
+			return
+		}
+	}
+
+	if req.Title != "" {
+		tag, err := h.db.Exec(r.Context(),
+			`UPDATE videos SET title = $1, updated_at = now()
+			 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
+			req.Title, videoID, userID,
+		)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update video")
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			httputil.WriteError(w, http.StatusNotFound, "video not found")
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
+const defaultPageSize = 50
+const maxPageSize = 100
+
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
+
+	limit := defaultPageSize
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+	}
+	if limit > maxPageSize {
+		limit = maxPageSize
+	}
+
+	offset := 0
+	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && o > 0 {
+		offset = o
+	}
 
 	rows, err := h.db.Query(r.Context(),
 		`SELECT id, title, status, duration, share_token, created_at
 		 FROM videos
 		 WHERE user_id = $1 AND status != 'deleted'
-		 ORDER BY created_at DESC`,
-		userID,
+		 ORDER BY created_at DESC
+		 LIMIT $2 OFFSET $3`,
+		userID, limit, offset,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to list videos")

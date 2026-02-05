@@ -526,7 +526,7 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 
 	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at`).
-		WithArgs(testUserID).
+		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
 			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at"}).
 				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt).
@@ -594,7 +594,7 @@ func TestList_ShareURLIncludesBaseURL(t *testing.T) {
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 
 	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at`).
-		WithArgs(testUserID).
+		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
 			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at"}).
 				AddRow("video-1", "My Video", "ready", 90, shareToken, createdAt),
@@ -636,7 +636,7 @@ func TestList_EmptyList(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL)
 
 	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at`).
-		WithArgs(testUserID).
+		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
 			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at"}),
 		)
@@ -681,7 +681,7 @@ func TestList_DatabaseError(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL)
 
 	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at`).
-		WithArgs(testUserID).
+		WithArgs(testUserID, 50, 0).
 		WillReturnError(errors.New("connection reset"))
 
 	r := chi.NewRouter()

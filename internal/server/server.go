@@ -46,6 +46,9 @@ func New(cfg Config) *Server {
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
 		if jwtSecret == "" {
+			if cfg.BaseURL != "" && strings.HasPrefix(cfg.BaseURL, "https://") {
+				log.Fatal("JWT_SECRET is required in production")
+			}
 			jwtSecret = "dev-secret-change-in-production"
 			log.Println("WARNING: using default JWT secret, set JWT_SECRET in production")
 		}

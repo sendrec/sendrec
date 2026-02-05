@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -70,7 +71,13 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := r.RemoteAddr
 		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			ip = forwarded
+			// Use only the first IP (the client IP set by the trusted reverse proxy).
+			// Subsequent IPs in the chain may be spoofed by the client.
+			if first, _, ok := strings.Cut(forwarded, ","); ok {
+				ip = strings.TrimSpace(first)
+			} else {
+				ip = strings.TrimSpace(forwarded)
+			}
 		}
 
 		if !l.allow(ip) {
