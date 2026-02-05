@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/server"
 	"github.com/sendrec/sendrec/internal/storage"
+	"github.com/sendrec/sendrec/web"
 )
 
 func main() {
@@ -48,7 +50,15 @@ func main() {
 	}
 	log.Println("storage bucket ready")
 
-	srv := server.New(db, store)
+	var webFS fs.FS
+	if sub, err := fs.Sub(web.DistFS, "dist"); err == nil {
+		webFS = sub
+		log.Println("embedded frontend loaded")
+	} else {
+		log.Println("no embedded frontend found, SPA serving disabled")
+	}
+
+	srv := server.New(db, store, webFS)
 
 	log.Printf("sendrec listening on :%s", port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), srv); err != nil {
