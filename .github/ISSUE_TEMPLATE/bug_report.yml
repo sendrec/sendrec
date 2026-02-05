@@ -1,0 +1,75 @@
+name: Bug Report
+description: Report a bug in SendRec
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: When I click record, the browser shows a permission error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      placeholder: Recording should start after granting permission.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to dashboard
+        2. Click "New Recording"
+        3. Grant screen permission
+        4. See error
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Frontend (React)
+        - Backend (Go API)
+        - Storage (S3/MinIO)
+        - Database
+        - Docker / Deployment
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment type
+      options:
+        - Docker Compose (self-hosted)
+        - Built from source
+        - Managed (app.sendrec.eu)
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, Go version, Node version — whatever is relevant.
+      placeholder: "macOS 15, Chrome 132, Go 1.25, Node 24"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste any error output, browser console logs, or server logs.
+      render: shell
+    validations:
+      required: false
