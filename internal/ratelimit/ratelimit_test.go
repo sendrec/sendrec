@@ -111,7 +111,7 @@ func TestMiddlewareReturns200WhenAllowed(t *testing.T) {
 
 	handler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 
 	request := httptest.NewRequest(http.MethodGet, "/", nil)

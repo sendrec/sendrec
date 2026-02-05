@@ -77,7 +77,7 @@ func (l *Limiter) Middleware(next http.Handler) http.Handler {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "10")
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"too many requests"}`))
+			_, _ = w.Write([]byte(`{"error":"too many requests"}`))
 			return
 		}
 

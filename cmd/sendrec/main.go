@@ -40,10 +40,11 @@ func main() {
 	log.Println("database migrations applied")
 
 	store, err := storage.New(ctx, storage.Config{
-		Endpoint:  getEnv("S3_ENDPOINT", "http://localhost:9000"),
-		Bucket:    getEnv("S3_BUCKET", "sendrec"),
-		AccessKey: getEnv("S3_ACCESS_KEY", "minioadmin"),
-		SecretKey: getEnv("S3_SECRET_KEY", "minioadmin"),
+		Endpoint:       getEnv("S3_ENDPOINT", "http://localhost:9000"),
+		PublicEndpoint: os.Getenv("S3_PUBLIC_ENDPOINT"),
+		Bucket:         getEnv("S3_BUCKET", "sendrec"),
+		AccessKey:      getEnv("S3_ACCESS_KEY", "minioadmin"),
+		SecretKey:      getEnv("S3_SECRET_KEY", "minioadmin"),
 	})
 	if err != nil {
 		log.Fatalf("storage initialization failed: %v", err)
