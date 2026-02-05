@@ -275,6 +275,26 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, items)
 }
 
+func deleteWithRetry(ctx context.Context, storage ObjectStorage, key string, maxAttempts int) error {
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+		lastErr = storage.DeleteObject(ctx, key)
+		if lastErr == nil {
+			return nil
+		}
+		log.Printf("delete attempt %d/%d failed for %s: %v", attempt+1, maxAttempts, key, lastErr)
+	}
+	return fmt.Errorf("all %d delete attempts failed for %s: %w", maxAttempts, key, lastErr)
+}
+
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
@@ -292,8 +312,16 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
-		if err := h.storage.DeleteObject(context.Background(), fileKey); err != nil {
-			log.Printf("async delete failed for %s: %v", fileKey, err)
+		ctx := context.Background()
+		if err := deleteWithRetry(ctx, h.storage, fileKey, 3); err != nil {
+			log.Printf("all delete retries failed for %s: %v", fileKey, err)
+			return
+		}
+		if _, err := h.db.Exec(ctx,
+			`UPDATE videos SET file_purged_at = now() WHERE file_key = $1`,
+			fileKey,
+		); err != nil {
+			log.Printf("failed to mark file_purged_at for %s: %v", fileKey, err)
 		}
 	}()
 

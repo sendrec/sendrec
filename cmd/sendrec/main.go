@@ -16,6 +16,7 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/server"
 	"github.com/sendrec/sendrec/internal/storage"
+	"github.com/sendrec/sendrec/internal/video"
 	"github.com/sendrec/sendrec/web"
 )
 
@@ -90,9 +91,14 @@ func main() {
 		Storage:        store,
 		WebFS:          webFS,
 		JWTSecret:      jwtSecret,
-		BaseURL:        baseURL,
-		MaxUploadBytes: getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
+		BaseURL:         baseURL,
+		MaxUploadBytes:  getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
+		S3PublicEndpoint: os.Getenv("S3_PUBLIC_ENDPOINT"),
 	})
+
+	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	defer cleanupCancel()
+	video.StartCleanupLoop(cleanupCtx, db.Pool, store, 10*time.Minute)
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
