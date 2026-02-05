@@ -11,6 +11,8 @@ interface Video {
   shareUrl: string;
   createdAt: string;
   shareExpiresAt: string;
+  viewCount: number;
+  uniqueViewCount: number;
 }
 
 function formatDuration(seconds: number): string {
@@ -168,6 +170,18 @@ export function Library() {
                 {video.status === "uploading" && (
                   <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
                     uploading...
+                  </span>
+                )}
+                {video.status === "ready" && video.viewCount > 0 && (
+                  <span style={{ marginLeft: 8 }}>
+                    &middot; {video.viewCount === video.uniqueViewCount
+                      ? `${video.viewCount} view${video.viewCount !== 1 ? "s" : ""}`
+                      : `${video.viewCount} views (${video.uniqueViewCount} unique)`}
+                  </span>
+                )}
+                {video.status === "ready" && video.viewCount === 0 && (
+                  <span style={{ color: "var(--color-text-secondary)", marginLeft: 8, opacity: 0.6 }}>
+                    &middot; No views yet
                   </span>
                 )}
                 {video.status === "ready" && (() => {
