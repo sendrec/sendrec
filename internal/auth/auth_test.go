@@ -27,6 +27,22 @@ func newTestHandler(t *testing.T) (*Handler, pgxmock.PgxPoolIface) {
 	return handler, mock
 }
 
+func expectInsertRefreshToken(mock pgxmock.PgxPoolIface, userID string) {
+	mock.ExpectExec(`INSERT INTO refresh_tokens`).
+		WithArgs(pgxmock.AnyArg(), userID, pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+}
+
+func expectRefreshValidation(mock pgxmock.PgxPoolIface, tokenID, userID string, expiresAt time.Time, revoked bool) {
+	mock.ExpectQuery(`SELECT revoked, expires_at FROM refresh_tokens`).
+		WithArgs(tokenID, userID).
+		WillReturnRows(pgxmock.NewRows([]string{"revoked", "expires_at"}).
+			AddRow(revoked, expiresAt))
+	mock.ExpectExec(`UPDATE refresh_tokens SET revoked`).
+		WithArgs(tokenID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+}
+
 func decodeTokenResponse(t *testing.T, rec *httptest.ResponseRecorder) tokenResponse {
 	t.Helper()
 	var resp tokenResponse
@@ -65,6 +81,8 @@ func TestRegister_Success(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO users`).
 		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
+
+	expectInsertRefreshToken(mock, "user-uuid-1")
 
 	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(body))
@@ -276,6 +294,8 @@ func TestLogin_Success(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "password"}).
 			AddRow("user-uuid-1", string(hashedPassword)))
 
+	expectInsertRefreshToken(mock, "user-uuid-1")
+
 	body := `{"email":"alice@example.com","password":"correctpassword"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -413,10 +433,14 @@ func TestRefresh_Success(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	refreshToken, err := GenerateRefreshToken(testSecret, "user-uuid-1")
+	tokenID := "rt-123"
+	refreshToken, err := GenerateRefreshToken(testSecret, "user-uuid-1", tokenID)
 	if err != nil {
 		t.Fatalf("generate refresh token: %v", err)
 	}
+
+	expectRefreshValidation(mock, tokenID, "user-uuid-1", time.Now().Add(RefreshTokenDuration), false)
+	expectInsertRefreshToken(mock, "user-uuid-1")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
 	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: refreshToken})
@@ -683,7 +707,7 @@ func TestMiddleware_RefreshTokenUsedAsAccess(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	refreshToken, _ := GenerateRefreshToken(testSecret, "user-uuid-1")
+	refreshToken, _ := GenerateRefreshToken(testSecret, "user-uuid-1", "rt-middleware")
 
 	nextCalled := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -769,6 +793,8 @@ func TestRegister_RefreshCookieAttributes(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO users`).
 		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
+
+	expectInsertRefreshToken(mock, "user-uuid-1")
 
 	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(body))

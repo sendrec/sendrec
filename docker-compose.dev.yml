@@ -7,11 +7,13 @@ services:
     environment:
       - DATABASE_URL=postgres://sendrec:${SENDREC_DB_PASSWORD:-sendrec}@postgres:5432/sendrec?sslmode=disable
       - S3_ENDPOINT=http://minio:9000
+      - S3_REGION=${S3_REGION:-eu-central-1}
       - S3_BUCKET=recordings
       - S3_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
       - S3_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - BASE_URL=${BASE_URL:-http://localhost:8080}
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-524288000}
     depends_on:
       postgres:
         condition: service_healthy

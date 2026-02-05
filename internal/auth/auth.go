@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -43,7 +45,6 @@ type loginRequest struct {
 type tokenResponse struct {
 	AccessToken string `json:"accessToken"`
 }
-
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
@@ -93,15 +94,9 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := GenerateAccessToken(h.jwtSecret, userID)
+	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
 	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate access token")
-		return
-	}
-
-	refreshToken, err := GenerateRefreshToken(h.jwtSecret, userID)
-	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate refresh token")
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate tokens")
 		return
 	}
 
@@ -135,15 +130,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := GenerateAccessToken(h.jwtSecret, userID)
+	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
 	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate access token")
-		return
-	}
-
-	refreshToken, err := GenerateRefreshToken(h.jwtSecret, userID)
-	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate refresh token")
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate tokens")
 		return
 	}
 
@@ -169,15 +158,24 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := GenerateAccessToken(h.jwtSecret, claims.UserID)
-	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate access token")
+	if claims.TokenID == "" {
+		httputil.WriteError(w, http.StatusUnauthorized, "invalid refresh token")
 		return
 	}
 
-	refreshToken, err := GenerateRefreshToken(h.jwtSecret, claims.UserID)
+	if err := h.validateStoredRefreshToken(r.Context(), claims.UserID, claims.TokenID); err != nil {
+		httputil.WriteError(w, http.StatusUnauthorized, "invalid refresh token")
+		return
+	}
+
+	if err := h.revokeRefreshToken(r.Context(), claims.TokenID); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to revoke refresh token")
+		return
+	}
+
+	accessToken, refreshToken, err := h.issueTokens(r.Context(), claims.UserID)
 	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate refresh token")
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate tokens")
 		return
 	}
 
@@ -186,6 +184,11 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	if cookie, err := r.Cookie("refresh_token"); err == nil {
+		if claims, err := ValidateToken(h.jwtSecret, cookie.Value); err == nil && claims.TokenType == "refresh" && claims.TokenID != "" {
+			_ = h.revokeRefreshToken(r.Context(), claims.TokenID)
+		}
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
@@ -243,4 +246,54 @@ func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   int(RefreshTokenDuration / time.Second),
 	})
+}
+
+func (h *Handler) issueTokens(ctx context.Context, userID string) (accessToken, refreshToken string, err error) {
+	tokenID, err := newTokenID()
+	if err != nil {
+		return "", "", err
+	}
+
+	expiresAt := time.Now().Add(RefreshTokenDuration)
+	if _, err := h.db.Exec(ctx, "INSERT INTO refresh_tokens (token_id, user_id, expires_at, revoked) VALUES ($1, $2, $3, false)", tokenID, userID, expiresAt); err != nil {
+		return "", "", err
+	}
+
+	accessToken, err = GenerateAccessToken(h.jwtSecret, userID)
+	if err != nil {
+		return "", "", err
+	}
+
+	refreshToken, err = GenerateRefreshToken(h.jwtSecret, userID, tokenID)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
+}
+
+func (h *Handler) validateStoredRefreshToken(ctx context.Context, userID, tokenID string) error {
+	var revoked bool
+	var expiresAt time.Time
+	err := h.db.QueryRow(ctx, "SELECT revoked, expires_at FROM refresh_tokens WHERE token_id = $1 AND user_id = $2", tokenID, userID).Scan(&revoked, &expiresAt)
+	if err != nil {
+		return err
+	}
+	if revoked || time.Now().After(expiresAt) {
+		return errors.New("token revoked or expired")
+	}
+	return nil
+}
+
+func (h *Handler) revokeRefreshToken(ctx context.Context, tokenID string) error {
+	_, err := h.db.Exec(ctx, "UPDATE refresh_tokens SET revoked = true, revoked_at = now() WHERE token_id = $1", tokenID)
+	return err
+}
+
+func newTokenID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
 }

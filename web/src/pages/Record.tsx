@@ -17,6 +17,7 @@ export function Record() {
   async function handleRecordingComplete(blob: Blob, duration: number) {
     setUploading(true);
     setError(null);
+    let videoId: string | null = null;
 
     try {
       const now = new Date();
@@ -31,11 +32,17 @@ export function Record() {
         throw new Error("Failed to create video");
       }
 
-      await fetch(result.uploadUrl, {
+      videoId = result.id;
+
+      const uploadResp = await fetch(result.uploadUrl, {
         method: "PUT",
         body: blob,
         headers: { "Content-Type": "video/webm" },
       });
+
+      if (!uploadResp.ok) {
+        throw new Error("Upload failed");
+      }
 
       await apiFetch(`/api/videos/${result.id}`, {
         method: "PATCH",
@@ -44,6 +51,10 @@ export function Record() {
 
       setShareUrl(`${window.location.origin}/watch/${result.shareToken}`);
     } catch (err) {
+      if (videoId) {
+        // Best-effort cleanup so “uploading” rows don’t accumulate.
+        apiFetch(`/api/videos/${videoId}`, { method: "DELETE" }).catch(() => {});
+      }
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);

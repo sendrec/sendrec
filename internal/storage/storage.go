@@ -16,6 +16,7 @@ type Storage struct {
 	client    *s3.Client
 	presigner *s3.PresignClient
 	bucket    string
+	maxBytes  int64
 }
 
 type Config struct {
@@ -25,11 +26,12 @@ type Config struct {
 	AccessKey      string
 	SecretKey      string
 	Region         string
+	MaxUploadBytes int64
 }
 
 func New(ctx context.Context, cfg Config) (*Storage, error) {
 	if cfg.Region == "" {
-		cfg.Region = "us-east-1"
+		cfg.Region = "eu-central-1"
 	}
 
 	awsCfg, err := config.LoadDefaultConfig(ctx,
@@ -61,14 +63,21 @@ func New(ctx context.Context, cfg Config) (*Storage, error) {
 		client:    client,
 		presigner: presigner,
 		bucket:    cfg.Bucket,
+		maxBytes:  cfg.MaxUploadBytes,
 	}, nil
 }
 
 func (s *Storage) GenerateUploadURL(ctx context.Context, key string, contentType string, contentLength int64, expiry time.Duration) (string, error) {
+	if s == nil {
+		return "", fmt.Errorf("storage not initialized")
+	}
 	input := &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(key),
 		ContentType: aws.String(contentType),
+	}
+	if s.uploadLimit() > 0 && contentLength > s.uploadLimit() {
+		return "", fmt.Errorf("file too large: %d > %d", contentLength, s.uploadLimit())
 	}
 	if contentLength > 0 {
 		input.ContentLength = aws.Int64(contentLength)
@@ -103,6 +112,10 @@ func (s *Storage) DeleteObject(ctx context.Context, key string) error {
 	}
 
 	return nil
+}
+
+func (s *Storage) uploadLimit() int64 {
+	return s.maxBytes
 }
 
 func (s *Storage) SetCORS(ctx context.Context, allowedOrigins []string) error {
