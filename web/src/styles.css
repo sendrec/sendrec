@@ -1,0 +1,36 @@
+:root {
+  --color-bg: #0a1628;
+  --color-surface: #111d32;
+  --color-border: #1e2d45;
+  --color-text: #ffffff;
+  --color-text-secondary: #8892a4;
+  --color-accent: #00b67a;
+  --color-accent-hover: #00a06b;
+  --color-error: #ef4444;
+}
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+}
