@@ -524,13 +524,14 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
+	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at`).
+	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at, share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt).
-				AddRow("video-2", "Second Video", "uploading", 60, "xyz789uvwklm", createdAt.Add(-time.Hour)),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, shareExpiresAt).
+				AddRow("video-2", "Second Video", "uploading", 60, "xyz789uvwklm", createdAt.Add(-time.Hour), shareExpiresAt),
 		)
 
 	r := chi.NewRouter()
@@ -570,6 +571,9 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	if items[0].CreatedAt != createdAt.Format(time.RFC3339) {
 		t.Errorf("expected first item created_at %q, got %q", createdAt.Format(time.RFC3339), items[0].CreatedAt)
 	}
+	if items[0].ShareExpiresAt != shareExpiresAt.Format(time.RFC3339) {
+		t.Errorf("expected first item share_expires_at %q, got %q", shareExpiresAt.Format(time.RFC3339), items[0].ShareExpiresAt)
+	}
 
 	if items[1].ID != "video-2" {
 		t.Errorf("expected second item ID %q, got %q", "video-2", items[1].ID)
@@ -592,12 +596,13 @@ func TestList_ShareURLIncludesBaseURL(t *testing.T) {
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
+	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at`).
+	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at, share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at"}).
-				AddRow("video-1", "My Video", "ready", 90, shareToken, createdAt),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at"}).
+				AddRow("video-1", "My Video", "ready", 90, shareToken, createdAt, shareExpiresAt),
 		)
 
 	r := chi.NewRouter()
@@ -635,10 +640,10 @@ func TestList_EmptyList(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL)
 
-	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at`).
+	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at, share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at"}),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at"}),
 		)
 
 	r := chi.NewRouter()
@@ -680,7 +685,7 @@ func TestList_DatabaseError(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL)
 
-	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at`).
+	mock.ExpectQuery(`SELECT id, title, status, duration, share_token, created_at, share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnError(errors.New("connection reset"))
 
@@ -798,11 +803,13 @@ func TestWatch_Success(t *testing.T) {
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 
-	mock.ExpectQuery(`SELECT v.title, v.duration, v.file_key, u.name, v.created_at`).
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "duration", "file_key", "name", "created_at"}).
-				AddRow("Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt),
+			pgxmock.NewRows([]string{"title", "duration", "file_key", "name", "created_at", "share_expires_at"}).
+				AddRow("Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt),
 		)
 
 	r := chi.NewRouter()
@@ -854,7 +861,7 @@ func TestWatch_VideoNotFound(t *testing.T) {
 
 	shareToken := "nonexistent12"
 
-	mock.ExpectQuery(`SELECT v.title, v.duration, v.file_key, u.name, v.created_at`).
+	mock.ExpectQuery(`SELECT v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -892,11 +899,13 @@ func TestWatch_StorageError(t *testing.T) {
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 
-	mock.ExpectQuery(`SELECT v.title, v.duration, v.file_key, u.name, v.created_at`).
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "duration", "file_key", "name", "created_at"}).
-				AddRow("Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt),
+			pgxmock.NewRows([]string{"title", "duration", "file_key", "name", "created_at", "share_expires_at"}).
+				AddRow("Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt),
 		)
 
 	r := chi.NewRouter()
@@ -913,6 +922,48 @@ func TestWatch_StorageError(t *testing.T) {
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
 	if errMsg != "failed to generate video URL" {
 		t.Errorf("expected error %q, got %q", "failed to generate video URL", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestWatch_ExpiredLink(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
+	handler := NewHandler(mock, storage, testBaseURL)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(-1 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title", "duration", "file_key", "name", "created_at", "share_expires_at"}).
+				AddRow("Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt),
+		)
+
+	r := chi.NewRouter()
+	r.Get("/watch/{shareToken}", handler.Watch)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/"+shareToken, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusGone {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusGone, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "link expired" {
+		t.Errorf("expected error %q, got %q", "link expired", errMsg)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -1020,12 +1071,13 @@ func TestWatchPage_Success(t *testing.T) {
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at`).
+	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at"}).
-				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt),
 		)
 
 	r := chi.NewRouter()
@@ -1078,7 +1130,7 @@ func TestWatchPage_VideoNotFound(t *testing.T) {
 
 	shareToken := "nonexistent12"
 
-	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at`).
+	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -1110,12 +1162,13 @@ func TestWatchPage_StorageError(t *testing.T) {
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at`).
+	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at"}).
-				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt),
 		)
 
 	r := chi.NewRouter()
@@ -1132,6 +1185,150 @@ func TestWatchPage_StorageError(t *testing.T) {
 	body := rec.Body.String()
 	if !strings.Contains(body, "internal server error") {
 		t.Errorf("expected response body to contain %q, got %q", "internal server error", body)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestWatchPage_ExpiredLink(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
+	handler := NewHandler(mock, storage, testBaseURL)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(-1 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt),
+		)
+
+	r := chi.NewRouter()
+	r.Get("/watch/{shareToken}", handler.WatchPage)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/"+shareToken, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusGone {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusGone, rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "This link has expired") {
+		t.Errorf("expected response body to contain %q, got %q", "This link has expired", body)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- Extend Tests ---
+
+func TestExtend_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL)
+	videoID := "video-123"
+
+	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
+		WithArgs(videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/extend", handler.Extend)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos/"+videoID+"/extend", nil))
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestExtend_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL)
+	videoID := "nonexistent-id"
+
+	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
+		WithArgs(videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/extend", handler.Extend)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos/"+videoID+"/extend", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "video not found" {
+		t.Errorf("expected error %q, got %q", "video not found", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestExtend_DatabaseError(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL)
+	videoID := "video-123"
+
+	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
+		WithArgs(videoID, testUserID).
+		WillReturnError(errors.New("database timeout"))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/extend", handler.Extend)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos/"+videoID+"/extend", nil))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d: %s", http.StatusInternalServerError, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "failed to extend share link" {
+		t.Errorf("expected error %q, got %q", "failed to extend share link", errMsg)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

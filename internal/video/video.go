@@ -45,13 +45,14 @@ type createResponse struct {
 }
 
 type listItem struct {
-	ID         string `json:"id"`
-	Title      string `json:"title"`
-	Status     string `json:"status"`
-	Duration   int    `json:"duration"`
-	ShareToken string `json:"shareToken"`
-	ShareURL   string `json:"shareUrl"`
-	CreatedAt  string `json:"createdAt"`
+	ID             string `json:"id"`
+	Title          string `json:"title"`
+	Status         string `json:"status"`
+	Duration       int    `json:"duration"`
+	ShareToken     string `json:"shareToken"`
+	ShareURL       string `json:"shareUrl"`
+	CreatedAt      string `json:"createdAt"`
+	ShareExpiresAt string `json:"shareExpiresAt"`
 }
 
 type updateRequest struct {
@@ -196,7 +197,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.Query(r.Context(),
-		`SELECT id, title, status, duration, share_token, created_at
+		`SELECT id, title, status, duration, share_token, created_at, share_expires_at
 		 FROM videos
 		 WHERE user_id = $1 AND status != 'deleted'
 		 ORDER BY created_at DESC
@@ -213,11 +214,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item listItem
 		var createdAt time.Time
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt); err != nil {
+		var shareExpiresAt time.Time
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
 		item.CreatedAt = createdAt.Format(time.RFC3339)
+		item.ShareExpiresAt = shareExpiresAt.Format(time.RFC3339)
 		item.ShareURL = h.baseURL + "/watch/" + item.ShareToken
 		items = append(items, item)
 	}
@@ -256,16 +259,22 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var fileKey string
 	var creator string
 	var createdAt time.Time
+	var shareExpiresAt time.Time
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.title, v.duration, v.file_key, u.name, v.created_at
+		`SELECT v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status = 'ready'`,
 		shareToken,
-	).Scan(&title, &duration, &fileKey, &creator, &createdAt)
+	).Scan(&title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	if time.Now().After(shareExpiresAt) {
+		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
 	}
 
@@ -284,3 +293,24 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+
+func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now()
+		 WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to extend share link")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
