@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { Recorder } from "../components/Recorder";
 
@@ -140,20 +141,55 @@ export function Record() {
           </button>
         </div>
 
-        <button
-          onClick={recordAnother}
-          style={{
-            background: "transparent",
-            color: "var(--color-accent)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: "10px 24px",
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          Record another
-        </button>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <a
+            href={shareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Watch video
+          </a>
+
+          <button
+            onClick={recordAnother}
+            style={{
+              background: "transparent",
+              color: "var(--color-accent)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            Record another
+          </button>
+
+          <Link
+            to="/library"
+            style={{
+              background: "transparent",
+              color: "var(--color-text-secondary)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Go to Library
+          </Link>
+        </div>
       </div>
     );
   }
