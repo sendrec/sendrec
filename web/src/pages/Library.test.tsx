@@ -208,6 +208,20 @@ describe("Library", () => {
     });
   });
 
+  it("shows usage indicator in empty state when limits are active", async () => {
+    mockFetch([], {
+      maxVideosPerMonth: 25,
+      maxVideoDurationSeconds: 300,
+      videosUsedThisMonth: 10,
+    });
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("No recordings yet.")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/10 \/ 25 videos this month/i)).toBeInTheDocument();
+  });
+
   it("hides usage indicator when limits are unlimited", async () => {
     mockFetch([makeVideo()]);
     renderLibrary();

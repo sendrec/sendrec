@@ -143,6 +143,11 @@ export function Library() {
         >
           Create your first recording
         </Link>
+        {limits && limits.maxVideosPerMonth > 0 && (
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginTop: 16 }}>
+            {limits.videosUsedThisMonth} / {limits.maxVideosPerMonth} videos this month
+          </p>
+        )}
       </div>
     );
   }
