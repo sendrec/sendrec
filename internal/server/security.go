@@ -28,11 +28,11 @@ func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
 			w.Header().Set("Referrer-Policy", "no-referrer")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-			w.Header().Set("Permissions-Policy", "camera=(), microphone=(self), geolocation=(), screen-wake-lock=(), display-capture=(self)")
+			w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(), screen-wake-lock=(), display-capture=(self)")
 
 			csp := fmt.Sprintf(
-				"default-src 'self'; img-src 'self' data:; media-src 'self' data:%s; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'%s;",
-				storageSuffix, nonce, nonce, storageSuffix,
+				"default-src 'self'; img-src 'self' data:%s; media-src 'self' data:%s; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'%s;",
+				storageSuffix, storageSuffix, nonce, nonce, storageSuffix,
 			)
 			w.Header().Set("Content-Security-Policy", csp)
 
