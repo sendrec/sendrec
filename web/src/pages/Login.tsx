@@ -33,6 +33,9 @@ export function Login() {
       onSubmit={handleLogin}
       footer={
         <>
+          <Link to="/forgot-password" style={{ display: "block", marginBottom: 8 }}>
+            Forgot password?
+          </Link>
           Don&apos;t have an account? <Link to="/register">Sign up</Link>
         </>
       }
