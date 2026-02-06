@@ -61,7 +61,16 @@ async function apiFetch<T>(
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, response.statusText);
+    let message = response.statusText;
+    try {
+      const body = await response.json();
+      if (body.error) {
+        message = body.error;
+      }
+    } catch {
+      // response body wasn't JSON, keep statusText
+    }
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204) {

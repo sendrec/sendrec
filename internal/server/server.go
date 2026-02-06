@@ -93,6 +93,14 @@ func (s *Server) routes() {
 		})
 	}
 
+	if s.authHandler != nil {
+		s.router.Route("/api/user", func(r chi.Router) {
+			r.Use(s.authHandler.Middleware)
+			r.Get("/", s.authHandler.GetUser)
+			r.Patch("/", s.authHandler.UpdateUser)
+		})
+	}
+
 	if s.videoHandler != nil {
 		videoLimiter := ratelimit.NewLimiter(2, 10)
 		s.router.Route("/api/videos", func(r chi.Router) {
