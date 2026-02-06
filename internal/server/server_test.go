@@ -38,6 +38,14 @@ func (m *mockStorage) HeadObject(ctx context.Context, key string) (int64, string
 	return 1024, "video/webm", nil
 }
 
+func (m *mockStorage) DownloadToFile(_ context.Context, _ string, _ string) error {
+	return nil
+}
+
+func (m *mockStorage) UploadFile(_ context.Context, _ string, _ string, _ string) error {
+	return nil
+}
+
 // --- Helpers ---
 
 func newServerWithoutDB() *server.Server {

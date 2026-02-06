@@ -17,11 +17,11 @@ func TestPurgeOrphanedFiles_DeletesUnpurgedFiles(t *testing.T) {
 
 	storage := &mockStorage{}
 
-	mock.ExpectQuery(`SELECT file_key FROM videos`).
+	mock.ExpectQuery(`SELECT file_key, thumbnail_key FROM videos`).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"file_key"}).
-				AddRow("recordings/user-1/abc.webm").
-				AddRow("recordings/user-2/def.webm"),
+			pgxmock.NewRows([]string{"file_key", "thumbnail_key"}).
+				AddRow("recordings/user-1/abc.webm", (*string)(nil)).
+				AddRow("recordings/user-2/def.webm", (*string)(nil)),
 		)
 
 	mock.ExpectExec(`UPDATE videos SET file_purged_at`).
@@ -51,8 +51,8 @@ func TestPurgeOrphanedFiles_SkipsWhenNoOrphans(t *testing.T) {
 
 	storage := &mockStorage{}
 
-	mock.ExpectQuery(`SELECT file_key FROM videos`).
-		WillReturnRows(pgxmock.NewRows([]string{"file_key"}))
+	mock.ExpectQuery(`SELECT file_key, thumbnail_key FROM videos`).
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key"}))
 
 	PurgeOrphanedFiles(context.Background(), mock, storage)
 
@@ -73,10 +73,10 @@ func TestPurgeOrphanedFiles_HandlesStorageFailure(t *testing.T) {
 
 	storage := &mockStorage{deleteErr: errors.New("s3 down")}
 
-	mock.ExpectQuery(`SELECT file_key FROM videos`).
+	mock.ExpectQuery(`SELECT file_key, thumbnail_key FROM videos`).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"file_key"}).
-				AddRow("recordings/user-1/abc.webm"),
+			pgxmock.NewRows([]string{"file_key", "thumbnail_key"}).
+				AddRow("recordings/user-1/abc.webm", (*string)(nil)),
 		)
 
 	// No UPDATE expectation — storage fails so purge mark should be skipped
@@ -96,7 +96,7 @@ func TestPurgeOrphanedFiles_HandlesDBQueryError(t *testing.T) {
 
 	storage := &mockStorage{}
 
-	mock.ExpectQuery(`SELECT file_key FROM videos`).
+	mock.ExpectQuery(`SELECT file_key, thumbnail_key FROM videos`).
 		WillReturnError(errors.New("connection refused"))
 
 	// Should not panic

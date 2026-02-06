@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 go build -o sendrec ./cmd/sendrec
 
 # Stage 3: Final image
 FROM alpine:3.21
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates ffmpeg
 RUN addgroup -S sendrec && adduser -S sendrec -G sendrec
 WORKDIR /app
 COPY --from=backend /app/sendrec .

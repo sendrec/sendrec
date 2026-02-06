@@ -24,6 +24,8 @@ type ObjectStorage interface {
 	GenerateDownloadURL(ctx context.Context, key string, expiry time.Duration) (string, error)
 	DeleteObject(ctx context.Context, key string) error
 	HeadObject(ctx context.Context, key string) (int64, string, error)
+	DownloadToFile(ctx context.Context, key string, destPath string) error
+	UploadFile(ctx context.Context, key string, filePath string, contentType string) error
 }
 
 type Handler struct {
@@ -54,16 +56,17 @@ type createResponse struct {
 }
 
 type listItem struct {
-	ID             string `json:"id"`
-	Title          string `json:"title"`
-	Status         string `json:"status"`
-	Duration       int    `json:"duration"`
-	ShareToken     string `json:"shareToken"`
-	ShareURL       string `json:"shareUrl"`
-	CreatedAt      string `json:"createdAt"`
+	ID              string `json:"id"`
+	Title           string `json:"title"`
+	Status          string `json:"status"`
+	Duration        int    `json:"duration"`
+	ShareToken      string `json:"shareToken"`
+	ShareURL        string `json:"shareUrl"`
+	CreatedAt       string `json:"createdAt"`
 	ShareExpiresAt  string `json:"shareExpiresAt"`
 	ViewCount       int64  `json:"viewCount"`
 	UniqueViewCount int64  `json:"uniqueViewCount"`
+	ThumbnailURL    string `json:"thumbnailUrl,omitempty"`
 }
 
 type updateRequest struct {
@@ -72,11 +75,12 @@ type updateRequest struct {
 }
 
 type watchResponse struct {
-	Title     string `json:"title"`
-	VideoURL  string `json:"videoUrl"`
-	Duration  int    `json:"duration"`
-	Creator   string `json:"creator"`
-	CreatedAt string `json:"createdAt"`
+	Title        string `json:"title"`
+	VideoURL     string `json:"videoUrl"`
+	Duration     int    `json:"duration"`
+	Creator      string `json:"creator"`
+	CreatedAt    string `json:"createdAt"`
+	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
 }
 
 func generateShareToken() (string, error) {
@@ -166,11 +170,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Status == "ready" {
 		var fileKey string
 		var fileSize int64
+		var shareToken string
 		err := h.db.QueryRow(r.Context(),
-			`SELECT file_key, file_size FROM videos
+			`SELECT file_key, file_size, share_token FROM videos
 			 WHERE id = $1 AND user_id = $2 AND status = 'uploading'`,
 			videoID, userID,
-		).Scan(&fileKey, &fileSize)
+		).Scan(&fileKey, &fileSize, &shareToken)
 		if err != nil {
 			httputil.WriteError(w, http.StatusNotFound, "video not found")
 			return
@@ -207,6 +212,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusNotFound, "video not found")
 			return
 		}
+
+		go GenerateThumbnail(
+			context.Background(),
+			h.db, h.storage,
+			videoID, fileKey,
+			thumbnailFileKey(userID, shareToken),
+		)
 	}
 
 	if req.Title != "" {
@@ -250,7 +262,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(),
 		`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at,
 		    (SELECT COUNT(*) FROM video_views vv WHERE vv.video_id = v.id) AS view_count,
-		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count
+		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
+		    v.thumbnail_key
 		 FROM videos v
 		 WHERE v.user_id = $1 AND v.status != 'deleted'
 		 ORDER BY v.created_at DESC
@@ -268,13 +281,20 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var item listItem
 		var createdAt time.Time
 		var shareExpiresAt time.Time
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount); err != nil {
+		var thumbnailKey *string
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
 		item.CreatedAt = createdAt.Format(time.RFC3339)
 		item.ShareExpiresAt = shareExpiresAt.Format(time.RFC3339)
 		item.ShareURL = h.baseURL + "/watch/" + item.ShareToken
+		if thumbnailKey != nil {
+			thumbURL, err := h.storage.GenerateDownloadURL(r.Context(), *thumbnailKey, 1*time.Hour)
+			if err == nil {
+				item.ThumbnailURL = thumbURL
+			}
+		}
 		items = append(items, item)
 	}
 
@@ -306,12 +326,13 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	videoID := chi.URLParam(r, "id")
 
 	var fileKey string
+	var thumbnailKey *string
 	err := h.db.QueryRow(r.Context(),
 		`UPDATE videos SET status = 'deleted', updated_at = now()
 		 WHERE id = $1 AND user_id = $2 AND status != 'deleted'
-		 RETURNING file_key`,
+		 RETURNING file_key, thumbnail_key`,
 		videoID, userID,
-	).Scan(&fileKey)
+	).Scan(&fileKey, &thumbnailKey)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -322,6 +343,11 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		if err := deleteWithRetry(ctx, h.storage, fileKey, 3); err != nil {
 			log.Printf("all delete retries failed for %s: %v", fileKey, err)
 			return
+		}
+		if thumbnailKey != nil {
+			if err := deleteWithRetry(ctx, h.storage, *thumbnailKey, 3); err != nil {
+				log.Printf("thumbnail delete failed for %s: %v", *thumbnailKey, err)
+			}
 		}
 		if _, err := h.db.Exec(ctx,
 			`UPDATE videos SET file_purged_at = now() WHERE file_key = $1`,
@@ -345,13 +371,15 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var createdAt time.Time
 	var shareExpiresAt time.Time
 
+	var thumbnailKey *string
+
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at
+		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status = 'ready'`,
 		shareToken,
-	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt)
+	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -379,12 +407,20 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var thumbnailURL string
+	if thumbnailKey != nil {
+		if u, err := h.storage.GenerateDownloadURL(r.Context(), *thumbnailKey, 1*time.Hour); err == nil {
+			thumbnailURL = u
+		}
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, watchResponse{
-		Title:     title,
-		VideoURL:  videoURL,
-		Duration:  duration,
-		Creator:   creator,
-		CreatedAt: createdAt.Format(time.RFC3339),
+		Title:        title,
+		VideoURL:     videoURL,
+		Duration:     duration,
+		Creator:      creator,
+		CreatedAt:    createdAt.Format(time.RFC3339),
+		ThumbnailURL: thumbnailURL,
 	})
 }
 
