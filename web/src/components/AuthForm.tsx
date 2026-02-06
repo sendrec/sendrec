@@ -4,6 +4,7 @@ interface AuthFormProps {
   title: string;
   submitLabel: string;
   showName?: boolean;
+  showPasswordConfirm?: boolean;
   onSubmit: (data: {
     email: string;
     password: string;
@@ -16,18 +17,26 @@ export function AuthForm({
   title,
   submitLabel,
   showName,
+  showPasswordConfirm,
   onSubmit,
   footer,
 }: AuthFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError("");
+
+    if (showPasswordConfirm && password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -40,13 +49,7 @@ export function AuthForm({
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 400,
-        margin: "80px auto",
-        padding: 24,
-      }}
-    >
+    <main className="auth-container">
       <h1
         style={{
           color: "var(--color-text)",
@@ -131,7 +134,35 @@ export function AuthForm({
               fontSize: 14,
             }}
           />
+          {showPasswordConfirm && (
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
+              Must be at least 8 characters
+            </span>
+          )}
         </label>
+
+        {showPasswordConfirm && (
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
+              Confirm password
+            </span>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
+              style={{
+                background: "var(--color-bg)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 4,
+                color: "var(--color-text)",
+                padding: "8px 12px",
+                fontSize: 14,
+              }}
+            />
+          </label>
+        )}
 
         {error && (
           <p
@@ -172,6 +203,6 @@ export function AuthForm({
           {footer}
         </p>
       </form>
-    </div>
+    </main>
   );
 }

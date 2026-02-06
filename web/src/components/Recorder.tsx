@@ -96,6 +96,7 @@ export function Recorder({ onRecordingComplete }: RecorderProps) {
       <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
         <button
           onClick={startRecording}
+          aria-label="Start recording"
           style={{
             background: "var(--color-accent)",
             color: "var(--color-text)",
@@ -138,6 +139,7 @@ export function Recorder({ onRecordingComplete }: RecorderProps) {
 
         <button
           onClick={stopRecording}
+          aria-label="Stop recording"
           style={{
             background: "var(--color-error)",
             color: "var(--color-text)",

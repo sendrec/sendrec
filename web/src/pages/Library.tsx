@@ -43,6 +43,9 @@ function expiryLabel(shareExpiresAt: string): { text: string; expired: boolean }
 export function Library() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [extendingId, setExtendingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchVideos() {
@@ -60,23 +63,52 @@ export function Library() {
   }, []);
 
   async function deleteVideo(id: string) {
-    await apiFetch(`/api/videos/${id}`, { method: "DELETE" });
-    setVideos((prev) => prev.filter((v) => v.id !== id));
+    if (!window.confirm("Delete this recording? This cannot be undone.")) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await apiFetch(`/api/videos/${id}`, { method: "DELETE" });
+      setVideos((prev) => prev.filter((v) => v.id !== id));
+    } finally {
+      setDeletingId(null);
+    }
   }
 
-  function copyLink(shareUrl: string) {
-    navigator.clipboard.writeText(shareUrl);
+  async function copyLink(shareUrl: string, videoId: string) {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopiedId(videoId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // Fallback for browsers/contexts where clipboard API is unavailable
+      const textArea = document.createElement("textarea");
+      textArea.value = shareUrl;
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopiedId(videoId);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   }
 
   async function extendVideo(id: string) {
-    await apiFetch(`/api/videos/${id}/extend`, { method: "POST" });
-    const result = await apiFetch<Video[]>("/api/videos");
-    setVideos(result ?? []);
+    setExtendingId(id);
+    try {
+      await apiFetch(`/api/videos/${id}/extend`, { method: "POST" });
+      const result = await apiFetch<Video[]>("/api/videos");
+      setVideos(result ?? []);
+    } finally {
+      setExtendingId(null);
+    }
   }
 
   if (loading) {
     return (
-      <div style={{ maxWidth: 800, margin: "80px auto", padding: 24, textAlign: "center" }}>
+      <div className="page-container page-container--centered">
         <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Loading...</p>
       </div>
     );
@@ -84,7 +116,7 @@ export function Library() {
 
   if (videos.length === 0) {
     return (
-      <div style={{ maxWidth: 800, margin: "80px auto", padding: 24, textAlign: "center" }}>
+      <div className="page-container page-container--centered">
         <p style={{ color: "var(--color-text-secondary)", fontSize: 16, marginBottom: 16 }}>No recordings yet.</p>
         <Link
           to="/"
@@ -105,7 +137,7 @@ export function Library() {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: "40px auto", padding: 24 }}>
+    <div className="page-container">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
           Library
@@ -130,15 +162,13 @@ export function Library() {
         {videos.map((video) => (
           <div
             key={video.id}
+            className="video-card"
             style={{
               background: "var(--color-surface)",
               border: "1px solid var(--color-border)",
               borderRadius: 8,
               padding: 16,
-              display: "flex",
-              alignItems: "center",
               justifyContent: "space-between",
-              gap: 16,
             }}
           >
             {video.thumbnailUrl && (
@@ -210,11 +240,11 @@ export function Library() {
               </p>
             </div>
 
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <div className="video-card-actions">
               {video.status === "ready" && (
                 <>
                   <button
-                    onClick={() => copyLink(video.shareUrl)}
+                    onClick={() => copyLink(video.shareUrl, video.id)}
                     style={{
                       background: "var(--color-accent)",
                       color: "var(--color-text)",
@@ -224,10 +254,11 @@ export function Library() {
                       fontWeight: 600,
                     }}
                   >
-                    Copy link
+                    {copiedId === video.id ? "Copied!" : "Copy link"}
                   </button>
                   <button
                     onClick={() => extendVideo(video.id)}
+                    disabled={extendingId === video.id}
                     style={{
                       background: "transparent",
                       color: "var(--color-accent)",
@@ -236,15 +267,17 @@ export function Library() {
                       padding: "6px 14px",
                       fontSize: 13,
                       fontWeight: 600,
+                      opacity: extendingId === video.id ? 0.7 : 1,
                     }}
                   >
-                    Extend
+                    {extendingId === video.id ? "Extending..." : "Extend"}
                   </button>
                 </>
               )}
 
               <button
                 onClick={() => deleteVideo(video.id)}
+                disabled={deletingId === video.id}
                 style={{
                   background: "transparent",
                   color: "var(--color-error)",
@@ -253,9 +286,10 @@ export function Library() {
                   padding: "6px 14px",
                   fontSize: 13,
                   fontWeight: 600,
+                  opacity: deletingId === video.id ? 0.7 : 1,
                 }}
               >
-                Delete
+                {deletingId === video.id ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

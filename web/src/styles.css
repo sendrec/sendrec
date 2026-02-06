@@ -35,7 +35,79 @@ button {
   font: inherit;
 }
 
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 0;
+  border-color: var(--color-accent);
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+
+/* Responsive layout */
+.page-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 24px;
+}
+
+.page-container--centered {
+  margin-top: 80px;
+  text-align: center;
+}
+
+.auth-container {
+  max-width: 400px;
+  margin: 80px auto;
+  padding: 24px;
+}
+
+.video-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.video-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .page-container {
+    margin: 24px auto;
+    padding: 16px;
+  }
+
+  .page-container--centered {
+    margin-top: 48px;
+  }
+
+  .auth-container {
+    margin: 48px auto;
+    padding: 16px;
+  }
+
+  .video-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .video-card-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .video-card-actions button {
+    flex: 1;
+    min-width: 0;
+  }
 }

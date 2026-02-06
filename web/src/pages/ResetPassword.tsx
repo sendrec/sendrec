@@ -13,7 +13,7 @@ export function ResetPassword() {
 
   if (!token) {
     return (
-      <div style={{ maxWidth: 400, margin: "80px auto", padding: 24 }}>
+      <main className="auth-container">
         <div
           style={{
             background: "var(--color-surface)",
@@ -48,13 +48,13 @@ export function ResetPassword() {
             Request new reset link
           </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (success) {
     return (
-      <div style={{ maxWidth: 400, margin: "80px auto", padding: 24 }}>
+      <main className="auth-container">
         <div
           style={{
             background: "var(--color-surface)",
@@ -89,7 +89,7 @@ export function ResetPassword() {
             Sign in
           </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -130,7 +130,7 @@ export function ResetPassword() {
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: "80px auto", padding: 24 }}>
+    <main style={{ maxWidth: 400, margin: "80px auto", padding: 24 }}>
       <h1
         style={{
           color: "var(--color-text)",
@@ -237,6 +237,6 @@ export function ResetPassword() {
           </Link>
         </p>
       </form>
-    </div>
+    </main>
   );
 }

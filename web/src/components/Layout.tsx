@@ -46,16 +46,18 @@ export function Layout({ children }: LayoutProps) {
           borderBottom: "1px solid var(--color-border)",
         }}
       >
-        <span
+        <Link
+          to="/"
           style={{
             fontWeight: 700,
             fontSize: "1.125rem",
             color: "var(--color-text)",
             marginRight: 16,
+            textDecoration: "none",
           }}
         >
           SendRec
-        </span>
+        </Link>
 
         <Link to="/" style={isActive("/") ? activeLinkStyle : inactiveLinkStyle}>
           Record

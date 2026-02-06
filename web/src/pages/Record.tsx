@@ -61,10 +61,24 @@ export function Record() {
     }
   }
 
-  function copyShareUrl() {
-    if (shareUrl) {
-      navigator.clipboard.writeText(shareUrl);
+  const [copied, setCopied] = useState(false);
+
+  async function copyShareUrl() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = shareUrl;
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   function recordAnother() {
@@ -74,7 +88,7 @@ export function Record() {
 
   if (uploading) {
     return (
-      <div style={{ maxWidth: 800, margin: "80px auto", padding: 24, textAlign: "center" }}>
+      <div className="page-container page-container--centered">
         <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Uploading...</p>
       </div>
     );
@@ -82,7 +96,7 @@ export function Record() {
 
   if (error) {
     return (
-      <div style={{ maxWidth: 800, margin: "80px auto", padding: 24, textAlign: "center" }}>
+      <div className="page-container page-container--centered">
         <p style={{ color: "var(--color-error)", fontSize: 16, marginBottom: 16 }}>{error}</p>
         <button
           onClick={recordAnother}
@@ -103,7 +117,7 @@ export function Record() {
 
   if (shareUrl) {
     return (
-      <div style={{ maxWidth: 800, margin: "80px auto", padding: 24, textAlign: "center" }}>
+      <div className="page-container page-container--centered">
         <h2
           style={{
             color: "var(--color-text)",
@@ -148,7 +162,7 @@ export function Record() {
               whiteSpace: "nowrap",
             }}
           >
-            Copy link
+            {copied ? "Copied!" : "Copy link"}
           </button>
         </div>
 
@@ -206,7 +220,7 @@ export function Record() {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: "80px auto", padding: 24 }}>
+    <div className="page-container page-container--centered">
       <h1
         style={{
           color: "var(--color-text)",

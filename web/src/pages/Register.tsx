@@ -33,6 +33,7 @@ export function Register() {
       title="Create account"
       submitLabel="Create account"
       showName
+      showPasswordConfirm
       onSubmit={handleRegister}
       footer={
         <>

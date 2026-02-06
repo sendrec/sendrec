@@ -8,6 +8,7 @@ import { Record } from "./pages/Record";
 import { Register } from "./pages/Register";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
+import { NotFound } from "./pages/NotFound";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(!getAccessToken());
@@ -56,7 +57,7 @@ export function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

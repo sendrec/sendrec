@@ -25,7 +25,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div style={{ padding: "2rem", textAlign: "center" }}>
           <h1>Something went wrong</h1>
-          <p style={{ color: "#666", marginTop: "0.5rem" }}>
+          <p style={{ color: "var(--color-text-secondary)", marginTop: "0.5rem" }}>
             Please try refreshing the page.
           </p>
           <button
