@@ -164,7 +164,7 @@ func TestCreate_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -223,7 +223,7 @@ func TestCreate_DefaultTitleWhenEmpty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -265,7 +265,7 @@ func TestCreate_InvalidJSONBody(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
@@ -291,7 +291,7 @@ func TestCreate_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -338,7 +338,7 @@ func TestCreate_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadErr: errors.New("s3 unavailable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -377,6 +377,294 @@ func TestCreate_StorageError(t *testing.T) {
 	}
 }
 
+// --- Duration Limit Tests ---
+
+func TestCreate_RejectsDurationExceedingLimit(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300) // 5 min limit
+
+	body, _ := json.Marshal(createRequest{
+		Title:    "Long Video",
+		Duration: 301,
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if !strings.Contains(errMsg, "5 minutes") {
+		t.Errorf("expected error mentioning 5 minutes, got %q", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_AllowsDurationWithinLimit(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300)
+
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"Short Video",
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-ok"))
+
+	body, _ := json.Marshal(createRequest{
+		Title:    "Short Video",
+		Duration: 300,
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_AllowsAnyDurationWhenLimitIsZero(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0) // no limit
+
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"Very Long Video",
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-long"))
+
+	body, _ := json.Marshal(createRequest{
+		Title:    "Very Long Video",
+		Duration: 3600,
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- Monthly Video Limit Tests ---
+
+func TestCreate_RejectsWhenMonthlyLimitReached(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0) // 25/month limit
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(25))
+
+	body, _ := json.Marshal(createRequest{
+		Title:    "One Too Many",
+		Duration: 60,
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if !strings.Contains(errMsg, "25") {
+		t.Errorf("expected error mentioning limit of 25, got %q", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_AllowsWhenBelowMonthlyLimit(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0)
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(24))
+
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"Video 25",
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-25"))
+
+	body, _ := json.Marshal(createRequest{
+		Title:    "Video 25",
+		Duration: 60,
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_SkipsMonthlyCheckWhenLimitIsZero(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0) // no limit
+
+	// No ExpectQuery for COUNT — should not query at all
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"Unlimited Video",
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-unlimited"))
+
+	body, _ := json.Marshal(createRequest{
+		Title:    "Unlimited Video",
+		Duration: 60,
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_MonthlyLimitCountQueryError(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0)
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
+		WithArgs(testUserID).
+		WillReturnError(errors.New("db error"))
+
+	body, _ := json.Marshal(createRequest{
+		Title:    "Error Video",
+		Duration: 60,
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusInternalServerError, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
 // --- Update Tests ---
 
 func TestUpdate_Success(t *testing.T) {
@@ -387,7 +675,7 @@ func TestUpdate_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 100000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "video-123"
 	fileKey := "recordings/user/video.webm"
 	fileSize := int64(100000)
@@ -425,7 +713,7 @@ func TestUpdate_InvalidStatus(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "video-123"
 
 	body, _ := json.Marshal(updateRequest{Status: "processing"})
@@ -454,7 +742,7 @@ func TestUpdate_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT file_key, file_size, share_token FROM videos`).
@@ -491,7 +779,7 @@ func TestUpdate_InvalidJSON(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "video-123"
 
 	r := chi.NewRouter()
@@ -518,7 +806,7 @@ func TestUpdate_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT file_key, file_size, share_token FROM videos`).
@@ -561,7 +849,7 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -635,7 +923,7 @@ func TestList_ShareURLIncludesBaseURL(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
@@ -681,7 +969,7 @@ func TestList_EmptyList(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
@@ -726,7 +1014,7 @@ func TestList_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
@@ -760,7 +1048,7 @@ func TestList_IncludesViewCounts(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -811,7 +1099,7 @@ func TestList_IncludesThumbnailURL(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/thumb?signed=abc"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -862,7 +1150,7 @@ func TestDelete_Success(t *testing.T) {
 
 	deleteCalled := make(chan string, 1)
 	storage := &mockStorage{deleteCalled: deleteCalled}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "video-123"
 	fileKey := "recordings/user-1/abc.webm"
 
@@ -902,7 +1190,7 @@ func TestDelete_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
@@ -940,7 +1228,7 @@ func TestWatch_Success(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1011,7 +1299,7 @@ func TestWatch_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "nonexistent12"
 
@@ -1048,7 +1336,7 @@ func TestWatch_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1100,7 +1388,7 @@ func TestWatch_ExpiredLink(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1148,7 +1436,7 @@ func TestNewHandler_SetsFields(t *testing.T) {
 	storage := &mockStorage{}
 	baseURL := "https://example.com"
 
-	handler := NewHandler(mock, storage, baseURL, 0)
+	handler := NewHandler(mock, storage, baseURL, 0, 0, 0)
 
 	if handler.db != mock {
 		t.Error("expected db to be set")
@@ -1171,7 +1459,7 @@ func TestCreate_FileKeyContainsUserIDAndShareToken(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -1232,7 +1520,7 @@ func TestWatchPage_Success(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1291,7 +1579,7 @@ func TestWatchPage_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "nonexistent12"
 
@@ -1323,7 +1611,7 @@ func TestWatchPage_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1365,7 +1653,7 @@ func TestWatchPage_ExpiredLink(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1408,7 +1696,7 @@ func TestWatch_RecordsView(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1456,7 +1744,7 @@ func TestWatch_IncludesThumbnailURL(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1513,7 +1801,7 @@ func TestExtend_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
@@ -1543,7 +1831,7 @@ func TestExtend_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "nonexistent-id"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
@@ -1578,7 +1866,7 @@ func TestExtend_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
@@ -1624,7 +1912,7 @@ func TestWatchPage_ContainsNonceInStyleTag(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1663,7 +1951,7 @@ func TestWatchPage_ContainsNonceInScriptTag(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1698,7 +1986,7 @@ func TestWatchPage_ExpiredContainsNonce(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1738,7 +2026,7 @@ func TestWatchPage_ContainsPosterAndOGImage(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1788,7 +2076,7 @@ func TestWatchPage_NoPosterWhenNoThumbnail(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1952,7 +2240,7 @@ func TestDelete_MarksFilePurgedOnSuccess(t *testing.T) {
 
 	deleteCalled := make(chan string, 1)
 	storage := &mockStorage{deleteCalled: deleteCalled}
-	handler := NewHandler(mock, storage, testBaseURL, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
 	videoID := "video-123"
 	fileKey := "recordings/user-1/abc.webm"
 
@@ -1982,6 +2270,97 @@ func TestDelete_MarksFilePurgedOnSuccess(t *testing.T) {
 
 	// Give goroutine time to execute the UPDATE
 	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- Limits Endpoint Tests ---
+
+func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300)
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(12))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/videos/limits", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
+		MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
+		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.MaxVideosPerMonth != 25 {
+		t.Errorf("expected maxVideosPerMonth 25, got %d", resp.MaxVideosPerMonth)
+	}
+	if resp.MaxVideoDurationSeconds != 300 {
+		t.Errorf("expected maxVideoDurationSeconds 300, got %d", resp.MaxVideoDurationSeconds)
+	}
+	if resp.VideosUsedThisMonth != 12 {
+		t.Errorf("expected videosUsedThisMonth 12, got %d", resp.VideosUsedThisMonth)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+
+	// No ExpectQuery — should not query COUNT when unlimited
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/videos/limits", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
+		MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
+		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.MaxVideosPerMonth != 0 {
+		t.Errorf("expected maxVideosPerMonth 0, got %d", resp.MaxVideosPerMonth)
+	}
+	if resp.VideosUsedThisMonth != 0 {
+		t.Errorf("expected videosUsedThisMonth 0, got %d", resp.VideosUsedThisMonth)
+	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet pgxmock expectations: %v", err)

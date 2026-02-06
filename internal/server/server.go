@@ -20,15 +20,17 @@ type Pinger interface {
 }
 
 type Config struct {
-	DB              database.DBTX
-	Pinger          Pinger
-	Storage         video.ObjectStorage
-	WebFS           fs.FS
-	JWTSecret       string
-	BaseURL         string
-	MaxUploadBytes  int64
-	S3PublicEndpoint string
-	EmailSender     auth.EmailSender
+	DB                      database.DBTX
+	Pinger                  Pinger
+	Storage                 video.ObjectStorage
+	WebFS                   fs.FS
+	JWTSecret               string
+	BaseURL                 string
+	MaxUploadBytes          int64
+	MaxVideosPerMonth       int
+	MaxVideoDurationSeconds int
+	S3PublicEndpoint        string
+	EmailSender             auth.EmailSender
 }
 
 type Server struct {
@@ -66,7 +68,7 @@ func New(cfg Config) *Server {
 		if cfg.EmailSender != nil {
 			s.authHandler.SetEmailSender(cfg.EmailSender, baseURL)
 		}
-		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes)
+		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes, cfg.MaxVideosPerMonth, cfg.MaxVideoDurationSeconds)
 	}
 
 	s.routes()
@@ -107,6 +109,7 @@ func (s *Server) routes() {
 			r.Use(videoLimiter.Middleware)
 			r.Use(s.authHandler.Middleware)
 			r.Post("/", s.videoHandler.Create)
+			r.Get("/limits", s.videoHandler.Limits)
 			r.Get("/", s.videoHandler.List)
 			r.Patch("/{id}", s.videoHandler.Update)
 			r.Delete("/{id}", s.videoHandler.Delete)
