@@ -20,6 +20,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
     <meta property="og:type" content="video.other">
     <meta property="og:video" content="{{.VideoURL}}">
     <meta property="og:video:type" content="video/webm">
+    {{if .ThumbnailURL}}<meta property="og:image" content="{{.ThumbnailURL}}">{{end}}
     <meta property="og:site_name" content="SendRec">
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -68,7 +69,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
 </head>
 <body>
     <div class="container">
-        <video id="player" controls>
+        <video id="player" controls{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
             <source src="{{.VideoURL}}" type="video/webm">
             Your browser does not support video playback.
         </video>
@@ -125,11 +126,12 @@ var expiredPageTemplate = template.Must(template.New("expired").Parse(`<!DOCTYPE
 </html>`))
 
 type watchPageData struct {
-	Title    string
-	VideoURL string
-	Creator  string
-	Date     string
-	Nonce    string
+	Title        string
+	VideoURL     string
+	Creator      string
+	Date         string
+	Nonce        string
+	ThumbnailURL string
 }
 
 type expiredPageData struct {
@@ -144,14 +146,15 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var creator string
 	var createdAt time.Time
 	var shareExpiresAt time.Time
+	var thumbnailKey *string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at
+		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status = 'ready'`,
 		shareToken,
-	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt)
+	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -174,13 +177,21 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var thumbnailURL string
+	if thumbnailKey != nil {
+		if u, err := h.storage.GenerateDownloadURL(r.Context(), *thumbnailKey, 1*time.Hour); err == nil {
+			thumbnailURL = u
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := watchPageTemplate.Execute(w, watchPageData{
-		Title:    title,
-		VideoURL: videoURL,
-		Creator:  creator,
-		Date:     createdAt.Format("Jan 2, 2006"),
-		Nonce:    nonce,
+		Title:        title,
+		VideoURL:     videoURL,
+		Creator:      creator,
+		Date:         createdAt.Format("Jan 2, 2006"),
+		Nonce:        nonce,
+		ThumbnailURL: thumbnailURL,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

@@ -13,6 +13,7 @@ interface Video {
   shareExpiresAt: string;
   viewCount: number;
   uniqueViewCount: number;
+  thumbnailUrl?: string;
 }
 
 function formatDuration(seconds: number): string {
@@ -140,6 +141,20 @@ export function Library() {
               gap: 16,
             }}
           >
+            {video.thumbnailUrl && (
+              <img
+                src={video.thumbnailUrl}
+                alt=""
+                style={{
+                  width: 120,
+                  height: 68,
+                  objectFit: "cover",
+                  borderRadius: 4,
+                  flexShrink: 0,
+                  background: "var(--color-border)",
+                }}
+              />
+            )}
             <div style={{ minWidth: 0, flex: 1 }}>
               <a
                 href={`/watch/${video.shareToken}`}

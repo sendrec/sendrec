@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -172,5 +174,46 @@ func (s *Storage) EnsureBucket(ctx context.Context) error {
 		return fmt.Errorf("create bucket: %w", err)
 	}
 
+	return nil
+}
+
+func (s *Storage) DownloadToFile(ctx context.Context, key string, destPath string) error {
+	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("get object %s: %w", key, err)
+	}
+	defer out.Body.Close()
+
+	f, err := os.Create(destPath)
+	if err != nil {
+		return fmt.Errorf("create file %s: %w", destPath, err)
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, out.Body); err != nil {
+		return fmt.Errorf("write file %s: %w", destPath, err)
+	}
+	return nil
+}
+
+func (s *Storage) UploadFile(ctx context.Context, key string, filePath string, contentType string) error {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("open file %s: %w", filePath, err)
+	}
+	defer f.Close()
+
+	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(key),
+		Body:        f,
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		return fmt.Errorf("upload file %s: %w", key, err)
+	}
 	return nil
 }
