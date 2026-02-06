@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/email"
 	"github.com/sendrec/sendrec/internal/server"
 	"github.com/sendrec/sendrec/internal/storage"
 	"github.com/sendrec/sendrec/internal/video"
@@ -85,15 +86,23 @@ func main() {
 		log.Println("no embedded frontend found, SPA serving disabled")
 	}
 
+	emailClient := email.New(email.Config{
+		BaseURL:    os.Getenv("LISTMONK_URL"),
+		Username:   getEnv("LISTMONK_USER", "admin"),
+		Password:   os.Getenv("LISTMONK_PASSWORD"),
+		TemplateID: int(getEnvInt64("LISTMONK_TEMPLATE_ID", 0)),
+	})
+
 	srv := server.New(server.Config{
-		DB:             db.Pool,
-		Pinger:         db,
-		Storage:        store,
-		WebFS:          webFS,
-		JWTSecret:      jwtSecret,
+		DB:              db.Pool,
+		Pinger:          db,
+		Storage:         store,
+		WebFS:           webFS,
+		JWTSecret:       jwtSecret,
 		BaseURL:         baseURL,
 		MaxUploadBytes:  getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
 		S3PublicEndpoint: os.Getenv("S3_PUBLIC_ENDPOINT"),
+		EmailSender:     emailClient,
 	})
 
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
