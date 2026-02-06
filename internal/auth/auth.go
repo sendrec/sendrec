@@ -298,6 +298,77 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, response)
 }
 
+type resetPasswordRequest struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
+}
+
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req resetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Token == "" || req.Password == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "token and password are required")
+		return
+	}
+
+	if len(req.Password) < 8 {
+		httputil.WriteError(w, http.StatusBadRequest, "password must be at least 8 characters")
+		return
+	}
+
+	if len(req.Password) > 72 {
+		httputil.WriteError(w, http.StatusBadRequest, "password must be at most 72 characters")
+		return
+	}
+
+	tokenHash := hashResetToken(req.Token)
+
+	var userID string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT user_id FROM password_resets WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()",
+		tokenHash,
+	).Scan(&userID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid or expired reset link")
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"UPDATE password_resets SET used_at = now() WHERE token_hash = $1",
+		tokenHash,
+	); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to process reset")
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to hash password")
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"UPDATE users SET password = $1, updated_at = now() WHERE id = $2",
+		string(hashedPassword), userID,
+	); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to update password")
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"UPDATE refresh_tokens SET revoked = true, revoked_at = now() WHERE user_id = $1 AND revoked = false",
+		userID,
+	); err != nil {
+		log.Printf("reset-password: failed to revoke refresh tokens: %v", err)
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, messageResponse{Message: "Password updated successfully"})
+}
+
 func (h *Handler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
