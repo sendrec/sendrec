@@ -38,8 +38,8 @@ func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStor
 		return
 	}
 	tmpVideoPath := tmpVideo.Name()
-	tmpVideo.Close()
-	defer os.Remove(tmpVideoPath)
+	_ = tmpVideo.Close()
+	defer func() { _ = os.Remove(tmpVideoPath) }()
 
 	if err := storage.DownloadToFile(ctx, fileKey, tmpVideoPath); err != nil {
 		log.Printf("thumbnail: failed to download video %s: %v", videoID, err)
@@ -52,8 +52,8 @@ func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStor
 		return
 	}
 	tmpThumbPath := tmpThumb.Name()
-	tmpThumb.Close()
-	defer os.Remove(tmpThumbPath)
+	_ = tmpThumb.Close()
+	defer func() { _ = os.Remove(tmpThumbPath) }()
 
 	if err := extractFrame(tmpVideoPath, tmpThumbPath); err != nil {
 		log.Printf("thumbnail: ffmpeg failed for video %s: %v", videoID, err)

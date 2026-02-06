@@ -185,13 +185,13 @@ func (s *Storage) DownloadToFile(ctx context.Context, key string, destPath strin
 	if err != nil {
 		return fmt.Errorf("get object %s: %w", key, err)
 	}
-	defer out.Body.Close()
+	defer func() { _ = out.Body.Close() }()
 
 	f, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("create file %s: %w", destPath, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := io.Copy(f, out.Body); err != nil {
 		return fmt.Errorf("write file %s: %w", destPath, err)
@@ -204,7 +204,7 @@ func (s *Storage) UploadFile(ctx context.Context, key string, filePath string, c
 	if err != nil {
 		return fmt.Errorf("open file %s: %w", filePath, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
