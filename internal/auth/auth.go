@@ -3,9 +3,13 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -21,14 +25,25 @@ type contextKey string
 
 const userIDKey contextKey = "userID"
 
+type EmailSender interface {
+	SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error
+}
+
 type Handler struct {
 	db            database.DBTX
 	jwtSecret     string
 	secureCookies bool
+	emailSender   EmailSender
+	baseURL       string
 }
 
 func NewHandler(db database.DBTX, jwtSecret string, secureCookies bool) *Handler {
 	return &Handler{db: db, jwtSecret: jwtSecret, secureCookies: secureCookies}
+}
+
+func (h *Handler) SetEmailSender(sender EmailSender, baseURL string) {
+	h.emailSender = sender
+	h.baseURL = baseURL
 }
 
 type registerRequest struct {
@@ -44,6 +59,32 @@ type loginRequest struct {
 
 type tokenResponse struct {
 	AccessToken string `json:"accessToken"`
+}
+
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+type messageResponse struct {
+	Message string `json:"message"`
+}
+
+const resetTokenExpiry = 1 * time.Hour
+
+func generateResetToken() (raw string, hash string, err error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", "", fmt.Errorf("generate random bytes: %w", err)
+	}
+	raw = base64.RawURLEncoding.EncodeToString(b)
+	h := sha256.Sum256([]byte(raw))
+	hash = hex.EncodeToString(h[:])
+	return raw, hash, nil
+}
+
+func hashResetToken(raw string) string {
+	h := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(h[:])
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
@@ -199,6 +240,62 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 	})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req forgotPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Email == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	response := messageResponse{Message: "If an account with that email exists, we've sent a password reset link"}
+
+	var userID, userName string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT id, name FROM users WHERE email = $1", req.Email,
+	).Scan(&userID, &userName)
+	if err != nil {
+		httputil.WriteJSON(w, http.StatusOK, response)
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"UPDATE password_resets SET used_at = now() WHERE user_id = $1 AND used_at IS NULL",
+		userID,
+	); err != nil {
+		log.Printf("forgot-password: failed to invalidate old tokens: %v", err)
+	}
+
+	rawToken, tokenHash, err := generateResetToken()
+	if err != nil {
+		log.Printf("forgot-password: failed to generate token: %v", err)
+		httputil.WriteJSON(w, http.StatusOK, response)
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
+		tokenHash, userID, time.Now().Add(resetTokenExpiry),
+	); err != nil {
+		log.Printf("forgot-password: failed to store token: %v", err)
+		httputil.WriteJSON(w, http.StatusOK, response)
+		return
+	}
+
+	resetLink := h.baseURL + "/reset-password?token=" + rawToken
+	if h.emailSender != nil {
+		if err := h.emailSender.SendPasswordReset(r.Context(), req.Email, userName, resetLink); err != nil {
+			log.Printf("forgot-password: failed to send email: %v", err)
+		}
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, response)
 }
 
 func (h *Handler) Middleware(next http.Handler) http.Handler {
