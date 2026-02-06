@@ -369,6 +369,106 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, messageResponse{Message: "Password updated successfully"})
 }
 
+type userResponse struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+
+	var resp userResponse
+	err := h.db.QueryRow(r.Context(),
+		"SELECT name, email FROM users WHERE id = $1", userID,
+	).Scan(&resp.Name, &resp.Email)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, resp)
+}
+
+type updateUserRequest struct {
+	Name            string `json:"name"`
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
+func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	var req updateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	userID := UserIDFromContext(r.Context())
+	hasNameChange := req.Name != ""
+	hasPasswordChange := req.NewPassword != ""
+
+	if !hasNameChange && !hasPasswordChange {
+		httputil.WriteError(w, http.StatusBadRequest, "nothing to update")
+		return
+	}
+
+	if hasPasswordChange {
+		if req.CurrentPassword == "" {
+			httputil.WriteError(w, http.StatusBadRequest, "current password is required to set a new password")
+			return
+		}
+
+		if len(req.NewPassword) < 8 {
+			httputil.WriteError(w, http.StatusBadRequest, "password must be at least 8 characters")
+			return
+		}
+
+		if len(req.NewPassword) > 72 {
+			httputil.WriteError(w, http.StatusBadRequest, "password must be at most 72 characters")
+			return
+		}
+
+		var currentHash string
+		err := h.db.QueryRow(r.Context(),
+			"SELECT password FROM users WHERE id = $1", userID,
+		).Scan(&currentHash)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to verify password")
+			return
+		}
+
+		if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.CurrentPassword)); err != nil {
+			httputil.WriteError(w, http.StatusUnauthorized, "current password is incorrect")
+			return
+		}
+
+		newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to hash password")
+			return
+		}
+
+		if _, err := h.db.Exec(r.Context(),
+			"UPDATE users SET password = $1, updated_at = now() WHERE id = $2",
+			string(newHash), userID,
+		); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update password")
+			return
+		}
+	}
+
+	if hasNameChange {
+		if _, err := h.db.Exec(r.Context(),
+			"UPDATE users SET name = $1, updated_at = now() WHERE id = $2",
+			req.Name, userID,
+		); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update name")
+			return
+		}
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, messageResponse{Message: "Settings updated"})
+}
+
 func (h *Handler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")

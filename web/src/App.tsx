@@ -9,6 +9,7 @@ import { Register } from "./pages/Register";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
 import { NotFound } from "./pages/NotFound";
+import { Settings } from "./pages/Settings";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(!getAccessToken());
@@ -54,6 +55,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <Library />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Settings />
           </ProtectedRoute>
         }
       />

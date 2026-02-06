@@ -70,6 +70,13 @@ export function Layout({ children }: LayoutProps) {
           Library
         </Link>
 
+        <Link
+          to="/settings"
+          style={isActive("/settings") ? activeLinkStyle : inactiveLinkStyle}
+        >
+          Settings
+        </Link>
+
         <button
           onClick={signOut}
           style={{
