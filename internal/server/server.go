@@ -20,14 +20,15 @@ type Pinger interface {
 }
 
 type Config struct {
-	DB             database.DBTX
-	Pinger         Pinger
-	Storage        video.ObjectStorage
-	WebFS          fs.FS
-	JWTSecret      string
-	BaseURL        string
+	DB              database.DBTX
+	Pinger          Pinger
+	Storage         video.ObjectStorage
+	WebFS           fs.FS
+	JWTSecret       string
+	BaseURL         string
 	MaxUploadBytes  int64
 	S3PublicEndpoint string
+	EmailSender     auth.EmailSender
 }
 
 type Server struct {
@@ -62,6 +63,9 @@ func New(cfg Config) *Server {
 
 		secureCookies := strings.HasPrefix(baseURL, "https://")
 		s.authHandler = auth.NewHandler(cfg.DB, jwtSecret, secureCookies)
+		if cfg.EmailSender != nil {
+			s.authHandler.SetEmailSender(cfg.EmailSender, baseURL)
+		}
 		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes)
 	}
 
@@ -84,6 +88,8 @@ func (s *Server) routes() {
 			r.Post("/login", s.authHandler.Login)
 			r.Post("/refresh", s.authHandler.Refresh)
 			r.Post("/logout", s.authHandler.Logout)
+			r.Post("/forgot-password", s.authHandler.ForgotPassword)
+			r.Post("/reset-password", s.authHandler.ResetPassword)
 		})
 	}
 
