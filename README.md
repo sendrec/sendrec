@@ -2,6 +2,8 @@
 
 The async video platform built for Europe. Open source, GDPR native, EU hosted.
 
+![SendRec — The async video platform built for Europe](.github/screenshots/landing-hero.png)
+
 ## What is SendRec?
 
 SendRec is an open-source alternative to Loom for teams that need their data to stay in the EU. Record your screen, share videos with your team, and keep full control of your data.
