@@ -61,6 +61,9 @@ func TestSecurityHeaders_CSPIncludesStorageEndpoint(t *testing.T) {
 	if !strings.Contains(csp, "media-src 'self' data: https://storage.example.com") {
 		t.Errorf("CSP media-src should include storage endpoint, got: %s", csp)
 	}
+	if !strings.Contains(csp, "img-src 'self' data: https://storage.example.com") {
+		t.Errorf("CSP img-src should include storage endpoint, got: %s", csp)
+	}
 }
 
 func TestSecurityHeaders_CSPOmitsStorageWhenEmpty(t *testing.T) {
@@ -122,6 +125,9 @@ func TestSecurityHeaders_PermissionsPolicyAllowsMicrophone(t *testing.T) {
 	pp := rec.Header().Get("Permissions-Policy")
 	if !strings.Contains(pp, "microphone=(self)") {
 		t.Errorf("Permissions-Policy should allow microphone=(self), got: %s", pp)
+	}
+	if !strings.Contains(pp, "camera=(self)") {
+		t.Errorf("Permissions-Policy should allow camera=(self), got: %s", pp)
 	}
 }
 
