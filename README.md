@@ -53,8 +53,10 @@ make test
 - `DATABASE_URL` – required
 - `JWT_SECRET` – required
 - `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` (defaults to EU region)
+- `S3_PUBLIC_ENDPOINT` – public URL for S3 (used for presigned URLs)
 - `BASE_URL` – used for CORS and share links
 - `MAX_UPLOAD_BYTES` – max allowed upload size (bytes), defaults to 500MB
+- `LISTMONK_BASE_URL`, `LISTMONK_USERNAME`, `LISTMONK_PASSWORD`, `LISTMONK_TEMPLATE_ID` – email (optional)
 
 ## Architecture
 
@@ -65,6 +67,28 @@ Single Go binary that:
 - Runs database migrations on startup
 
 Video recordings happen entirely in the browser using `getDisplayMedia` + `MediaRecorder`. Files upload directly to S3 via presigned URLs — the server never touches video bytes.
+
+## Deployment
+
+Deployments are automated via GitHub Actions. Three environments are available:
+
+| Environment | URL | Trigger |
+|-------------|-----|---------|
+| **Preview** | `pr-{N}.app.sendrec.eu` | PR opened/updated (write-access authors only, max 3 concurrent) |
+| **Staging** | `staging.app.sendrec.eu` | Push to `main` |
+| **Production** | `app.sendrec.eu` | Push a git tag (`v*`) |
+
+### Deploying to production
+
+1. Merge your PR to `main` — staging deploys automatically
+2. Verify on `staging.app.sendrec.eu`
+3. Tag and push:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+Preview environments are cleaned up automatically when the PR is closed.
 
 ## License
 
