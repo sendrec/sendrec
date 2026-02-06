@@ -966,3 +966,95 @@ func TestForgotPassword_EmailSendFailure_StillReturns200(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+// --- ResetPassword ---
+
+func TestResetPassword_Success(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	rawToken, tokenHash, _ := generateResetToken()
+
+	mock.ExpectQuery(`SELECT user_id FROM password_resets`).
+		WithArgs(tokenHash).
+		WillReturnRows(pgxmock.NewRows([]string{"user_id"}).AddRow("user-uuid-1"))
+
+	mock.ExpectExec(`UPDATE password_resets SET used_at`).
+		WithArgs(tokenHash).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	mock.ExpectExec(`UPDATE users SET password`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	mock.ExpectExec(`UPDATE refresh_tokens SET revoked`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 2))
+
+	body := `{"token":"` + rawToken + `","password":"newpassword123"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResetPassword(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestResetPassword_InvalidToken(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT user_id FROM password_resets`).
+		WithArgs(pgxmock.AnyArg()).
+		WillReturnError(pgx.ErrNoRows)
+
+	body := `{"token":"invalid-token","password":"newpassword123"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResetPassword(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+	errMsg := decodeErrorResponse(t, rec)
+	if errMsg != "invalid or expired reset link" {
+		t.Errorf("expected invalid token error, got %q", errMsg)
+	}
+}
+
+func TestResetPassword_PasswordTooShort(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	body := `{"token":"sometoken","password":"short"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResetPassword(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestResetPassword_MissingFields(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	body := `{"token":"","password":""}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/reset-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResetPassword(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
