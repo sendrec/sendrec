@@ -29,18 +29,27 @@ type ObjectStorage interface {
 }
 
 type Handler struct {
-	db             database.DBTX
-	storage        ObjectStorage
-	baseURL        string
-	maxUploadBytes int64
+	db                     database.DBTX
+	storage                ObjectStorage
+	baseURL                string
+	maxUploadBytes         int64
+	maxVideosPerMonth      int
+	maxVideoDurationSeconds int
 }
 
 func videoFileKey(userID, shareToken string) string {
 	return fmt.Sprintf("recordings/%s/%s.webm", userID, shareToken)
 }
 
-func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64) *Handler {
-	return &Handler{db: db, storage: s, baseURL: baseURL, maxUploadBytes: maxUploadBytes}
+func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64, maxVideosPerMonth int, maxVideoDurationSeconds int) *Handler {
+	return &Handler{
+		db:                      db,
+		storage:                 s,
+		baseURL:                 baseURL,
+		maxUploadBytes:          maxUploadBytes,
+		maxVideosPerMonth:       maxVideosPerMonth,
+		maxVideoDurationSeconds: maxVideoDurationSeconds,
+	}
 }
 
 type createRequest struct {
@@ -110,6 +119,23 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.maxVideoDurationSeconds > 0 && req.Duration > h.maxVideoDurationSeconds {
+		httputil.WriteError(w, http.StatusBadRequest, fmt.Sprintf("video duration exceeds the maximum of %d minutes", h.maxVideoDurationSeconds/60))
+		return
+	}
+
+	if h.maxVideosPerMonth > 0 {
+		count, err := h.countVideosThisMonth(r.Context(), userID)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to check video limit")
+			return
+		}
+		if count >= h.maxVideosPerMonth {
+			httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("monthly video limit of %d reached", h.maxVideosPerMonth))
+			return
+		}
+	}
+
 	title := req.Title
 	if title == "" {
 		title = "Untitled Recording"
@@ -144,6 +170,41 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		ID:         videoID,
 		UploadURL:  uploadURL,
 		ShareToken: shareToken,
+	})
+}
+
+func (h *Handler) countVideosThisMonth(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := h.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM videos WHERE user_id = $1 AND created_at >= date_trunc('month', now())`,
+		userID,
+	).Scan(&count)
+	return count, err
+}
+
+type limitsResponse struct {
+	MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
+	MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
+	VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+}
+
+func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+
+	var videosUsed int
+	if h.maxVideosPerMonth > 0 {
+		var err error
+		videosUsed, err = h.countVideosThisMonth(r.Context(), userID)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to check video limit")
+			return
+		}
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, limitsResponse{
+		MaxVideosPerMonth:       h.maxVideosPerMonth,
+		MaxVideoDurationSeconds: h.maxVideoDurationSeconds,
+		VideosUsedThisMonth:     videosUsed,
 	})
 }
 

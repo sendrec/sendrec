@@ -10,6 +10,8 @@ vi.mock("../api/client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
+const unlimitedLimits = { maxVideosPerMonth: 0, maxVideoDurationSeconds: 0, videosUsedThisMonth: 0 };
+
 function makeVideo(overrides: Record<string, unknown> = {}) {
   return {
     id: "v1",
@@ -25,6 +27,12 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     thumbnailUrl: "https://storage.sendrec.eu/thumb.jpg",
     ...overrides,
   };
+}
+
+function mockFetch(videos: unknown[], limits = unlimitedLimits) {
+  mockApiFetch
+    .mockResolvedValueOnce(videos)
+    .mockResolvedValueOnce(limits);
 }
 
 function renderLibrary() {
@@ -51,7 +59,7 @@ describe("Library", () => {
   });
 
   it("shows empty state when no videos", async () => {
-    mockApiFetch.mockResolvedValueOnce([]);
+    mockFetch([]);
     renderLibrary();
 
     await waitFor(() => {
@@ -61,7 +69,7 @@ describe("Library", () => {
   });
 
   it("renders video list with title and metadata", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeVideo()]);
+    mockFetch([makeVideo()]);
     renderLibrary();
 
     await waitFor(() => {
@@ -72,7 +80,7 @@ describe("Library", () => {
   });
 
   it("shows view counts", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeVideo({ viewCount: 3, uniqueViewCount: 2 })]);
+    mockFetch([makeVideo({ viewCount: 3, uniqueViewCount: 2 })]);
     renderLibrary();
 
     await waitFor(() => {
@@ -81,7 +89,7 @@ describe("Library", () => {
   });
 
   it("shows 'No views yet' for zero views", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeVideo({ viewCount: 0, uniqueViewCount: 0 })]);
+    mockFetch([makeVideo({ viewCount: 0, uniqueViewCount: 0 })]);
     renderLibrary();
 
     await waitFor(() => {
@@ -90,7 +98,7 @@ describe("Library", () => {
   });
 
   it("shows expiry label", async () => {
-    mockApiFetch.mockResolvedValueOnce([
+    mockFetch([
       makeVideo({ shareExpiresAt: new Date(Date.now() + 3 * 86400000).toISOString() }),
     ]);
     renderLibrary();
@@ -101,7 +109,7 @@ describe("Library", () => {
   });
 
   it("shows expired label for past expiry", async () => {
-    mockApiFetch.mockResolvedValueOnce([
+    mockFetch([
       makeVideo({ shareExpiresAt: new Date(Date.now() - 86400000).toISOString() }),
     ]);
     renderLibrary();
@@ -112,7 +120,7 @@ describe("Library", () => {
   });
 
   it("renders copy link and delete buttons for ready videos", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeVideo()]);
+    mockFetch([makeVideo()]);
     renderLibrary();
 
     await waitFor(() => {
@@ -123,7 +131,7 @@ describe("Library", () => {
   });
 
   it("shows uploading status", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeVideo({ status: "uploading" })]);
+    mockFetch([makeVideo({ status: "uploading" })]);
     renderLibrary();
 
     await waitFor(() => {
@@ -132,7 +140,7 @@ describe("Library", () => {
   });
 
   it("renders thumbnail when available", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeVideo()]);
+    mockFetch([makeVideo()]);
     const { container } = renderLibrary();
 
     await waitFor(() => {
@@ -143,7 +151,7 @@ describe("Library", () => {
   });
 
   it("does not render thumbnail when unavailable", async () => {
-    mockApiFetch.mockResolvedValueOnce([makeVideo({ thumbnailUrl: undefined })]);
+    mockFetch([makeVideo({ thumbnailUrl: undefined })]);
     const { container } = renderLibrary();
 
     await waitFor(() => {
@@ -155,7 +163,7 @@ describe("Library", () => {
   it("confirms before deleting", async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-    mockApiFetch.mockResolvedValueOnce([makeVideo()]);
+    mockFetch([makeVideo()]);
     renderLibrary();
 
     await waitFor(() => {
@@ -164,16 +172,15 @@ describe("Library", () => {
 
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(confirmSpy).toHaveBeenCalledWith("Delete this recording? This cannot be undone.");
-    // Should not have called delete API
-    expect(mockApiFetch).toHaveBeenCalledTimes(1); // only initial fetch
+    // Should not have called delete API (only initial fetch + limits fetch)
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
   });
 
   it("deletes video when confirmed", async () => {
     const user = userEvent.setup();
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    mockApiFetch
-      .mockResolvedValueOnce([makeVideo()])
-      .mockResolvedValueOnce(undefined); // delete response
+    mockFetch([makeVideo()]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // delete response
     renderLibrary();
 
     await waitFor(() => {
@@ -186,5 +193,28 @@ describe("Library", () => {
       expect(screen.queryByText("My Recording")).not.toBeInTheDocument();
     });
     expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1", { method: "DELETE" });
+  });
+
+  it("shows usage indicator when limits are active", async () => {
+    mockFetch([makeVideo()], {
+      maxVideosPerMonth: 25,
+      maxVideoDurationSeconds: 300,
+      videosUsedThisMonth: 12,
+    });
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText(/12 \/ 25 videos this month/i)).toBeInTheDocument();
+    });
+  });
+
+  it("hides usage indicator when limits are unlimited", async () => {
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("My Recording")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/videos this month/i)).not.toBeInTheDocument();
   });
 });

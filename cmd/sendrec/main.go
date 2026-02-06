@@ -15,6 +15,7 @@ import (
 
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/email"
+	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/server"
 	"github.com/sendrec/sendrec/internal/storage"
 	"github.com/sendrec/sendrec/internal/video"
@@ -94,15 +95,17 @@ func main() {
 	})
 
 	srv := server.New(server.Config{
-		DB:              db.Pool,
-		Pinger:          db,
-		Storage:         store,
-		WebFS:           webFS,
-		JWTSecret:       jwtSecret,
-		BaseURL:         baseURL,
-		MaxUploadBytes:  getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
-		S3PublicEndpoint: os.Getenv("S3_PUBLIC_ENDPOINT"),
-		EmailSender:     emailClient,
+		DB:                      db.Pool,
+		Pinger:                  db,
+		Storage:                 store,
+		WebFS:                   webFS,
+		JWTSecret:               jwtSecret,
+		BaseURL:                 baseURL,
+		MaxUploadBytes:          getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
+		MaxVideosPerMonth:       int(getEnvInt64("MAX_VIDEOS_PER_MONTH", int64(plans.Free.MaxVideosPerMonth))),
+		MaxVideoDurationSeconds: int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),
+		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
+		EmailSender:             emailClient,
 	})
 
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())

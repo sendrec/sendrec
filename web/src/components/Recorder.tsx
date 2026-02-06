@@ -4,6 +4,7 @@ type RecordingState = "idle" | "recording" | "stopped";
 
 interface RecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
+  maxDurationSeconds?: number;
 }
 
 function formatDuration(seconds: number): string {
@@ -12,7 +13,7 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${String(remaining).padStart(2, "0")}`;
 }
 
-export function Recorder({ onRecordingComplete }: RecorderProps) {
+export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: RecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [duration, setDuration] = useState(0);
 
@@ -72,7 +73,8 @@ export function Recorder({ onRecordingComplete }: RecorderProps) {
       startTimeRef.current = Date.now();
       setDuration(0);
       timerRef.current = setInterval(() => {
-        setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        setDuration(elapsed);
       }, 1000);
 
       recorder.start(1000);
@@ -85,6 +87,16 @@ export function Recorder({ onRecordingComplete }: RecorderProps) {
   }
 
   useEffect(() => {
+    if (
+      recordingState === "recording" &&
+      maxDurationSeconds > 0 &&
+      duration >= maxDurationSeconds
+    ) {
+      stopRecording();
+    }
+  }, [duration, maxDurationSeconds, recordingState, stopRecording]);
+
+  useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
       stopAllStreams();
@@ -94,6 +106,11 @@ export function Recorder({ onRecordingComplete }: RecorderProps) {
   if (recordingState === "idle") {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
+        {maxDurationSeconds > 0 && (
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: 0 }}>
+            Maximum recording length: {formatDuration(maxDurationSeconds)}
+          </p>
+        )}
         <button
           onClick={startRecording}
           aria-label="Start recording"
@@ -111,6 +128,8 @@ export function Recorder({ onRecordingComplete }: RecorderProps) {
       </div>
     );
   }
+
+  const remaining = maxDurationSeconds > 0 ? maxDurationSeconds - duration : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
@@ -135,6 +154,11 @@ export function Recorder({ onRecordingComplete }: RecorderProps) {
             }}
           />
           {formatDuration(duration)}
+          {remaining !== null && (
+            <span style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}>
+              ({formatDuration(remaining)} remaining)
+            </span>
+          )}
         </div>
 
         <button

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { Recorder } from "../components/Recorder";
@@ -9,10 +9,32 @@ interface CreateVideoResponse {
   shareToken: string;
 }
 
+interface LimitsResponse {
+  maxVideosPerMonth: number;
+  maxVideoDurationSeconds: number;
+  videosUsedThisMonth: number;
+}
+
 export function Record() {
   const [uploading, setUploading] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [limits, setLimits] = useState<LimitsResponse | null>(null);
+  const [loadingLimits, setLoadingLimits] = useState(true);
+
+  useEffect(() => {
+    async function fetchLimits() {
+      try {
+        const result = await apiFetch<LimitsResponse>("/api/videos/limits");
+        setLimits(result ?? null);
+      } catch {
+        setLimits(null);
+      } finally {
+        setLoadingLimits(false);
+      }
+    }
+    fetchLimits();
+  }, []);
 
   async function handleRecordingComplete(blob: Blob, duration: number) {
     setUploading(true);
@@ -52,7 +74,7 @@ export function Record() {
       setShareUrl(`${window.location.origin}/watch/${result.shareToken}`);
     } catch (err) {
       if (videoId) {
-        // Best-effort cleanup so “uploading” rows don’t accumulate.
+        // Best-effort cleanup so "uploading" rows don't accumulate.
         apiFetch(`/api/videos/${videoId}`, { method: "DELETE" }).catch(() => {});
       }
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -86,6 +108,14 @@ export function Record() {
     setError(null);
   }
 
+  if (loadingLimits) {
+    return (
+      <div className="page-container page-container--centered">
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Loading...</p>
+      </div>
+    );
+  }
+
   if (uploading) {
     return (
       <div className="page-container page-container--centered">
@@ -111,6 +141,36 @@ export function Record() {
         >
           Try again
         </button>
+      </div>
+    );
+  }
+
+  const quotaReached =
+    limits !== null &&
+    limits.maxVideosPerMonth > 0 &&
+    limits.videosUsedThisMonth >= limits.maxVideosPerMonth;
+
+  if (quotaReached) {
+    return (
+      <div className="page-container page-container--centered">
+        <p style={{ color: "var(--color-error)", fontSize: 16, marginBottom: 16 }}>
+          You've reached your limit of {limits!.maxVideosPerMonth} videos this month.
+          Delete unused recordings or wait until next month.
+        </p>
+        <Link
+          to="/library"
+          style={{
+            background: "var(--color-accent)",
+            color: "var(--color-text)",
+            borderRadius: 8,
+            padding: "10px 24px",
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: "none",
+          }}
+        >
+          Go to Library
+        </Link>
       </div>
     );
   }
@@ -219,6 +279,11 @@ export function Record() {
     );
   }
 
+  const remaining =
+    limits && limits.maxVideosPerMonth > 0
+      ? limits.maxVideosPerMonth - limits.videosUsedThisMonth
+      : null;
+
   return (
     <div className="page-container page-container--centered">
       <h1
@@ -231,7 +296,15 @@ export function Record() {
       >
         New Recording
       </h1>
-      <Recorder onRecordingComplete={handleRecordingComplete} />
+      {remaining !== null && (
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 16 }}>
+          {remaining} videos remaining this month
+        </p>
+      )}
+      <Recorder
+        onRecordingComplete={handleRecordingComplete}
+        maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
+      />
     </div>
   );
 }

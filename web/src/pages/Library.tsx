@@ -16,6 +16,12 @@ interface Video {
   thumbnailUrl?: string;
 }
 
+interface LimitsResponse {
+  maxVideosPerMonth: number;
+  maxVideoDurationSeconds: number;
+  videosUsedThisMonth: number;
+}
+
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
@@ -46,12 +52,17 @@ export function Library() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [extendingId, setExtendingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [limits, setLimits] = useState<LimitsResponse | null>(null);
 
   useEffect(() => {
-    async function fetchVideos() {
+    async function fetchData() {
       try {
-        const result = await apiFetch<Video[]>("/api/videos");
-        setVideos(result ?? []);
+        const [videosResult, limitsResult] = await Promise.all([
+          apiFetch<Video[]>("/api/videos"),
+          apiFetch<LimitsResponse>("/api/videos/limits"),
+        ]);
+        setVideos(videosResult ?? []);
+        setLimits(limitsResult ?? null);
       } catch {
         setVideos([]);
       } finally {
@@ -59,7 +70,7 @@ export function Library() {
       }
     }
 
-    fetchVideos();
+    fetchData();
   }, []);
 
   async function deleteVideo(id: string) {
@@ -139,9 +150,16 @@ export function Library() {
   return (
     <div className="page-container">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
-          Library
-        </h1>
+        <div>
+          <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
+            Library
+          </h1>
+          {limits && limits.maxVideosPerMonth > 0 && (
+            <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "4px 0 0" }}>
+              {limits.videosUsedThisMonth} / {limits.maxVideosPerMonth} videos this month
+            </p>
+          )}
+        </div>
         <Link
           to="/"
           style={{
