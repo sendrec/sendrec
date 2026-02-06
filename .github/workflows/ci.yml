@@ -47,6 +47,26 @@ jobs:
       - name: Audit frontend dependencies
         run: cd web && pnpm audit --prod --audit-level high
 
+      - name: Run frontend tests
+        run: cd web && pnpm test:coverage
+
+      - name: Frontend coverage summary
+        run: |
+          {
+            echo '## Frontend Coverage'
+            echo ''
+            node -e "
+              const r = require('./coverage/coverage-summary.json');
+              const t = r.total;
+              console.log('| Metric | Coverage |');
+              console.log('|--------|----------|');
+              for (const [k, v] of Object.entries(t)) {
+                console.log('| ' + k.charAt(0).toUpperCase() + k.slice(1) + ' | ' + v.pct + '% |');
+              }
+            "
+          } >> $GITHUB_STEP_SUMMARY
+        working-directory: web
+
       - name: Typecheck frontend
         run: cd web && pnpm typecheck
 
