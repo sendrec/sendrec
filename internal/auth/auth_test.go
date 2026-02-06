@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -826,5 +827,142 @@ func TestRegister_RefreshCookieAttributes(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+// --- mock email sender ---
+
+type mockEmailSender struct {
+	lastEmail     string
+	lastName      string
+	lastResetLink string
+	sendErr       error
+}
+
+func (m *mockEmailSender) SendPasswordReset(_ context.Context, toEmail, toName, resetLink string) error {
+	m.lastEmail = toEmail
+	m.lastName = toName
+	m.lastResetLink = resetLink
+	return m.sendErr
+}
+
+// --- ForgotPassword ---
+
+func TestForgotPassword_Success(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	emailSender := &mockEmailSender{}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
+	mock.ExpectQuery(`SELECT id, name FROM users WHERE email`).
+		WithArgs("alice@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name"}).AddRow("user-uuid-1", "Alice"))
+
+	mock.ExpectExec(`UPDATE password_resets SET used_at`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	mock.ExpectExec(`INSERT INTO password_resets`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := `{"email":"alice@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ForgotPassword(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if emailSender.lastEmail != "alice@example.com" {
+		t.Errorf("expected email sent to alice@example.com, got %q", emailSender.lastEmail)
+	}
+	if emailSender.lastResetLink == "" {
+		t.Error("expected non-empty reset link")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestForgotPassword_UnknownEmail_StillReturns200(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	emailSender := &mockEmailSender{}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
+	mock.ExpectQuery(`SELECT id, name FROM users WHERE email`).
+		WithArgs("nobody@example.com").
+		WillReturnError(pgx.ErrNoRows)
+
+	body := `{"email":"nobody@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ForgotPassword(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	if emailSender.lastEmail != "" {
+		t.Error("should not send email for unknown user")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestForgotPassword_MissingEmail(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	body := `{"email":""}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ForgotPassword(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestForgotPassword_EmailSendFailure_StillReturns200(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	emailSender := &mockEmailSender{sendErr: errors.New("smtp down")}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
+	mock.ExpectQuery(`SELECT id, name FROM users WHERE email`).
+		WithArgs("alice@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name"}).AddRow("user-uuid-1", "Alice"))
+
+	mock.ExpectExec(`UPDATE password_resets SET used_at`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	mock.ExpectExec(`INSERT INTO password_resets`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := `{"email":"alice@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ForgotPassword(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
 	}
 }
