@@ -59,10 +59,20 @@ jobs:
           version: v2.8.0
 
       - name: Run Go tests
-        run: go clean -cache && go test ./... -coverprofile=coverage.out -covermode=atomic
+        run: go clean -cache && go test ./... -coverprofile=coverage.out -covermode=atomic | tee test-output.txt
 
       - name: Coverage summary
-        run: go tool cover -func=coverage.out | tail -1
+        run: |
+          {
+            echo '## Code Coverage'
+            echo ''
+            echo '| Package | Coverage |'
+            echo '|---------|----------|'
+            awk '/coverage:/ {sub("github.com/sendrec/sendrec/", "", $2); for(i=1;i<=NF;i++) if($i ~ /%/) pct=$i; printf "| %s | %s |\n", $2, pct}' test-output.txt
+            echo ''
+            echo -n '**Total: '
+            go tool cover -func=coverage.out | awk '/^total:/ {printf "%s**\n", $NF}'
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage report
         if: github.event_name == 'pull_request'
