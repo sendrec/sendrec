@@ -30,19 +30,21 @@ type ObjectStorage interface {
 }
 
 type Handler struct {
-	db                     database.DBTX
-	storage                ObjectStorage
-	baseURL                string
-	maxUploadBytes         int64
-	maxVideosPerMonth      int
+	db                      database.DBTX
+	storage                 ObjectStorage
+	baseURL                 string
+	maxUploadBytes          int64
+	maxVideosPerMonth       int
 	maxVideoDurationSeconds int
+	hmacSecret              string
+	secureCookies           bool
 }
 
 func videoFileKey(userID, shareToken string) string {
 	return fmt.Sprintf("recordings/%s/%s.webm", userID, shareToken)
 }
 
-func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64, maxVideosPerMonth int, maxVideoDurationSeconds int) *Handler {
+func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64, maxVideosPerMonth int, maxVideoDurationSeconds int, hmacSecret string, secureCookies bool) *Handler {
 	return &Handler{
 		db:                      db,
 		storage:                 s,
@@ -50,6 +52,8 @@ func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadByte
 		maxUploadBytes:          maxUploadBytes,
 		maxVideosPerMonth:       maxVideosPerMonth,
 		maxVideoDurationSeconds: maxVideoDurationSeconds,
+		hmacSecret:              hmacSecret,
+		secureCookies:           secureCookies,
 	}
 }
 
@@ -77,6 +81,7 @@ type listItem struct {
 	ViewCount       int64  `json:"viewCount"`
 	UniqueViewCount int64  `json:"uniqueViewCount"`
 	ThumbnailURL    string `json:"thumbnailUrl,omitempty"`
+	HasPassword     bool   `json:"hasPassword"`
 }
 
 type updateRequest struct {
@@ -325,7 +330,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at,
 		    (SELECT COUNT(*) FROM video_views vv WHERE vv.video_id = v.id) AS view_count,
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
-		    v.thumbnail_key
+		    v.thumbnail_key, v.share_password
 		 FROM videos v
 		 WHERE v.user_id = $1 AND v.status != 'deleted'
 		 ORDER BY v.created_at DESC
@@ -344,13 +349,15 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var createdAt time.Time
 		var shareExpiresAt time.Time
 		var thumbnailKey *string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey); err != nil {
+		var sharePassword *string
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
 		item.CreatedAt = createdAt.Format(time.RFC3339)
 		item.ShareExpiresAt = shareExpiresAt.Format(time.RFC3339)
 		item.ShareURL = h.baseURL + "/watch/" + item.ShareToken
+		item.HasPassword = sharePassword != nil
 		if thumbnailKey != nil {
 			thumbURL, err := h.storage.GenerateDownloadURL(r.Context(), *thumbnailKey, 1*time.Hour)
 			if err == nil {
@@ -432,16 +439,16 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var creator string
 	var createdAt time.Time
 	var shareExpiresAt time.Time
-
 	var thumbnailKey *string
+	var sharePassword *string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key
+		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status = 'ready'`,
 		shareToken,
-	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey)
+	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -450,6 +457,13 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	if time.Now().After(shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
+	}
+
+	if sharePassword != nil {
+		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
+			httputil.WriteError(w, http.StatusForbidden, "password required")
+			return
+		}
 	}
 
 	go func() {
@@ -517,11 +531,12 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 	var title string
 	var fileKey string
 	var shareExpiresAt time.Time
+	var sharePassword *string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT title, file_key, share_expires_at FROM videos WHERE share_token = $1 AND status = 'ready'`,
+		`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = $1 AND status = 'ready'`,
 		shareToken,
-	).Scan(&title, &fileKey, &shareExpiresAt)
+	).Scan(&title, &fileKey, &shareExpiresAt, &sharePassword)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -530,6 +545,13 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 	if time.Now().After(shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
+	}
+
+	if sharePassword != nil {
+		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
+			httputil.WriteError(w, http.StatusForbidden, "password required")
+			return
+		}
 	}
 
 	filename := title + ".webm"
@@ -555,6 +577,59 @@ func clientIP(r *http.Request) string {
 		return strings.TrimSpace(forwarded)
 	}
 	return r.RemoteAddr
+}
+
+type setPasswordRequest struct {
+	Password string `json:"password"`
+}
+
+func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Password == "" {
+		tag, err := h.db.Exec(r.Context(),
+			`UPDATE videos SET share_password = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+			videoID, userID,
+		)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update password")
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			httputil.WriteError(w, http.StatusNotFound, "video not found")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	hash, err := hashSharePassword(req.Password)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to hash password")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET share_password = $1, updated_at = now() WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
+		hash, videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to update password")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {

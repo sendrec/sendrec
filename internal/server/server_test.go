@@ -208,6 +208,7 @@ func TestNilDBVideoRoutesNotRegistered(t *testing.T) {
 		{http.MethodPatch, "/api/videos/some-id"},
 		{http.MethodDelete, "/api/videos/some-id"},
 		{http.MethodGet, "/api/watch/some-token"},
+		{http.MethodPost, "/api/watch/some-token/verify"},
 		{http.MethodGet, "/watch/some-token"},
 	}
 
@@ -335,6 +336,36 @@ func TestWatchPageRouteRegisteredWithDB(t *testing.T) {
 	// The route is registered if the handler hit the DB mock expectation.
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("route /watch/{shareToken} not registered: mock expectation unmet: %v", err)
+	}
+}
+
+func TestPasswordRouteRequiresAuth(t *testing.T) {
+	srv, _ := newServerWithDB(t)
+
+	rec := executeRequestWithBody(srv, http.MethodPut, "/api/videos/some-id/password", `{"password":"secret"}`)
+	if rec.Code == http.StatusNotFound {
+		t.Errorf("expected PUT /api/videos/{id}/password to be registered (not 404), got %d", rec.Code)
+	}
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for unauthenticated password set, got %d", rec.Code)
+	}
+}
+
+func TestVerifyWatchPasswordRouteRegistered(t *testing.T) {
+	srv, mock := newServerWithDB(t)
+
+	mock.ExpectQuery("SELECT share_password FROM videos").
+		WithArgs("some-token").
+		WillReturnError(errors.New("no rows"))
+
+	rec := executeRequestWithBody(srv, http.MethodPost, "/api/watch/some-token/verify", `{"password":"test"}`)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "video not found") {
+		t.Errorf("expected handler response with 'video not found', got %d %q", rec.Code, body)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("route /api/watch/{shareToken}/verify not registered: mock expectation unmet: %v", err)
 	}
 }
 

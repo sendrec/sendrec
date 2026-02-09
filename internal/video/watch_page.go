@@ -167,6 +167,93 @@ type expiredPageData struct {
 	Nonce string
 }
 
+type passwordPageData struct {
+	Title      string
+	ShareToken string
+	Nonce      string
+}
+
+var passwordPageTemplate = template.Must(template.New("password").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}} — SendRec</title>
+    <style nonce="{{.Nonce}}">
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a1628;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container { text-align: center; padding: 2rem; max-width: 400px; width: 100%; }
+        h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+        p { color: #94a3b8; margin-bottom: 1.5rem; }
+        .error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
+        input[type="password"] {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            outline: none;
+        }
+        input[type="password"]:focus { border-color: #00b67a; }
+        button {
+            width: 100%;
+            background: #00b67a;
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>This video is password protected</h1>
+        <p>Enter the password to watch this video.</p>
+        <p class="error" id="error-msg"></p>
+        <form id="password-form">
+            <input type="password" id="password-input" placeholder="Password" required autofocus>
+            <button type="submit" id="submit-btn">Watch Video</button>
+        </form>
+    </div>
+    <script nonce="{{.Nonce}}">
+        document.getElementById('password-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var btn = document.getElementById('submit-btn');
+            var errEl = document.getElementById('error-msg');
+            var pw = document.getElementById('password-input').value;
+            btn.disabled = true;
+            errEl.style.display = 'none';
+            fetch('/api/watch/{{.ShareToken}}/verify', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password: pw})
+            }).then(function(r) {
+                if (r.ok) { window.location.reload(); }
+                else { errEl.textContent = 'Incorrect password'; errEl.style.display = 'block'; btn.disabled = false; }
+            }).catch(function() {
+                errEl.textContent = 'Something went wrong'; errEl.style.display = 'block'; btn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>`))
+
 func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	shareToken := chi.URLParam(r, "shareToken")
 
@@ -176,14 +263,15 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var createdAt time.Time
 	var shareExpiresAt time.Time
 	var thumbnailKey *string
+	var sharePassword *string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key
+		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status = 'ready'`,
 		shareToken,
-	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey)
+	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -198,6 +286,20 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 			log.Printf("failed to render expired page: %v", err)
 		}
 		return
+	}
+
+	if sharePassword != nil {
+		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := passwordPageTemplate.Execute(w, passwordPageData{
+				Title:      title,
+				ShareToken: shareToken,
+				Nonce:      nonce,
+			}); err != nil {
+				log.Printf("failed to render password page: %v", err)
+			}
+			return
+		}
 	}
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)

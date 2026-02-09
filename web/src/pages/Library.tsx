@@ -14,6 +14,7 @@ interface Video {
   viewCount: number;
   uniqueViewCount: number;
   thumbnailUrl?: string;
+  hasPassword: boolean;
 }
 
 interface LimitsResponse {
@@ -128,6 +129,35 @@ export function Library() {
     } finally {
       setExtendingId(null);
     }
+  }
+
+  async function addPassword(id: string) {
+    const password = window.prompt("Enter a password for this video:");
+    if (!password) return;
+    await apiFetch(`/api/videos/${id}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ password }),
+    });
+    const [videosResult, limitsResult] = await Promise.all([
+      apiFetch<Video[]>("/api/videos"),
+      apiFetch<LimitsResponse>("/api/videos/limits"),
+    ]);
+    setVideos(videosResult ?? []);
+    setLimits(limitsResult ?? null);
+  }
+
+  async function removePassword(id: string) {
+    if (!window.confirm("Remove the password from this video?")) return;
+    await apiFetch(`/api/videos/${id}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ password: "" }),
+    });
+    const [videosResult, limitsResult] = await Promise.all([
+      apiFetch<Video[]>("/api/videos"),
+      apiFetch<LimitsResponse>("/api/videos/limits"),
+    ]);
+    setVideos(videosResult ?? []);
+    setLimits(limitsResult ?? null);
   }
 
   if (loading) {
@@ -279,6 +309,42 @@ export function Library() {
             <div className="video-card-actions">
               {video.status === "ready" && (
                 <>
+                  {video.hasPassword && (
+                    <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+                      Password protected
+                    </span>
+                  )}
+                  {video.hasPassword ? (
+                    <button
+                      onClick={() => removePassword(video.id)}
+                      style={{
+                        background: "transparent",
+                        color: "var(--color-text-secondary)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 4,
+                        padding: "6px 14px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Remove password
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => addPassword(video.id)}
+                      style={{
+                        background: "transparent",
+                        color: "var(--color-text-secondary)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 4,
+                        padding: "6px 14px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Add password
+                    </button>
+                  )}
                   <button
                     onClick={() => copyLink(video.shareUrl, video.id)}
                     style={{

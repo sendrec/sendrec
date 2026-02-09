@@ -173,7 +173,7 @@ func TestCreate_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -232,7 +232,7 @@ func TestCreate_DefaultTitleWhenEmpty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -274,7 +274,7 @@ func TestCreate_InvalidJSONBody(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
@@ -300,7 +300,7 @@ func TestCreate_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -347,7 +347,7 @@ func TestCreate_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadErr: errors.New("s3 unavailable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -396,7 +396,7 @@ func TestCreate_RejectsDurationExceedingLimit(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300) // 5 min limit
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, testJWTSecret, false) // 5 min limit
 
 	body, _ := json.Marshal(createRequest{
 		Title:    "Long Video",
@@ -432,7 +432,7 @@ func TestCreate_AllowsDurationWithinLimit(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, testJWTSecret, false)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -474,7 +474,7 @@ func TestCreate_AllowsAnyDurationWhenLimitIsZero(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0) // no limit
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false) // no limit
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -518,7 +518,7 @@ func TestCreate_RejectsWhenMonthlyLimitReached(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0) // 25/month limit
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, testJWTSecret, false) // 25/month limit
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
@@ -558,7 +558,7 @@ func TestCreate_AllowsWhenBelowMonthlyLimit(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
@@ -604,7 +604,7 @@ func TestCreate_SkipsMonthlyCheckWhenLimitIsZero(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0) // no limit
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false) // no limit
 
 	// No ExpectQuery for COUNT — should not query at all
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -647,7 +647,7 @@ func TestCreate_MonthlyLimitCountQueryError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
@@ -684,7 +684,7 @@ func TestUpdate_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 100000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 	fileKey := "recordings/user/video.webm"
 	fileSize := int64(100000)
@@ -722,7 +722,7 @@ func TestUpdate_InvalidStatus(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	body, _ := json.Marshal(updateRequest{Status: "processing"})
@@ -751,7 +751,7 @@ func TestUpdate_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT file_key, file_size, share_token FROM videos`).
@@ -788,7 +788,7 @@ func TestUpdate_InvalidJSON(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	r := chi.NewRouter()
@@ -815,7 +815,7 @@ func TestUpdate_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT file_key, file_size, share_token FROM videos`).
@@ -858,7 +858,7 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -866,9 +866,9 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, shareExpiresAt, int64(0), int64(0), (*string)(nil)).
-				AddRow("video-2", "Second Video", "uploading", 60, "xyz789uvwklm", createdAt.Add(-time.Hour), shareExpiresAt, int64(0), int64(0), (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil)).
+				AddRow("video-2", "Second Video", "uploading", 60, "xyz789uvwklm", createdAt.Add(-time.Hour), shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -932,7 +932,7 @@ func TestList_ShareURLIncludesBaseURL(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
@@ -941,8 +941,8 @@ func TestList_ShareURLIncludesBaseURL(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key"}).
-				AddRow("video-1", "My Video", "ready", 90, shareToken, createdAt, shareExpiresAt, int64(0), int64(0), (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password"}).
+				AddRow("video-1", "My Video", "ready", 90, shareToken, createdAt, shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -978,12 +978,12 @@ func TestList_EmptyList(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key"}),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password"}),
 		)
 
 	r := chi.NewRouter()
@@ -1023,7 +1023,7 @@ func TestList_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
@@ -1057,7 +1057,7 @@ func TestList_IncludesViewCounts(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -1065,8 +1065,8 @@ func TestList_IncludesViewCounts(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, shareExpiresAt, int64(15), int64(8), (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, shareExpiresAt, int64(15), int64(8), (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -1108,7 +1108,7 @@ func TestList_IncludesThumbnailURL(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/thumb?signed=abc"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -1117,8 +1117,8 @@ func TestList_IncludesThumbnailURL(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, shareExpiresAt, int64(5), int64(3), &thumbKey),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, shareExpiresAt, int64(5), int64(3), &thumbKey, (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -1159,7 +1159,7 @@ func TestDelete_Success(t *testing.T) {
 
 	deleteCalled := make(chan string, 1)
 	storage := &mockStorage{deleteCalled: deleteCalled}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 	fileKey := "recordings/user-1/abc.webm"
 
@@ -1199,7 +1199,7 @@ func TestDelete_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
@@ -1237,7 +1237,7 @@ func TestWatch_Success(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1249,8 +1249,8 @@ func TestWatch_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -1308,7 +1308,7 @@ func TestWatch_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "nonexistent12"
 
@@ -1345,7 +1345,7 @@ func TestWatch_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1357,8 +1357,8 @@ func TestWatch_StorageError(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -1397,7 +1397,7 @@ func TestWatch_ExpiredLink(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1408,8 +1408,8 @@ func TestWatch_ExpiredLink(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -1445,7 +1445,7 @@ func TestNewHandler_SetsFields(t *testing.T) {
 	storage := &mockStorage{}
 	baseURL := "https://example.com"
 
-	handler := NewHandler(mock, storage, baseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, baseURL, 0, 0, 0, testJWTSecret, false)
 
 	if handler.db != mock {
 		t.Error("expected db to be set")
@@ -1468,7 +1468,7 @@ func TestCreate_FileKeyContainsUserIDAndShareToken(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -1529,7 +1529,7 @@ func TestWatchPage_Success(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1538,8 +1538,8 @@ func TestWatchPage_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -1588,7 +1588,7 @@ func TestWatchPage_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "nonexistent12"
 
@@ -1620,7 +1620,7 @@ func TestWatchPage_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1629,8 +1629,8 @@ func TestWatchPage_StorageError(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -1662,7 +1662,7 @@ func TestWatchPage_ExpiredLink(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1671,8 +1671,8 @@ func TestWatchPage_ExpiredLink(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -1705,7 +1705,7 @@ func TestWatch_RecordsView(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1715,8 +1715,8 @@ func TestWatch_RecordsView(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -1753,7 +1753,7 @@ func TestWatch_IncludesThumbnailURL(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1764,8 +1764,8 @@ func TestWatch_IncludesThumbnailURL(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, &thumbKey),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, &thumbKey, (*string)(nil)),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -1810,7 +1810,7 @@ func TestExtend_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
@@ -1840,7 +1840,7 @@ func TestExtend_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
@@ -1875,7 +1875,7 @@ func TestExtend_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
@@ -1921,7 +1921,7 @@ func TestWatchPage_ContainsNonceInStyleTag(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1930,8 +1930,8 @@ func TestWatchPage_ContainsNonceInStyleTag(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow("Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -1960,7 +1960,7 @@ func TestWatchPage_ContainsNonceInScriptTag(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1969,8 +1969,8 @@ func TestWatchPage_ContainsNonceInScriptTag(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow("Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -1995,7 +1995,7 @@ func TestWatchPage_ExpiredContainsNonce(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2004,8 +2004,8 @@ func TestWatchPage_ExpiredContainsNonce(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow("Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -2035,7 +2035,7 @@ func TestWatchPage_ContainsPosterAndOGImage(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2045,8 +2045,8 @@ func TestWatchPage_ContainsPosterAndOGImage(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, &thumbKey),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, &thumbKey, (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -2085,7 +2085,7 @@ func TestWatchPage_NoPosterWhenNoThumbnail(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2094,8 +2094,8 @@ func TestWatchPage_NoPosterWhenNoThumbnail(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -2131,7 +2131,7 @@ func TestWatchPage_ContainsDownloadButton(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2140,8 +2140,8 @@ func TestWatchPage_ContainsDownloadButton(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -2295,7 +2295,7 @@ func TestDelete_MarksFilePurgedOnSuccess(t *testing.T) {
 
 	deleteCalled := make(chan string, 1)
 	storage := &mockStorage{deleteCalled: deleteCalled}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 	fileKey := "recordings/user-1/abc.webm"
 
@@ -2341,7 +2341,7 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
@@ -2388,7 +2388,7 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	// No ExpectQuery — should not query COUNT when unlimited
 
@@ -2433,7 +2433,7 @@ func TestDownload_Success(t *testing.T) {
 
 	dispositionURL := "https://s3.example.com/download?signed=xyz&disposition=attachment"
 	storage := &mockStorage{downloadDispositionURL: dispositionURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT title, file_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
@@ -2474,7 +2474,7 @@ func TestDownload_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT title, file_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
@@ -2509,7 +2509,7 @@ func TestDownload_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadDispositionErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT title, file_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
@@ -2543,15 +2543,15 @@ func TestWatchDownload_Success(t *testing.T) {
 
 	dispositionURL := "https://s3.example.com/download?signed=xyz&disposition=attachment"
 	storage := &mockStorage{downloadDispositionURL: dispositionURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
 		WithArgs(shareToken).
-		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at"}).
-			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt))
+		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password"}).
+			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt, (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/download", handler.WatchDownload)
@@ -2587,11 +2587,11 @@ func TestWatchDownload_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "nonexistent12"
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
 		WithArgs(shareToken).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -2624,15 +2624,15 @@ func TestWatchDownload_Expired(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadDispositionURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(-1 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
 		WithArgs(shareToken).
-		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at"}).
-			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt))
+		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password"}).
+			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt, (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/download", handler.WatchDownload)
@@ -2648,6 +2648,101 @@ func TestWatchDownload_Expired(t *testing.T) {
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
 	if errMsg != "link expired" {
 		t.Errorf("expected error %q, got %q", "link expired", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- SetPassword Tests ---
+
+func TestSetPassword_SetNewPassword(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "550e8400-e29b-41d4-a716-446655440099"
+
+	mock.ExpectExec(`UPDATE videos SET share_password = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
+		WithArgs(pgxmock.AnyArg(), videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := `{"password":"secret123"}`
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/password", handler.SetPassword)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/password", []byte(body)))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetPassword_RemovePassword(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "550e8400-e29b-41d4-a716-446655440099"
+
+	mock.ExpectExec(`UPDATE videos SET share_password = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := `{"password":""}`
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/password", handler.SetPassword)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/password", []byte(body)))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetPassword_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "550e8400-e29b-41d4-a716-446655440099"
+
+	mock.ExpectExec(`UPDATE videos SET share_password = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
+		WithArgs(pgxmock.AnyArg(), videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	body := `{"password":"secret123"}`
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/password", handler.SetPassword)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/password", []byte(body)))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
