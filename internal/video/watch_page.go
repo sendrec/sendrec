@@ -153,6 +153,51 @@ var expiredPageTemplate = template.Must(template.New("expired").Parse(`<!DOCTYPE
 </body>
 </html>`))
 
+var notFoundPageTemplate = template.Must(template.New("notfound").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Video Not Found — SendRec</title>
+    <style nonce="{{.Nonce}}">
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a1628;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container { text-align: center; padding: 2rem; }
+        h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+        p { color: #94a3b8; margin-bottom: 1.5rem; }
+        a {
+            display: inline-block;
+            background: #00b67a;
+            color: #fff;
+            padding: 0.625rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        a:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Video not found</h1>
+        <p>This video doesn't exist or has been deleted.</p>
+        <a href="https://sendrec.eu">Go to SendRec</a>
+    </div>
+</body>
+</html>`))
+
+type notFoundPageData struct {
+	Nonce string
+}
+
 type watchPageData struct {
 	Title        string
 	VideoURL     string
@@ -273,7 +318,12 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		shareToken,
 	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword)
 	if err != nil {
-		http.NotFound(w, r)
+		nonce := httputil.NonceFromContext(r.Context())
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		if err := notFoundPageTemplate.Execute(w, notFoundPageData{Nonce: nonce}); err != nil {
+			log.Printf("failed to render not found page: %v", err)
+		}
 		return
 	}
 
