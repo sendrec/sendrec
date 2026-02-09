@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type RecordingState = "idle" | "recording" | "stopped";
+type RecordingState = "idle" | "recording" | "paused" | "stopped";
 
 interface RecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
@@ -22,6 +22,8 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const startTimeRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>);
   const screenStreamRef = useRef<MediaStream | null>(null);
+  const pauseStartRef = useRef<number>(0);
+  const totalPausedRef = useRef<number>(0);
 
   const stopAllStreams = useCallback(() => {
     if (screenStreamRef.current) {
@@ -30,14 +32,45 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     }
   }, []);
 
+  const elapsedSeconds = useCallback(() => {
+    return Math.floor((Date.now() - startTimeRef.current - totalPausedRef.current) / 1000);
+  }, []);
+
+  const startTimer = useCallback(() => {
+    timerRef.current = setInterval(() => {
+      setDuration(elapsedSeconds());
+    }, 1000);
+  }, [elapsedSeconds]);
+
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      if (mediaRecorderRef.current.state === "paused") {
+        totalPausedRef.current += Date.now() - pauseStartRef.current;
+      }
       mediaRecorderRef.current.stop();
     }
     clearInterval(timerRef.current);
     stopAllStreams();
     setRecordingState("stopped");
   }, [stopAllStreams]);
+
+  const pauseRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.pause();
+      pauseStartRef.current = Date.now();
+      clearInterval(timerRef.current);
+      setRecordingState("paused");
+    }
+  }, []);
+
+  const resumeRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
+      totalPausedRef.current += Date.now() - pauseStartRef.current;
+      mediaRecorderRef.current.resume();
+      startTimer();
+      setRecordingState("recording");
+    }
+  }, [startTimer]);
 
   async function startRecording() {
     try {
@@ -53,6 +86,8 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
+      pauseStartRef.current = 0;
+      totalPausedRef.current = 0;
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -62,7 +97,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
 
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "video/webm" });
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        const elapsed = elapsedSeconds();
         onRecordingComplete(blob, elapsed);
       };
 
@@ -72,10 +107,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
 
       startTimeRef.current = Date.now();
       setDuration(0);
-      timerRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-        setDuration(elapsed);
-      }, 1000);
+      startTimer();
 
       recorder.start(1000);
       setRecordingState("recording");
@@ -129,6 +161,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     );
   }
 
+  const isPaused = recordingState === "paused";
   const remaining = maxDurationSeconds > 0 ? maxDurationSeconds - duration : null;
 
   return (
@@ -139,7 +172,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
             display: "flex",
             alignItems: "center",
             gap: 8,
-            color: "var(--color-error)",
+            color: isPaused ? "var(--color-text-secondary)" : "var(--color-error)",
             fontWeight: 600,
             fontSize: 14,
           }}
@@ -149,17 +182,55 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
               width: 10,
               height: 10,
               borderRadius: "50%",
-              background: "var(--color-error)",
-              animation: "pulse 1.5s infinite",
+              background: isPaused ? "var(--color-text-secondary)" : "var(--color-error)",
+              animation: isPaused ? "none" : "pulse 1.5s infinite",
             }}
           />
           {formatDuration(duration)}
-          {remaining !== null && (
+          {isPaused && (
+            <span style={{ fontWeight: 400 }}>
+              (Paused)
+            </span>
+          )}
+          {!isPaused && remaining !== null && (
             <span style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}>
               ({formatDuration(remaining)} remaining)
             </span>
           )}
         </div>
+
+        {isPaused ? (
+          <button
+            onClick={resumeRecording}
+            aria-label="Resume recording"
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            Resume
+          </button>
+        ) : (
+          <button
+            onClick={pauseRecording}
+            aria-label="Pause recording"
+            style={{
+              background: "transparent",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            Pause
+          </button>
+        )}
 
         <button
           onClick={stopRecording}
