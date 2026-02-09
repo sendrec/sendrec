@@ -81,6 +81,13 @@ input:focus-visible {
   flex-shrink: 0;
 }
 
+.pip-preview {
+  border-radius: 8px;
+  border: 2px solid var(--color-accent);
+  object-fit: cover;
+  background: var(--color-bg);
+}
+
 @media (max-width: 640px) {
   .page-container {
     margin: 24px auto;

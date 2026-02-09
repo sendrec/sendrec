@@ -193,7 +193,7 @@ func TestVerifyWatchPassword_CorrectPassword(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 
-	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows([]string{"share_password"}).AddRow(&passwordHash))
 
@@ -234,7 +234,7 @@ func TestVerifyWatchPassword_WrongPassword(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 
-	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows([]string{"share_password"}).AddRow(&passwordHash))
 
@@ -266,7 +266,7 @@ func TestVerifyWatchPassword_NoPasswordSet(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 
-	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows([]string{"share_password"}).AddRow((*string)(nil)))
 
@@ -298,7 +298,7 @@ func TestVerifyWatchPassword_VideoNotFound(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 
-	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnError(errors.New("no rows"))
 
@@ -421,7 +421,7 @@ func TestWatchDownload_PasswordProtected_NoCookie(t *testing.T) {
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password"}).
 			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt, &passwordHash))

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type RecordingState = "idle" | "recording" | "paused" | "stopped";
 
 interface RecorderProps {
-  onRecordingComplete: (blob: Blob, duration: number) => void;
+  onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void;
   maxDurationSeconds?: number;
 }
 
@@ -16,6 +16,7 @@ function formatDuration(seconds: number): string {
 export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: RecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [duration, setDuration] = useState(0);
+  const [webcamEnabled, setWebcamEnabled] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -25,12 +26,29 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const pauseStartRef = useRef<number>(0);
   const totalPausedRef = useRef<number>(0);
 
+  const webcamStreamRef = useRef<MediaStream | null>(null);
+  const webcamRecorderRef = useRef<MediaRecorder | null>(null);
+  const webcamChunksRef = useRef<Blob[]>([]);
+  const webcamVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
+    if (node && webcamStreamRef.current) {
+      node.srcObject = webcamStreamRef.current;
+    }
+  }, []);
+
+  const stopWebcamStream = useCallback(() => {
+    if (webcamStreamRef.current) {
+      webcamStreamRef.current.getTracks().forEach((track) => track.stop());
+      webcamStreamRef.current = null;
+    }
+  }, []);
+
   const stopAllStreams = useCallback(() => {
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((track) => track.stop());
       screenStreamRef.current = null;
     }
-  }, []);
+    stopWebcamStream();
+  }, [stopWebcamStream]);
 
   const elapsedSeconds = useCallback(() => {
     return Math.floor((Date.now() - startTimeRef.current - totalPausedRef.current) / 1000);
@@ -49,6 +67,12 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       }
       mediaRecorderRef.current.stop();
     }
+    if (webcamRecorderRef.current && webcamRecorderRef.current.state !== "inactive") {
+      if (webcamRecorderRef.current.state === "paused") {
+        webcamRecorderRef.current.resume();
+      }
+      webcamRecorderRef.current.stop();
+    }
     clearInterval(timerRef.current);
     stopAllStreams();
     setRecordingState("stopped");
@@ -57,6 +81,9 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.pause();
+      if (webcamRecorderRef.current && webcamRecorderRef.current.state === "recording") {
+        webcamRecorderRef.current.pause();
+      }
       pauseStartRef.current = Date.now();
       clearInterval(timerRef.current);
       setRecordingState("paused");
@@ -67,10 +94,32 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
       totalPausedRef.current += Date.now() - pauseStartRef.current;
       mediaRecorderRef.current.resume();
+      if (webcamRecorderRef.current && webcamRecorderRef.current.state === "paused") {
+        webcamRecorderRef.current.resume();
+      }
       startTimer();
       setRecordingState("recording");
     }
   }, [startTimer]);
+
+  async function toggleWebcam() {
+    if (webcamEnabled) {
+      stopWebcamStream();
+      setWebcamEnabled(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 240, facingMode: "user" },
+        audio: false,
+      });
+      webcamStreamRef.current = stream;
+      setWebcamEnabled(true);
+    } catch (err) {
+      console.error("Webcam access failed", err);
+      alert("Could not access your camera. Please allow camera access and try again.");
+    }
+  }
 
   async function startRecording() {
     try {
@@ -89,16 +138,41 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       pauseStartRef.current = 0;
       totalPausedRef.current = 0;
 
+      // Set up webcam recorder if webcam is enabled
+      let webcamBlobPromise: Promise<Blob> | null = null;
+      if (webcamEnabled && webcamStreamRef.current) {
+        const webcamRecorder = new MediaRecorder(webcamStreamRef.current, {
+          mimeType: "video/webm;codecs=vp9",
+        });
+        webcamRecorderRef.current = webcamRecorder;
+        webcamChunksRef.current = [];
+
+        webcamRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            webcamChunksRef.current.push(event.data);
+          }
+        };
+
+        webcamBlobPromise = new Promise<Blob>((resolve) => {
+          webcamRecorder.onstop = () => {
+            resolve(new Blob(webcamChunksRef.current, { type: "video/webm" }));
+          };
+        });
+
+        webcamRecorder.start(1000);
+      }
+
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
 
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "video/webm" });
         const elapsed = elapsedSeconds();
-        onRecordingComplete(blob, elapsed);
+        const webcamBlob = webcamBlobPromise ? await webcamBlobPromise : undefined;
+        onRecordingComplete(blob, elapsed, webcamBlob);
       };
 
       screenStream.getVideoTracks()[0].addEventListener("ended", () => {
@@ -135,6 +209,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     };
   }, [stopAllStreams]);
 
+
   if (recordingState === "idle") {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
@@ -143,20 +218,49 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
             Maximum recording length: {formatDuration(maxDurationSeconds)}
           </p>
         )}
-        <button
-          onClick={startRecording}
-          aria-label="Start recording"
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 8,
-            padding: "14px 32px",
-            fontSize: 16,
-            fontWeight: 600,
-          }}
-        >
-          Start Recording
-        </button>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button
+            onClick={toggleWebcam}
+            aria-label={webcamEnabled ? "Disable camera" : "Enable camera"}
+            style={{
+              background: webcamEnabled ? "var(--color-accent)" : "transparent",
+              color: webcamEnabled ? "var(--color-text)" : "var(--color-text-secondary)",
+              border: webcamEnabled ? "none" : "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "14px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            {webcamEnabled ? "Camera On" : "Camera Off"}
+          </button>
+          <button
+            onClick={startRecording}
+            aria-label="Start recording"
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              borderRadius: 8,
+              padding: "14px 32px",
+              fontSize: 16,
+              fontWeight: 600,
+            }}
+          >
+            Start Recording
+          </button>
+        </div>
+        {webcamEnabled && (
+          <div style={{ position: "relative", marginTop: 8 }}>
+            <video
+              ref={webcamVideoCallbackRef}
+              autoPlay
+              muted
+              playsInline
+              className="pip-preview"
+              style={{ width: 160, height: 120 }}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -248,6 +352,16 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         </button>
       </div>
 
+      {webcamEnabled && (
+        <video
+          ref={webcamVideoCallbackRef}
+          autoPlay
+          muted
+          playsInline
+          className="pip-preview"
+          style={{ width: 160, height: 120 }}
+        />
+      )}
     </div>
   );
 }

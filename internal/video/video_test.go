@@ -21,6 +21,7 @@ import (
 
 type mockStorage struct {
 	uploadURL              string
+	webcamUploadURL        string
 	uploadErr              error
 	downloadURL            string
 	downloadErr            error
@@ -37,7 +38,10 @@ type mockStorage struct {
 	uploadFileErr          error
 }
 
-func (m *mockStorage) GenerateUploadURL(_ context.Context, _ string, _ string, _ int64, _ time.Duration) (string, error) {
+func (m *mockStorage) GenerateUploadURL(_ context.Context, key string, _ string, _ int64, _ time.Duration) (string, error) {
+	if m.webcamUploadURL != "" && strings.HasSuffix(key, "_webcam.webm") {
+		return m.webcamUploadURL, m.uploadErr
+	}
 	return m.uploadURL, m.uploadErr
 }
 
@@ -183,6 +187,7 @@ func TestCreate_Success(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-123"))
 
@@ -238,6 +243,7 @@ func TestCreate_DefaultTitleWhenEmpty(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Untitled Recording",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -310,6 +316,7 @@ func TestCreate_DatabaseError(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnError(errors.New("connection refused"))
 
@@ -353,6 +360,7 @@ func TestCreate_StorageError(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Test Video",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -442,6 +450,7 @@ func TestCreate_AllowsDurationWithinLimit(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-ok"))
 
@@ -480,6 +489,7 @@ func TestCreate_AllowsAnyDurationWhenLimitIsZero(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Very Long Video",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -572,6 +582,7 @@ func TestCreate_AllowsWhenBelowMonthlyLimit(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-25"))
 
@@ -611,6 +622,7 @@ func TestCreate_SkipsMonthlyCheckWhenLimitIsZero(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Unlimited Video",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -674,6 +686,117 @@ func TestCreate_MonthlyLimitCountQueryError(t *testing.T) {
 	}
 }
 
+// --- Create with Webcam Tests ---
+
+func TestCreate_WithWebcam_ReturnsWebcamUploadURL(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{
+		uploadURL:       "https://s3.example.com/upload?signed=screen",
+		webcamUploadURL: "https://s3.example.com/upload?signed=webcam",
+	}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"Webcam Recording",
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-webcam"))
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"title":          "Webcam Recording",
+		"duration":       120,
+		"fileSize":       5000000,
+		"webcamFileSize": 1000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp["uploadUrl"] != "https://s3.example.com/upload?signed=screen" {
+		t.Errorf("expected screen upload URL, got %v", resp["uploadUrl"])
+	}
+	if resp["webcamUploadUrl"] != "https://s3.example.com/upload?signed=webcam" {
+		t.Errorf("expected webcam upload URL, got %v", resp["webcamUploadUrl"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_WithoutWebcam_OmitsWebcamUploadURL(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=screen"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"No Webcam",
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-noweb"))
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"title":    "No Webcam",
+		"duration": 60,
+		"fileSize": 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if _, exists := resp["webcamUploadUrl"]; exists {
+		t.Errorf("expected webcamUploadUrl to be absent, got %v", resp["webcamUploadUrl"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
 // --- Update Tests ---
 
 func TestUpdate_Success(t *testing.T) {
@@ -689,9 +812,9 @@ func TestUpdate_Success(t *testing.T) {
 	fileKey := "recordings/user/video.webm"
 	fileSize := int64(100000)
 
-	mock.ExpectQuery(`SELECT file_key, file_size, share_token FROM videos`).
+	mock.ExpectQuery(`SELECT file_key, file_size, share_token, webcam_key FROM videos`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"file_key", "file_size", "share_token"}).AddRow(fileKey, fileSize, "abc123defghi"))
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "file_size", "share_token", "webcam_key"}).AddRow(fileKey, fileSize, "abc123defghi", (*string)(nil)))
 
 	mock.ExpectExec(`UPDATE videos SET status`).
 		WithArgs("ready", videoID, testUserID).
@@ -754,7 +877,7 @@ func TestUpdate_VideoNotFound(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
-	mock.ExpectQuery(`SELECT file_key, file_size, share_token FROM videos`).
+	mock.ExpectQuery(`SELECT file_key, file_size, share_token, webcam_key FROM videos`).
 		WithArgs(videoID, testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -818,9 +941,9 @@ func TestUpdate_DatabaseError(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT file_key, file_size, share_token FROM videos`).
+	mock.ExpectQuery(`SELECT file_key, file_size, share_token, webcam_key FROM videos`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"file_key", "file_size", "share_token"}).AddRow("recordings/user/video.webm", int64(1000), "abc123defghi"))
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "file_size", "share_token", "webcam_key"}).AddRow("recordings/user/video.webm", int64(1000), "abc123defghi", (*string)(nil)))
 
 	mock.ExpectExec(`UPDATE videos SET status`).
 		WithArgs("ready", videoID, testUserID).
@@ -841,6 +964,87 @@ func TestUpdate_DatabaseError(t *testing.T) {
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
 	if errMsg != "failed to update video" {
 		t.Errorf("expected error %q, got %q", "failed to update video", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- Update with Webcam Tests ---
+
+func TestUpdate_WithWebcam_SetsProcessingStatus(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{headSize: 100000, headType: "video/webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-webcam"
+	fileKey := "recordings/user/video.webm"
+	fileSize := int64(100000)
+	webcamKey := "recordings/user/video_webcam.webm"
+
+	mock.ExpectQuery(`SELECT file_key, file_size, share_token, webcam_key FROM videos`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "file_size", "share_token", "webcam_key"}).
+			AddRow(fileKey, fileSize, "abc123defghi", &webcamKey))
+
+	mock.ExpectExec(`UPDATE videos SET status`).
+		WithArgs("processing", videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body, _ := json.Marshal(updateRequest{Status: "ready"})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Patch("/api/videos/{id}", handler.Update)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPatch, "/api/videos/"+videoID, body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestUpdate_WithoutWebcam_SetsReadyStatus(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{headSize: 100000, headType: "video/webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-noweb"
+	fileKey := "recordings/user/video.webm"
+	fileSize := int64(100000)
+
+	mock.ExpectQuery(`SELECT file_key, file_size, share_token, webcam_key FROM videos`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "file_size", "share_token", "webcam_key"}).
+			AddRow(fileKey, fileSize, "abc123defghi", (*string)(nil)))
+
+	mock.ExpectExec(`UPDATE videos SET status`).
+		WithArgs("ready", videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body, _ := json.Marshal(updateRequest{Status: "ready"})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Patch("/api/videos/{id}", handler.Update)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPatch, "/api/videos/"+videoID, body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -1165,7 +1369,7 @@ func TestDelete_Success(t *testing.T) {
 
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key"}).AddRow(fileKey, (*string)(nil)))
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key", "webcam_key"}).AddRow(fileKey, (*string)(nil), (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Delete("/api/videos/{id}", handler.Delete)
@@ -1474,6 +1678,7 @@ func TestCreate_FileKeyContainsUserIDAndShareToken(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Test Video",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -2301,7 +2506,7 @@ func TestDelete_MarksFilePurgedOnSuccess(t *testing.T) {
 
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key"}).AddRow(fileKey, (*string)(nil)))
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key", "webcam_key"}).AddRow(fileKey, (*string)(nil), (*string)(nil)))
 
 	mock.ExpectExec(`UPDATE videos SET file_purged_at`).
 		WithArgs(fileKey).
@@ -2321,6 +2526,66 @@ func TestDelete_MarksFilePurgedOnSuccess(t *testing.T) {
 	case <-deleteCalled:
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected delete to be called")
+	}
+
+	// Give goroutine time to execute the UPDATE
+	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- Delete with Webcam Tests ---
+
+func TestDelete_CleansUpWebcamFile(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	deleteCalled := make(chan string, 3)
+	storage := &mockStorage{deleteCalled: deleteCalled}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-webcam-del"
+	fileKey := "recordings/user-1/abc.webm"
+	webcamKey := "recordings/user-1/abc_webcam.webm"
+
+	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key", "webcam_key"}).AddRow(fileKey, (*string)(nil), &webcamKey))
+
+	mock.ExpectExec(`UPDATE videos SET file_purged_at`).
+		WithArgs(fileKey).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Delete("/api/videos/{id}", handler.Delete)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodDelete, "/api/videos/"+videoID, nil))
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	// Collect deleted keys (video file + webcam file)
+	deletedKeys := make(map[string]bool)
+	for i := 0; i < 2; i++ {
+		select {
+		case key := <-deleteCalled:
+			deletedKeys[key] = true
+		case <-time.After(2 * time.Second):
+			t.Fatal("expected 2 delete calls within 2 seconds")
+		}
+	}
+
+	if !deletedKeys[fileKey] {
+		t.Errorf("expected video file %q to be deleted", fileKey)
+	}
+	if !deletedKeys[webcamKey] {
+		t.Errorf("expected webcam file %q to be deleted", webcamKey)
 	}
 
 	// Give goroutine time to execute the UPDATE
@@ -2548,7 +2813,7 @@ func TestWatchDownload_Success(t *testing.T) {
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password"}).
 			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt, (*string)(nil)))
@@ -2591,7 +2856,7 @@ func TestWatchDownload_VideoNotFound(t *testing.T) {
 
 	shareToken := "nonexistent12"
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -2629,7 +2894,7 @@ func TestWatchDownload_Expired(t *testing.T) {
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(-1 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password"}).
 			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt, (*string)(nil)))
