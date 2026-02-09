@@ -490,7 +490,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
-		 WHERE v.share_token = $1 AND v.status = 'ready'`,
+		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword)
 	if err != nil {
@@ -578,7 +578,7 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 	var sharePassword *string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = $1 AND status = 'ready'`,
+		`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&title, &fileKey, &shareExpiresAt, &sharePassword)
 	if err != nil {

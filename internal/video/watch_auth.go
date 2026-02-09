@@ -83,7 +83,7 @@ func (h *Handler) VerifyWatchPassword(w http.ResponseWriter, r *http.Request) {
 
 	var sharePassword *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT share_password FROM videos WHERE share_token = $1 AND status = 'ready'`,
+		`SELECT share_password FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&sharePassword)
 	if err != nil {

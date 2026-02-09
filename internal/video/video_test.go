@@ -2813,7 +2813,7 @@ func TestWatchDownload_Success(t *testing.T) {
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password"}).
 			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt, (*string)(nil)))
@@ -2856,7 +2856,7 @@ func TestWatchDownload_VideoNotFound(t *testing.T) {
 
 	shareToken := "nonexistent12"
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -2894,7 +2894,7 @@ func TestWatchDownload_Expired(t *testing.T) {
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(-1 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password"}).
 			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt, (*string)(nil)))

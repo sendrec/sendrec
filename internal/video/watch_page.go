@@ -269,7 +269,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
-		 WHERE v.share_token = $1 AND v.status = 'ready'`,
+		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword)
 	if err != nil {

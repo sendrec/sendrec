@@ -29,7 +29,11 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const webcamStreamRef = useRef<MediaStream | null>(null);
   const webcamRecorderRef = useRef<MediaRecorder | null>(null);
   const webcamChunksRef = useRef<Blob[]>([]);
-  const webcamVideoRef = useRef<HTMLVideoElement | null>(null);
+  const webcamVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
+    if (node && webcamStreamRef.current) {
+      node.srcObject = webcamStreamRef.current;
+    }
+  }, []);
 
   const stopWebcamStream = useCallback(() => {
     if (webcamStreamRef.current) {
@@ -110,9 +114,6 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         audio: false,
       });
       webcamStreamRef.current = stream;
-      if (webcamVideoRef.current) {
-        webcamVideoRef.current.srcObject = stream;
-      }
       setWebcamEnabled(true);
     } catch (err) {
       console.error("Webcam access failed", err);
@@ -208,12 +209,6 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     };
   }, [stopAllStreams]);
 
-  // Attach webcam stream to video element when ref becomes available
-  useEffect(() => {
-    if (webcamVideoRef.current && webcamStreamRef.current) {
-      webcamVideoRef.current.srcObject = webcamStreamRef.current;
-    }
-  }, [webcamEnabled]);
 
   if (recordingState === "idle") {
     return (
@@ -257,7 +252,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         {webcamEnabled && (
           <div style={{ position: "relative", marginTop: 8 }}>
             <video
-              ref={webcamVideoRef}
+              ref={webcamVideoCallbackRef}
               autoPlay
               muted
               playsInline
@@ -359,7 +354,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
 
       {webcamEnabled && (
         <video
-          ref={webcamVideoRef}
+          ref={webcamVideoCallbackRef}
           autoPlay
           muted
           playsInline
