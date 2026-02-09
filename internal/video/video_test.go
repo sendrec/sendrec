@@ -20,19 +20,21 @@ import (
 )
 
 type mockStorage struct {
-	uploadURL         string
-	uploadErr         error
-	downloadURL       string
-	downloadErr       error
-	deleteErr         error
-	deleteCalled      chan string
-	deleteCallCount   int
-	deleteFailUntil   int
-	headSize          int64
-	headType          string
-	headErr           error
-	downloadToFileErr error
-	uploadFileErr     error
+	uploadURL              string
+	uploadErr              error
+	downloadURL            string
+	downloadErr            error
+	downloadDispositionURL string
+	downloadDispositionErr error
+	deleteErr              error
+	deleteCalled           chan string
+	deleteCallCount        int
+	deleteFailUntil        int
+	headSize               int64
+	headType               string
+	headErr                error
+	downloadToFileErr      error
+	uploadFileErr          error
 }
 
 func (m *mockStorage) GenerateUploadURL(_ context.Context, _ string, _ string, _ int64, _ time.Duration) (string, error) {
@@ -40,6 +42,13 @@ func (m *mockStorage) GenerateUploadURL(_ context.Context, _ string, _ string, _
 }
 
 func (m *mockStorage) GenerateDownloadURL(_ context.Context, _ string, _ time.Duration) (string, error) {
+	return m.downloadURL, m.downloadErr
+}
+
+func (m *mockStorage) GenerateDownloadURLWithDisposition(_ context.Context, _ string, _ string, _ time.Duration) (string, error) {
+	if m.downloadDispositionURL != "" || m.downloadDispositionErr != nil {
+		return m.downloadDispositionURL, m.downloadDispositionErr
+	}
 	return m.downloadURL, m.downloadErr
 }
 
@@ -2113,6 +2122,52 @@ func TestWatchPage_NoPosterWhenNoThumbnail(t *testing.T) {
 	}
 }
 
+func TestWatchPage_ContainsDownloadButton(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	downloadURL := "https://s3.example.com/download?signed=xyz"
+	storage := &mockStorage{downloadURL: downloadURL}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key"}).
+				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+		)
+
+	r := chi.NewRouter()
+	r.Get("/watch/{shareToken}", handler.WatchPage)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/"+shareToken, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Download") {
+		t.Error("expected watch page to contain Download button")
+	}
+	if !strings.Contains(body, "/api/watch/"+shareToken+"/download") {
+		t.Errorf("expected watch page to contain download API URL for share token %s", shareToken)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
 // --- viewerHash Tests ---
 
 func TestViewerHash_DeterministicOutput(t *testing.T) {
@@ -2360,6 +2415,239 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	}
 	if resp.VideosUsedThisMonth != 0 {
 		t.Errorf("expected videosUsedThisMonth 0, got %d", resp.VideosUsedThisMonth)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- Download Tests ---
+
+func TestDownload_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	dispositionURL := "https://s3.example.com/download?signed=xyz&disposition=attachment"
+	storage := &mockStorage{downloadDispositionURL: dispositionURL}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	videoID := "video-123"
+
+	mock.ExpectQuery(`SELECT title, file_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key"}).
+			AddRow("Demo Recording", "recordings/user-1/abc.webm"))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/download", handler.Download)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/download", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		DownloadURL string `json:"downloadUrl"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.DownloadURL != dispositionURL {
+		t.Errorf("expected downloadUrl %q, got %q", dispositionURL, resp.DownloadURL)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestDownload_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	videoID := "nonexistent-id"
+
+	mock.ExpectQuery(`SELECT title, file_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/download", handler.Download)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/download", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "video not found" {
+		t.Errorf("expected error %q, got %q", "video not found", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestDownload_StorageError(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadDispositionErr: errors.New("s3 unreachable")}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+	videoID := "video-123"
+
+	mock.ExpectQuery(`SELECT title, file_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key"}).
+			AddRow("Demo Recording", "recordings/user-1/abc.webm"))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/download", handler.Download)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/download", nil))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("expected status %d, got %d: %s", http.StatusInternalServerError, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- WatchDownload Tests ---
+
+func TestWatchDownload_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	dispositionURL := "https://s3.example.com/download?signed=xyz&disposition=attachment"
+	storage := &mockStorage{downloadDispositionURL: dispositionURL}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+
+	shareToken := "abc123defghi"
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at"}).
+			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt))
+
+	r := chi.NewRouter()
+	r.Get("/api/watch/{shareToken}/download", handler.WatchDownload)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/watch/"+shareToken+"/download", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		DownloadURL string `json:"downloadUrl"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.DownloadURL != dispositionURL {
+		t.Errorf("expected downloadUrl %q, got %q", dispositionURL, resp.DownloadURL)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestWatchDownload_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+
+	shareToken := "nonexistent12"
+
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+		WithArgs(shareToken).
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.Get("/api/watch/{shareToken}/download", handler.WatchDownload)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/watch/"+shareToken+"/download", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "video not found" {
+		t.Errorf("expected error %q, got %q", "video not found", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestWatchDownload_Expired(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadDispositionURL: "https://s3.example.com/download"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0)
+
+	shareToken := "abc123defghi"
+	shareExpiresAt := time.Now().Add(-1 * time.Hour)
+
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at FROM videos WHERE share_token = \$1 AND status = 'ready'`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at"}).
+			AddRow("Demo Recording", "recordings/user-1/abc.webm", shareExpiresAt))
+
+	r := chi.NewRouter()
+	r.Get("/api/watch/{shareToken}/download", handler.WatchDownload)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/watch/"+shareToken+"/download", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusGone {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusGone, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "link expired" {
+		t.Errorf("expected error %q, got %q", "link expired", errMsg)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

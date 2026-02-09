@@ -30,6 +30,10 @@ func (m *mockStorage) GenerateDownloadURL(ctx context.Context, key string, expir
 	return "https://example.com/download", nil
 }
 
+func (m *mockStorage) GenerateDownloadURLWithDisposition(ctx context.Context, key string, filename string, expiry time.Duration) (string, error) {
+	return "https://example.com/download?disposition=attachment", nil
+}
+
 func (m *mockStorage) DeleteObject(ctx context.Context, key string) error {
 	return nil
 }

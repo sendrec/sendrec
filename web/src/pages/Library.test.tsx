@@ -231,4 +231,30 @@ describe("Library", () => {
     });
     expect(screen.queryByText(/videos this month/i)).not.toBeInTheDocument();
   });
+
+  it("renders download button for ready videos", async () => {
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+    });
+  });
+
+  it("triggers download API call on click", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo()]);
+    mockApiFetch.mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/download" });
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Download" }));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/download");
+    });
+  });
 });

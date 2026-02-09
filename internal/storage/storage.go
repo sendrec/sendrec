@@ -104,6 +104,20 @@ func (s *Storage) GenerateDownloadURL(ctx context.Context, key string, expiry ti
 	return req.URL, nil
 }
 
+func (s *Storage) GenerateDownloadURLWithDisposition(ctx context.Context, key string, filename string, expiry time.Duration) (string, error) {
+	disposition := fmt.Sprintf(`attachment; filename="%s"`, filename)
+	req, err := s.presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket:                     aws.String(s.bucket),
+		Key:                        aws.String(key),
+		ResponseContentDisposition: aws.String(disposition),
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", fmt.Errorf("presign download: %w", err)
+	}
+
+	return req.URL, nil
+}
+
 func (s *Storage) DeleteObject(ctx context.Context, key string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucket),
