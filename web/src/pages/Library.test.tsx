@@ -339,4 +339,88 @@ describe("Library", () => {
     // Should not have called password API (only initial fetch + limits fetch)
     expect(mockApiFetch).toHaveBeenCalledTimes(2);
   });
+
+  it("enters edit mode on title click", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("My Recording")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("My Recording"));
+
+    const input = screen.getByDisplayValue("My Recording");
+    expect(input).toBeInTheDocument();
+    expect(input.tagName).toBe("INPUT");
+  });
+
+  it("saves title on Enter", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo()]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // PATCH response
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("My Recording")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("My Recording"));
+    const input = screen.getByDisplayValue("My Recording");
+    await user.clear(input);
+    await user.type(input, "New Title{Enter}");
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1", {
+        method: "PATCH",
+        body: JSON.stringify({ title: "New Title" }),
+      });
+    });
+    expect(screen.getByText("New Title")).toBeInTheDocument();
+  });
+
+  it("cancels edit on Escape", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("My Recording")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("My Recording"));
+    const input = screen.getByDisplayValue("My Recording");
+    await user.clear(input);
+    await user.type(input, "Something else{Escape}");
+
+    expect(screen.getByText("My Recording")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Something else")).not.toBeInTheDocument();
+    // Should not have called PATCH (only initial fetch + limits fetch)
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("saves title on blur", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo()]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // PATCH response
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("My Recording")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("My Recording"));
+    const input = screen.getByDisplayValue("My Recording");
+    await user.clear(input);
+    await user.type(input, "Blurred Title");
+    await user.tab(); // triggers blur
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1", {
+        method: "PATCH",
+        body: JSON.stringify({ title: "Blurred Title" }),
+      });
+    });
+  });
 });
