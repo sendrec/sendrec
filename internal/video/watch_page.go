@@ -65,6 +65,24 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
         .branding a:hover {
             text-decoration: underline;
         }
+        .actions {
+            margin-top: 1rem;
+        }
+        .download-btn {
+            display: inline-block;
+            background: transparent;
+            color: #00b67a;
+            border: 1px solid #00b67a;
+            padding: 0.5rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .download-btn:hover {
+            background: rgba(0, 182, 122, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -79,6 +97,16 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
         </script>
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
+        <div class="actions">
+            <button class="download-btn" id="download-btn">Download</button>
+        </div>
+        <script nonce="{{.Nonce}}">
+            document.getElementById('download-btn').addEventListener('click', function() {
+                fetch('/api/watch/{{.ShareToken}}/download')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) { if (data.downloadUrl) window.location.href = data.downloadUrl; });
+            });
+        </script>
         <p class="branding">Shared via <a href="https://sendrec.eu">SendRec</a> — open-source video messaging</p>
     </div>
 </body>
@@ -132,6 +160,7 @@ type watchPageData struct {
 	Date         string
 	Nonce        string
 	ThumbnailURL string
+	ShareToken   string
 }
 
 type expiredPageData struct {
@@ -192,6 +221,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Date:         createdAt.Format("Jan 2, 2006"),
 		Nonce:        nonce,
 		ThumbnailURL: thumbnailURL,
+		ShareToken:   shareToken,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

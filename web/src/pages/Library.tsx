@@ -52,6 +52,7 @@ export function Library() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [extendingId, setExtendingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
 
   useEffect(() => {
@@ -103,6 +104,18 @@ export function Library() {
       document.body.removeChild(textArea);
       setCopiedId(videoId);
       setTimeout(() => setCopiedId(null), 2000);
+    }
+  }
+
+  async function downloadVideo(id: string) {
+    setDownloadingId(id);
+    try {
+      const resp = await apiFetch<{ downloadUrl: string }>(`/api/videos/${id}/download`);
+      if (resp?.downloadUrl) {
+        window.location.href = resp.downloadUrl;
+      }
+    } finally {
+      setDownloadingId(null);
     }
   }
 
@@ -278,6 +291,22 @@ export function Library() {
                     }}
                   >
                     {copiedId === video.id ? "Copied!" : "Copy link"}
+                  </button>
+                  <button
+                    onClick={() => downloadVideo(video.id)}
+                    disabled={downloadingId === video.id}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-accent)",
+                      border: "1px solid var(--color-accent)",
+                      borderRadius: 4,
+                      padding: "6px 14px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      opacity: downloadingId === video.id ? 0.7 : 1,
+                    }}
+                  >
+                    {downloadingId === video.id ? "Downloading..." : "Download"}
                   </button>
                   <button
                     onClick={() => extendVideo(video.id)}

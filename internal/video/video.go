@@ -22,6 +22,7 @@ import (
 type ObjectStorage interface {
 	GenerateUploadURL(ctx context.Context, key string, contentType string, contentLength int64, expiry time.Duration) (string, error)
 	GenerateDownloadURL(ctx context.Context, key string, expiry time.Duration) (string, error)
+	GenerateDownloadURLWithDisposition(ctx context.Context, key string, filename string, expiry time.Duration) (string, error)
 	DeleteObject(ctx context.Context, key string) error
 	HeadObject(ctx context.Context, key string) (int64, string, error)
 	DownloadToFile(ctx context.Context, key string, destPath string) error
@@ -483,6 +484,62 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    createdAt.Format(time.RFC3339),
 		ThumbnailURL: thumbnailURL,
 	})
+}
+
+func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var title string
+	var fileKey string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT title, file_key FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
+		videoID, userID,
+	).Scan(&title, &fileKey)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	filename := title + ".webm"
+	downloadURL, err := h.storage.GenerateDownloadURLWithDisposition(r.Context(), fileKey, filename, 1*time.Hour)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate download URL")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"downloadUrl": downloadURL})
+}
+
+func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
+	shareToken := chi.URLParam(r, "shareToken")
+
+	var title string
+	var fileKey string
+	var shareExpiresAt time.Time
+
+	err := h.db.QueryRow(r.Context(),
+		`SELECT title, file_key, share_expires_at FROM videos WHERE share_token = $1 AND status = 'ready'`,
+		shareToken,
+	).Scan(&title, &fileKey, &shareExpiresAt)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	if time.Now().After(shareExpiresAt) {
+		httputil.WriteError(w, http.StatusGone, "link expired")
+		return
+	}
+
+	filename := title + ".webm"
+	downloadURL, err := h.storage.GenerateDownloadURLWithDisposition(r.Context(), fileKey, filename, 1*time.Hour)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate download URL")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"downloadUrl": downloadURL})
 }
 
 func viewerHash(ip, userAgent string) string {
