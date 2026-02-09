@@ -7,6 +7,7 @@ interface CreateVideoResponse {
   id: string;
   uploadUrl: string;
   shareToken: string;
+  webcamUploadUrl?: string;
 }
 
 interface LimitsResponse {
@@ -36,7 +37,7 @@ export function Record() {
     fetchLimits();
   }, []);
 
-  async function handleRecordingComplete(blob: Blob, duration: number) {
+  async function handleRecordingComplete(blob: Blob, duration: number, webcamBlob?: Blob) {
     setUploading(true);
     setError(null);
     let videoId: string | null = null;
@@ -45,9 +46,14 @@ export function Record() {
       const now = new Date();
       const title = `Recording ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
 
+      const createBody: Record<string, unknown> = { title, duration, fileSize: blob.size };
+      if (webcamBlob) {
+        createBody.webcamFileSize = webcamBlob.size;
+      }
+
       const result = await apiFetch<CreateVideoResponse>("/api/videos", {
         method: "POST",
-        body: JSON.stringify({ title, duration, fileSize: blob.size }),
+        body: JSON.stringify(createBody),
       });
 
       if (!result) {
@@ -66,6 +72,18 @@ export function Record() {
         throw new Error("Upload failed");
       }
 
+      if (webcamBlob && result.webcamUploadUrl) {
+        const webcamResp = await fetch(result.webcamUploadUrl, {
+          method: "PUT",
+          body: webcamBlob,
+          headers: { "Content-Type": "video/webm" },
+        });
+
+        if (!webcamResp.ok) {
+          throw new Error("Webcam upload failed");
+        }
+      }
+
       await apiFetch(`/api/videos/${result.id}`, {
         method: "PATCH",
         body: JSON.stringify({ status: "ready" }),
@@ -74,7 +92,6 @@ export function Record() {
       setShareUrl(`${window.location.origin}/watch/${result.shareToken}`);
     } catch (err) {
       if (videoId) {
-        // Best-effort cleanup so "uploading" rows don't accumulate.
         apiFetch(`/api/videos/${videoId}`, { method: "DELETE" }).catch(() => {});
       }
       setError(err instanceof Error ? err.message : "Upload failed");

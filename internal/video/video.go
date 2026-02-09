@@ -44,6 +44,10 @@ func videoFileKey(userID, shareToken string) string {
 	return fmt.Sprintf("recordings/%s/%s.webm", userID, shareToken)
 }
 
+func webcamFileKey(userID, shareToken string) string {
+	return fmt.Sprintf("recordings/%s/%s_webcam.webm", userID, shareToken)
+}
+
 func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64, maxVideosPerMonth int, maxVideoDurationSeconds int, hmacSecret string, secureCookies bool) *Handler {
 	return &Handler{
 		db:                      db,
@@ -58,15 +62,17 @@ func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadByte
 }
 
 type createRequest struct {
-	Title    string `json:"title"`
-	Duration int    `json:"duration"`
-	FileSize int64  `json:"fileSize"`
+	Title          string `json:"title"`
+	Duration       int    `json:"duration"`
+	FileSize       int64  `json:"fileSize"`
+	WebcamFileSize int64  `json:"webcamFileSize,omitempty"`
 }
 
 type createResponse struct {
-	ID         string `json:"id"`
-	UploadURL  string `json:"uploadUrl"`
-	ShareToken string `json:"shareToken"`
+	ID              string `json:"id"`
+	UploadURL       string `json:"uploadUrl"`
+	ShareToken      string `json:"shareToken"`
+	WebcamUploadURL string `json:"webcamUploadUrl,omitempty"`
 }
 
 type listItem struct {
@@ -155,11 +161,17 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	fileKey := videoFileKey(userID, shareToken)
 
+	var webcamKey *string
+	if req.WebcamFileSize > 0 {
+		k := webcamFileKey(userID, shareToken)
+		webcamKey = &k
+	}
+
 	var videoID string
 	err = h.db.QueryRow(r.Context(),
-		`INSERT INTO videos (user_id, title, duration, file_size, file_key, share_token)
-		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		userID, title, req.Duration, req.FileSize, fileKey, shareToken,
+		`INSERT INTO videos (user_id, title, duration, file_size, file_key, share_token, webcam_key)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		userID, title, req.Duration, req.FileSize, fileKey, shareToken, webcamKey,
 	).Scan(&videoID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create video")
@@ -172,11 +184,22 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httputil.WriteJSON(w, http.StatusCreated, createResponse{
+	resp := createResponse{
 		ID:         videoID,
 		UploadURL:  uploadURL,
 		ShareToken: shareToken,
-	})
+	}
+
+	if webcamKey != nil {
+		webcamURL, err := h.storage.GenerateUploadURL(r.Context(), *webcamKey, "video/webm", req.WebcamFileSize, 30*time.Minute)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to generate webcam upload URL")
+			return
+		}
+		resp.WebcamUploadURL = webcamURL
+	}
+
+	httputil.WriteJSON(w, http.StatusCreated, resp)
 }
 
 func (h *Handler) countVideosThisMonth(ctx context.Context, userID string) (int, error) {
@@ -238,11 +261,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		var fileKey string
 		var fileSize int64
 		var shareToken string
+		var webcamKey *string
 		err := h.db.QueryRow(r.Context(),
-			`SELECT file_key, file_size, share_token FROM videos
+			`SELECT file_key, file_size, share_token, webcam_key FROM videos
 			 WHERE id = $1 AND user_id = $2 AND status = 'uploading'`,
 			videoID, userID,
-		).Scan(&fileKey, &fileSize, &shareToken)
+		).Scan(&fileKey, &fileSize, &shareToken, &webcamKey)
 		if err != nil {
 			httputil.WriteError(w, http.StatusNotFound, "video not found")
 			return
@@ -266,10 +290,15 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		newStatus := "ready"
+		if webcamKey != nil {
+			newStatus = "processing"
+		}
+
 		tag, err := h.db.Exec(r.Context(),
 			`UPDATE videos SET status = $1, updated_at = now()
 			 WHERE id = $2 AND user_id = $3 AND status = 'uploading'`,
-			req.Status, videoID, userID,
+			newStatus, videoID, userID,
 		)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update video")
@@ -280,12 +309,21 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		go GenerateThumbnail(
-			context.Background(),
-			h.db, h.storage,
-			videoID, fileKey,
-			thumbnailFileKey(userID, shareToken),
-		)
+		if webcamKey != nil {
+			go CompositeWithWebcam(
+				context.Background(),
+				h.db, h.storage,
+				videoID, fileKey, *webcamKey,
+				thumbnailFileKey(userID, shareToken),
+			)
+		} else {
+			go GenerateThumbnail(
+				context.Background(),
+				h.db, h.storage,
+				videoID, fileKey,
+				thumbnailFileKey(userID, shareToken),
+			)
+		}
 	}
 
 	if req.Title != "" {
@@ -396,12 +434,13 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	var fileKey string
 	var thumbnailKey *string
+	var webcamKey *string
 	err := h.db.QueryRow(r.Context(),
 		`UPDATE videos SET status = 'deleted', updated_at = now()
 		 WHERE id = $1 AND user_id = $2 AND status != 'deleted'
-		 RETURNING file_key, thumbnail_key`,
+		 RETURNING file_key, thumbnail_key, webcam_key`,
 		videoID, userID,
-	).Scan(&fileKey, &thumbnailKey)
+	).Scan(&fileKey, &thumbnailKey, &webcamKey)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -416,6 +455,11 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		if thumbnailKey != nil {
 			if err := deleteWithRetry(ctx, h.storage, *thumbnailKey, 3); err != nil {
 				log.Printf("thumbnail delete failed for %s: %v", *thumbnailKey, err)
+			}
+		}
+		if webcamKey != nil {
+			if err := deleteWithRetry(ctx, h.storage, *webcamKey, 3); err != nil {
+				log.Printf("webcam delete failed for %s: %v", *webcamKey, err)
 			}
 		}
 		if _, err := h.db.Exec(ctx,

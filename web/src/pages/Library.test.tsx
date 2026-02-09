@@ -340,6 +340,15 @@ describe("Library", () => {
     expect(mockApiFetch).toHaveBeenCalledTimes(2);
   });
 
+  it("shows processing status", async () => {
+    mockFetch([makeVideo({ status: "processing" })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("processing...")).toBeInTheDocument();
+    });
+  });
+
   it("enters edit mode on title click", async () => {
     const user = userEvent.setup();
     mockFetch([makeVideo()]);

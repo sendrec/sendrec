@@ -328,6 +328,11 @@ export function Library() {
                     uploading...
                   </span>
                 )}
+                {video.status === "processing" && (
+                  <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
+                    processing...
+                  </span>
+                )}
                 {video.status === "ready" && video.viewCount > 0 && (
                   <span style={{ marginLeft: 8 }}>
                     &middot; {video.viewCount === video.uniqueViewCount
