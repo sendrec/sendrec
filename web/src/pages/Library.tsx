@@ -55,6 +55,8 @@ export function Library() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -160,6 +162,20 @@ export function Library() {
     setLimits(limitsResult ?? null);
   }
 
+  async function saveTitle(id: string) {
+    const original = videos.find((v) => v.id === id)?.title;
+    if (!editTitle.trim() || editTitle === original) {
+      setEditingId(null);
+      return;
+    }
+    await apiFetch(`/api/videos/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title: editTitle }),
+    });
+    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, title: editTitle } : v)));
+    setEditingId(null);
+  }
+
   if (loading) {
     return (
       <div className="page-container page-container--centered">
@@ -252,24 +268,53 @@ export function Library() {
               />
             )}
             <div style={{ minWidth: 0, flex: 1 }}>
-              <a
-                href={`/watch/${video.shareToken}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  fontWeight: 600,
-                  fontSize: 15,
-                  color: "var(--color-text)",
-                  margin: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  display: "block",
-                  textDecoration: "none",
-                }}
-              >
-                {video.title}
-              </a>
+              {editingId === video.id ? (
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveTitle(video.id);
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  onBlur={() => saveTitle(video.id)}
+                  autoFocus
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 15,
+                    color: "var(--color-text)",
+                    background: "var(--color-surface)",
+                    border: "1px solid var(--color-accent)",
+                    borderRadius: 4,
+                    padding: "2px 6px",
+                    margin: 0,
+                    width: "100%",
+                    outline: "none",
+                  }}
+                />
+              ) : (
+                <a
+                  href={`/watch/${video.shareToken}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setEditingId(video.id);
+                    setEditTitle(video.title);
+                  }}
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 15,
+                    color: "var(--color-text)",
+                    margin: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    display: "block",
+                    textDecoration: "none",
+                    cursor: "text",
+                  }}
+                >
+                  {video.title}
+                </a>
+              )}
               <p
                 style={{
                   color: "var(--color-text-secondary)",
