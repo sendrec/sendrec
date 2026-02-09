@@ -257,4 +257,86 @@ describe("Library", () => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/download");
     });
   });
+
+  it("shows password-protected label when hasPassword is true", async () => {
+    mockFetch([makeVideo({ hasPassword: true })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("Password protected")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Remove password" })).toBeInTheDocument();
+  });
+
+  it("shows 'Add password' button when hasPassword is false", async () => {
+    mockFetch([makeVideo({ hasPassword: false })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Add password" })).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Password protected")).not.toBeInTheDocument();
+  });
+
+  it("sets password via prompt and API call", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "prompt").mockReturnValue("mysecret");
+    mockFetch([makeVideo({ hasPassword: false })]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // PUT password response
+    mockApiFetch.mockResolvedValueOnce([makeVideo({ hasPassword: true })]); // refetch videos
+    mockApiFetch.mockResolvedValueOnce(unlimitedLimits); // refetch limits
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Add password" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Add password" }));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/password", {
+        method: "PUT",
+        body: JSON.stringify({ password: "mysecret" }),
+      });
+    });
+  });
+
+  it("removes password via API call", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockFetch([makeVideo({ hasPassword: true })]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // PUT password response
+    mockApiFetch.mockResolvedValueOnce([makeVideo({ hasPassword: false })]); // refetch videos
+    mockApiFetch.mockResolvedValueOnce(unlimitedLimits); // refetch limits
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Remove password" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Remove password" }));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/password", {
+        method: "PUT",
+        body: JSON.stringify({ password: "" }),
+      });
+    });
+  });
+
+  it("does not set password when prompt is cancelled", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "prompt").mockReturnValue(null);
+    mockFetch([makeVideo({ hasPassword: false })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Add password" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Add password" }));
+
+    // Should not have called password API (only initial fetch + limits fetch)
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+  });
 });

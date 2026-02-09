@@ -68,7 +68,7 @@ func New(cfg Config) *Server {
 		if cfg.EmailSender != nil {
 			s.authHandler.SetEmailSender(cfg.EmailSender, baseURL)
 		}
-		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes, cfg.MaxVideosPerMonth, cfg.MaxVideoDurationSeconds)
+		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes, cfg.MaxVideosPerMonth, cfg.MaxVideoDurationSeconds, jwtSecret, secureCookies)
 	}
 
 	s.routes()
@@ -115,9 +115,12 @@ func (s *Server) routes() {
 			r.Delete("/{id}", s.videoHandler.Delete)
 			r.Post("/{id}/extend", s.videoHandler.Extend)
 			r.Get("/{id}/download", s.videoHandler.Download)
+			r.Put("/{id}/password", s.videoHandler.SetPassword)
 		})
+		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
 		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
 		s.router.Get("/api/watch/{shareToken}/download", s.videoHandler.WatchDownload)
+		s.router.With(watchAuthLimiter.Middleware).Post("/api/watch/{shareToken}/verify", s.videoHandler.VerifyWatchPassword)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 	}
 
