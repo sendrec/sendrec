@@ -83,28 +83,31 @@ input:focus-visible {
 
 .video-card-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
   align-items: center;
 }
 
 .action-link {
-  background: none;
+  background: var(--color-surface);
   color: var(--color-text-secondary);
-  font-size: 13px;
-  padding: 0;
+  font-size: 12px;
+  padding: 4px 10px;
   text-decoration: none;
   white-space: nowrap;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .action-link:hover {
   color: var(--color-text);
+  background: var(--color-border);
+  border-color: var(--color-text-secondary);
 }
 
 .action-sep {
-  color: var(--color-border);
-  font-size: 13px;
-  user-select: none;
+  display: none;
 }
 
 .pip-preview {

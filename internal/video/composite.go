@@ -28,7 +28,7 @@ func compositeOverlay(screenPath, webcamPath, outputPath string) error {
 	return nil
 }
 
-func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey string) {
+func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey, userID, shareToken string) {
 	log.Printf("composite: starting webcam overlay for video %s", videoID)
 
 	setReadyFallback := func() {
@@ -107,5 +107,6 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	}
 
 	GenerateThumbnail(ctx, db, storage, videoID, screenKey, thumbnailKey)
+	TranscribeVideo(ctx, db, storage, videoID, screenKey, userID, shareToken)
 	log.Printf("composite: completed for video %s", videoID)
 }

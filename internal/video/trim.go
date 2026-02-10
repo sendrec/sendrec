@@ -27,7 +27,7 @@ func trimVideo(inputPath, outputPath string, startSeconds, endSeconds float64) e
 	return nil
 }
 
-func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, thumbnailKey string, startSeconds, endSeconds float64) {
+func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, thumbnailKey, userID, shareToken string, startSeconds, endSeconds float64) {
 	log.Printf("trim: starting for video %s (%.1f-%.1f)", videoID, startSeconds, endSeconds)
 
 	setReadyFallback := func() {
@@ -87,5 +87,6 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 	}
 
 	GenerateThumbnail(ctx, db, storage, videoID, fileKey, thumbnailKey)
+	TranscribeVideo(ctx, db, storage, videoID, fileKey, userID, shareToken)
 	log.Printf("trim: completed for video %s", videoID)
 }

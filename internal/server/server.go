@@ -120,6 +120,7 @@ func (s *Server) routes() {
 			r.Post("/{id}/extend", s.videoHandler.Extend)
 			r.Get("/{id}/download", s.videoHandler.Download)
 			r.Post("/{id}/trim", s.videoHandler.Trim)
+			r.Post("/{id}/retranscribe", s.videoHandler.Retranscribe)
 			r.Put("/{id}/password", s.videoHandler.SetPassword)
 			r.Put("/{id}/comment-mode", s.videoHandler.SetCommentMode)
 			r.Get("/{id}/comments", s.videoHandler.ListOwnerComments)

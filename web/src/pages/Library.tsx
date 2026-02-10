@@ -18,6 +18,7 @@ interface Video {
   hasPassword: boolean;
   commentMode: string;
   commentCount: number;
+  transcriptStatus: string;
 }
 
 interface LimitsResponse {
@@ -95,7 +96,9 @@ export function Library() {
   }, []);
 
   useEffect(() => {
-    const hasProcessing = videos.some((v) => v.status === "processing");
+    const hasProcessing = videos.some(
+      (v) => v.status === "processing" || v.transcriptStatus === "processing"
+    );
     if (!hasProcessing) return;
 
     const interval = setInterval(async () => {
@@ -206,6 +209,11 @@ export function Library() {
     });
     setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, title: editTitle } : v)));
     setEditingId(null);
+  }
+
+  async function retranscribeVideo(id: string) {
+    await apiFetch(`/api/videos/${id}/retranscribe`, { method: "POST" });
+    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, transcriptStatus: "processing" } : v)));
   }
 
   async function cycleCommentMode(video: Video) {
@@ -397,6 +405,23 @@ export function Library() {
                       </span>
                     );
                   })()}
+                  {video.status === "ready" && video.transcriptStatus === "processing" && (
+                    <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
+                      &middot; Transcribing...
+                    </span>
+                  )}
+                  {video.status === "ready" && video.transcriptStatus !== "processing" && (
+                    <span style={{ marginLeft: 8 }}>
+                      &middot;{" "}
+                      <button
+                        onClick={() => retranscribeVideo(video.id)}
+                        className="action-link"
+                        style={{ color: video.transcriptStatus === "failed" ? "var(--color-error)" : undefined }}
+                      >
+                        {video.transcriptStatus === "failed" ? "Retry transcript" : video.transcriptStatus === "none" ? "Transcribe" : "Redo transcript"}
+                      </button>
+                    </span>
+                  )}
                 </p>
               </div>
             </div>

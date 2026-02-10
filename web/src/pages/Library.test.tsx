@@ -27,6 +27,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     thumbnailUrl: "https://storage.sendrec.eu/thumb.jpg",
     commentMode: "disabled",
     commentCount: 0,
+    transcriptStatus: "none",
     ...overrides,
   };
 }
@@ -586,5 +587,19 @@ describe("Library", () => {
         body: JSON.stringify({ title: "Blurred Title" }),
       });
     });
+  });
+
+  it("shows Transcribing badge when transcriptStatus is processing", async () => {
+    mockFetch([makeVideo({ transcriptStatus: "processing" })]);
+    renderLibrary();
+
+    expect(await screen.findByText(/Transcribing/)).toBeInTheDocument();
+  });
+
+  it("shows Retry transcript button when transcriptStatus is failed", async () => {
+    mockFetch([makeVideo({ transcriptStatus: "failed" })]);
+    renderLibrary();
+
+    expect(await screen.findByText("Retry transcript")).toBeInTheDocument();
   });
 });
