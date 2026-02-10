@@ -106,6 +106,7 @@ func main() {
 		MaxVideoDurationSeconds: int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),
 		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EmailSender:             emailClient,
+		CommentNotifier:         emailClient,
 	})
 
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())

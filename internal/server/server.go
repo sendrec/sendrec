@@ -31,6 +31,7 @@ type Config struct {
 	MaxVideoDurationSeconds int
 	S3PublicEndpoint        string
 	EmailSender             auth.EmailSender
+	CommentNotifier         video.CommentNotifier
 }
 
 type Server struct {
@@ -69,6 +70,9 @@ func New(cfg Config) *Server {
 			s.authHandler.SetEmailSender(cfg.EmailSender, baseURL)
 		}
 		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes, cfg.MaxVideosPerMonth, cfg.MaxVideoDurationSeconds, jwtSecret, secureCookies)
+		if cfg.CommentNotifier != nil {
+			s.videoHandler.SetCommentNotifier(cfg.CommentNotifier)
+		}
 	}
 
 	s.routes()
@@ -117,11 +121,17 @@ func (s *Server) routes() {
 			r.Get("/{id}/download", s.videoHandler.Download)
 			r.Post("/{id}/trim", s.videoHandler.Trim)
 			r.Put("/{id}/password", s.videoHandler.SetPassword)
+			r.Put("/{id}/comment-mode", s.videoHandler.SetCommentMode)
+			r.Get("/{id}/comments", s.videoHandler.ListOwnerComments)
+			r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
 		})
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
+		commentLimiter := ratelimit.NewLimiter(0.2, 3)
 		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
 		s.router.Get("/api/watch/{shareToken}/download", s.videoHandler.WatchDownload)
 		s.router.With(watchAuthLimiter.Middleware).Post("/api/watch/{shareToken}/verify", s.videoHandler.VerifyWatchPassword)
+		s.router.Get("/api/watch/{shareToken}/comments", s.videoHandler.ListWatchComments)
+		s.router.With(commentLimiter.Middleware).Post("/api/watch/{shareToken}/comments", s.videoHandler.PostWatchComment)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 	}
 

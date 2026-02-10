@@ -16,6 +16,8 @@ interface Video {
   uniqueViewCount: number;
   thumbnailUrl?: string;
   hasPassword: boolean;
+  commentMode: string;
+  commentCount: number;
 }
 
 interface LimitsResponse {
@@ -33,6 +35,15 @@ function formatDuration(seconds: number): string {
 function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString();
 }
+
+const commentModeLabels: Record<string, string> = {
+  disabled: "Comments off",
+  anonymous: "Comments: anonymous",
+  name_required: "Comments: name required",
+  name_email_required: "Comments: name + email",
+};
+
+const commentModeOrder = ["disabled", "anonymous", "name_required", "name_email_required"];
 
 function expiryLabel(shareExpiresAt: string): { text: string; expired: boolean } {
   const expiry = new Date(shareExpiresAt);
@@ -195,6 +206,16 @@ export function Library() {
     });
     setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, title: editTitle } : v)));
     setEditingId(null);
+  }
+
+  async function cycleCommentMode(video: Video) {
+    const currentIndex = commentModeOrder.indexOf(video.commentMode);
+    const nextMode = commentModeOrder[(currentIndex + 1) % commentModeOrder.length];
+    await apiFetch(`/api/videos/${video.id}/comment-mode`, {
+      method: "PUT",
+      body: JSON.stringify({ commentMode: nextMode }),
+    });
+    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, commentMode: nextMode } : v)));
   }
 
   if (loading) {
@@ -417,6 +438,21 @@ export function Library() {
                       Add password
                     </button>
                   )}
+                  <button
+                    onClick={() => cycleCommentMode(video)}
+                    style={{
+                      background: "transparent",
+                      color: video.commentMode === "disabled" ? "var(--color-text-secondary)" : "var(--color-accent)",
+                      border: `1px solid ${video.commentMode === "disabled" ? "var(--color-border)" : "var(--color-accent)"}`,
+                      borderRadius: 4,
+                      padding: "6px 14px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {commentModeLabels[video.commentMode] ?? "Comments off"}
+                    {video.commentCount > 0 && ` (${video.commentCount})`}
+                  </button>
                   <button
                     onClick={() => copyLink(video.shareUrl, video.id)}
                     style={{

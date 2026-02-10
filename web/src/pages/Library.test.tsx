@@ -25,6 +25,8 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     viewCount: 3,
     uniqueViewCount: 2,
     thumbnailUrl: "https://storage.sendrec.eu/thumb.jpg",
+    commentMode: "disabled",
+    commentCount: 0,
     ...overrides,
   };
 }
@@ -496,6 +498,47 @@ describe("Library", () => {
     expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
 
     vi.useRealTimers();
+  });
+
+  it("shows comment mode button with label", async () => {
+    mockFetch([makeVideo({ commentMode: "anonymous", commentCount: 5 })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Comments: anonymous \(5\)/ })).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'Comments off' when comments are disabled", async () => {
+    mockFetch([makeVideo({ commentMode: "disabled", commentCount: 0 })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Comments off" })).toBeInTheDocument();
+    });
+  });
+
+  it("cycles comment mode on click", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo({ commentMode: "disabled" })]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // PUT comment-mode response
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Comments off" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Comments off" }));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/comment-mode", {
+        method: "PUT",
+        body: JSON.stringify({ commentMode: "anonymous" }),
+      });
+    });
+
+    // UI should now show the next mode
+    expect(screen.getByRole("button", { name: /Comments: anonymous/ })).toBeInTheDocument();
   });
 
   it("saves title on blur", async () => {
