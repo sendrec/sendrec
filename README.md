@@ -86,7 +86,7 @@ make test
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `API_DOCS_ENABLED` | Serve interactive API docs at `/api/docs` | `true` |
+| `API_DOCS_ENABLED` | Serve interactive API docs at `/api/docs` | `false` |
 
 #### Transcription (optional)
 
