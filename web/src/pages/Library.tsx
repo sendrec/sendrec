@@ -60,15 +60,19 @@ export function Library() {
   const [editTitle, setEditTitle] = useState("");
   const [trimmingId, setTrimmingId] = useState<string | null>(null);
 
+  async function fetchVideosAndLimits() {
+    const [videosResult, limitsResult] = await Promise.all([
+      apiFetch<Video[]>("/api/videos"),
+      apiFetch<LimitsResponse>("/api/videos/limits"),
+    ]);
+    setVideos(videosResult ?? []);
+    setLimits(limitsResult ?? null);
+  }
+
   useEffect(() => {
     async function fetchData() {
       try {
-        const [videosResult, limitsResult] = await Promise.all([
-          apiFetch<Video[]>("/api/videos"),
-          apiFetch<LimitsResponse>("/api/videos/limits"),
-        ]);
-        setVideos(videosResult ?? []);
-        setLimits(limitsResult ?? null);
+        await fetchVideosAndLimits();
       } catch {
         setVideos([]);
       } finally {
@@ -78,6 +82,21 @@ export function Library() {
 
     fetchData();
   }, []);
+
+  useEffect(() => {
+    const hasProcessing = videos.some((v) => v.status === "processing");
+    if (!hasProcessing) return;
+
+    const interval = setInterval(async () => {
+      try {
+        await fetchVideosAndLimits();
+      } catch {
+        // ignore poll errors
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [videos]);
 
   async function deleteVideo(id: string) {
     if (!window.confirm("Delete this recording? This cannot be undone.")) {
