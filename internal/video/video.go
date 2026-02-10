@@ -337,9 +337,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			)
 		} else {
 			go GenerateThumbnail(context.Background(), h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken))
-		}
-		if err := EnqueueTranscription(r.Context(), h.db, videoID); err != nil {
-			log.Printf("failed to enqueue transcription for %s: %v", videoID, err)
+			if err := EnqueueTranscription(r.Context(), h.db, videoID); err != nil {
+				log.Printf("failed to enqueue transcription for %s: %v", videoID, err)
+			}
 		}
 	}
 
@@ -807,12 +807,12 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
-	var fileKey, shareToken string
+	var exists bool
 	err := h.db.QueryRow(r.Context(),
-		`SELECT file_key, share_token FROM videos
+		`SELECT true FROM videos
 		 WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
 		videoID, userID,
-	).Scan(&fileKey, &shareToken)
+	).Scan(&exists)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return

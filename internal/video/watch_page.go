@@ -910,7 +910,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 fetch('/api/watch/{{.ShareToken}}')
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
-                        if (data.transcriptStatus === 'ready') {
+                        if (data.transcriptStatus === 'ready' || data.transcriptStatus === 'failed') {
                             clearInterval(pollInterval);
                             window.location.reload();
                         }

@@ -2,9 +2,11 @@ package video
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/database"
 )
 
@@ -40,7 +42,10 @@ func processNextTranscription(ctx context.Context, db database.DBTX, storage Obj
 		 RETURNING id, file_key, user_id, share_token`,
 	).Scan(&videoID, &fileKey, &userID, &shareToken)
 	if err != nil {
-		return // no pending jobs or error
+		if !errors.Is(err, pgx.ErrNoRows) {
+			log.Printf("transcribe-worker: failed to claim job: %v", err)
+		}
+		return
 	}
 
 	log.Printf("transcribe-worker: claimed video %s", videoID)
