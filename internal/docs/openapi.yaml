@@ -1,0 +1,1305 @@
+openapi: "3.0.3"
+info:
+  title: SendRec API
+  version: "1.14.0"
+  description: API for SendRec, an open-source EU-native async video messaging platform.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://app.sendrec.eu
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Health
+    description: Service health checks
+  - name: Authentication
+    description: User registration, login, and token management
+  - name: User
+    description: User profile management
+  - name: Videos
+    description: Video CRUD, sharing, and management
+  - name: Watch
+    description: Public video watching and interaction
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+        name:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 8
+          maxLength: 72
+
+    AuthResponse:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken:
+          type: string
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    UserResponse:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 72
+
+    CreateVideoRequest:
+      type: object
+      required: [duration, fileSize]
+      properties:
+        title:
+          type: string
+          maxLength: 500
+        duration:
+          type: integer
+          description: Duration in seconds
+        fileSize:
+          type: integer
+          format: int64
+          description: File size in bytes
+        webcamFileSize:
+          type: integer
+          format: int64
+          description: Webcam file size in bytes (optional)
+
+    CreateVideoResponse:
+      type: object
+      required: [id, uploadUrl, shareToken]
+      properties:
+        id:
+          type: string
+        uploadUrl:
+          type: string
+          format: uri
+        shareToken:
+          type: string
+        webcamUploadUrl:
+          type: string
+          format: uri
+
+    VideoItem:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - duration
+        - shareToken
+        - shareUrl
+        - createdAt
+        - shareExpiresAt
+        - viewCount
+        - uniqueViewCount
+        - hasPassword
+        - commentMode
+        - commentCount
+        - transcriptStatus
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [uploading, ready, processing, deleted]
+        duration:
+          type: integer
+        shareToken:
+          type: string
+        shareUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        shareExpiresAt:
+          type: string
+          format: date-time
+        viewCount:
+          type: integer
+          format: int64
+        uniqueViewCount:
+          type: integer
+          format: int64
+        thumbnailUrl:
+          type: string
+          format: uri
+        hasPassword:
+          type: boolean
+        commentMode:
+          type: string
+          enum: [disabled, anonymous, name_required, name_email_required]
+        commentCount:
+          type: integer
+          format: int64
+        transcriptStatus:
+          type: string
+
+    VideoLimits:
+      type: object
+      required: [maxVideosPerMonth, maxVideoDurationSeconds, videosUsedThisMonth]
+      properties:
+        maxVideosPerMonth:
+          type: integer
+        maxVideoDurationSeconds:
+          type: integer
+        videosUsedThisMonth:
+          type: integer
+
+    UpdateVideoRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready]
+        title:
+          type: string
+          maxLength: 500
+
+    TrimRequest:
+      type: object
+      required: [startSeconds, endSeconds]
+      properties:
+        startSeconds:
+          type: number
+          format: double
+          minimum: 0
+        endSeconds:
+          type: number
+          format: double
+          description: Must be greater than startSeconds. Trimmed video must be at least 1 second.
+
+    SetPasswordRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          maxLength: 128
+          description: Set to empty string to remove the password.
+
+    SetCommentModeRequest:
+      type: object
+      required: [commentMode]
+      properties:
+        commentMode:
+          type: string
+          enum: [disabled, anonymous, name_required, name_email_required]
+
+    DownloadResponse:
+      type: object
+      required: [downloadUrl]
+      properties:
+        downloadUrl:
+          type: string
+          format: uri
+
+    WatchResponse:
+      type: object
+      required: [title, videoUrl, duration, creator, createdAt, transcriptStatus]
+      properties:
+        title:
+          type: string
+        videoUrl:
+          type: string
+          format: uri
+        duration:
+          type: integer
+        creator:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        thumbnailUrl:
+          type: string
+          format: uri
+        transcriptStatus:
+          type: string
+        transcriptUrl:
+          type: string
+          format: uri
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranscriptSegment"
+
+    VerifyPasswordRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          maxLength: 128
+
+    Comment:
+      type: object
+      required: [id, authorName, body, isPrivate, isOwner, createdAt]
+      properties:
+        id:
+          type: string
+        authorName:
+          type: string
+        body:
+          type: string
+        isPrivate:
+          type: boolean
+        isOwner:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        videoTimestamp:
+          type: number
+          format: double
+
+    PostCommentRequest:
+      type: object
+      required: [body]
+      properties:
+        authorName:
+          type: string
+          maxLength: 200
+        authorEmail:
+          type: string
+          maxLength: 320
+        body:
+          type: string
+          maxLength: 5000
+        isPrivate:
+          type: boolean
+          description: Requires JWT authentication.
+        videoTimestamp:
+          type: number
+          format: double
+
+    CommentsResponse:
+      type: object
+      required: [comments, commentMode]
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        commentMode:
+          type: string
+          enum: [disabled, anonymous, name_required, name_email_required]
+
+    TranscriptSegment:
+      type: object
+      required: [start, end, text]
+      properties:
+        start:
+          type: number
+          format: double
+        end:
+          type: number
+          format: double
+        text:
+          type: string
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, unhealthy]
+        error:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      description: Rate limited to 0.5 requests per second with a burst of 5.
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registration successful
+          headers:
+            Set-Cookie:
+              description: refresh_token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Log in
+      description: Rate limited to 0.5 requests per second with a burst of 5.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: refresh_token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      description: Uses the refresh_token cookie to issue a new access token. Rate limited to 0.5 requests per second with a burst of 5.
+      operationId: refreshToken
+      responses:
+        "200":
+          description: Token refreshed
+          headers:
+            Set-Cookie:
+              description: refresh_token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid or missing refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Log out
+      description: Revokes the refresh token and clears the cookie. Rate limited to 0.5 requests per second with a burst of 5.
+      operationId: logout
+      responses:
+        "204":
+          description: Logged out successfully
+
+  /api/auth/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Request password reset
+      description: Always returns 200 to prevent email enumeration. Rate limited to 0.5 requests per second with a burst of 5.
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Reset email sent if account exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Reset password with token
+      description: Rate limited to 0.5 requests per second with a burst of 5.
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid or expired token, or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/user:
+    get:
+      tags: [User]
+      summary: Get current user profile
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [User]
+      summary: Update current user profile
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Wrong current password or unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos:
+    post:
+      tags: [Videos]
+      summary: Create a new video
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: createVideo
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVideoRequest"
+      responses:
+        "201":
+          description: Video created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateVideoResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Monthly video quota exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Videos]
+      summary: List videos
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: listVideos
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: List of videos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VideoItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/limits:
+    get:
+      tags: [Videos]
+      summary: Get video usage limits
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: getVideoLimits
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Video limits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoLimits"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}:
+    patch:
+      tags: [Videos]
+      summary: Update a video
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: updateVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVideoRequest"
+      responses:
+        "204":
+          description: Video updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Videos]
+      summary: Delete a video
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: deleteVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Video deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/extend:
+    post:
+      tags: [Videos]
+      summary: Extend share link expiry
+      description: Resets the share expiry to now plus 7 days. Rate limited to 2 requests per second with a burst of 10.
+      operationId: extendShareLink
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Share link extended
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/download:
+    get:
+      tags: [Videos]
+      summary: Get video download URL
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: downloadVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Download URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownloadResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/trim:
+    post:
+      tags: [Videos]
+      summary: Trim a video
+      description: Trims the video to the specified time range. Processing happens asynchronously. Rate limited to 2 requests per second with a burst of 10.
+      operationId: trimVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrimRequest"
+      responses:
+        "202":
+          description: Trim started
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Video is already being processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/retranscribe:
+    post:
+      tags: [Videos]
+      summary: Re-transcribe a video
+      description: Triggers a new transcription of the video. Rate limited to 2 requests per second with a burst of 10.
+      operationId: retranscribeVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Transcription started
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Transcription unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/password:
+    put:
+      tags: [Videos]
+      summary: Set or remove share password
+      description: Set a password to protect the share link. Send an empty password to remove it. Rate limited to 2 requests per second with a burst of 10.
+      operationId: setVideoPassword
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPasswordRequest"
+      responses:
+        "204":
+          description: Password updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/comment-mode:
+    put:
+      tags: [Videos]
+      summary: Set comment mode for a video
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: setCommentMode
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetCommentModeRequest"
+      responses:
+        "204":
+          description: Comment mode updated
+        "400":
+          description: Invalid comment mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/comments:
+    get:
+      tags: [Videos]
+      summary: List comments (owner view)
+      description: Returns all comments including private ones. Rate limited to 2 requests per second with a burst of 10.
+      operationId: listOwnerComments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comments list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/comments/{commentId}:
+    delete:
+      tags: [Videos]
+      summary: Delete a comment
+      description: Rate limited to 2 requests per second with a burst of 10.
+      operationId: deleteComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Comment deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/watch/{shareToken}:
+    get:
+      tags: [Watch]
+      summary: Get video for watching
+      operationId: watchVideo
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Video details for playback
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchResponse"
+        "403":
+          description: Password required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Share link expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/watch/{shareToken}/download:
+    get:
+      tags: [Watch]
+      summary: Get public download URL
+      operationId: watchDownload
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Download URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownloadResponse"
+        "403":
+          description: Password required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Share link expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/watch/{shareToken}/verify:
+    post:
+      tags: [Watch]
+      summary: Verify share password
+      description: Sets an authentication cookie on success. Rate limited to 0.5 requests per second with a burst of 5.
+      operationId: verifyWatchPassword
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyPasswordRequest"
+      responses:
+        "200":
+          description: Password verified, auth cookie set
+          headers:
+            Set-Cookie:
+              description: Watch authentication cookie
+              schema:
+                type: string
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Incorrect password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/watch/{shareToken}/comments:
+    get:
+      tags: [Watch]
+      summary: List comments (public view)
+      description: Returns public comments. If authenticated as the video owner, private comments are also included.
+      operationId: listWatchComments
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - {}
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Comments list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentsResponse"
+        "403":
+          description: Password required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Share link expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Watch]
+      summary: Post a comment
+      description: Rate limited to 0.2 requests per second with a burst of 3.
+      operationId: postWatchComment
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - {}
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostCommentRequest"
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Comments disabled or password required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Share link expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
