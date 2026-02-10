@@ -34,6 +34,16 @@ describe("apiFetch", () => {
     expect(result).toBeUndefined();
   });
 
+  it("returns undefined on 202 Accepted", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+    });
+
+    const result = await apiFetch("/api/test", { method: "POST" });
+    expect(result).toBeUndefined();
+  });
+
   it("throws ApiError with JSON error message on failure", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
