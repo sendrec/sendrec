@@ -133,6 +133,16 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 	req.AuthorName = strings.TrimSpace(req.AuthorName)
 	req.AuthorEmail = strings.TrimSpace(req.AuthorEmail)
 
+	if len(req.AuthorName) > 200 {
+		httputil.WriteError(w, http.StatusBadRequest, "name is too long")
+		return
+	}
+
+	if len(req.AuthorEmail) > 320 {
+		httputil.WriteError(w, http.StatusBadRequest, "email is too long")
+		return
+	}
+
 	if req.Body == "" {
 		httputil.WriteError(w, http.StatusBadRequest, "comment body is required")
 		return

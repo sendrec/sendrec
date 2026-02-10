@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -358,6 +359,95 @@ func TestPostWatchComment_EmptyBody_Returns400(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+}
+
+func TestPostWatchComment_NameTooLong_Returns400(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	expiresAt := time.Now().Add(24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_required", expiresAt, (*string)(nil)))
+
+	body, _ := json.Marshal(postCommentRequest{
+		AuthorName: strings.Repeat("a", 201),
+		Body:       "Hello",
+	})
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/comments", handler.PostWatchComment)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/"+shareToken+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "name is too long" {
+		t.Errorf("expected error %q, got %q", "name is too long", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestPostWatchComment_EmailTooLong_Returns400(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	expiresAt := time.Now().Add(24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_email_required", expiresAt, (*string)(nil)))
+
+	body, _ := json.Marshal(postCommentRequest{
+		AuthorName:  "Alex",
+		AuthorEmail: strings.Repeat("a", 321),
+		Body:        "Hello",
+	})
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/comments", handler.PostWatchComment)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/"+shareToken+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "email is too long" {
+		t.Errorf("expected error %q, got %q", "email is too long", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
 }
 
