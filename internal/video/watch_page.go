@@ -295,6 +295,17 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
         .timestamp-toggle.active:hover {
             background: rgba(0, 182, 122, 0.25);
         }
+        .timestamp-edit-input {
+            background: transparent;
+            border: none;
+            color: inherit;
+            font: inherit;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            width: 3.5rem;
+            padding: 0;
+            outline: none;
+        }
         .timestamp-toggle-remove {
             display: inline-flex;
             align-items: center;
@@ -420,10 +431,12 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                     {{end}}
                 </div>
                 {{end}}
-                <button type="button" class="timestamp-toggle" id="timestamp-toggle">
-                    <span id="timestamp-toggle-text">&#x1F551; Add timestamp</span>
+                <span class="timestamp-toggle" id="timestamp-toggle">
+                    <span id="timestamp-toggle-label">&#x1F551;</span>
+                    <span id="timestamp-toggle-text">Add timestamp</span>
+                    <input type="text" class="timestamp-edit-input" id="timestamp-edit-input" style="display:none;" placeholder="0:00">
                     <span class="timestamp-toggle-remove" id="timestamp-toggle-remove" style="display:none;"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></span>
-                </button>
+                </span>
                 <textarea id="comment-body" placeholder="Write a comment..." maxlength="5000"></textarea>
                 <div class="comment-form-actions">
                     <div style="display:flex;align-items:center;gap:0.5rem;">
@@ -456,6 +469,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             var timestampToggle = document.getElementById('timestamp-toggle');
             var timestampToggleText = document.getElementById('timestamp-toggle-text');
             var timestampToggleRemove = document.getElementById('timestamp-toggle-remove');
+            var timestampEditInput = document.getElementById('timestamp-edit-input');
             var capturedTimestamp = null;
             var emojiTrigger = document.getElementById('emoji-trigger');
             var emojiGrid = document.getElementById('emoji-grid');
@@ -579,19 +593,59 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
 
             loadComments();
 
-            function activateTimestamp() {
-                capturedTimestamp = player.currentTime;
-                player.pause();
+            function parseTimestamp(str) {
+                var parts = str.trim().split(':');
+                if (parts.length === 2) {
+                    var m = parseInt(parts[0], 10);
+                    var s = parseInt(parts[1], 10);
+                    if (!isNaN(m) && !isNaN(s) && s >= 0 && s < 60 && m >= 0) {
+                        return m * 60 + s;
+                    }
+                }
+                if (parts.length === 1) {
+                    var sec = parseInt(parts[0], 10);
+                    if (!isNaN(sec) && sec >= 0) return sec;
+                }
+                return null;
+            }
+
+            function setTimestamp(seconds) {
+                capturedTimestamp = Math.min(seconds, videoDuration);
                 timestampToggle.classList.add('active');
-                timestampToggleText.textContent = '\uD83D\uDD51 ' + formatTimestamp(capturedTimestamp);
+                timestampToggleText.textContent = formatTimestamp(capturedTimestamp);
+                timestampToggleText.style.display = '';
+                timestampEditInput.style.display = 'none';
                 timestampToggleRemove.style.display = 'inline-flex';
             }
 
             function deactivateTimestamp() {
                 capturedTimestamp = null;
                 timestampToggle.classList.remove('active');
-                timestampToggleText.textContent = '\uD83D\uDD51 Add timestamp';
+                timestampToggleText.textContent = 'Add timestamp';
+                timestampToggleText.style.display = '';
+                timestampEditInput.style.display = 'none';
                 timestampToggleRemove.style.display = 'none';
+            }
+
+            function startEditing() {
+                var current = capturedTimestamp !== null ? formatTimestamp(capturedTimestamp) : '';
+                timestampToggleText.style.display = 'none';
+                timestampEditInput.style.display = '';
+                timestampEditInput.value = current;
+                timestampEditInput.focus();
+                timestampEditInput.select();
+            }
+
+            function commitEdit() {
+                var parsed = parseTimestamp(timestampEditInput.value);
+                if (parsed !== null && videoDuration > 0) {
+                    setTimestamp(parsed);
+                } else if (capturedTimestamp !== null) {
+                    timestampToggleText.style.display = '';
+                    timestampEditInput.style.display = 'none';
+                } else {
+                    deactivateTimestamp();
+                }
             }
 
             timestampToggle.addEventListener('click', function(e) {
@@ -600,9 +654,26 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                     deactivateTimestamp();
                     return;
                 }
-                if (videoDuration > 0) {
-                    activateTimestamp();
+                if (e.target === timestampEditInput) return;
+                if (capturedTimestamp !== null) {
+                    startEditing();
+                } else if (videoDuration > 0) {
+                    player.pause();
+                    setTimestamp(player.currentTime);
                 }
+            });
+
+            timestampEditInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    timestampToggleText.style.display = '';
+                    timestampEditInput.style.display = 'none';
+                }
+            });
+
+            timestampEditInput.addEventListener('blur', function() {
+                commitEdit();
             });
 
             var emojiCategories = {
