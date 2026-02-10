@@ -82,6 +82,12 @@ make test
 | `MAX_VIDEOS_PER_MONTH` | Maximum videos a user can record per month. Set to `0` for unlimited | `25` |
 | `MAX_VIDEO_DURATION_SECONDS` | Maximum recording duration in seconds. Set to `0` for unlimited | `300` (5 min) |
 
+#### API Documentation
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `API_DOCS_ENABLED` | Serve interactive API docs at `/api/docs` | `true` |
+
 #### Transcription (optional)
 
 | Variable | Description | Default |

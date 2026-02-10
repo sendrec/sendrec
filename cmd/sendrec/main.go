@@ -106,6 +106,7 @@ func main() {
 		MaxVideosPerMonth:       int(getEnvInt64("MAX_VIDEOS_PER_MONTH", int64(plans.Free.MaxVideosPerMonth))),
 		MaxVideoDurationSeconds: int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),
 		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
+		EnableDocs:              getEnv("API_DOCS_ENABLED", "true") == "true",
 		EmailSender:             emailClient,
 		CommentNotifier:         emailClient,
 	})
