@@ -31,7 +31,7 @@ func whisperModelPath() string {
 }
 
 func isTranscriptionAvailable() bool {
-	if os.Getenv("TRANSCRIPTION_ENABLED") == "false" {
+	if os.Getenv("TRANSCRIPTION_ENABLED") != "true" {
 		return false
 	}
 	if _, err := exec.LookPath("whisper-cli"); err != nil {
