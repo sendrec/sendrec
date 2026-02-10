@@ -703,12 +703,17 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 	var duration int
 	var fileKey string
 	var shareToken string
+	var status string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT duration, file_key, share_token FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
+		`SELECT duration, file_key, share_token, status FROM videos WHERE id = $1 AND user_id = $2`,
 		videoID, userID,
-	).Scan(&duration, &fileKey, &shareToken)
+	).Scan(&duration, &fileKey, &shareToken, &status)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+	if status != "ready" {
+		httputil.WriteError(w, http.StatusConflict, "video is currently being processed")
 		return
 	}
 
