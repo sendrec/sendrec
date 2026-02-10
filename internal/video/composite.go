@@ -28,7 +28,7 @@ func compositeOverlay(screenPath, webcamPath, outputPath string) error {
 	return nil
 }
 
-func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey, userID, shareToken string) {
+func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey string) {
 	log.Printf("composite: starting webcam overlay for video %s", videoID)
 
 	setReadyFallback := func() {
@@ -107,6 +107,8 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	}
 
 	GenerateThumbnail(ctx, db, storage, videoID, screenKey, thumbnailKey)
-	TranscribeVideo(ctx, db, storage, videoID, screenKey, userID, shareToken)
+	if err := EnqueueTranscription(ctx, db, videoID); err != nil {
+		log.Printf("composite: failed to enqueue transcription for %s: %v", videoID, err)
+	}
 	log.Printf("composite: completed for video %s", videoID)
 }

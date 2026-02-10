@@ -147,35 +147,23 @@ func parseWhisperJSON(jsonPath string) ([]TranscriptSegment, error) {
 	return segments, nil
 }
 
-var transcriptionSemaphore = make(chan struct{}, 1)
-
-func TranscribeVideo(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, userID, shareToken string) {
-	select {
-	case transcriptionSemaphore <- struct{}{}:
-		defer func() { <-transcriptionSemaphore }()
-	case <-ctx.Done():
-		log.Printf("transcribe: context cancelled waiting for semaphore for video %s", videoID)
-		return
-	}
-
+func processTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, userID, shareToken string) {
 	if !isTranscriptionAvailable() {
-		log.Printf("transcribe: transcription not available, skipping video %s", videoID)
+		log.Printf("transcribe: transcription not available, marking video %s as failed", videoID)
+		if _, err := db.Exec(ctx,
+			`UPDATE videos SET transcript_status = 'failed', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
+			videoID,
+		); err != nil {
+			log.Printf("transcribe: failed to set failed status for %s: %v", videoID, err)
+		}
 		return
 	}
 
 	log.Printf("transcribe: starting for video %s", videoID)
 
-	if _, err := db.Exec(ctx,
-		`UPDATE videos SET transcript_status = 'processing', updated_at = now() WHERE id = $1`,
-		videoID,
-	); err != nil {
-		log.Printf("transcribe: failed to set processing status for %s: %v", videoID, err)
-		return
-	}
-
 	setFailed := func() {
 		if _, err := db.Exec(ctx,
-			`UPDATE videos SET transcript_status = 'failed', updated_at = now() WHERE id = $1`,
+			`UPDATE videos SET transcript_status = 'failed', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
 			log.Printf("transcribe: failed to set failed status for %s: %v", videoID, err)
@@ -258,7 +246,7 @@ func TranscribeVideo(ctx context.Context, db database.DBTX, storage ObjectStorag
 	}
 
 	if _, err := db.Exec(ctx,
-		`UPDATE videos SET transcript_key = $1, transcript_json = $2, transcript_status = 'ready', updated_at = now() WHERE id = $3`,
+		`UPDATE videos SET transcript_key = $1, transcript_json = $2, transcript_status = 'ready', transcript_started_at = NULL, updated_at = now() WHERE id = $3`,
 		transcriptKey, string(segmentsJSON), videoID,
 	); err != nil {
 		log.Printf("transcribe: failed to update transcript data for %s: %v", videoID, err)

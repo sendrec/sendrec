@@ -97,7 +97,7 @@ export function Library() {
 
   useEffect(() => {
     const hasProcessing = videos.some(
-      (v) => v.status === "processing" || v.transcriptStatus === "processing"
+      (v) => v.status === "processing" || v.transcriptStatus === "processing" || v.transcriptStatus === "pending"
     );
     if (!hasProcessing) return;
 
@@ -213,7 +213,7 @@ export function Library() {
 
   async function retranscribeVideo(id: string) {
     await apiFetch(`/api/videos/${id}/retranscribe`, { method: "POST" });
-    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, transcriptStatus: "processing" } : v)));
+    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, transcriptStatus: "pending" } : v)));
   }
 
   async function cycleCommentMode(video: Video) {
@@ -405,12 +405,17 @@ export function Library() {
                       </span>
                     );
                   })()}
+                  {video.status === "ready" && video.transcriptStatus === "pending" && (
+                    <span style={{ color: "var(--color-text-secondary)", marginLeft: 8 }}>
+                      &middot; Pending transcription...
+                    </span>
+                  )}
                   {video.status === "ready" && video.transcriptStatus === "processing" && (
                     <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
                       &middot; Transcribing...
                     </span>
                   )}
-                  {video.status === "ready" && video.transcriptStatus !== "processing" && (
+                  {video.status === "ready" && video.transcriptStatus !== "processing" && video.transcriptStatus !== "pending" && (
                     <span style={{ marginLeft: 8 }}>
                       &middot;{" "}
                       <button

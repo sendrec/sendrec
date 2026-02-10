@@ -596,6 +596,23 @@ describe("Library", () => {
     expect(await screen.findByText(/Transcribing/)).toBeInTheDocument();
   });
 
+  it("shows Pending transcription badge when transcriptStatus is pending", async () => {
+    mockFetch([makeVideo({ transcriptStatus: "pending" })]);
+    renderLibrary();
+
+    expect(await screen.findByText(/Pending transcription/)).toBeInTheDocument();
+  });
+
+  it("hides transcript buttons when transcriptStatus is pending", async () => {
+    mockFetch([makeVideo({ transcriptStatus: "pending" })]);
+    renderLibrary();
+
+    await screen.findByText(/Pending transcription/);
+    expect(screen.queryByText("Transcribe")).not.toBeInTheDocument();
+    expect(screen.queryByText("Retry transcript")).not.toBeInTheDocument();
+    expect(screen.queryByText("Redo transcript")).not.toBeInTheDocument();
+  });
+
   it("shows Retry transcript button when transcriptStatus is failed", async () => {
     mockFetch([makeVideo({ transcriptStatus: "failed" })]);
     renderLibrary();
