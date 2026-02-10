@@ -10,7 +10,7 @@ import (
 
 func PurgeOrphanedFiles(ctx context.Context, db database.DBTX, storage ObjectStorage) {
 	rows, err := db.Query(ctx,
-		`SELECT file_key, thumbnail_key FROM videos
+		`SELECT file_key, thumbnail_key, transcript_key FROM videos
 		 WHERE status = 'deleted' AND file_purged_at IS NULL
 		 LIMIT 50`)
 	if err != nil {
@@ -22,7 +22,8 @@ func PurgeOrphanedFiles(ctx context.Context, db database.DBTX, storage ObjectSto
 	for rows.Next() {
 		var fileKey string
 		var thumbnailKey *string
-		if err := rows.Scan(&fileKey, &thumbnailKey); err != nil {
+		var transcriptKey *string
+		if err := rows.Scan(&fileKey, &thumbnailKey, &transcriptKey); err != nil {
 			log.Printf("cleanup: failed to scan file key: %v", err)
 			continue
 		}
@@ -33,6 +34,11 @@ func PurgeOrphanedFiles(ctx context.Context, db database.DBTX, storage ObjectSto
 		if thumbnailKey != nil {
 			if err := deleteWithRetry(ctx, storage, *thumbnailKey, 3); err != nil {
 				log.Printf("cleanup: failed to delete thumbnail %s: %v", *thumbnailKey, err)
+			}
+		}
+		if transcriptKey != nil {
+			if err := deleteWithRetry(ctx, storage, *transcriptKey, 3); err != nil {
+				log.Printf("cleanup: failed to delete transcript %s: %v", *transcriptKey, err)
 			}
 		}
 		if _, err := db.Exec(ctx,
