@@ -904,7 +904,7 @@ func TestListWatchComments_DisabledMode_ReturnsEmptyArray(t *testing.T) {
 	}
 }
 
-func TestListWatchComments_WithJWT_IncludesPrivate(t *testing.T) {
+func TestListWatchComments_WithJWT_NonOwner_ExcludesPrivate(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -919,7 +919,52 @@ func TestListWatchComments_WithJWT_IncludesPrivate(t *testing.T) {
 	ownerID := "owner-user-1"
 	expiresAt := time.Now().Add(24 * time.Hour)
 	now := time.Now()
-	viewerID := string(testUserID)
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+
+	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 AND c\.is_private = false ORDER BY c\.created_at ASC`).
+		WithArgs(videoID).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at", "video_timestamp_seconds"}).
+			AddRow("c1", (*string)(nil), "Alex", "Public", false, now, (*float64)(nil)))
+
+	r := chi.NewRouter()
+	r.Get("/api/watch/{shareToken}/comments", handler.ListWatchComments)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/watch/"+shareToken+"/comments", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp listCommentsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp.Comments) != 1 {
+		t.Fatalf("expected 1 public comment (private excluded for non-owner), got %d", len(resp.Comments))
+	}
+}
+
+func TestListWatchComments_WithJWT_Owner_IncludesPrivate(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	videoID := "video-123"
+	ownerID := string(testUserID)
+	expiresAt := time.Now().Add(24 * time.Hour)
+	now := time.Now()
+	commenterID := "commenter-1"
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
@@ -929,7 +974,7 @@ func TestListWatchComments_WithJWT_IncludesPrivate(t *testing.T) {
 		WithArgs(videoID).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at", "video_timestamp_seconds"}).
 			AddRow("c1", (*string)(nil), "Alex", "Public", false, now, (*float64)(nil)).
-			AddRow("c2", &viewerID, "Viewer", "Private note", true, now, (*float64)(nil)))
+			AddRow("c2", &commenterID, "Viewer", "Private note", true, now, (*float64)(nil)))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/comments", handler.ListWatchComments)
@@ -947,7 +992,7 @@ func TestListWatchComments_WithJWT_IncludesPrivate(t *testing.T) {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 	if len(resp.Comments) != 2 {
-		t.Fatalf("expected 2 comments (public + private), got %d", len(resp.Comments))
+		t.Fatalf("expected 2 comments (public + private for owner), got %d", len(resp.Comments))
 	}
 	if !resp.Comments[1].IsPrivate {
 		t.Error("expected second comment to be private")

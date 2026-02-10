@@ -83,6 +83,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
+func maxBodySize(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Body != nil {
+				r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func (s *Server) routes() {
 	s.router.Get("/api/health", s.handleHealth)
 
@@ -90,6 +101,7 @@ func (s *Server) routes() {
 		authLimiter := ratelimit.NewLimiter(0.5, 5)
 		s.router.Route("/api/auth", func(r chi.Router) {
 			r.Use(authLimiter.Middleware)
+			r.Use(maxBodySize(64 * 1024))
 			r.Post("/register", s.authHandler.Register)
 			r.Post("/login", s.authHandler.Login)
 			r.Post("/refresh", s.authHandler.Refresh)
@@ -102,6 +114,7 @@ func (s *Server) routes() {
 	if s.authHandler != nil {
 		s.router.Route("/api/user", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
+			r.Use(maxBodySize(64 * 1024))
 			r.Get("/", s.authHandler.GetUser)
 			r.Patch("/", s.authHandler.UpdateUser)
 		})
@@ -112,6 +125,7 @@ func (s *Server) routes() {
 		s.router.Route("/api/videos", func(r chi.Router) {
 			r.Use(videoLimiter.Middleware)
 			r.Use(s.authHandler.Middleware)
+			r.Use(maxBodySize(64 * 1024))
 			r.Post("/", s.videoHandler.Create)
 			r.Get("/limits", s.videoHandler.Limits)
 			r.Get("/", s.videoHandler.List)
@@ -130,9 +144,9 @@ func (s *Server) routes() {
 		commentLimiter := ratelimit.NewLimiter(0.2, 3)
 		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
 		s.router.Get("/api/watch/{shareToken}/download", s.videoHandler.WatchDownload)
-		s.router.With(watchAuthLimiter.Middleware).Post("/api/watch/{shareToken}/verify", s.videoHandler.VerifyWatchPassword)
+		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/verify", s.videoHandler.VerifyWatchPassword)
 		s.router.Get("/api/watch/{shareToken}/comments", s.videoHandler.ListWatchComments)
-		s.router.With(commentLimiter.Middleware).Post("/api/watch/{shareToken}/comments", s.videoHandler.PostWatchComment)
+		s.router.With(commentLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/comments", s.videoHandler.PostWatchComment)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 	}
 

@@ -39,7 +39,7 @@ type txRequest struct {
 
 func (c *Client) SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error {
 	if c.config.BaseURL == "" {
-		log.Printf("email not configured — reset link for %s: %s", toEmail, resetLink)
+		log.Printf("email not configured — password reset requested for %s (link not logged for security)", toEmail)
 		return nil
 	}
 
