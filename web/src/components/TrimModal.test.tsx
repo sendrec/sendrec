@@ -21,16 +21,41 @@ describe("TrimModal", () => {
     mockApiFetch.mockReset();
     defaultProps.onClose.mockReset();
     defaultProps.onTrimStarted.mockReset();
+    // First call fetches the video download URL
+    mockApiFetch.mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" });
   });
 
-  it("renders modal with trim controls", () => {
-    render(<TrimModal {...defaultProps} />);
+  it("renders modal with video player and trim controls", async () => {
+    const { container } = render(<TrimModal {...defaultProps} />);
+
     expect(screen.getByText("Trim Video")).toBeInTheDocument();
-    expect(screen.getByText("Start")).toBeInTheDocument();
-    expect(screen.getByText("End")).toBeInTheDocument();
-    expect(screen.getAllByRole("slider")).toHaveLength(2);
+
+    await waitFor(() => {
+      const video = container.querySelector("video");
+      expect(video).not.toBeNull();
+      expect(video).toHaveAttribute("src", "https://s3.example.com/video.webm");
+    });
+
     expect(screen.getByRole("button", { name: "Trim" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
+  it("fetches video URL on mount", async () => {
+    render(<TrimModal {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/download");
+    });
+  });
+
+  it("shows time labels", async () => {
+    render(<TrimModal {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Start: 0:00/)).toBeInTheDocument();
+      expect(screen.getByText(/End: 2:00/)).toBeInTheDocument();
+      expect(screen.getByText(/Duration: 2:00/)).toBeInTheDocument();
+    });
   });
 
   it("calls onClose when Cancel is clicked", async () => {
@@ -73,6 +98,16 @@ describe("TrimModal", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/trim failed/i)).toBeInTheDocument();
+    });
+  });
+
+  it("renders timeline track", async () => {
+    const { container } = render(<TrimModal {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(container.querySelector("[data-testid='trim-track']")).not.toBeNull();
+      expect(container.querySelector("[data-testid='trim-handle-start']")).not.toBeNull();
+      expect(container.querySelector("[data-testid='trim-handle-end']")).not.toBeNull();
     });
   });
 });

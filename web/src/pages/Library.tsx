@@ -252,110 +252,111 @@ export function Library() {
               border: "1px solid var(--color-border)",
               borderRadius: 8,
               padding: 16,
-              justifyContent: "space-between",
             }}
           >
-            {video.thumbnailUrl && (
-              <img
-                src={video.thumbnailUrl}
-                alt=""
-                style={{
-                  width: 120,
-                  height: 68,
-                  objectFit: "cover",
-                  borderRadius: 4,
-                  flexShrink: 0,
-                  background: "var(--color-border)",
-                }}
-              />
-            )}
-            <div style={{ minWidth: 0, flex: 1 }}>
-              {editingId === video.id ? (
-                <input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveTitle(video.id);
-                    if (e.key === "Escape") setEditingId(null);
-                  }}
-                  onBlur={() => saveTitle(video.id)}
-                  autoFocus
+            <div className="video-card-top">
+              {video.thumbnailUrl && (
+                <img
+                  src={video.thumbnailUrl}
+                  alt=""
                   style={{
-                    fontWeight: 600,
-                    fontSize: 15,
-                    color: "var(--color-text)",
-                    background: "var(--color-surface)",
-                    border: "1px solid var(--color-accent)",
+                    width: 120,
+                    height: 68,
+                    objectFit: "cover",
                     borderRadius: 4,
-                    padding: "2px 6px",
-                    margin: 0,
-                    width: "100%",
-                    outline: "none",
+                    flexShrink: 0,
+                    background: "var(--color-border)",
                   }}
                 />
-              ) : (
-                <a
-                  href={`/watch/${video.shareToken}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setEditingId(video.id);
-                    setEditTitle(video.title);
-                  }}
+              )}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                {editingId === video.id ? (
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveTitle(video.id);
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                    onBlur={() => saveTitle(video.id)}
+                    autoFocus
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 15,
+                      color: "var(--color-text)",
+                      background: "var(--color-surface)",
+                      border: "1px solid var(--color-accent)",
+                      borderRadius: 4,
+                      padding: "2px 6px",
+                      margin: 0,
+                      width: "100%",
+                      outline: "none",
+                    }}
+                  />
+                ) : (
+                  <a
+                    href={`/watch/${video.shareToken}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setEditingId(video.id);
+                      setEditTitle(video.title);
+                    }}
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 15,
+                      color: "var(--color-text)",
+                      margin: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      display: "block",
+                      textDecoration: "none",
+                      cursor: "text",
+                    }}
+                  >
+                    {video.title}
+                  </a>
+                )}
+                <p
                   style={{
-                    fontWeight: 600,
-                    fontSize: 15,
-                    color: "var(--color-text)",
-                    margin: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    display: "block",
-                    textDecoration: "none",
-                    cursor: "text",
+                    color: "var(--color-text-secondary)",
+                    fontSize: 13,
+                    margin: "4px 0 0",
                   }}
                 >
-                  {video.title}
-                </a>
-              )}
-              <p
-                style={{
-                  color: "var(--color-text-secondary)",
-                  fontSize: 13,
-                  margin: "4px 0 0",
-                }}
-              >
-                {formatDuration(video.duration)} &middot; {formatDate(video.createdAt)}
-                {video.status === "uploading" && (
-                  <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
-                    uploading...
-                  </span>
-                )}
-                {video.status === "processing" && (
-                  <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
-                    processing...
-                  </span>
-                )}
-                {video.status === "ready" && video.viewCount > 0 && (
-                  <span style={{ marginLeft: 8 }}>
-                    &middot; {video.viewCount === video.uniqueViewCount
-                      ? `${video.viewCount} view${video.viewCount !== 1 ? "s" : ""}`
-                      : `${video.viewCount} views (${video.uniqueViewCount} unique)`}
-                  </span>
-                )}
-                {video.status === "ready" && video.viewCount === 0 && (
-                  <span style={{ color: "var(--color-text-secondary)", marginLeft: 8, opacity: 0.6 }}>
-                    &middot; No views yet
-                  </span>
-                )}
-                {video.status === "ready" && (() => {
-                  const expiry = expiryLabel(video.shareExpiresAt);
-                  return (
-                    <span style={{ color: expiry.expired ? "var(--color-error)" : "var(--color-text-secondary)", marginLeft: 8 }}>
-                      &middot; {expiry.text}
+                  {formatDuration(video.duration)} &middot; {formatDate(video.createdAt)}
+                  {video.status === "uploading" && (
+                    <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
+                      uploading...
                     </span>
-                  );
-                })()}
-              </p>
+                  )}
+                  {video.status === "processing" && (
+                    <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
+                      processing...
+                    </span>
+                  )}
+                  {video.status === "ready" && video.viewCount > 0 && (
+                    <span style={{ marginLeft: 8 }}>
+                      &middot; {video.viewCount === video.uniqueViewCount
+                        ? `${video.viewCount} view${video.viewCount !== 1 ? "s" : ""}`
+                        : `${video.viewCount} views (${video.uniqueViewCount} unique)`}
+                    </span>
+                  )}
+                  {video.status === "ready" && video.viewCount === 0 && (
+                    <span style={{ color: "var(--color-text-secondary)", marginLeft: 8, opacity: 0.6 }}>
+                      &middot; No views yet
+                    </span>
+                  )}
+                  {video.status === "ready" && (() => {
+                    const expiry = expiryLabel(video.shareExpiresAt);
+                    return (
+                      <span style={{ color: expiry.expired ? "var(--color-error)" : "var(--color-text-secondary)", marginLeft: 8 }}>
+                        &middot; {expiry.text}
+                      </span>
+                    );
+                  })()}
+                </p>
+              </div>
             </div>
 
             <div className="video-card-actions">
@@ -471,6 +472,7 @@ export function Library() {
                   fontSize: 13,
                   fontWeight: 600,
                   opacity: deletingId === video.id ? 0.7 : 1,
+                  marginLeft: "auto",
                 }}
               >
                 {deletingId === video.id ? "Deleting..." : "Delete"}

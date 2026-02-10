@@ -421,6 +421,7 @@ describe("Library", () => {
   it("opens trim modal and updates status to processing after trim", async () => {
     const user = userEvent.setup();
     mockFetch([makeVideo()]);
+    mockApiFetch.mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" }); // download URL for TrimModal
     mockApiFetch.mockResolvedValueOnce(undefined); // trim API response
     renderLibrary();
 
