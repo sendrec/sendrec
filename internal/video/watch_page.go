@@ -83,6 +83,317 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
         .download-btn:hover {
             background: rgba(0, 182, 122, 0.1);
         }
+        .comments-section {
+            margin-top: 2rem;
+            border-top: 1px solid #1e293b;
+            padding-top: 1.5rem;
+        }
+        .comments-header {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .comment {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 0.875rem 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .comment-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.375rem;
+            font-size: 0.8125rem;
+            color: #94a3b8;
+        }
+        .comment-author {
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+        .comment-owner-badge {
+            background: #00b67a;
+            color: #fff;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+        }
+        .comment-private-badge {
+            background: #3b82f6;
+            color: #fff;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            padding: 0.125rem 0.375rem;
+            border-radius: 4px;
+        }
+        .comment-body {
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .comment-form {
+            margin-top: 1rem;
+        }
+        .form-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .form-row input {
+            flex: 1;
+        }
+        .comment-form input,
+        .comment-form textarea {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #fff;
+            font-size: 0.875rem;
+            font-family: inherit;
+            outline: none;
+        }
+        .comment-form input:focus,
+        .comment-form textarea:focus {
+            border-color: #00b67a;
+        }
+        .comment-form textarea {
+            min-height: 80px;
+            resize: vertical;
+            margin-bottom: 0.75rem;
+        }
+        .comment-form-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .comment-form-actions label {
+            font-size: 0.8125rem;
+            color: #94a3b8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+        .comment-submit {
+            background: #00b67a;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .comment-submit:hover { opacity: 0.9; }
+        .comment-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+        .comment-error {
+            color: #ef4444;
+            font-size: 0.8125rem;
+            margin-bottom: 0.5rem;
+            display: none;
+        }
+        .no-comments {
+            color: #64748b;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+        .markers-bar {
+            position: relative;
+            height: 8px;
+            background: #1e293b;
+            border-radius: 4px;
+            margin-top: 0.75rem;
+            cursor: pointer;
+        }
+        .marker-dot {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #00b67a;
+            border-radius: 50%;
+            top: 1px;
+            transform: translateX(-50%);
+            transition: transform 0.15s;
+        }
+        .marker-dot:hover {
+            transform: translateX(-50%) scale(1.6);
+        }
+        .marker-dot.private {
+            background: #3b82f6;
+        }
+        .marker-dot.multi {
+            width: 8px;
+            height: 8px;
+            top: 0;
+        }
+        .marker-tooltip {
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 0.375rem 0.625rem;
+            font-size: 0.75rem;
+            color: #e2e8f0;
+            white-space: nowrap;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+        .marker-dot:hover .marker-tooltip {
+            display: block;
+        }
+        .comment-highlight {
+            animation: glow 1.5s ease-out;
+        }
+        @keyframes glow {
+            0% { box-shadow: 0 0 0 3px rgba(0, 182, 122, 0.5); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 182, 122, 0); }
+        }
+        .comment-timestamp {
+            background: #00b67a;
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.125rem 0.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .comment-timestamp:hover {
+            opacity: 0.85;
+        }
+        .timestamp-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            padding: 0.375rem 0.75rem;
+            border-radius: 12px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            border: none;
+            background: rgba(100, 116, 139, 0.15);
+            color: #94a3b8;
+        }
+        .timestamp-toggle:hover {
+            background: rgba(100, 116, 139, 0.25);
+            color: #cbd5e1;
+        }
+        .timestamp-toggle.active {
+            background: rgba(0, 182, 122, 0.15);
+            color: #00b67a;
+            font-weight: 600;
+        }
+        .timestamp-toggle.active:hover {
+            background: rgba(0, 182, 122, 0.25);
+        }
+        .timestamp-edit-input {
+            display: none;
+            background: transparent;
+            border: none;
+            color: inherit;
+            font: inherit;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            width: 3.5rem;
+            padding: 0;
+            outline: none;
+        }
+        .timestamp-edit-input.editing {
+            display: inline-block;
+        }
+        .timestamp-toggle-remove {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(148, 163, 184, 0.2);
+        }
+        .timestamp-toggle-remove:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+        .timestamp-toggle-remove svg {
+            width: 8px;
+            height: 8px;
+            stroke: #94a3b8;
+            stroke-width: 2;
+            stroke-linecap: round;
+        }
+        .timestamp-toggle-remove:hover svg {
+            stroke: #ef4444;
+        }
+        .emoji-picker-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .emoji-trigger {
+            background: transparent;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 0.375rem 0.5rem;
+            font-size: 1.125rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .emoji-trigger:hover {
+            border-color: #00b67a;
+        }
+        .emoji-grid {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 0.5rem;
+            background: #111d32;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 0.5rem;
+            width: 260px;
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 20;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .emoji-grid.open {
+            display: block;
+        }
+        .emoji-category {
+            font-size: 0.625rem;
+            color: #475569;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0.5rem 0 0.25rem;
+            padding: 0 0.125rem;
+        }
+        .emoji-category:first-child {
+            margin-top: 0;
+        }
+        .emoji-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            font-size: 1.125rem;
+            cursor: pointer;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+        }
+        .emoji-btn:hover {
+            background: #1e293b;
+        }
     </style>
 </head>
 <body>
@@ -95,6 +406,9 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             var v = document.getElementById('player');
             v.play().catch(function() { v.muted = true; v.play(); });
         </script>
+        {{if ne .CommentMode "disabled"}}
+        <div class="markers-bar" id="markers-bar"></div>
+        {{end}}
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
         <div class="actions">
@@ -107,6 +421,357 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                     .then(function(data) { if (data.downloadUrl) window.location.href = data.downloadUrl; });
             });
         </script>
+        {{if ne .CommentMode "disabled"}}
+        <div class="comments-section" id="comments-section">
+            <h2 class="comments-header" id="comments-header">Comments</h2>
+            <div id="comments-list"></div>
+            <div class="comment-form" id="comment-form">
+                <p class="comment-error" id="comment-error"></p>
+                {{if or (eq .CommentMode "name_required") (eq .CommentMode "name_email_required")}}
+                <div class="form-row">
+                    <input type="text" id="comment-name" placeholder="Your name" maxlength="200">
+                    {{if eq .CommentMode "name_email_required"}}
+                    <input type="email" id="comment-email" placeholder="Your email" maxlength="320">
+                    {{end}}
+                </div>
+                {{end}}
+                <span class="timestamp-toggle" id="timestamp-toggle">
+                    <span id="timestamp-toggle-label">&#x1F551;</span>
+                    <span id="timestamp-toggle-text">Add timestamp</span>
+                    <input type="text" class="timestamp-edit-input" id="timestamp-edit-input" placeholder="0:00">
+                    <span class="timestamp-toggle-remove" id="timestamp-toggle-remove" style="display:none;"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></span>
+                </span>
+                <textarea id="comment-body" placeholder="Write a comment..." maxlength="5000"></textarea>
+                <div class="comment-form-actions">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span id="private-toggle"></span>
+                        <div class="emoji-picker-wrapper" id="emoji-wrapper">
+                            <button type="button" class="emoji-trigger" id="emoji-trigger">&#x1F642;</button>
+                            <div class="emoji-grid" id="emoji-grid"></div>
+                        </div>
+                    </div>
+                    <button class="comment-submit" id="comment-submit">Post comment</button>
+                </div>
+            </div>
+        </div>
+        <script nonce="{{.Nonce}}">
+        (function() {
+            var shareToken = '{{.ShareToken}}';
+            var commentMode = '{{.CommentMode}}';
+            var listEl = document.getElementById('comments-list');
+            var headerEl = document.getElementById('comments-header');
+            var errorEl = document.getElementById('comment-error');
+            var submitBtn = document.getElementById('comment-submit');
+            var bodyEl = document.getElementById('comment-body');
+            var nameEl = document.getElementById('comment-name');
+            var emailEl = document.getElementById('comment-email');
+            var privateToggleEl = document.getElementById('private-toggle');
+            var markersBar = document.getElementById('markers-bar');
+            var player = document.getElementById('player');
+            var videoDuration = 0;
+            var lastComments = null;
+            var timestampToggle = document.getElementById('timestamp-toggle');
+            var timestampToggleText = document.getElementById('timestamp-toggle-text');
+            var timestampToggleRemove = document.getElementById('timestamp-toggle-remove');
+            var timestampEditInput = document.getElementById('timestamp-edit-input');
+            var capturedTimestamp = null;
+            var emojiTrigger = document.getElementById('emoji-trigger');
+            var emojiGrid = document.getElementById('emoji-grid');
+
+            function getAuthToken() {
+                try { return localStorage.getItem('token') || ''; } catch(e) { return ''; }
+            }
+
+            var token = getAuthToken();
+            if (token && privateToggleEl) {
+                privateToggleEl.innerHTML = '<label><input type="checkbox" id="comment-private"> Private comment</label>';
+            }
+
+            function timeAgo(dateStr) {
+                var seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+                if (seconds < 60) return 'just now';
+                var minutes = Math.floor(seconds / 60);
+                if (minutes < 60) return minutes + (minutes === 1 ? ' min ago' : ' mins ago');
+                var hours = Math.floor(minutes / 60);
+                if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+                var days = Math.floor(hours / 24);
+                return days + (days === 1 ? ' day ago' : ' days ago');
+            }
+
+            function escapeHtml(text) {
+                var div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function formatTimestamp(seconds) {
+                var m = Math.floor(seconds / 60);
+                var s = Math.floor(seconds % 60);
+                return m + ':' + (s < 10 ? '0' : '') + s;
+            }
+
+            function renderMarkers(comments) {
+                if (!markersBar || !videoDuration) return;
+                markersBar.innerHTML = '';
+                var bySecond = {};
+                comments.forEach(function(c) {
+                    if (c.videoTimestamp == null) return;
+                    var sec = Math.floor(c.videoTimestamp);
+                    if (!bySecond[sec]) bySecond[sec] = [];
+                    bySecond[sec].push(c);
+                });
+                Object.keys(bySecond).forEach(function(sec) {
+                    var group = bySecond[sec];
+                    var dot = document.createElement('div');
+                    dot.className = 'marker-dot' + (group.length > 1 ? ' multi' : '') + (group[0].isPrivate ? ' private' : '');
+                    dot.style.left = (group[0].videoTimestamp / videoDuration * 100) + '%';
+                    var author = group[0].authorName || 'Anonymous';
+                    var preview = group[0].body.substring(0, 80);
+                    var tooltip = document.createElement('div');
+                    tooltip.className = 'marker-tooltip';
+                    tooltip.textContent = author + ' \u00b7 ' + formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + preview;
+                    dot.appendChild(tooltip);
+                    dot.setAttribute('data-comment-id', group[0].id);
+                    dot.addEventListener('click', function() {
+                        player.currentTime = group[0].videoTimestamp;
+                        var commentEl = document.getElementById('comment-' + group[0].id);
+                        if (commentEl) {
+                            commentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            commentEl.classList.add('comment-highlight');
+                            setTimeout(function() { commentEl.classList.remove('comment-highlight'); }, 1500);
+                        }
+                    });
+                    markersBar.appendChild(dot);
+                });
+            }
+
+            player.addEventListener('loadedmetadata', function() {
+                videoDuration = player.duration;
+                if (lastComments) renderMarkers(lastComments);
+            });
+
+            function renderComment(c) {
+                var authorName = c.authorName || 'Anonymous';
+                var badges = '';
+                if (c.videoTimestamp != null) {
+                    badges += ' <span class="comment-timestamp" data-ts="' + c.videoTimestamp + '">' + formatTimestamp(c.videoTimestamp) + '</span>';
+                }
+                if (c.isOwner) badges += ' <span class="comment-owner-badge">Owner</span>';
+                if (c.isPrivate) badges += ' <span class="comment-private-badge">Private</span>';
+                return '<div class="comment" id="comment-' + c.id + '">' +
+                    '<div class="comment-meta">' +
+                        '<span class="comment-author">' + escapeHtml(authorName) + '</span>' +
+                        badges +
+                        '<span>\u00b7 ' + timeAgo(c.createdAt) + '</span>' +
+                    '</div>' +
+                    '<div class="comment-body">' + escapeHtml(c.body) + '</div>' +
+                '</div>';
+            }
+
+            listEl.addEventListener('click', function(e) {
+                var tsEl = e.target.closest('.comment-timestamp');
+                if (tsEl) {
+                    player.currentTime = parseFloat(tsEl.getAttribute('data-ts'));
+                    player.play().catch(function() {});
+                }
+            });
+
+            function loadComments() {
+                var headers = {};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                fetch('/api/watch/' + shareToken + '/comments', { headers: headers })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (!data.comments || data.comments.length === 0) {
+                            listEl.innerHTML = '<p class="no-comments">No comments yet. Be the first!</p>';
+                            headerEl.textContent = 'Comments';
+                            lastComments = [];
+                        } else {
+                            headerEl.textContent = 'Comments (' + data.comments.length + ')';
+                            listEl.innerHTML = data.comments.map(renderComment).join('');
+                            lastComments = data.comments;
+                            renderMarkers(data.comments);
+                        }
+                    });
+            }
+
+            loadComments();
+
+            function parseTimestamp(str) {
+                var parts = str.trim().split(':');
+                if (parts.length === 2) {
+                    var m = parseInt(parts[0], 10);
+                    var s = parseInt(parts[1], 10);
+                    if (!isNaN(m) && !isNaN(s) && s >= 0 && s < 60 && m >= 0) {
+                        return m * 60 + s;
+                    }
+                }
+                if (parts.length === 1) {
+                    var sec = parseInt(parts[0], 10);
+                    if (!isNaN(sec) && sec >= 0) return sec;
+                }
+                return null;
+            }
+
+            function setTimestamp(seconds) {
+                capturedTimestamp = Math.min(seconds, videoDuration);
+                timestampToggle.classList.add('active');
+                timestampToggleText.textContent = formatTimestamp(capturedTimestamp);
+                timestampToggleText.style.display = '';
+                timestampEditInput.classList.remove('editing');
+                timestampToggleRemove.style.display = 'inline-flex';
+            }
+
+            function deactivateTimestamp() {
+                capturedTimestamp = null;
+                timestampToggle.classList.remove('active');
+                timestampToggleText.textContent = 'Add timestamp';
+                timestampToggleText.style.display = '';
+                timestampEditInput.classList.remove('editing');
+                timestampToggleRemove.style.display = 'none';
+            }
+
+            function startEditing() {
+                var current = capturedTimestamp !== null ? formatTimestamp(capturedTimestamp) : '';
+                timestampToggleText.style.display = 'none';
+                timestampEditInput.classList.add('editing');
+                timestampEditInput.value = current;
+                timestampEditInput.focus();
+                timestampEditInput.select();
+            }
+
+            function commitEdit() {
+                var parsed = parseTimestamp(timestampEditInput.value);
+                if (parsed !== null && videoDuration > 0) {
+                    setTimestamp(parsed);
+                } else if (capturedTimestamp !== null) {
+                    timestampToggleText.style.display = '';
+                    timestampEditInput.classList.remove('editing');
+                } else {
+                    deactivateTimestamp();
+                }
+            }
+
+            timestampToggle.addEventListener('click', function(e) {
+                if (e.target.closest('.timestamp-toggle-remove')) {
+                    e.stopPropagation();
+                    deactivateTimestamp();
+                    return;
+                }
+                if (e.target === timestampEditInput) return;
+                if (capturedTimestamp !== null) {
+                    startEditing();
+                } else if (videoDuration > 0) {
+                    player.pause();
+                    setTimestamp(player.currentTime);
+                }
+            });
+
+            timestampEditInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    timestampToggleText.style.display = '';
+                    timestampEditInput.style.display = 'none';
+                }
+            });
+
+            timestampEditInput.addEventListener('blur', function() {
+                commitEdit();
+            });
+
+            var emojiCategories = {
+                'Smileys': ['\uD83D\uDE00','\uD83D\uDE03','\uD83D\uDE04','\uD83D\uDE01','\uD83D\uDE06','\uD83D\uDE05','\uD83E\uDD23','\uD83D\uDE02','\uD83D\uDE42','\uD83D\uDE09','\uD83D\uDE0A','\uD83D\uDE07','\uD83D\uDE0D','\uD83E\uDD29','\uD83D\uDE18','\uD83D\uDE0B','\uD83D\uDE1C','\uD83E\uDD17','\uD83E\uDD14','\uD83D\uDE10','\uD83D\uDE11','\uD83D\uDE36'],
+                'Hands': ['\uD83D\uDC4D','\uD83D\uDC4E','\uD83D\uDC4F','\uD83D\uDE4C','\uD83E\uDD1D','\u270C\uFE0F','\uD83E\uDD1E','\uD83E\uDD1F','\uD83D\uDC4B','\uD83D\uDD90\uFE0F','\u270B','\uD83D\uDC4A'],
+                'Symbols': ['\u2764\uFE0F','\uD83D\uDD25','\u2B50','\u2705','\u274C','\u26A1','\uD83D\uDCA1','\uD83C\uDFAF','\uD83C\uDFC6','\uD83D\uDCAC','\uD83D\uDCCC','\uD83D\uDD17'],
+                'Reactions': ['\uD83D\uDCAF','\uD83D\uDC40','\uD83C\uDF89','\uD83D\uDE31','\uD83D\uDE2C','\uD83E\uDD2F','\uD83E\uDD26','\uD83E\uDD37','\uD83D\uDCAA','\uD83D\uDE4F','\uD83D\uDE22','\uD83D\uDE21'],
+                'Work': ['\uD83D\uDCBB','\uD83D\uDCCA','\uD83D\uDCDD','\uD83D\uDCC1','\uD83D\uDD27','\uD83D\uDD0D','\uD83D\uDCF1','\uD83D\uDDA5\uFE0F','\u23F0','\uD83D\uDCC5','\uD83D\uDCC8','\uD83D\uDDC2\uFE0F'],
+                'Misc': ['\uD83D\uDE80','\uD83C\uDF1F','\uD83D\uDC8E','\uD83C\uDFB5','\u2615','\uD83C\uDF55','\uD83C\uDF08','\uD83C\uDFA8','\uD83D\uDCF8','\uD83C\uDFE0','\uD83C\uDF0D','\uD83D\uDCA4']
+            };
+
+            var gridHTML = '';
+            Object.keys(emojiCategories).forEach(function(cat) {
+                gridHTML += '<div class="emoji-category">' + cat + '</div><div>';
+                emojiCategories[cat].forEach(function(em) {
+                    gridHTML += '<button type="button" class="emoji-btn" data-emoji="' + em + '">' + em + '</button>';
+                });
+                gridHTML += '</div>';
+            });
+            emojiGrid.innerHTML = gridHTML;
+
+            emojiTrigger.addEventListener('click', function(e) {
+                e.stopPropagation();
+                emojiGrid.classList.toggle('open');
+            });
+
+            emojiGrid.addEventListener('click', function(e) {
+                var btn = e.target.closest('.emoji-btn');
+                if (!btn) return;
+                var emoji = btn.getAttribute('data-emoji');
+                var start = bodyEl.selectionStart || 0;
+                var end = bodyEl.selectionEnd || 0;
+                bodyEl.value = bodyEl.value.substring(0, start) + emoji + bodyEl.value.substring(end);
+                bodyEl.selectionStart = bodyEl.selectionEnd = start + emoji.length;
+                bodyEl.focus();
+                emojiGrid.classList.remove('open');
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#emoji-wrapper')) {
+                    emojiGrid.classList.remove('open');
+                }
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    emojiGrid.classList.remove('open');
+                }
+            });
+
+            submitBtn.addEventListener('click', function() {
+                var body = bodyEl.value.trim();
+                if (!body) { errorEl.textContent = 'Please write a comment.'; errorEl.style.display = 'block'; return; }
+                var authorName = nameEl ? nameEl.value.trim() : '';
+                var authorEmail = emailEl ? emailEl.value.trim() : '';
+                if ((commentMode === 'name_required' || commentMode === 'name_email_required') && !authorName) {
+                    errorEl.textContent = 'Name is required.'; errorEl.style.display = 'block'; return;
+                }
+                if (commentMode === 'name_email_required' && !authorEmail) {
+                    errorEl.textContent = 'Email is required.'; errorEl.style.display = 'block'; return;
+                }
+                var privateEl = document.getElementById('comment-private');
+                var isPrivate = privateEl ? privateEl.checked : false;
+                submitBtn.disabled = true;
+                errorEl.style.display = 'none';
+                var headers = {'Content-Type': 'application/json'};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                fetch('/api/watch/' + shareToken + '/comments', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({authorName: authorName, authorEmail: authorEmail, body: body, isPrivate: isPrivate, videoTimestamp: capturedTimestamp})
+                }).then(function(r) {
+                    if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Could not post comment'); });
+                    return r.json();
+                }).then(function(comment) {
+                    listEl.querySelector('.no-comments') && listEl.querySelector('.no-comments').remove();
+                    listEl.insertAdjacentHTML('beforeend', renderComment(comment));
+                    var count = listEl.querySelectorAll('.comment').length;
+                    headerEl.textContent = 'Comments (' + count + ')';
+                    bodyEl.value = '';
+                    if (privateEl) privateEl.checked = false;
+                    deactivateTimestamp();
+                    if (lastComments) {
+                        lastComments.push(comment);
+                        renderMarkers(lastComments);
+                    }
+                    submitBtn.disabled = false;
+                }).catch(function(err) {
+                    errorEl.textContent = err.message; errorEl.style.display = 'block'; submitBtn.disabled = false;
+                });
+            });
+        })();
+        </script>
+        {{end}}
         <p class="branding">Shared via <a href="https://sendrec.eu">SendRec</a> — open-source video messaging</p>
     </div>
 </body>
@@ -206,6 +871,7 @@ type watchPageData struct {
 	Nonce        string
 	ThumbnailURL string
 	ShareToken   string
+	CommentMode  string
 }
 
 type expiredPageData struct {
@@ -309,14 +975,15 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var shareExpiresAt time.Time
 	var thumbnailKey *string
 	var sharePassword *string
+	var commentMode string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password
+		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
-	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword)
+	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &commentMode)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -374,6 +1041,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Nonce:        nonce,
 		ThumbnailURL: thumbnailURL,
 		ShareToken:   shareToken,
+		CommentMode:  commentMode,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

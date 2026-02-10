@@ -88,10 +88,11 @@ func main() {
 	}
 
 	emailClient := email.New(email.Config{
-		BaseURL:    os.Getenv("LISTMONK_URL"),
-		Username:   getEnv("LISTMONK_USER", "admin"),
-		Password:   os.Getenv("LISTMONK_PASSWORD"),
-		TemplateID: int(getEnvInt64("LISTMONK_TEMPLATE_ID", 0)),
+		BaseURL:           os.Getenv("LISTMONK_URL"),
+		Username:          getEnv("LISTMONK_USER", "admin"),
+		Password:          os.Getenv("LISTMONK_PASSWORD"),
+		TemplateID:        int(getEnvInt64("LISTMONK_TEMPLATE_ID", 0)),
+		CommentTemplateID: int(getEnvInt64("LISTMONK_COMMENT_TEMPLATE_ID", 0)),
 	})
 
 	srv := server.New(server.Config{
@@ -106,6 +107,7 @@ func main() {
 		MaxVideoDurationSeconds: int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),
 		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EmailSender:             emailClient,
+		CommentNotifier:         emailClient,
 	})
 
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())

@@ -3,6 +3,7 @@ package email
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -79,5 +80,101 @@ func TestSendPasswordReset_NoBaseURL(t *testing.T) {
 	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSendCommentNotification_UsesCommentTemplateID(t *testing.T) {
+	var received txRequest
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "user",
+		Password:          "pass",
+		TemplateID:        10,
+		CommentTemplateID: 42,
+	})
+
+	err := client.SendCommentNotification(context.Background(),
+		"alice@example.com", "Alice", "My Video", "Bob", "Nice video!", "https://example.com/watch/abc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.TemplateID != 42 {
+		t.Errorf("expected template_id=42, got %d", received.TemplateID)
+	}
+}
+
+func TestSendCommentNotification_LogsWarningWhenTemplateIDZero(t *testing.T) {
+	serverHit := false
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "user",
+		Password:          "pass",
+		TemplateID:        10,
+		CommentTemplateID: 0,
+	})
+
+	err := client.SendCommentNotification(context.Background(),
+		"alice@example.com", "Alice", "My Video", "Bob", "Nice video!", "https://example.com/watch/abc")
+	if err != nil {
+		t.Fatalf("expected nil error when CommentTemplateID is zero, got: %v", err)
+	}
+
+	if serverHit {
+		t.Error("expected no HTTP request when CommentTemplateID is zero")
+	}
+}
+
+func TestSendPasswordReset_StillUsesTemplateID(t *testing.T) {
+	var received txRequest
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "user",
+		Password:          "pass",
+		TemplateID:        10,
+		CommentTemplateID: 42,
+	})
+
+	err := client.SendPasswordReset(context.Background(),
+		"alice@example.com", "Alice", "https://example.com/reset/token123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.TemplateID != 10 {
+		t.Errorf("expected template_id=10, got %d", received.TemplateID)
 	}
 }

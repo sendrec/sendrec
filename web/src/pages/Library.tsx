@@ -16,6 +16,8 @@ interface Video {
   uniqueViewCount: number;
   thumbnailUrl?: string;
   hasPassword: boolean;
+  commentMode: string;
+  commentCount: number;
 }
 
 interface LimitsResponse {
@@ -33,6 +35,15 @@ function formatDuration(seconds: number): string {
 function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString();
 }
+
+const commentModeLabels: Record<string, string> = {
+  disabled: "Comments off",
+  anonymous: "Comments: anonymous",
+  name_required: "Comments: name required",
+  name_email_required: "Comments: name + email",
+};
+
+const commentModeOrder = ["disabled", "anonymous", "name_required", "name_email_required"];
 
 function expiryLabel(shareExpiresAt: string): { text: string; expired: boolean } {
   const expiry = new Date(shareExpiresAt);
@@ -197,6 +208,16 @@ export function Library() {
     setEditingId(null);
   }
 
+  async function cycleCommentMode(video: Video) {
+    const currentIndex = commentModeOrder.indexOf(video.commentMode);
+    const nextMode = commentModeOrder[(currentIndex + 1) % commentModeOrder.length];
+    await apiFetch(`/api/videos/${video.id}/comment-mode`, {
+      method: "PUT",
+      body: JSON.stringify({ commentMode: nextMode }),
+    });
+    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, commentMode: nextMode } : v)));
+  }
+
   if (loading) {
     return (
       <div className="page-container page-container--centered">
@@ -275,18 +296,20 @@ export function Library() {
           >
             <div className="video-card-top">
               {video.thumbnailUrl && (
-                <img
-                  src={video.thumbnailUrl}
-                  alt=""
-                  style={{
-                    width: 120,
-                    height: 68,
-                    objectFit: "cover",
-                    borderRadius: 4,
-                    flexShrink: 0,
-                    background: "var(--color-border)",
-                  }}
-                />
+                <a href={`/watch/${video.shareToken}`} style={{ flexShrink: 0 }}>
+                  <img
+                    src={video.thumbnailUrl}
+                    alt=""
+                    style={{
+                      width: 120,
+                      height: 68,
+                      objectFit: "cover",
+                      borderRadius: 4,
+                      background: "var(--color-border)",
+                      display: "block",
+                    }}
+                  />
+                </a>
               )}
               <div style={{ minWidth: 0, flex: 1 }}>
                 {editingId === video.id ? (
@@ -378,125 +401,76 @@ export function Library() {
               </div>
             </div>
 
-            <div className="video-card-actions">
-              {video.status === "ready" && (
-                <>
-                  {video.hasPassword && (
-                    <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
-                      Password protected
-                    </span>
-                  )}
-                  {video.hasPassword ? (
-                    <button
-                      onClick={() => removePassword(video.id)}
-                      style={{
-                        background: "transparent",
-                        color: "var(--color-text-secondary)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 4,
-                        padding: "6px 14px",
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Remove password
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => addPassword(video.id)}
-                      style={{
-                        background: "transparent",
-                        color: "var(--color-text-secondary)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 4,
-                        padding: "6px 14px",
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Add password
-                    </button>
-                  )}
+            {video.status === "ready" && (
+              <div className="video-card-actions" style={{ borderTop: "1px solid var(--color-border)", marginTop: 12, paddingTop: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <a
+                    href={`/watch/${video.shareToken}`}
+                    className="action-link"
+                  >
+                    View
+                  </a>
+                  <span className="action-sep">&middot;</span>
                   <button
                     onClick={() => copyLink(video.shareUrl, video.id)}
-                    style={{
-                      background: "var(--color-accent)",
-                      color: "var(--color-text)",
-                      borderRadius: 4,
-                      padding: "6px 14px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                    }}
+                    className="action-link"
+                    style={{ color: copiedId === video.id ? "var(--color-accent)" : undefined }}
                   >
                     {copiedId === video.id ? "Copied!" : "Copy link"}
                   </button>
-                  <button
-                    onClick={() => setTrimmingId(video.id)}
-                    style={{
-                      background: "transparent",
-                      color: "var(--color-accent)",
-                      border: "1px solid var(--color-accent)",
-                      borderRadius: 4,
-                      padding: "6px 14px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Trim
-                  </button>
+                  <span className="action-sep">&middot;</span>
                   <button
                     onClick={() => downloadVideo(video.id)}
                     disabled={downloadingId === video.id}
-                    style={{
-                      background: "transparent",
-                      color: "var(--color-accent)",
-                      border: "1px solid var(--color-accent)",
-                      borderRadius: 4,
-                      padding: "6px 14px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      opacity: downloadingId === video.id ? 0.7 : 1,
-                    }}
+                    className="action-link"
+                    style={{ opacity: downloadingId === video.id ? 0.5 : undefined }}
                   >
                     {downloadingId === video.id ? "Downloading..." : "Download"}
                   </button>
+                  <span className="action-sep">&middot;</span>
+                  <button
+                    onClick={() => setTrimmingId(video.id)}
+                    className="action-link"
+                  >
+                    Trim
+                  </button>
+                  <span className="action-sep">&middot;</span>
                   <button
                     onClick={() => extendVideo(video.id)}
                     disabled={extendingId === video.id}
-                    style={{
-                      background: "transparent",
-                      color: "var(--color-accent)",
-                      border: "1px solid var(--color-accent)",
-                      borderRadius: 4,
-                      padding: "6px 14px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      opacity: extendingId === video.id ? 0.7 : 1,
-                    }}
+                    className="action-link"
+                    style={{ opacity: extendingId === video.id ? 0.5 : undefined }}
                   >
                     {extendingId === video.id ? "Extending..." : "Extend"}
                   </button>
-                </>
-              )}
-
-              <button
-                onClick={() => deleteVideo(video.id)}
-                disabled={deletingId === video.id}
-                style={{
-                  background: "transparent",
-                  color: "var(--color-error)",
-                  border: "1px solid var(--color-error)",
-                  borderRadius: 4,
-                  padding: "6px 14px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  opacity: deletingId === video.id ? 0.7 : 1,
-                  marginLeft: "auto",
-                }}
-              >
-                {deletingId === video.id ? "Deleting..." : "Delete"}
-              </button>
-            </div>
+                  <span className="action-sep">&middot;</span>
+                  <button
+                    onClick={() => cycleCommentMode(video)}
+                    className="action-link"
+                    style={{ color: video.commentMode !== "disabled" ? "var(--color-accent)" : undefined }}
+                  >
+                    {commentModeLabels[video.commentMode] ?? "Comments off"}
+                    {video.commentCount > 0 && ` (${video.commentCount})`}
+                  </button>
+                  <span className="action-sep">&middot;</span>
+                  <button
+                    onClick={() => video.hasPassword ? removePassword(video.id) : addPassword(video.id)}
+                    className="action-link"
+                  >
+                    {video.hasPassword ? "Remove password" : "Add password"}
+                  </button>
+                  <span style={{ flex: 1 }} />
+                  <button
+                    onClick={() => deleteVideo(video.id)}
+                    disabled={deletingId === video.id}
+                    className="action-link"
+                    style={{ color: "var(--color-error)", opacity: deletingId === video.id ? 0.5 : undefined }}
+                  >
+                    {deletingId === video.id ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

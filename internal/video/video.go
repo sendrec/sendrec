@@ -29,6 +29,10 @@ type ObjectStorage interface {
 	UploadFile(ctx context.Context, key string, filePath string, contentType string) error
 }
 
+type CommentNotifier interface {
+	SendCommentNotification(ctx context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error
+}
+
 type Handler struct {
 	db                      database.DBTX
 	storage                 ObjectStorage
@@ -38,6 +42,11 @@ type Handler struct {
 	maxVideoDurationSeconds int
 	hmacSecret              string
 	secureCookies           bool
+	commentNotifier         CommentNotifier
+}
+
+func (h *Handler) SetCommentNotifier(n CommentNotifier) {
+	h.commentNotifier = n
 }
 
 func videoFileKey(userID, shareToken string) string {
@@ -88,6 +97,8 @@ type listItem struct {
 	UniqueViewCount int64  `json:"uniqueViewCount"`
 	ThumbnailURL    string `json:"thumbnailUrl,omitempty"`
 	HasPassword     bool   `json:"hasPassword"`
+	CommentMode     string `json:"commentMode"`
+	CommentCount    int64  `json:"commentCount"`
 }
 
 type updateRequest struct {
@@ -368,7 +379,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at,
 		    (SELECT COUNT(*) FROM video_views vv WHERE vv.video_id = v.id) AS view_count,
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
-		    v.thumbnail_key, v.share_password
+		    v.thumbnail_key, v.share_password, v.comment_mode,
+		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count
 		 FROM videos v
 		 WHERE v.user_id = $1 AND v.status != 'deleted'
 		 ORDER BY v.created_at DESC
@@ -388,7 +400,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var shareExpiresAt time.Time
 		var thumbnailKey *string
 		var sharePassword *string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
