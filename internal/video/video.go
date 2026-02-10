@@ -676,6 +676,80 @@ func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type trimRequest struct {
+	StartSeconds float64 `json:"startSeconds"`
+	EndSeconds   float64 `json:"endSeconds"`
+}
+
+func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req trimRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.StartSeconds < 0 {
+		httputil.WriteError(w, http.StatusBadRequest, "startSeconds must not be negative")
+		return
+	}
+	if req.EndSeconds <= req.StartSeconds {
+		httputil.WriteError(w, http.StatusBadRequest, "endSeconds must be greater than startSeconds")
+		return
+	}
+
+	var duration int
+	var fileKey string
+	var shareToken string
+	var status string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT duration, file_key, share_token, status FROM videos WHERE id = $1 AND user_id = $2`,
+		videoID, userID,
+	).Scan(&duration, &fileKey, &shareToken, &status)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+	if status != "ready" {
+		httputil.WriteError(w, http.StatusConflict, "video is currently being processed")
+		return
+	}
+
+	if req.EndSeconds > float64(duration) {
+		httputil.WriteError(w, http.StatusBadRequest, "endSeconds exceeds video duration")
+		return
+	}
+	if req.EndSeconds-req.StartSeconds < 1.0 {
+		httputil.WriteError(w, http.StatusBadRequest, "trimmed video must be at least 1 second")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET status = 'processing', updated_at = now() WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
+		videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video status")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusConflict, "video is already being processed")
+		return
+	}
+
+	go TrimVideoAsync(
+		context.Background(),
+		h.db, h.storage,
+		videoID, fileKey,
+		thumbnailFileKey(userID, shareToken),
+		req.StartSeconds, req.EndSeconds,
+	)
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")

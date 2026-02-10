@@ -71,6 +71,12 @@ input:focus-visible {
 
 .video-card {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.video-card-top {
+  display: flex;
   align-items: center;
   gap: 16px;
 }
@@ -78,7 +84,8 @@ input:focus-visible {
 .video-card-actions {
   display: flex;
   gap: 8px;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .pip-preview {
@@ -103,13 +110,12 @@ input:focus-visible {
     padding: 16px;
   }
 
-  .video-card {
+  .video-card-top {
     flex-direction: column;
     align-items: flex-start;
   }
 
   .video-card-actions {
-    flex-wrap: wrap;
     width: 100%;
   }
 

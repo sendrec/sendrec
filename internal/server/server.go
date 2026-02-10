@@ -115,6 +115,7 @@ func (s *Server) routes() {
 			r.Delete("/{id}", s.videoHandler.Delete)
 			r.Post("/{id}/extend", s.videoHandler.Extend)
 			r.Get("/{id}/download", s.videoHandler.Download)
+			r.Post("/{id}/trim", s.videoHandler.Trim)
 			r.Put("/{id}/password", s.videoHandler.SetPassword)
 		})
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)

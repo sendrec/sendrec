@@ -409,6 +409,95 @@ describe("Library", () => {
     expect(mockApiFetch).toHaveBeenCalledTimes(2);
   });
 
+  it("renders Trim button for ready videos", async () => {
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Trim" })).toBeInTheDocument();
+    });
+  });
+
+  it("opens trim modal and updates status to processing after trim", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo()]);
+    mockApiFetch.mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" }); // download URL for TrimModal
+    mockApiFetch.mockResolvedValueOnce(undefined); // trim API response
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Trim" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Trim" }));
+
+    // TrimModal should be visible
+    expect(screen.getByText("Trim Video")).toBeInTheDocument();
+
+    // Click trim in the modal
+    const trimButtons = screen.getAllByRole("button", { name: "Trim" });
+    // The modal's Trim button is the one inside the modal
+    const modalTrimButton = trimButtons.find((btn) => btn.closest("[style*='position: fixed']"));
+    await user.click(modalTrimButton!);
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/trim", {
+        method: "POST",
+        body: expect.any(String),
+      });
+    });
+
+    // After trim starts, modal should close and status should show processing
+    await waitFor(() => {
+      expect(screen.getByText("processing...")).toBeInTheDocument();
+    });
+  });
+
+  it("polls for video status after trim and updates when ready", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockFetch([makeVideo()]);
+    mockApiFetch.mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" }); // download URL for TrimModal
+    mockApiFetch.mockResolvedValueOnce(undefined); // trim API response
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Trim" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Trim" }));
+    expect(screen.getByText("Trim Video")).toBeInTheDocument();
+
+    const trimButtons = screen.getAllByRole("button", { name: "Trim" });
+    const modalTrimButton = trimButtons.find((btn) => btn.closest("[style*='position: fixed']"));
+    await user.click(modalTrimButton!);
+
+    await waitFor(() => {
+      expect(screen.getByText("processing...")).toBeInTheDocument();
+    });
+
+    // First poll: still processing
+    mockApiFetch.mockResolvedValueOnce([makeVideo({ status: "processing" })]);
+    mockApiFetch.mockResolvedValueOnce(unlimitedLimits);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await waitFor(() => {
+      expect(screen.getByText("processing...")).toBeInTheDocument();
+    });
+
+    // Second poll: ready
+    mockApiFetch.mockResolvedValueOnce([makeVideo({ status: "ready" })]);
+    mockApiFetch.mockResolvedValueOnce(unlimitedLimits);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await waitFor(() => {
+      expect(screen.queryByText("processing...")).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
   it("saves title on blur", async () => {
     const user = userEvent.setup();
     mockFetch([makeVideo()]);
