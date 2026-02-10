@@ -593,7 +593,7 @@ describe("Library", () => {
     mockFetch([makeVideo({ transcriptStatus: "processing" })]);
     renderLibrary();
 
-    expect(await screen.findByText("Transcribing...")).toBeInTheDocument();
+    expect(await screen.findByText(/Transcribing/)).toBeInTheDocument();
   });
 
   it("shows Retry transcript button when transcriptStatus is failed", async () => {

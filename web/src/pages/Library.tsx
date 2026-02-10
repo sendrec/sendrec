@@ -406,14 +406,13 @@ export function Library() {
                     );
                   })()}
                   {video.status === "ready" && video.transcriptStatus === "processing" && (
-                    <>
-                      <span className="action-sep">&middot;</span>
-                      <span style={{ color: "var(--color-accent)" }}>Transcribing...</span>
-                    </>
+                    <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
+                      &middot; Transcribing...
+                    </span>
                   )}
                   {video.status === "ready" && video.transcriptStatus === "failed" && (
-                    <>
-                      <span className="action-sep">&middot;</span>
+                    <span style={{ marginLeft: 8 }}>
+                      &middot;{" "}
                       <button
                         onClick={() => retranscribeVideo(video.id)}
                         className="action-link"
@@ -421,7 +420,7 @@ export function Library() {
                       >
                         Retry transcript
                       </button>
-                    </>
+                    </span>
                   )}
                 </p>
               </div>
