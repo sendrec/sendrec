@@ -11,10 +11,11 @@ import (
 )
 
 type Config struct {
-	BaseURL    string
-	Username   string
-	Password   string
-	TemplateID int
+	BaseURL           string
+	Username          string
+	Password          string
+	TemplateID        int
+	CommentTemplateID int
 }
 
 type Client struct {
@@ -84,9 +85,14 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 		return nil
 	}
 
+	if c.config.CommentTemplateID == 0 {
+		log.Printf("LISTMONK_COMMENT_TEMPLATE_ID not set — skipping comment notification for %q", videoTitle)
+		return nil
+	}
+
 	body := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.TemplateID,
+		TemplateID:      c.config.CommentTemplateID,
 		Data: map[string]string{
 			"name":          toName,
 			"videoTitle":    videoTitle,
