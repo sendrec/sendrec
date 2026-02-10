@@ -22,7 +22,8 @@ func TestTrimVideoAsync_DownloadError(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	TrimVideoAsync(context.Background(), mock, s, "video-123",
-		"recordings/user/video.webm", "recordings/user/video.jpg", 5.0, 30.0)
+		"recordings/user/video.webm", "recordings/user/video.jpg",
+		"user-123", "sharetoken", 5.0, 30.0)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
@@ -43,7 +44,8 @@ func TestTrimVideoAsync_FFmpegFailsFallsBackToReady(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	TrimVideoAsync(context.Background(), mock, s, "video-123",
-		"recordings/user/video.webm", "recordings/user/video.jpg", 5.0, 30.0)
+		"recordings/user/video.webm", "recordings/user/video.jpg",
+		"user-123", "sharetoken", 5.0, 30.0)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
@@ -64,7 +66,8 @@ func TestTrimVideoAsync_UploadError(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	TrimVideoAsync(context.Background(), mock, s, "video-123",
-		"recordings/user/video.webm", "recordings/user/video.jpg", 5.0, 30.0)
+		"recordings/user/video.webm", "recordings/user/video.jpg",
+		"user-123", "sharetoken", 5.0, 30.0)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)

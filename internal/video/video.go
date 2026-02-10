@@ -326,14 +326,14 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 				h.db, h.storage,
 				videoID, fileKey, *webcamKey,
 				thumbnailFileKey(userID, shareToken),
+				userID, shareToken,
 			)
 		} else {
-			go GenerateThumbnail(
-				context.Background(),
-				h.db, h.storage,
-				videoID, fileKey,
-				thumbnailFileKey(userID, shareToken),
-			)
+			go func() {
+				ctx := context.Background()
+				GenerateThumbnail(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken))
+				TranscribeVideo(ctx, h.db, h.storage, videoID, fileKey, userID, shareToken)
+			}()
 		}
 	}
 
@@ -756,6 +756,7 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 		h.db, h.storage,
 		videoID, fileKey,
 		thumbnailFileKey(userID, shareToken),
+		userID, shareToken,
 		req.StartSeconds, req.EndSeconds,
 	)
 

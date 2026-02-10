@@ -31,7 +31,8 @@ func TestCompositeWithWebcam_ScreenDownloadError(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	CompositeWithWebcam(context.Background(), mock, s, "video-123",
-		"recordings/user/video.webm", "recordings/user/video_webcam.webm", "recordings/user/video.jpg")
+		"recordings/user/video.webm", "recordings/user/video_webcam.webm", "recordings/user/video.jpg",
+		"user-123", "sharetoken")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
@@ -54,7 +55,8 @@ func TestCompositeWithWebcam_FFmpegFailsFallsBackToReady(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	CompositeWithWebcam(context.Background(), mock, s, "video-123",
-		"recordings/user/video.webm", "recordings/user/video_webcam.webm", "recordings/user/video.jpg")
+		"recordings/user/video.webm", "recordings/user/video_webcam.webm", "recordings/user/video.jpg",
+		"user-123", "sharetoken")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
