@@ -12,6 +12,7 @@ SendRec is an open-source alternative to Loom for teams that need their data to 
 - **GDPR native** — privacy-first by design, not bolted on after the fact
 - **Open source** — AGPLv3 licensed, self-host or use our managed platform
 - **No US cloud dependency** — no data transfers to the US, no Schrems II risk
+- **Automatic transcription** — videos are transcribed with whisper.cpp, displayed as subtitles and a clickable transcript panel
 
 ## Quick Start
 
@@ -49,6 +50,7 @@ make test
 - **Backend:** Go (single binary, chi router)
 - **Database:** PostgreSQL 18
 - **Storage:** S3-compatible object storage (MinIO for dev, Hetzner Object Storage for prod)
+- **Transcription:** [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (optional, runs server-side)
 - **Deployment:** Docker Compose
 
 ### Key environment variables
@@ -59,6 +61,8 @@ make test
 - `BASE_URL` – used for CORS and share links
 - `MAX_UPLOAD_BYTES` – max allowed upload size (bytes), defaults to 500MB
 - `LISTMONK_BASE_URL`, `LISTMONK_USERNAME`, `LISTMONK_PASSWORD`, `LISTMONK_TEMPLATE_ID` – email (optional)
+- `TRANSCRIPTION_ENABLED` – enable automatic video transcription (default `true`)
+- `WHISPER_MODEL_PATH` – path to whisper.cpp model file (default `/models/ggml-small.bin`)
 
 ## Architecture
 
@@ -69,6 +73,8 @@ Single Go binary that:
 - Runs database migrations on startup
 
 Video recordings happen entirely in the browser using `getDisplayMedia` + `MediaRecorder`. Files upload directly to S3 via presigned URLs — the server never touches video bytes.
+
+After upload, the server generates a thumbnail with ffmpeg and transcribes the audio with [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Transcripts are stored as VTT subtitles and a clickable segment panel on the watch page. Transcription is optional — if the whisper model is not available, it is silently skipped.
 
 ## Deployment
 
