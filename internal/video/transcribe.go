@@ -149,12 +149,12 @@ func parseWhisperJSON(jsonPath string) ([]TranscriptSegment, error) {
 
 func processTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, userID, shareToken string) {
 	if !isTranscriptionAvailable() {
-		log.Printf("transcribe: transcription not available, requeueing video %s", videoID)
+		log.Printf("transcribe: transcription not available, marking video %s as failed", videoID)
 		if _, err := db.Exec(ctx,
-			`UPDATE videos SET transcript_status = 'pending', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
+			`UPDATE videos SET transcript_status = 'failed', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
-			log.Printf("transcribe: failed to requeue %s: %v", videoID, err)
+			log.Printf("transcribe: failed to set failed status for %s: %v", videoID, err)
 		}
 		return
 	}
