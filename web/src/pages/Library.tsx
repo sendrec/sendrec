@@ -18,6 +18,7 @@ interface Video {
   hasPassword: boolean;
   commentMode: string;
   commentCount: number;
+  transcriptStatus: string;
 }
 
 interface LimitsResponse {
@@ -95,7 +96,9 @@ export function Library() {
   }, []);
 
   useEffect(() => {
-    const hasProcessing = videos.some((v) => v.status === "processing");
+    const hasProcessing = videos.some(
+      (v) => v.status === "processing" || v.transcriptStatus === "processing"
+    );
     if (!hasProcessing) return;
 
     const interval = setInterval(async () => {
@@ -397,6 +400,18 @@ export function Library() {
                       </span>
                     );
                   })()}
+                  {video.status === "ready" && video.transcriptStatus === "processing" && (
+                    <>
+                      <span className="action-sep">&middot;</span>
+                      <span style={{ color: "var(--color-accent)" }}>Transcribing...</span>
+                    </>
+                  )}
+                  {video.status === "ready" && video.transcriptStatus === "failed" && (
+                    <>
+                      <span className="action-sep">&middot;</span>
+                      <span style={{ color: "var(--color-error)" }}>Transcript failed</span>
+                    </>
+                  )}
                 </p>
               </div>
             </div>
