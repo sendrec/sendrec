@@ -488,6 +488,35 @@ func TestHealthEndpointWrongMethodReturnsMethodNotAllowed(t *testing.T) {
 	}
 }
 
+// --- API Docs toggle ---
+
+func TestDocsDisabledByDefault(t *testing.T) {
+	srv := newServerWithoutDB()
+	rec := executeRequest(srv, http.MethodGet, "/api/docs")
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for /api/docs when disabled, got %d", rec.Code)
+	}
+
+	rec = executeRequest(srv, http.MethodGet, "/api/docs/openapi.yaml")
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for /api/docs/openapi.yaml when disabled, got %d", rec.Code)
+	}
+}
+
+func TestDocsEnabledWhenConfigured(t *testing.T) {
+	srv := server.New(server.Config{EnableDocs: true})
+
+	rec := executeRequest(srv, http.MethodGet, "/api/docs")
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for /api/docs when enabled, got %d", rec.Code)
+	}
+
+	rec = executeRequest(srv, http.MethodGet, "/api/docs/openapi.yaml")
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for /api/docs/openapi.yaml when enabled, got %d", rec.Code)
+	}
+}
+
 // --- SPA does not intercept API routes ---
 
 func TestSPADoesNotInterceptHealthEndpoint(t *testing.T) {

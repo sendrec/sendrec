@@ -31,6 +31,7 @@ type Config struct {
 	MaxVideosPerMonth       int
 	MaxVideoDurationSeconds int
 	S3PublicEndpoint        string
+	EnableDocs              bool
 	EmailSender             auth.EmailSender
 	CommentNotifier         video.CommentNotifier
 }
@@ -41,6 +42,7 @@ type Server struct {
 	authHandler  *auth.Handler
 	videoHandler *video.Handler
 	webFS        fs.FS
+	enableDocs   bool
 }
 
 func New(cfg Config) *Server {
@@ -52,7 +54,7 @@ func New(cfg Config) *Server {
 		StorageEndpoint: cfg.S3PublicEndpoint,
 	}))
 
-	s := &Server{router: r, pinger: cfg.Pinger, webFS: cfg.WebFS}
+	s := &Server{router: r, pinger: cfg.Pinger, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -97,8 +99,10 @@ func maxBodySize(maxBytes int64) func(http.Handler) http.Handler {
 
 func (s *Server) routes() {
 	s.router.Get("/api/health", s.handleHealth)
-	s.router.Get("/api/docs", docs.HandleDocs)
-	s.router.Get("/api/docs/openapi.yaml", docs.HandleSpec)
+	if s.enableDocs {
+		s.router.Get("/api/docs", docs.HandleDocs)
+		s.router.Get("/api/docs/openapi.yaml", docs.HandleSpec)
+	}
 
 	if s.authHandler != nil {
 		authLimiter := ratelimit.NewLimiter(0.5, 5)
