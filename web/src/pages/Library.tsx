@@ -410,15 +410,15 @@ export function Library() {
                       &middot; Transcribing...
                     </span>
                   )}
-                  {video.status === "ready" && video.transcriptStatus === "failed" && (
+                  {video.status === "ready" && (video.transcriptStatus === "failed" || video.transcriptStatus === "ready") && (
                     <span style={{ marginLeft: 8 }}>
                       &middot;{" "}
                       <button
                         onClick={() => retranscribeVideo(video.id)}
                         className="action-link"
-                        style={{ color: "var(--color-error)" }}
+                        style={{ color: video.transcriptStatus === "failed" ? "var(--color-error)" : undefined }}
                       >
-                        Retry transcript
+                        {video.transcriptStatus === "failed" ? "Retry transcript" : "Redo transcript"}
                       </button>
                     </span>
                   )}
