@@ -272,10 +272,10 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
         .timestamp-toggle {
             display: inline-flex;
             align-items: center;
-            gap: 0.375rem;
+            gap: 0.5rem;
             font-size: 0.8125rem;
             font-weight: 500;
-            padding: 0.25rem 0.625rem;
+            padding: 0.375rem 0.75rem;
             border-radius: 12px;
             margin-bottom: 0.5rem;
             cursor: pointer;
@@ -296,6 +296,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             background: rgba(0, 182, 122, 0.25);
         }
         .timestamp-edit-input {
+            display: none;
             background: transparent;
             border: none;
             color: inherit;
@@ -305,6 +306,9 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             width: 3.5rem;
             padding: 0;
             outline: none;
+        }
+        .timestamp-edit-input.editing {
+            display: inline-block;
         }
         .timestamp-toggle-remove {
             display: inline-flex;
@@ -434,7 +438,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                 <span class="timestamp-toggle" id="timestamp-toggle">
                     <span id="timestamp-toggle-label">&#x1F551;</span>
                     <span id="timestamp-toggle-text">Add timestamp</span>
-                    <input type="text" class="timestamp-edit-input" id="timestamp-edit-input" style="display:none;" placeholder="0:00">
+                    <input type="text" class="timestamp-edit-input" id="timestamp-edit-input" placeholder="0:00">
                     <span class="timestamp-toggle-remove" id="timestamp-toggle-remove" style="display:none;"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></span>
                 </span>
                 <textarea id="comment-body" placeholder="Write a comment..." maxlength="5000"></textarea>
@@ -614,7 +618,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                 timestampToggle.classList.add('active');
                 timestampToggleText.textContent = formatTimestamp(capturedTimestamp);
                 timestampToggleText.style.display = '';
-                timestampEditInput.style.display = 'none';
+                timestampEditInput.classList.remove('editing');
                 timestampToggleRemove.style.display = 'inline-flex';
             }
 
@@ -623,14 +627,14 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                 timestampToggle.classList.remove('active');
                 timestampToggleText.textContent = 'Add timestamp';
                 timestampToggleText.style.display = '';
-                timestampEditInput.style.display = 'none';
+                timestampEditInput.classList.remove('editing');
                 timestampToggleRemove.style.display = 'none';
             }
 
             function startEditing() {
                 var current = capturedTimestamp !== null ? formatTimestamp(capturedTimestamp) : '';
                 timestampToggleText.style.display = 'none';
-                timestampEditInput.style.display = '';
+                timestampEditInput.classList.add('editing');
                 timestampEditInput.value = current;
                 timestampEditInput.focus();
                 timestampEditInput.select();
@@ -642,7 +646,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                     setTimestamp(parsed);
                 } else if (capturedTimestamp !== null) {
                     timestampToggleText.style.display = '';
-                    timestampEditInput.style.display = 'none';
+                    timestampEditInput.classList.remove('editing');
                 } else {
                     deactivateTimestamp();
                 }
