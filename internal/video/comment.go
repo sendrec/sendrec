@@ -27,19 +27,21 @@ type setCommentModeRequest struct {
 }
 
 type postCommentRequest struct {
-	AuthorName  string `json:"authorName"`
-	AuthorEmail string `json:"authorEmail"`
-	Body        string `json:"body"`
-	IsPrivate   bool   `json:"isPrivate"`
+	AuthorName     string   `json:"authorName"`
+	AuthorEmail    string   `json:"authorEmail"`
+	Body           string   `json:"body"`
+	IsPrivate      bool     `json:"isPrivate"`
+	VideoTimestamp *float64 `json:"videoTimestamp"`
 }
 
 type commentResponse struct {
-	ID         string `json:"id"`
-	AuthorName string `json:"authorName"`
-	Body       string `json:"body"`
-	IsPrivate  bool   `json:"isPrivate"`
-	IsOwner    bool   `json:"isOwner"`
-	CreatedAt  string `json:"createdAt"`
+	ID             string   `json:"id"`
+	AuthorName     string   `json:"authorName"`
+	Body           string   `json:"body"`
+	IsPrivate      bool     `json:"isPrivate"`
+	IsOwner        bool     `json:"isOwner"`
+	CreatedAt      string   `json:"createdAt"`
+	VideoTimestamp *float64 `json:"videoTimestamp,omitempty"`
 }
 
 func (h *Handler) SetCommentMode(w http.ResponseWriter, r *http.Request) {
@@ -143,6 +145,11 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.VideoTimestamp != nil && *req.VideoTimestamp < 0 {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid timestamp")
+		return
+	}
+
 	if req.Body == "" {
 		httputil.WriteError(w, http.StatusBadRequest, "comment body is required")
 		return
@@ -185,10 +192,10 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 	var commentID string
 	var createdAt time.Time
 	err = h.db.QueryRow(r.Context(),
-		`INSERT INTO video_comments (video_id, user_id, author_name, author_email, body, is_private)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO video_comments (video_id, user_id, author_name, author_email, body, is_private, video_timestamp_seconds)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 RETURNING id, created_at`,
-		videoID, userIDArg, req.AuthorName, req.AuthorEmail, req.Body, req.IsPrivate,
+		videoID, userIDArg, req.AuthorName, req.AuthorEmail, req.Body, req.IsPrivate, req.VideoTimestamp,
 	).Scan(&commentID, &createdAt)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not save comment")
@@ -218,12 +225,13 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusCreated, commentResponse{
-		ID:         commentID,
-		AuthorName: req.AuthorName,
-		Body:       req.Body,
-		IsPrivate:  req.IsPrivate,
-		IsOwner:    callerUserID == ownerID && callerUserID != "",
-		CreatedAt:  createdAt.Format(time.RFC3339),
+		ID:             commentID,
+		AuthorName:     req.AuthorName,
+		Body:           req.Body,
+		IsPrivate:      req.IsPrivate,
+		IsOwner:        callerUserID == ownerID && callerUserID != "",
+		CreatedAt:      createdAt.Format(time.RFC3339),
+		VideoTimestamp: req.VideoTimestamp,
 	})
 }
 
@@ -259,7 +267,7 @@ func (h *Handler) lookupWatchVideo(w http.ResponseWriter, r *http.Request) (vide
 }
 
 func (h *Handler) queryComments(ctx context.Context, videoID, ownerID string, includePrivate bool) ([]commentResponse, error) {
-	query := `SELECT c.id, c.user_id, c.author_name, c.body, c.is_private, c.created_at
+	query := `SELECT c.id, c.user_id, c.author_name, c.body, c.is_private, c.created_at, c.video_timestamp_seconds
 		 FROM video_comments c WHERE c.video_id = $1`
 	if !includePrivate {
 		query += ` AND c.is_private = false`
@@ -278,19 +286,21 @@ func (h *Handler) queryComments(ctx context.Context, videoID, ownerID string, in
 		var userID *string
 		var isPrivate bool
 		var createdAt time.Time
+		var videoTimestamp *float64
 
-		if err := rows.Scan(&id, &userID, &authorName, &body, &isPrivate, &createdAt); err != nil {
+		if err := rows.Scan(&id, &userID, &authorName, &body, &isPrivate, &createdAt, &videoTimestamp); err != nil {
 			return nil, err
 		}
 
 		isOwner := userID != nil && *userID == ownerID
 		comments = append(comments, commentResponse{
-			ID:         id,
-			AuthorName: authorName,
-			Body:       body,
-			IsPrivate:  isPrivate,
-			IsOwner:    isOwner,
-			CreatedAt:  createdAt.Format(time.RFC3339),
+			ID:             id,
+			AuthorName:     authorName,
+			Body:           body,
+			IsPrivate:      isPrivate,
+			IsOwner:        isOwner,
+			CreatedAt:      createdAt.Format(time.RFC3339),
+			VideoTimestamp: videoTimestamp,
 		})
 	}
 

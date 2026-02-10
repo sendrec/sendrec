@@ -187,7 +187,7 @@ func TestPostWatchComment_AnonymousMode_Success(t *testing.T) {
 		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`INSERT INTO video_comments`).
-		WithArgs(videoID, (*string)(nil), "Someone", "", "Great video!", false).
+		WithArgs(videoID, (*string)(nil), "Someone", "", "Great video!", false, (*float64)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).AddRow("comment-1", time.Now()))
 
 	mock.ExpectQuery(`SELECT u\.email, u\.name, v\.title FROM users u JOIN videos v ON v\.user_id = u\.id WHERE v\.id = \$1`).
@@ -582,6 +582,225 @@ func TestPostWatchComment_BodyTooLong_Returns400(t *testing.T) {
 	}
 }
 
+// --- VideoTimestamp Tests ---
+
+func TestPostWatchComment_WithValidTimestamp_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	videoID := "video-123"
+	ownerID := "owner-user-1"
+	expiresAt := time.Now().Add(24 * time.Hour)
+	timestamp := 83.5
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+
+	mock.ExpectQuery(`INSERT INTO video_comments`).
+		WithArgs(videoID, (*string)(nil), "Someone", "", "Great at 83.5s!", false, &timestamp).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).AddRow("comment-ts", time.Now()))
+
+	body, _ := json.Marshal(postCommentRequest{
+		AuthorName:     "Someone",
+		Body:           "Great at 83.5s!",
+		VideoTimestamp: &timestamp,
+	})
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/comments", handler.PostWatchComment)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/"+shareToken+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	var resp commentResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.VideoTimestamp == nil {
+		t.Fatal("expected videoTimestamp to be set, got nil")
+	}
+	if *resp.VideoTimestamp != 83.5 {
+		t.Errorf("expected videoTimestamp 83.5, got %f", *resp.VideoTimestamp)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestPostWatchComment_NegativeTimestamp_Returns400(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	expiresAt := time.Now().Add(24 * time.Hour)
+	negativeTimestamp := -5.0
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", expiresAt, (*string)(nil)))
+
+	body, _ := json.Marshal(postCommentRequest{
+		Body:           "Bad timestamp",
+		VideoTimestamp: &negativeTimestamp,
+	})
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/comments", handler.PostWatchComment)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/"+shareToken+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "invalid timestamp" {
+		t.Errorf("expected error %q, got %q", "invalid timestamp", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestPostWatchComment_NilTimestamp_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	videoID := "video-123"
+	ownerID := "owner-user-1"
+	expiresAt := time.Now().Add(24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+
+	mock.ExpectQuery(`INSERT INTO video_comments`).
+		WithArgs(videoID, (*string)(nil), "", "", "No timestamp here", false, (*float64)(nil)).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).AddRow("comment-no-ts", time.Now()))
+
+	body, _ := json.Marshal(postCommentRequest{
+		Body: "No timestamp here",
+	})
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/comments", handler.PostWatchComment)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/"+shareToken+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	var resp commentResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.VideoTimestamp != nil {
+		t.Errorf("expected videoTimestamp to be nil, got %f", *resp.VideoTimestamp)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestListWatchComments_IncludesTimestamp(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	videoID := "video-123"
+	ownerID := "owner-user-1"
+	expiresAt := time.Now().Add(24 * time.Hour)
+	now := time.Now()
+	timestamp := 42.7
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+
+	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 AND c\.is_private = false ORDER BY c\.created_at ASC`).
+		WithArgs(videoID).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at", "video_timestamp_seconds"}).
+			AddRow("c1", (*string)(nil), "Alex", "At 42.7s", false, now, &timestamp).
+			AddRow("c2", (*string)(nil), "Bob", "General comment", false, now, (*float64)(nil)))
+
+	r := chi.NewRouter()
+	r.Get("/api/watch/{shareToken}/comments", handler.ListWatchComments)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/watch/"+shareToken+"/comments", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp listCommentsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp.Comments) != 2 {
+		t.Fatalf("expected 2 comments, got %d", len(resp.Comments))
+	}
+
+	if resp.Comments[0].VideoTimestamp == nil {
+		t.Fatal("expected first comment to have videoTimestamp, got nil")
+	}
+	if *resp.Comments[0].VideoTimestamp != 42.7 {
+		t.Errorf("expected first comment videoTimestamp 42.7, got %f", *resp.Comments[0].VideoTimestamp)
+	}
+
+	if resp.Comments[1].VideoTimestamp != nil {
+		t.Errorf("expected second comment to have nil videoTimestamp, got %f", *resp.Comments[1].VideoTimestamp)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
 // --- ListWatchComments Tests ---
 
 type listCommentsResponse struct {
@@ -609,11 +828,11 @@ func TestListWatchComments_PublicOnly(t *testing.T) {
 		WithArgs(shareToken).
 		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
 
-	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at FROM video_comments c WHERE c\.video_id = \$1 AND c\.is_private = false ORDER BY c\.created_at ASC`).
+	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 AND c\.is_private = false ORDER BY c\.created_at ASC`).
 		WithArgs(videoID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at"}).
-			AddRow("c1", (*string)(nil), "Alex", "Nice!", false, now).
-			AddRow("c2", &ownerID, "Owner", "Thanks!", false, now))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at", "video_timestamp_seconds"}).
+			AddRow("c1", (*string)(nil), "Alex", "Nice!", false, now, (*float64)(nil)).
+			AddRow("c2", &ownerID, "Owner", "Thanks!", false, now, (*float64)(nil)))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/comments", handler.ListWatchComments)
@@ -706,11 +925,11 @@ func TestListWatchComments_WithJWT_IncludesPrivate(t *testing.T) {
 		WithArgs(shareToken).
 		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
 
-	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at FROM video_comments c WHERE c\.video_id = \$1 ORDER BY c\.created_at ASC`).
+	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 ORDER BY c\.created_at ASC`).
 		WithArgs(videoID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at"}).
-			AddRow("c1", (*string)(nil), "Alex", "Public", false, now).
-			AddRow("c2", &viewerID, "Viewer", "Private note", true, now))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at", "video_timestamp_seconds"}).
+			AddRow("c1", (*string)(nil), "Alex", "Public", false, now, (*float64)(nil)).
+			AddRow("c2", &viewerID, "Viewer", "Private note", true, now, (*float64)(nil)))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/comments", handler.ListWatchComments)
@@ -784,11 +1003,11 @@ func TestListOwnerComments_ReturnsAllComments(t *testing.T) {
 		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"user_id", "comment_mode"}).AddRow(testUserID, "anonymous"))
 
-	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at FROM video_comments c WHERE c\.video_id = \$1 ORDER BY c\.created_at ASC`).
+	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 ORDER BY c\.created_at ASC`).
 		WithArgs(videoID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at"}).
-			AddRow("c1", (*string)(nil), "Alex", "Public comment", false, now).
-			AddRow("c2", &commenterID, "Viewer", "Private note", true, now))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at", "video_timestamp_seconds"}).
+			AddRow("c1", (*string)(nil), "Alex", "Public comment", false, now, (*float64)(nil)).
+			AddRow("c2", &commenterID, "Viewer", "Private note", true, now, (*float64)(nil)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/comments", handler.ListOwnerComments)
