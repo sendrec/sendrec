@@ -1,6 +1,8 @@
 package video
 
 import (
+	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -10,7 +12,15 @@ import (
 	"github.com/sendrec/sendrec/internal/httputil"
 )
 
-var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE html>
+var watchFuncs = template.FuncMap{
+	"formatTimestamp": func(seconds float64) string {
+		m := int(seconds) / 60
+		s := int(seconds) % 60
+		return fmt.Sprintf("%d:%02d", m, s)
+	},
+}
+
+var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Parse(`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -394,12 +404,56 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
         .emoji-btn:hover {
             background: #1e293b;
         }
+        .transcript-section {
+            margin-top: 2rem;
+            border-top: 1px solid #1e293b;
+            padding-top: 1.5rem;
+        }
+        .transcript-header {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #f8fafc;
+        }
+        .transcript-segment {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.5rem 0.625rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .transcript-segment:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .transcript-segment.active {
+            background: rgba(0, 182, 122, 0.1);
+        }
+        .transcript-timestamp {
+            color: #00b67a;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            white-space: nowrap;
+            min-width: 3rem;
+            padding-top: 0.125rem;
+        }
+        .transcript-text {
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: #cbd5e1;
+        }
+        .transcript-processing {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <video id="player" controls{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
             <source src="{{.VideoURL}}" type="video/webm">
+            {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
             Your browser does not support video playback.
         </video>
         <script nonce="{{.Nonce}}">
@@ -772,6 +826,67 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
         })();
         </script>
         {{end}}
+        {{if or (eq .TranscriptStatus "processing") (eq .TranscriptStatus "ready")}}
+        <div class="transcript-section">
+            <h2 class="transcript-header">Transcript</h2>
+            {{if eq .TranscriptStatus "processing"}}
+            <p class="transcript-processing">Transcription in progress...</p>
+            {{else}}
+            <div id="transcript-panel">
+                {{range .Segments}}
+                <div class="transcript-segment" data-start="{{.Start}}" data-end="{{.End}}">
+                    <span class="transcript-timestamp">{{formatTimestamp .Start}}</span>
+                    <span class="transcript-text">{{.Text}}</span>
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+        <script nonce="{{.Nonce}}">
+        (function() {
+            var panel = document.getElementById('transcript-panel');
+            if (!panel) return;
+            var player = document.getElementById('player');
+            var segments = panel.querySelectorAll('.transcript-segment');
+
+            panel.addEventListener('click', function(e) {
+                var seg = e.target.closest('.transcript-segment');
+                if (!seg) return;
+                var start = parseFloat(seg.getAttribute('data-start'));
+                player.currentTime = start;
+                player.play().catch(function() {});
+            });
+
+            player.addEventListener('timeupdate', function() {
+                var currentTime = player.currentTime;
+                segments.forEach(function(seg) {
+                    var start = parseFloat(seg.getAttribute('data-start'));
+                    var end = parseFloat(seg.getAttribute('data-end'));
+                    if (currentTime >= start && currentTime < end) {
+                        seg.classList.add('active');
+                    } else {
+                        seg.classList.remove('active');
+                    }
+                });
+            });
+        })();
+        {{if eq .TranscriptStatus "processing"}}
+        (function() {
+            var pollInterval = setInterval(function() {
+                fetch('/api/watch/{{.ShareToken}}')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.transcriptStatus === 'ready') {
+                            clearInterval(pollInterval);
+                            window.location.reload();
+                        }
+                    })
+                    .catch(function() {});
+            }, 10000);
+        })();
+        {{end}}
+        </script>
+        {{end}}
         <p class="branding">Shared via <a href="https://sendrec.eu">SendRec</a> — open-source video messaging</p>
     </div>
 </body>
@@ -864,14 +979,17 @@ type notFoundPageData struct {
 }
 
 type watchPageData struct {
-	Title        string
-	VideoURL     string
-	Creator      string
-	Date         string
-	Nonce        string
-	ThumbnailURL string
-	ShareToken   string
-	CommentMode  string
+	Title            string
+	VideoURL         string
+	Creator          string
+	Date             string
+	Nonce            string
+	ThumbnailURL     string
+	ShareToken       string
+	CommentMode      string
+	TranscriptURL    string
+	TranscriptStatus string
+	Segments         []TranscriptSegment
 }
 
 type expiredPageData struct {
@@ -976,14 +1094,19 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var thumbnailKey *string
 	var sharePassword *string
 	var commentMode string
+	var transcriptKey *string
+	var transcriptJSON *string
+	var transcriptStatus string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode
+		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
+		        v.transcript_key, v.transcript_json, v.transcript_status
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
-	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &commentMode)
+	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &commentMode,
+		&transcriptKey, &transcriptJSON, &transcriptStatus)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1032,16 +1155,30 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var transcriptURL string
+	var segments []TranscriptSegment
+	if transcriptKey != nil {
+		if u, err := h.storage.GenerateDownloadURL(r.Context(), *transcriptKey, 1*time.Hour); err == nil {
+			transcriptURL = u
+		}
+	}
+	if transcriptJSON != nil {
+		_ = json.Unmarshal([]byte(*transcriptJSON), &segments)
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := watchPageTemplate.Execute(w, watchPageData{
-		Title:        title,
-		VideoURL:     videoURL,
-		Creator:      creator,
-		Date:         createdAt.Format("Jan 2, 2006"),
-		Nonce:        nonce,
-		ThumbnailURL: thumbnailURL,
-		ShareToken:   shareToken,
-		CommentMode:  commentMode,
+		Title:            title,
+		VideoURL:         videoURL,
+		Creator:          creator,
+		Date:             createdAt.Format("Jan 2, 2006"),
+		Nonce:            nonce,
+		ThumbnailURL:     thumbnailURL,
+		ShareToken:       shareToken,
+		CommentMode:      commentMode,
+		TranscriptURL:    transcriptURL,
+		TranscriptStatus: transcriptStatus,
+		Segments:         segments,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}
