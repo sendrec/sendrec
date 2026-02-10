@@ -10,7 +10,7 @@ RUN pnpm build
 FROM alpine:3.21 AS whisper
 RUN apk add --no-cache build-base cmake git
 WORKDIR /build
-RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git . && \
+RUN git clone --depth 1 --branch v1.8.3 https://github.com/ggerganov/whisper.cpp.git . && \
     cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF && \
     cmake --build build --target whisper-cli -j$(nproc)
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -104,8 +105,20 @@ func (s *Storage) GenerateDownloadURL(ctx context.Context, key string, expiry ti
 	return req.URL, nil
 }
 
+func sanitizeFilename(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		if r == '"' || r == '\\' || r < 0x20 {
+			b.WriteRune('_')
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 func (s *Storage) GenerateDownloadURLWithDisposition(ctx context.Context, key string, filename string, expiry time.Duration) (string, error) {
-	disposition := fmt.Sprintf(`attachment; filename="%s"`, filename)
+	disposition := fmt.Sprintf(`attachment; filename="%s"`, sanitizeFilename(filename))
 	req, err := s.presigner.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket:                     aws.String(s.bucket),
 		Key:                        aws.String(key),

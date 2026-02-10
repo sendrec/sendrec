@@ -31,7 +31,7 @@ func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
 			w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(), screen-wake-lock=(), display-capture=(self)")
 
 			csp := fmt.Sprintf(
-				"default-src 'self'; img-src 'self' data:%s; media-src 'self' data:%s; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'%s;",
+				"default-src 'self'; img-src 'self' data:%s; media-src 'self' data:%s; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'%s; frame-ancestors 'self';",
 				storageSuffix, storageSuffix, nonce, nonce, storageSuffix,
 			)
 			w.Header().Set("Content-Security-Policy", csp)

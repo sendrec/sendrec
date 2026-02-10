@@ -115,8 +115,12 @@ func main() {
 	video.StartCleanupLoop(cleanupCtx, db.Pool, store, 10*time.Minute)
 
 	httpServer := &http.Server{
-		Addr:    fmt.Sprintf(":%s", port),
-		Handler: srv,
+		Addr:              fmt.Sprintf(":%s", port),
+		Handler:           srv,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	shutdownCh := make(chan os.Signal, 1)

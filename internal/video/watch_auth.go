@@ -81,6 +81,11 @@ func (h *Handler) VerifyWatchPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.Password) > 128 {
+		httputil.WriteError(w, http.StatusBadRequest, "password is too long")
+		return
+	}
+
 	var sharePassword *string
 	err := h.db.QueryRow(r.Context(),
 		`SELECT share_password FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,

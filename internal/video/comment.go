@@ -331,7 +331,7 @@ func (h *Handler) ListWatchComments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	callerUserID := h.optionalUserID(r)
-	includePrivate := callerUserID != ""
+	includePrivate := callerUserID != "" && callerUserID == ownerID
 
 	comments, err := h.queryComments(r.Context(), videoID, ownerID, includePrivate)
 	if err != nil {

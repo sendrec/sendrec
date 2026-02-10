@@ -25,15 +25,24 @@ jobs:
 
       - name: Deploy preview
         if: github.event.action != 'closed'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH_REF: ${{ github.event.pull_request.head.ref }}
         run: |
+          if ! echo "$BRANCH_REF" | grep -qE '^[a-zA-Z0-9._/-]+$'; then
+            echo "::error::Invalid branch name: $BRANCH_REF"
+            exit 1
+          fi
           ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "/opt/sendrec/deploy.sh preview up ${{ github.event.pull_request.number }} ${{ github.event.pull_request.head.ref }}"
+            "/opt/sendrec/deploy.sh preview up ${PR_NUMBER} ${BRANCH_REF}"
 
       - name: Teardown preview
         if: github.event.action == 'closed'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "/opt/sendrec/deploy.sh preview down ${{ github.event.pull_request.number }}"
+            "/opt/sendrec/deploy.sh preview down ${PR_NUMBER}"
 
       - name: Comment PR with preview URL
         if: github.event.action != 'closed'

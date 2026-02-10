@@ -23,15 +23,22 @@ jobs:
           echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
 
       - name: Deploy production
+        env:
+          TAG_NAME: ${{ github.ref_name }}
         run: |
+          if ! echo "$TAG_NAME" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::Invalid tag name: $TAG_NAME"
+            exit 1
+          fi
           ssh -i ~/.ssh/deploy_key ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "/opt/sendrec/deploy.sh production ${{ github.ref_name }}"
+            "/opt/sendrec/deploy.sh production ${TAG_NAME}"
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
         run: |
-          gh release create "${{ github.ref_name }}" \
+          gh release create "$TAG_NAME" \
             --repo "${{ github.repository }}" \
-            --title "${{ github.ref_name }}" \
+            --title "$TAG_NAME" \
             --generate-notes

@@ -167,6 +167,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if title == "" {
 		title = "Untitled Recording"
 	}
+	if len(title) > 500 {
+		httputil.WriteError(w, http.StatusBadRequest, "title is too long")
+		return
+	}
 
 	shareToken, err := generateShareToken()
 	if err != nil {
@@ -342,6 +346,10 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Title != "" {
+		if len(req.Title) > 500 {
+			httputil.WriteError(w, http.StatusBadRequest, "title is too long")
+			return
+		}
 		tag, err := h.db.Exec(r.Context(),
 			`UPDATE videos SET title = $1, updated_at = now()
 			 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
@@ -676,6 +684,11 @@ func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	var req setPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if len(req.Password) > 128 {
+		httputil.WriteError(w, http.StatusBadRequest, "password is too long")
 		return
 	}
 
