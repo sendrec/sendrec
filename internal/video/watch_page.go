@@ -269,20 +269,33 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
         .comment-timestamp:hover {
             opacity: 0.85;
         }
-        .timestamp-pill {
+        .timestamp-toggle {
             display: inline-flex;
             align-items: center;
             gap: 0.375rem;
-            background: rgba(0, 182, 122, 0.15);
-            color: #00b67a;
             font-size: 0.8125rem;
-            font-weight: 600;
+            font-weight: 500;
             padding: 0.25rem 0.625rem;
             border-radius: 12px;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.5rem;
             cursor: pointer;
+            border: none;
+            background: rgba(100, 116, 139, 0.15);
+            color: #94a3b8;
         }
-        .timestamp-pill-remove {
+        .timestamp-toggle:hover {
+            background: rgba(100, 116, 139, 0.25);
+            color: #cbd5e1;
+        }
+        .timestamp-toggle.active {
+            background: rgba(0, 182, 122, 0.15);
+            color: #00b67a;
+            font-weight: 600;
+        }
+        .timestamp-toggle.active:hover {
+            background: rgba(0, 182, 122, 0.25);
+        }
+        .timestamp-toggle-remove {
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -290,19 +303,18 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             height: 14px;
             border-radius: 50%;
             background: rgba(148, 163, 184, 0.2);
-            cursor: pointer;
         }
-        .timestamp-pill-remove:hover {
+        .timestamp-toggle-remove:hover {
             background: rgba(239, 68, 68, 0.3);
         }
-        .timestamp-pill-remove svg {
+        .timestamp-toggle-remove svg {
             width: 8px;
             height: 8px;
             stroke: #94a3b8;
             stroke-width: 2;
             stroke-linecap: round;
         }
-        .timestamp-pill-remove:hover svg {
+        .timestamp-toggle-remove:hover svg {
             stroke: #ef4444;
         }
         .emoji-picker-wrapper {
@@ -408,10 +420,10 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                     {{end}}
                 </div>
                 {{end}}
-                <div class="timestamp-pill" id="timestamp-pill" style="display:none;">
-                    <span id="timestamp-pill-text"></span>
-                    <span class="timestamp-pill-remove" id="timestamp-pill-remove"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></span>
-                </div>
+                <button type="button" class="timestamp-toggle" id="timestamp-toggle">
+                    <span id="timestamp-toggle-text">&#x1F551; Add timestamp</span>
+                    <span class="timestamp-toggle-remove" id="timestamp-toggle-remove" style="display:none;"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></span>
+                </button>
                 <textarea id="comment-body" placeholder="Write a comment..." maxlength="5000"></textarea>
                 <div class="comment-form-actions">
                     <div style="display:flex;align-items:center;gap:0.5rem;">
@@ -441,9 +453,9 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             var player = document.getElementById('player');
             var videoDuration = 0;
             var lastComments = null;
-            var timestampPill = document.getElementById('timestamp-pill');
-            var timestampPillText = document.getElementById('timestamp-pill-text');
-            var timestampPillRemove = document.getElementById('timestamp-pill-remove');
+            var timestampToggle = document.getElementById('timestamp-toggle');
+            var timestampToggleText = document.getElementById('timestamp-toggle-text');
+            var timestampToggleRemove = document.getElementById('timestamp-toggle-remove');
             var capturedTimestamp = null;
             var emojiTrigger = document.getElementById('emoji-trigger');
             var emojiGrid = document.getElementById('emoji-grid');
@@ -567,25 +579,30 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
 
             loadComments();
 
-            bodyEl.addEventListener('focus', function() {
-                if (videoDuration > 0 && capturedTimestamp === null) {
-                    capturedTimestamp = player.currentTime;
-                    player.pause();
-                    timestampPill.style.display = 'inline-flex';
-                    timestampPillText.textContent = '@ ' + formatTimestamp(capturedTimestamp);
-                }
-            });
-
-            timestampPill.addEventListener('click', function(e) {
-                if (e.target === timestampPillRemove || e.target.closest('.timestamp-pill-remove')) return;
+            function activateTimestamp() {
                 capturedTimestamp = player.currentTime;
-                timestampPillText.textContent = '@ ' + formatTimestamp(capturedTimestamp);
-            });
+                player.pause();
+                timestampToggle.classList.add('active');
+                timestampToggleText.textContent = '\uD83D\uDD51 ' + formatTimestamp(capturedTimestamp);
+                timestampToggleRemove.style.display = 'inline-flex';
+            }
 
-            timestampPillRemove.addEventListener('click', function(e) {
-                e.stopPropagation();
+            function deactivateTimestamp() {
                 capturedTimestamp = null;
-                timestampPill.style.display = 'none';
+                timestampToggle.classList.remove('active');
+                timestampToggleText.textContent = '\uD83D\uDD51 Add timestamp';
+                timestampToggleRemove.style.display = 'none';
+            }
+
+            timestampToggle.addEventListener('click', function(e) {
+                if (e.target.closest('.timestamp-toggle-remove')) {
+                    e.stopPropagation();
+                    deactivateTimestamp();
+                    return;
+                }
+                if (videoDuration > 0) {
+                    activateTimestamp();
+                }
             });
 
             var emojiCategories = {
@@ -667,8 +684,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                     headerEl.textContent = 'Comments (' + count + ')';
                     bodyEl.value = '';
                     if (privateEl) privateEl.checked = false;
-                    capturedTimestamp = null;
-                    timestampPill.style.display = 'none';
+                    deactivateTimestamp();
                     if (lastComments) {
                         lastComments.push(comment);
                         renderMarkers(lastComments);
