@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/docs"
 	"github.com/sendrec/sendrec/internal/ratelimit"
 	"github.com/sendrec/sendrec/internal/video"
 )
@@ -96,6 +97,8 @@ func maxBodySize(maxBytes int64) func(http.Handler) http.Handler {
 
 func (s *Server) routes() {
 	s.router.Get("/api/health", s.handleHealth)
+	s.router.Get("/api/docs", docs.HandleDocs)
+	s.router.Get("/api/docs/openapi.yaml", docs.HandleSpec)
 
 	if s.authHandler != nil {
 		authLimiter := ratelimit.NewLimiter(0.5, 5)
