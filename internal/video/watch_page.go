@@ -826,12 +826,11 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         })();
         </script>
         {{end}}
-        {{if or (eq .TranscriptStatus "processing") (eq .TranscriptStatus "ready")}}
         <div class="transcript-section">
-            <h2 class="transcript-header">Transcript</h2>
+            <h2 class="transcript-header">Transcript <button class="download-btn" id="transcribe-btn" style="display:none;font-size:0.75rem;padding:0.25rem 0.75rem;margin-left:0.5rem;">Transcribe</button></h2>
             {{if eq .TranscriptStatus "processing"}}
             <p class="transcript-processing">Transcription in progress...</p>
-            {{else}}
+            {{else if eq .TranscriptStatus "ready"}}
             <div id="transcript-panel">
                 {{range .Segments}}
                 <div class="transcript-segment" data-start="{{.Start}}" data-end="{{.End}}">
@@ -840,35 +839,62 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 </div>
                 {{end}}
             </div>
+            {{else if eq .TranscriptStatus "failed"}}
+            <p class="transcript-processing">Transcription failed.</p>
             {{end}}
         </div>
         <script nonce="{{.Nonce}}">
         (function() {
             var panel = document.getElementById('transcript-panel');
-            if (!panel) return;
-            var player = document.getElementById('player');
-            var segments = panel.querySelectorAll('.transcript-segment');
+            if (panel) {
+                var player = document.getElementById('player');
+                var segments = panel.querySelectorAll('.transcript-segment');
 
-            panel.addEventListener('click', function(e) {
-                var seg = e.target.closest('.transcript-segment');
-                if (!seg) return;
-                var start = parseFloat(seg.getAttribute('data-start'));
-                player.currentTime = start;
-                player.play().catch(function() {});
-            });
-
-            player.addEventListener('timeupdate', function() {
-                var currentTime = player.currentTime;
-                segments.forEach(function(seg) {
+                panel.addEventListener('click', function(e) {
+                    var seg = e.target.closest('.transcript-segment');
+                    if (!seg) return;
                     var start = parseFloat(seg.getAttribute('data-start'));
-                    var end = parseFloat(seg.getAttribute('data-end'));
-                    if (currentTime >= start && currentTime < end) {
-                        seg.classList.add('active');
-                    } else {
-                        seg.classList.remove('active');
-                    }
+                    player.currentTime = start;
+                    player.play().catch(function() {});
                 });
-            });
+
+                player.addEventListener('timeupdate', function() {
+                    var currentTime = player.currentTime;
+                    segments.forEach(function(seg) {
+                        var start = parseFloat(seg.getAttribute('data-start'));
+                        var end = parseFloat(seg.getAttribute('data-end'));
+                        if (currentTime >= start && currentTime < end) {
+                            seg.classList.add('active');
+                        } else {
+                            seg.classList.remove('active');
+                        }
+                    });
+                });
+            }
+
+            var token = localStorage.getItem('token');
+            var btn = document.getElementById('transcribe-btn');
+            if (token && btn) {
+                var status = '{{.TranscriptStatus}}';
+                if (status === 'none') btn.textContent = 'Transcribe';
+                else if (status === 'failed') btn.textContent = 'Retry';
+                else if (status === 'ready') btn.textContent = 'Redo';
+                else btn.textContent = '';
+                if (status !== 'processing' && btn.textContent) {
+                    btn.style.display = 'inline-block';
+                }
+                btn.addEventListener('click', function() {
+                    btn.disabled = true;
+                    btn.textContent = 'Starting...';
+                    fetch('/api/videos/{{.VideoID}}/retranscribe', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    }).then(function(r) {
+                        if (r.ok) window.location.reload();
+                        else { btn.textContent = 'Error'; btn.disabled = false; }
+                    }).catch(function() { btn.textContent = 'Error'; btn.disabled = false; });
+                });
+            }
         })();
         {{if eq .TranscriptStatus "processing"}}
         (function() {
@@ -886,7 +912,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         })();
         {{end}}
         </script>
-        {{end}}
         <p class="branding">Shared via <a href="https://sendrec.eu">SendRec</a> — open-source video messaging</p>
     </div>
 </body>
@@ -986,6 +1011,7 @@ type watchPageData struct {
 	Nonce            string
 	ThumbnailURL     string
 	ShareToken       string
+	VideoID          string
 	CommentMode      string
 	TranscriptURL    string
 	TranscriptStatus string
@@ -1097,15 +1123,16 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var transcriptKey *string
 	var transcriptJSON *string
 	var transcriptStatus string
+	var videoID string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
+		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
 		        v.transcript_key, v.transcript_json, v.transcript_status
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
-	).Scan(&title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &commentMode,
+	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &commentMode,
 		&transcriptKey, &transcriptJSON, &transcriptStatus)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
@@ -1175,6 +1202,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Nonce:            nonce,
 		ThumbnailURL:     thumbnailURL,
 		ShareToken:       shareToken,
+		VideoID:          videoID,
 		CommentMode:      commentMode,
 		TranscriptURL:    transcriptURL,
 		TranscriptStatus: transcriptStatus,

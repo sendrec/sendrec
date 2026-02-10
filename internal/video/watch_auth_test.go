@@ -456,11 +456,11 @@ func TestWatchPage_PasswordProtected_ShowsPasswordForm(t *testing.T) {
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status"}).
-				AddRow("Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), &passwordHash, "disabled", (*string)(nil), (*string)(nil), "none"),
+			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status"}).
+				AddRow("vid-1", "Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), &passwordHash, "disabled", (*string)(nil), (*string)(nil), "none"),
 		)
 
 	r := chi.NewRouter()
