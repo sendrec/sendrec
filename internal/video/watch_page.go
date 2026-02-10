@@ -827,7 +827,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </script>
         {{end}}
         <div class="transcript-section">
-            <h2 class="transcript-header">Transcript <button class="download-btn" id="transcribe-btn" style="display:none;font-size:0.75rem;padding:0.25rem 0.75rem;margin-left:0.5rem;">Transcribe</button></h2>
+            <h2 class="transcript-header">Transcript <button class="download-btn" id="transcribe-btn" style="display:none;font-size:0.75rem;padding:0.25rem 0.75rem;margin-left:1rem;vertical-align:middle;">Transcribe</button></h2>
             {{if eq .TranscriptStatus "processing"}}
             <p class="transcript-processing">Transcription in progress...</p>
             {{else if eq .TranscriptStatus "ready"}}
