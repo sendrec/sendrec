@@ -293,6 +293,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
         }
         .emoji-picker-wrapper {
             position: relative;
+            display: inline-block;
         }
         .emoji-trigger {
             background: transparent;
@@ -307,41 +308,50 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             border-color: #00b67a;
         }
         .emoji-grid {
+            display: none;
             position: absolute;
             bottom: 100%;
-            left: 0;
+            right: 0;
             margin-bottom: 0.5rem;
-            background: #1e293b;
+            background: #111d32;
             border: 1px solid #334155;
             border-radius: 8px;
             padding: 0.5rem;
-            width: 280px;
-            max-height: 220px;
+            width: 260px;
+            max-height: 240px;
             overflow-y: auto;
             z-index: 20;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+        .emoji-grid.open {
+            display: block;
         }
         .emoji-category {
-            font-size: 0.6875rem;
-            color: #64748b;
+            font-size: 0.625rem;
+            color: #475569;
             font-weight: 600;
             text-transform: uppercase;
-            margin: 0.375rem 0 0.25rem;
+            letter-spacing: 0.05em;
+            margin: 0.5rem 0 0.25rem;
+            padding: 0 0.125rem;
         }
         .emoji-category:first-child {
             margin-top: 0;
         }
         .emoji-btn {
-            display: inline-block;
-            font-size: 1.25rem;
-            padding: 0.25rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            font-size: 1.125rem;
             cursor: pointer;
-            border-radius: 4px;
-            line-height: 1;
+            border-radius: 6px;
             border: none;
             background: transparent;
         }
         .emoji-btn:hover {
-            background: #334155;
+            background: #1e293b;
         }
     </style>
 </head>
@@ -394,7 +404,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                         <span id="private-toggle"></span>
                         <div class="emoji-picker-wrapper" id="emoji-wrapper">
                             <button type="button" class="emoji-trigger" id="emoji-trigger">&#x1F642;</button>
-                            <div class="emoji-grid" id="emoji-grid" style="display:none;"></div>
+                            <div class="emoji-grid" id="emoji-grid"></div>
                         </div>
                     </div>
                     <button class="comment-submit" id="comment-submit">Post comment</button>
@@ -585,7 +595,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
 
             emojiTrigger.addEventListener('click', function(e) {
                 e.stopPropagation();
-                emojiGrid.style.display = emojiGrid.style.display === 'none' ? 'block' : 'none';
+                emojiGrid.classList.toggle('open');
             });
 
             emojiGrid.addEventListener('click', function(e) {
@@ -597,18 +607,18 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                 bodyEl.value = bodyEl.value.substring(0, start) + emoji + bodyEl.value.substring(end);
                 bodyEl.selectionStart = bodyEl.selectionEnd = start + emoji.length;
                 bodyEl.focus();
-                emojiGrid.style.display = 'none';
+                emojiGrid.classList.remove('open');
             });
 
             document.addEventListener('click', function(e) {
                 if (!e.target.closest('#emoji-wrapper')) {
-                    emojiGrid.style.display = 'none';
+                    emojiGrid.classList.remove('open');
                 }
             });
 
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') {
-                    emojiGrid.style.display = 'none';
+                    emojiGrid.classList.remove('open');
                 }
             });
 

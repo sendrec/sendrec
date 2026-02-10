@@ -88,6 +88,25 @@ input:focus-visible {
   align-items: center;
 }
 
+.action-link {
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  padding: 0;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.action-link:hover {
+  color: var(--color-text);
+}
+
+.action-sep {
+  color: var(--color-border);
+  font-size: 13px;
+  user-select: none;
+}
+
 .pip-preview {
   border-radius: 8px;
   border: 2px solid var(--color-accent);
@@ -117,10 +136,5 @@ input:focus-visible {
 
   .video-card-actions {
     width: 100%;
-  }
-
-  .video-card-actions button {
-    flex: 1;
-    min-width: 0;
   }
 }

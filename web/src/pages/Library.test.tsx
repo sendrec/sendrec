@@ -260,14 +260,13 @@ describe("Library", () => {
     });
   });
 
-  it("shows password-protected label when hasPassword is true", async () => {
+  it("shows 'Remove password' button when hasPassword is true", async () => {
     mockFetch([makeVideo({ hasPassword: true })]);
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByText("Password protected")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove password" })).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: "Remove password" })).toBeInTheDocument();
   });
 
   it("shows 'Add password' button when hasPassword is false", async () => {
