@@ -10,7 +10,7 @@ var specYAML []byte
 
 func HandleSpec(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/yaml")
-	w.Write(specYAML)
+	_, _ = w.Write(specYAML)
 }
 
 func HandleDocs(w http.ResponseWriter, r *http.Request) {
@@ -21,7 +21,7 @@ func HandleDocs(w http.ResponseWriter, r *http.Request) {
 			"font-src 'self' https://cdn.jsdelivr.net data:; "+
 			"img-src 'self' data:; connect-src 'self'; frame-ancestors 'self';")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(docsHTML))
+	_, _ = w.Write([]byte(docsHTML))
 }
 
 const docsHTML = `<!DOCTYPE html>
