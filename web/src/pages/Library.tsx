@@ -296,18 +296,20 @@ export function Library() {
           >
             <div className="video-card-top">
               {video.thumbnailUrl && (
-                <img
-                  src={video.thumbnailUrl}
-                  alt=""
-                  style={{
-                    width: 120,
-                    height: 68,
-                    objectFit: "cover",
-                    borderRadius: 4,
-                    flexShrink: 0,
-                    background: "var(--color-border)",
-                  }}
-                />
+                <a href={`/watch/${video.shareToken}`} style={{ flexShrink: 0 }}>
+                  <img
+                    src={video.thumbnailUrl}
+                    alt=""
+                    style={{
+                      width: 120,
+                      height: 68,
+                      objectFit: "cover",
+                      borderRadius: 4,
+                      background: "var(--color-border)",
+                      display: "block",
+                    }}
+                  />
+                </a>
               )}
               <div style={{ minWidth: 0, flex: 1 }}>
                 {editingId === video.id ? (
@@ -453,6 +455,22 @@ export function Library() {
                     {commentModeLabels[video.commentMode] ?? "Comments off"}
                     {video.commentCount > 0 && ` (${video.commentCount})`}
                   </button>
+                  <a
+                    href={`/watch/${video.shareToken}`}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-accent)",
+                      border: "1px solid var(--color-accent)",
+                      borderRadius: 4,
+                      padding: "6px 14px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textDecoration: "none",
+                      display: "inline-block",
+                    }}
+                  >
+                    View
+                  </a>
                   <button
                     onClick={() => copyLink(video.shareUrl, video.id)}
                     style={{

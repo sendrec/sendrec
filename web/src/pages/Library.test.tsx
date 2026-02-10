@@ -541,6 +541,30 @@ describe("Library", () => {
     expect(screen.getByRole("button", { name: /Comments: anonymous/ })).toBeInTheDocument();
   });
 
+  it("links thumbnail to watch page", async () => {
+    mockFetch([makeVideo()]);
+    const { container } = renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("My Recording")).toBeInTheDocument();
+    });
+
+    const thumbnailLink = container.querySelector("a[href='/watch/abc123']");
+    expect(thumbnailLink).not.toBeNull();
+    const img = thumbnailLink!.querySelector("img");
+    expect(img).not.toBeNull();
+  });
+
+  it("shows View button linking to watch page", async () => {
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      const viewLink = screen.getByRole("link", { name: "View" });
+      expect(viewLink).toHaveAttribute("href", "/watch/abc123");
+    });
+  });
+
   it("saves title on blur", async () => {
     const user = userEvent.setup();
     mockFetch([makeVideo()]);
