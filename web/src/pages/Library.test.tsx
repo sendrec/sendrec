@@ -596,10 +596,10 @@ describe("Library", () => {
     expect(await screen.findByText("Transcribing...")).toBeInTheDocument();
   });
 
-  it("shows Transcript failed badge when transcriptStatus is failed", async () => {
+  it("shows Retry transcript button when transcriptStatus is failed", async () => {
     mockFetch([makeVideo({ transcriptStatus: "failed" })]);
     renderLibrary();
 
-    expect(await screen.findByText("Transcript failed")).toBeInTheDocument();
+    expect(await screen.findByText("Retry transcript")).toBeInTheDocument();
   });
 });

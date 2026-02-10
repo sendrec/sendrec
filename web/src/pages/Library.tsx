@@ -211,6 +211,11 @@ export function Library() {
     setEditingId(null);
   }
 
+  async function retranscribeVideo(id: string) {
+    await apiFetch(`/api/videos/${id}/retranscribe`, { method: "POST" });
+    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, transcriptStatus: "processing" } : v)));
+  }
+
   async function cycleCommentMode(video: Video) {
     const currentIndex = commentModeOrder.indexOf(video.commentMode);
     const nextMode = commentModeOrder[(currentIndex + 1) % commentModeOrder.length];
@@ -409,7 +414,13 @@ export function Library() {
                   {video.status === "ready" && video.transcriptStatus === "failed" && (
                     <>
                       <span className="action-sep">&middot;</span>
-                      <span style={{ color: "var(--color-error)" }}>Transcript failed</span>
+                      <button
+                        onClick={() => retranscribeVideo(video.id)}
+                        className="action-link"
+                        style={{ color: "var(--color-error)" }}
+                      >
+                        Retry transcript
+                      </button>
                     </>
                   )}
                 </p>

@@ -793,6 +793,31 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var fileKey, shareToken string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT file_key, share_token FROM videos
+		 WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
+		videoID, userID,
+	).Scan(&fileKey, &shareToken)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	if !isTranscriptionAvailable() {
+		httputil.WriteError(w, http.StatusServiceUnavailable, "transcription not available")
+		return
+	}
+
+	go TranscribeVideo(context.Background(), h.db, h.storage, videoID, fileKey, userID, shareToken)
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
