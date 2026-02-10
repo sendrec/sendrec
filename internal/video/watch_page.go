@@ -202,6 +202,147 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             font-size: 0.875rem;
             margin-bottom: 1rem;
         }
+        .markers-bar {
+            position: relative;
+            height: 8px;
+            background: #1e293b;
+            border-radius: 4px;
+            margin-top: 0.75rem;
+            cursor: pointer;
+        }
+        .marker-dot {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #00b67a;
+            border-radius: 50%;
+            top: 1px;
+            transform: translateX(-50%);
+            transition: transform 0.15s;
+        }
+        .marker-dot:hover {
+            transform: translateX(-50%) scale(1.6);
+        }
+        .marker-dot.private {
+            background: #3b82f6;
+        }
+        .marker-dot.multi {
+            width: 8px;
+            height: 8px;
+            top: 0;
+        }
+        .marker-tooltip {
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 0.375rem 0.625rem;
+            font-size: 0.75rem;
+            color: #e2e8f0;
+            white-space: nowrap;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+        .marker-dot:hover .marker-tooltip {
+            display: block;
+        }
+        .comment-highlight {
+            animation: glow 1.5s ease-out;
+        }
+        @keyframes glow {
+            0% { box-shadow: 0 0 0 3px rgba(0, 182, 122, 0.5); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 182, 122, 0); }
+        }
+        .comment-timestamp {
+            background: #00b67a;
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.125rem 0.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .comment-timestamp:hover {
+            opacity: 0.85;
+        }
+        .timestamp-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            background: rgba(0, 182, 122, 0.15);
+            color: #00b67a;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            padding: 0.25rem 0.625rem;
+            border-radius: 12px;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+        }
+        .timestamp-pill-remove {
+            color: #94a3b8;
+            font-size: 1rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .timestamp-pill-remove:hover {
+            color: #ef4444;
+        }
+        .emoji-picker-wrapper {
+            position: relative;
+        }
+        .emoji-trigger {
+            background: transparent;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 0.375rem 0.5rem;
+            font-size: 1.125rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .emoji-trigger:hover {
+            border-color: #00b67a;
+        }
+        .emoji-grid {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 0.5rem;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 0.5rem;
+            width: 280px;
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 20;
+        }
+        .emoji-category {
+            font-size: 0.6875rem;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin: 0.375rem 0 0.25rem;
+        }
+        .emoji-category:first-child {
+            margin-top: 0;
+        }
+        .emoji-btn {
+            display: inline-block;
+            font-size: 1.25rem;
+            padding: 0.25rem;
+            cursor: pointer;
+            border-radius: 4px;
+            line-height: 1;
+            border: none;
+            background: transparent;
+        }
+        .emoji-btn:hover {
+            background: #334155;
+        }
     </style>
 </head>
 <body>
@@ -214,6 +355,9 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             var v = document.getElementById('player');
             v.play().catch(function() { v.muted = true; v.play(); });
         </script>
+        {{if ne .CommentMode "disabled"}}
+        <div class="markers-bar" id="markers-bar"></div>
+        {{end}}
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
         <div class="actions">
@@ -240,9 +384,19 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                     {{end}}
                 </div>
                 {{end}}
+                <div class="timestamp-pill" id="timestamp-pill" style="display:none;">
+                    <span id="timestamp-pill-text"></span>
+                    <span class="timestamp-pill-remove" id="timestamp-pill-remove">&times;</span>
+                </div>
                 <textarea id="comment-body" placeholder="Write a comment..." maxlength="5000"></textarea>
                 <div class="comment-form-actions">
-                    <span id="private-toggle"></span>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span id="private-toggle"></span>
+                        <div class="emoji-picker-wrapper" id="emoji-wrapper">
+                            <button type="button" class="emoji-trigger" id="emoji-trigger">&#x1F642;</button>
+                            <div class="emoji-grid" id="emoji-grid" style="display:none;"></div>
+                        </div>
+                    </div>
                     <button class="comment-submit" id="comment-submit">Post comment</button>
                 </div>
             </div>
@@ -259,6 +413,16 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             var nameEl = document.getElementById('comment-name');
             var emailEl = document.getElementById('comment-email');
             var privateToggleEl = document.getElementById('private-toggle');
+            var markersBar = document.getElementById('markers-bar');
+            var player = document.getElementById('player');
+            var videoDuration = 0;
+            var lastComments = null;
+            var timestampPill = document.getElementById('timestamp-pill');
+            var timestampPillText = document.getElementById('timestamp-pill-text');
+            var timestampPillRemove = document.getElementById('timestamp-pill-remove');
+            var capturedTimestamp = null;
+            var emojiTrigger = document.getElementById('emoji-trigger');
+            var emojiGrid = document.getElementById('emoji-grid');
 
             function getAuthToken() {
                 try { return localStorage.getItem('token') || ''; } catch(e) { return ''; }
@@ -286,12 +450,61 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                 return div.innerHTML;
             }
 
+            function formatTimestamp(seconds) {
+                var m = Math.floor(seconds / 60);
+                var s = Math.floor(seconds % 60);
+                return m + ':' + (s < 10 ? '0' : '') + s;
+            }
+
+            function renderMarkers(comments) {
+                if (!markersBar || !videoDuration) return;
+                markersBar.innerHTML = '';
+                var bySecond = {};
+                comments.forEach(function(c) {
+                    if (c.videoTimestamp == null) return;
+                    var sec = Math.floor(c.videoTimestamp);
+                    if (!bySecond[sec]) bySecond[sec] = [];
+                    bySecond[sec].push(c);
+                });
+                Object.keys(bySecond).forEach(function(sec) {
+                    var group = bySecond[sec];
+                    var dot = document.createElement('div');
+                    dot.className = 'marker-dot' + (group.length > 1 ? ' multi' : '') + (group[0].isPrivate ? ' private' : '');
+                    dot.style.left = (group[0].videoTimestamp / videoDuration * 100) + '%';
+                    var author = group[0].authorName || 'Anonymous';
+                    var preview = group[0].body.substring(0, 80);
+                    var tooltip = document.createElement('div');
+                    tooltip.className = 'marker-tooltip';
+                    tooltip.textContent = author + ' \u00b7 ' + formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + preview;
+                    dot.appendChild(tooltip);
+                    dot.setAttribute('data-comment-id', group[0].id);
+                    dot.addEventListener('click', function() {
+                        player.currentTime = group[0].videoTimestamp;
+                        var commentEl = document.getElementById('comment-' + group[0].id);
+                        if (commentEl) {
+                            commentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            commentEl.classList.add('comment-highlight');
+                            setTimeout(function() { commentEl.classList.remove('comment-highlight'); }, 1500);
+                        }
+                    });
+                    markersBar.appendChild(dot);
+                });
+            }
+
+            player.addEventListener('loadedmetadata', function() {
+                videoDuration = player.duration;
+                if (lastComments) renderMarkers(lastComments);
+            });
+
             function renderComment(c) {
                 var authorName = c.authorName || 'Anonymous';
                 var badges = '';
+                if (c.videoTimestamp != null) {
+                    badges += ' <span class="comment-timestamp" data-ts="' + c.videoTimestamp + '">' + formatTimestamp(c.videoTimestamp) + '</span>';
+                }
                 if (c.isOwner) badges += ' <span class="comment-owner-badge">Owner</span>';
                 if (c.isPrivate) badges += ' <span class="comment-private-badge">Private</span>';
-                return '<div class="comment">' +
+                return '<div class="comment" id="comment-' + c.id + '">' +
                     '<div class="comment-meta">' +
                         '<span class="comment-author">' + escapeHtml(authorName) + '</span>' +
                         badges +
@@ -300,6 +513,14 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                     '<div class="comment-body">' + escapeHtml(c.body) + '</div>' +
                 '</div>';
             }
+
+            listEl.addEventListener('click', function(e) {
+                var tsEl = e.target.closest('.comment-timestamp');
+                if (tsEl) {
+                    player.currentTime = parseFloat(tsEl.getAttribute('data-ts'));
+                    player.play().catch(function() {});
+                }
+            });
 
             function loadComments() {
                 var headers = {};
@@ -310,14 +531,86 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                         if (!data.comments || data.comments.length === 0) {
                             listEl.innerHTML = '<p class="no-comments">No comments yet. Be the first!</p>';
                             headerEl.textContent = 'Comments';
+                            lastComments = [];
                         } else {
                             headerEl.textContent = 'Comments (' + data.comments.length + ')';
                             listEl.innerHTML = data.comments.map(renderComment).join('');
+                            lastComments = data.comments;
+                            renderMarkers(data.comments);
                         }
                     });
             }
 
             loadComments();
+
+            bodyEl.addEventListener('focus', function() {
+                if (videoDuration > 0 && capturedTimestamp === null) {
+                    capturedTimestamp = player.currentTime;
+                    player.pause();
+                    timestampPill.style.display = 'inline-flex';
+                    timestampPillText.textContent = '@ ' + formatTimestamp(capturedTimestamp);
+                }
+            });
+
+            timestampPill.addEventListener('click', function(e) {
+                if (e.target === timestampPillRemove || e.target.closest('.timestamp-pill-remove')) return;
+                capturedTimestamp = player.currentTime;
+                timestampPillText.textContent = '@ ' + formatTimestamp(capturedTimestamp);
+            });
+
+            timestampPillRemove.addEventListener('click', function(e) {
+                e.stopPropagation();
+                capturedTimestamp = null;
+                timestampPill.style.display = 'none';
+            });
+
+            var emojiCategories = {
+                'Smileys': ['\uD83D\uDE00','\uD83D\uDE03','\uD83D\uDE04','\uD83D\uDE01','\uD83D\uDE06','\uD83D\uDE05','\uD83E\uDD23','\uD83D\uDE02','\uD83D\uDE42','\uD83D\uDE09','\uD83D\uDE0A','\uD83D\uDE07','\uD83D\uDE0D','\uD83E\uDD29','\uD83D\uDE18','\uD83D\uDE0B','\uD83D\uDE1C','\uD83E\uDD17','\uD83E\uDD14','\uD83D\uDE10','\uD83D\uDE11','\uD83D\uDE36'],
+                'Hands': ['\uD83D\uDC4D','\uD83D\uDC4E','\uD83D\uDC4F','\uD83D\uDE4C','\uD83E\uDD1D','\u270C\uFE0F','\uD83E\uDD1E','\uD83E\uDD1F','\uD83D\uDC4B','\uD83D\uDD90\uFE0F','\u270B','\uD83D\uDC4A'],
+                'Symbols': ['\u2764\uFE0F','\uD83D\uDD25','\u2B50','\u2705','\u274C','\u26A1','\uD83D\uDCA1','\uD83C\uDFAF','\uD83C\uDFC6','\uD83D\uDCAC','\uD83D\uDCCC','\uD83D\uDD17'],
+                'Reactions': ['\uD83D\uDCAF','\uD83D\uDC40','\uD83C\uDF89','\uD83D\uDE31','\uD83D\uDE2C','\uD83E\uDD2F','\uD83E\uDD26','\uD83E\uDD37','\uD83D\uDCAA','\uD83D\uDE4F','\uD83D\uDE22','\uD83D\uDE21'],
+                'Work': ['\uD83D\uDCBB','\uD83D\uDCCA','\uD83D\uDCDD','\uD83D\uDCC1','\uD83D\uDD27','\uD83D\uDD0D','\uD83D\uDCF1','\uD83D\uDDA5\uFE0F','\u23F0','\uD83D\uDCC5','\uD83D\uDCC8','\uD83D\uDDC2\uFE0F'],
+                'Misc': ['\uD83D\uDE80','\uD83C\uDF1F','\uD83D\uDC8E','\uD83C\uDFB5','\u2615','\uD83C\uDF55','\uD83C\uDF08','\uD83C\uDFA8','\uD83D\uDCF8','\uD83C\uDFE0','\uD83C\uDF0D','\uD83D\uDCA4']
+            };
+
+            var gridHTML = '';
+            Object.keys(emojiCategories).forEach(function(cat) {
+                gridHTML += '<div class="emoji-category">' + cat + '</div><div>';
+                emojiCategories[cat].forEach(function(em) {
+                    gridHTML += '<button type="button" class="emoji-btn" data-emoji="' + em + '">' + em + '</button>';
+                });
+                gridHTML += '</div>';
+            });
+            emojiGrid.innerHTML = gridHTML;
+
+            emojiTrigger.addEventListener('click', function(e) {
+                e.stopPropagation();
+                emojiGrid.style.display = emojiGrid.style.display === 'none' ? 'block' : 'none';
+            });
+
+            emojiGrid.addEventListener('click', function(e) {
+                var btn = e.target.closest('.emoji-btn');
+                if (!btn) return;
+                var emoji = btn.getAttribute('data-emoji');
+                var start = bodyEl.selectionStart || 0;
+                var end = bodyEl.selectionEnd || 0;
+                bodyEl.value = bodyEl.value.substring(0, start) + emoji + bodyEl.value.substring(end);
+                bodyEl.selectionStart = bodyEl.selectionEnd = start + emoji.length;
+                bodyEl.focus();
+                emojiGrid.style.display = 'none';
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#emoji-wrapper')) {
+                    emojiGrid.style.display = 'none';
+                }
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    emojiGrid.style.display = 'none';
+                }
+            });
 
             submitBtn.addEventListener('click', function() {
                 var body = bodyEl.value.trim();
@@ -339,7 +632,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                 fetch('/api/watch/' + shareToken + '/comments', {
                     method: 'POST',
                     headers: headers,
-                    body: JSON.stringify({authorName: authorName, authorEmail: authorEmail, body: body, isPrivate: isPrivate})
+                    body: JSON.stringify({authorName: authorName, authorEmail: authorEmail, body: body, isPrivate: isPrivate, videoTimestamp: capturedTimestamp})
                 }).then(function(r) {
                     if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || 'Could not post comment'); });
                     return r.json();
@@ -350,6 +643,12 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                     headerEl.textContent = 'Comments (' + count + ')';
                     bodyEl.value = '';
                     if (privateEl) privateEl.checked = false;
+                    capturedTimestamp = null;
+                    timestampPill.style.display = 'none';
+                    if (lastComments) {
+                        lastComments.push(comment);
+                        renderMarkers(lastComments);
+                    }
                     submitBtn.disabled = false;
                 }).catch(function(err) {
                     errorEl.textContent = err.message; errorEl.style.display = 'block'; submitBtn.disabled = false;
