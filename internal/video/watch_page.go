@@ -409,6 +409,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             border-top: 1px solid #1e293b;
             padding-top: 1.5rem;
         }
+        .hidden { display: none; }
+        .flex-center { display: flex; align-items: center; gap: 0.5rem; }
+        .transcribe-btn { font-size: 0.7rem; padding: 0.2rem 0.6rem; }
         .transcript-header {
             display: flex;
             align-items: center;
@@ -454,7 +457,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 </head>
 <body>
     <div class="container">
-        <video id="player" controls{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
+        <video id="player" controls crossorigin="anonymous"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
             <source src="{{.VideoURL}}" type="video/webm">
             {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
             Your browser does not support video playback.
@@ -496,11 +499,11 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     <span id="timestamp-toggle-label">&#x1F551;</span>
                     <span id="timestamp-toggle-text">Add timestamp</span>
                     <input type="text" class="timestamp-edit-input" id="timestamp-edit-input" placeholder="0:00">
-                    <span class="timestamp-toggle-remove" id="timestamp-toggle-remove" style="display:none;"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></span>
+                    <span class="timestamp-toggle-remove hidden" id="timestamp-toggle-remove"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></span>
                 </span>
                 <textarea id="comment-body" placeholder="Write a comment..." maxlength="5000"></textarea>
                 <div class="comment-form-actions">
-                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <div class="flex-center">
                         <span id="private-toggle"></span>
                         <div class="emoji-picker-wrapper" id="emoji-wrapper">
                             <button type="button" class="emoji-trigger" id="emoji-trigger">&#x1F642;</button>
@@ -830,7 +833,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </script>
         {{end}}
         <div class="transcript-section">
-            <h2 class="transcript-header">Transcript <button class="download-btn" id="transcribe-btn" style="display:none;font-size:0.7rem;padding:0.2rem 0.6rem;">Transcribe</button></h2>
+            <h2 class="transcript-header">Transcript <button class="download-btn transcribe-btn hidden" id="transcribe-btn">Transcribe</button></h2>
             {{if eq .TranscriptStatus "pending"}}
             <p class="transcript-processing">Transcription queued...</p>
             {{else if eq .TranscriptStatus "processing"}}
@@ -885,8 +888,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 else if (status === 'failed') btn.textContent = 'Retry';
                 else if (status === 'ready') btn.textContent = 'Redo';
                 else btn.textContent = '';
-                if (status !== 'processing' && btn.textContent) {
-                    btn.style.display = 'inline-block';
+                if (status !== 'processing' && status !== 'pending' && btn.textContent) {
+                    btn.classList.remove('hidden');
                 }
                 btn.addEventListener('click', function() {
                     btn.disabled = true;
