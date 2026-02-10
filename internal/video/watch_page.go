@@ -831,7 +831,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{end}}
         <div class="transcript-section">
             <h2 class="transcript-header">Transcript <button class="download-btn" id="transcribe-btn" style="display:none;font-size:0.7rem;padding:0.2rem 0.6rem;">Transcribe</button></h2>
-            {{if eq .TranscriptStatus "processing"}}
+            {{if eq .TranscriptStatus "pending"}}
+            <p class="transcript-processing">Transcription queued...</p>
+            {{else if eq .TranscriptStatus "processing"}}
             <p class="transcript-processing">Transcription in progress...</p>
             {{else if eq .TranscriptStatus "ready"}}
             <div id="transcript-panel">
@@ -899,7 +901,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 });
             }
         })();
-        {{if eq .TranscriptStatus "processing"}}
+        {{if or (eq .TranscriptStatus "processing") (eq .TranscriptStatus "pending")}}
         (function() {
             var pollInterval = setInterval(function() {
                 fetch('/api/watch/{{.ShareToken}}')

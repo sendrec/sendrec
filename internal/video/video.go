@@ -334,14 +334,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 				h.db, h.storage,
 				videoID, fileKey, *webcamKey,
 				thumbnailFileKey(userID, shareToken),
-				userID, shareToken,
 			)
 		} else {
-			go func() {
-				ctx := context.Background()
-				GenerateThumbnail(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken))
-				TranscribeVideo(ctx, h.db, h.storage, videoID, fileKey, userID, shareToken)
-			}()
+			go GenerateThumbnail(context.Background(), h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken))
+		}
+		if err := EnqueueTranscription(r.Context(), h.db, videoID); err != nil {
+			log.Printf("failed to enqueue transcription for %s: %v", videoID, err)
 		}
 	}
 
@@ -799,7 +797,6 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 		h.db, h.storage,
 		videoID, fileKey,
 		thumbnailFileKey(userID, shareToken),
-		userID, shareToken,
 		req.StartSeconds, req.EndSeconds,
 	)
 
@@ -821,12 +818,10 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isTranscriptionAvailable() {
-		httputil.WriteError(w, http.StatusServiceUnavailable, "transcription not available")
+	if err := EnqueueTranscription(r.Context(), h.db, videoID); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to enqueue transcription")
 		return
 	}
-
-	go TranscribeVideo(context.Background(), h.db, h.storage, videoID, fileKey, userID, shareToken)
 
 	w.WriteHeader(http.StatusAccepted)
 }

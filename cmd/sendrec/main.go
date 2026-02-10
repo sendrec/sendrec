@@ -114,6 +114,7 @@ func main() {
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	defer cleanupCancel()
 	video.StartCleanupLoop(cleanupCtx, db.Pool, store, 10*time.Minute)
+	video.StartTranscriptionWorker(cleanupCtx, db.Pool, store, 5*time.Second)
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),
