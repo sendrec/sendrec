@@ -101,11 +101,16 @@ Transcription requires the whisper model to be available at `WHISPER_MODEL_PATH`
 | `LISTMONK_TEMPLATE_ID` | Template ID for share link emails |
 | `LISTMONK_COMMENT_TEMPLATE_ID` | Template ID for new comment notifications |
 
+## API Documentation
+
+Interactive API reference is available at [`/api/docs`](https://app.sendrec.eu/api/docs) (powered by [Scalar](https://github.com/scalar/scalar)). The raw OpenAPI 3.0 spec is at [`/api/docs/openapi.yaml`](https://app.sendrec.eu/api/docs/openapi.yaml).
+
 ## Architecture
 
 Single Go binary that:
 - Serves the React SPA (embedded at build time)
 - Handles REST API requests (`/api/*`)
+- Serves interactive API documentation (`/api/docs`)
 - Renders server-side watch pages with OpenGraph tags (`/watch/:token`)
 - Runs database migrations on startup
 
@@ -233,5 +238,6 @@ SendRec is licensed under the [GNU Affero General Public License v3.0](LICENSE).
 ## Links
 
 - **Website:** [sendrec.eu](https://sendrec.eu)
+- **API docs:** [app.sendrec.eu/api/docs](https://app.sendrec.eu/api/docs)
 - **Blog:** [sendrec.eu/blog](https://sendrec.eu/blog)
 - **Email:** hello@sendrec.eu

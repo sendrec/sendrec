@@ -53,12 +53,17 @@ cd web && pnpm typecheck    # Frontend type checking
 make build    # Builds frontend + Go binary into bin/sendrec
 ```
 
+## API Reference
+
+Interactive API documentation is available at [`/api/docs`](https://app.sendrec.eu/api/docs). The OpenAPI 3.0 spec lives at `internal/docs/openapi.yaml` — update it when adding or changing endpoints.
+
 ## Submitting Changes
 
 1. Fork the repository and create a branch from `main`.
 2. Make your changes. Write tests for new functionality.
-3. Run `make test` and `make build` to verify everything works.
-4. Open a pull request against `main`.
+3. If you added or changed API endpoints, update `internal/docs/openapi.yaml`.
+4. Run `make test` and `make build` to verify everything works.
+5. Open a pull request against `main`.
 
 Keep PRs focused on a single change. If you're fixing a bug and also refactoring nearby code, split them into separate PRs.
 
