@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { TrimModal } from "../components/TrimModal";
 
 interface Video {
   id: string;
@@ -57,6 +58,7 @@ export function Library() {
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [trimmingId, setTrimmingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -409,6 +411,20 @@ export function Library() {
                     {copiedId === video.id ? "Copied!" : "Copy link"}
                   </button>
                   <button
+                    onClick={() => setTrimmingId(video.id)}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-accent)",
+                      border: "1px solid var(--color-accent)",
+                      borderRadius: 4,
+                      padding: "6px 14px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Trim
+                  </button>
+                  <button
                     onClick={() => downloadVideo(video.id)}
                     disabled={downloadingId === video.id}
                     style={{
@@ -463,6 +479,24 @@ export function Library() {
           </div>
         ))}
       </div>
+
+      {trimmingId && (() => {
+        const video = videos.find((v) => v.id === trimmingId);
+        if (!video) return null;
+        return (
+          <TrimModal
+            videoId={video.id}
+            duration={video.duration}
+            onClose={() => setTrimmingId(null)}
+            onTrimStarted={() => {
+              setVideos((prev) =>
+                prev.map((v) => (v.id === trimmingId ? { ...v, status: "processing" } : v))
+              );
+              setTrimmingId(null);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
