@@ -283,13 +283,27 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
             cursor: pointer;
         }
         .timestamp-pill-remove {
-            color: #94a3b8;
-            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(148, 163, 184, 0.2);
             cursor: pointer;
-            line-height: 1;
         }
         .timestamp-pill-remove:hover {
-            color: #ef4444;
+            background: rgba(239, 68, 68, 0.3);
+        }
+        .timestamp-pill-remove svg {
+            width: 8px;
+            height: 8px;
+            stroke: #94a3b8;
+            stroke-width: 2;
+            stroke-linecap: round;
+        }
+        .timestamp-pill-remove:hover svg {
+            stroke: #ef4444;
         }
         .emoji-picker-wrapper {
             position: relative;
@@ -396,7 +410,7 @@ var watchPageTemplate = template.Must(template.New("watch").Parse(`<!DOCTYPE htm
                 {{end}}
                 <div class="timestamp-pill" id="timestamp-pill" style="display:none;">
                     <span id="timestamp-pill-text"></span>
-                    <span class="timestamp-pill-remove" id="timestamp-pill-remove">&times;</span>
+                    <span class="timestamp-pill-remove" id="timestamp-pill-remove"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></span>
                 </div>
                 <textarea id="comment-body" placeholder="Write a comment..." maxlength="5000"></textarea>
                 <div class="comment-form-actions">
