@@ -21,7 +21,8 @@ func processNextTranscription(ctx context.Context, db database.DBTX, storage Obj
 	// Reset stuck jobs (processing for more than 10 minutes)
 	if _, err := db.Exec(ctx,
 		`UPDATE videos SET transcript_status = 'pending', transcript_started_at = NULL, updated_at = now()
-		 WHERE transcript_status = 'processing' AND transcript_started_at < now() - INTERVAL '10 minutes'`,
+		 WHERE transcript_status = 'processing'
+		   AND (transcript_started_at < now() - INTERVAL '10 minutes' OR transcript_started_at IS NULL)`,
 	); err != nil {
 		log.Printf("transcribe-worker: failed to reset stuck jobs: %v", err)
 	}
