@@ -47,8 +47,10 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const {
     drawMode,
     drawColor,
+    lineWidth,
     toggleDrawMode,
     setDrawColor,
+    setLineWidth,
     clearCanvas,
     handlePointerDown,
     handlePointerMove,
@@ -286,7 +288,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
       {/* Screen preview with drawing overlay — hidden in idle, visible during recording */}
-      <div style={{ position: "relative", width: "100%", maxWidth: 640, display: isRecording ? "block" : "none" }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: 960, display: isRecording ? "block" : "none" }}>
         <video
           ref={screenVideoRef}
           autoPlay
@@ -457,6 +459,39 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
             >
               Clear
             </button>
+          )}
+
+          {drawMode && (
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }} data-testid="thickness-selector">
+              {[2, 4, 8].map((w) => (
+                <button
+                  key={w}
+                  onClick={() => setLineWidth(w)}
+                  aria-label={`Line width ${w}`}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    border: lineWidth === w ? "2px solid var(--color-accent)" : "1px solid var(--color-border)",
+                    background: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: w + 2,
+                      height: w + 2,
+                      borderRadius: "50%",
+                      background: "var(--color-text)",
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
           )}
 
           {isPaused ? (

@@ -164,6 +164,33 @@ describe("useDrawingCanvas", () => {
     expect(ctx.strokeStyle).toBe("#ff0000");
   });
 
+  it("has default lineWidth of 3", () => {
+    const { result } = renderHook(() =>
+      useDrawingCanvas({ canvasRef, captureWidth: 1920, captureHeight: 1080 }),
+    );
+    expect(result.current.lineWidth).toBe(3);
+  });
+
+  it("updates lineWidth via setLineWidth", () => {
+    const { result } = renderHook(() =>
+      useDrawingCanvas({ canvasRef, captureWidth: 1920, captureHeight: 1080 }),
+    );
+    act(() => result.current.setLineWidth(8));
+    expect(result.current.lineWidth).toBe(8);
+  });
+
+  it("uses updated lineWidth when drawing", () => {
+    const { result } = renderHook(() =>
+      useDrawingCanvas({ canvasRef, captureWidth: 1920, captureHeight: 1080 }),
+    );
+    act(() => result.current.toggleDrawMode());
+    act(() => result.current.setLineWidth(6));
+    act(() => result.current.handlePointerDown(pointerEvent(0, 0)));
+    act(() => result.current.handlePointerMove(pointerEvent(100, 50)));
+
+    expect(ctx.lineWidth).toBe(6);
+  });
+
   it("does not draw when drawMode is off", () => {
     const { result } = renderHook(() =>
       useDrawingCanvas({ canvasRef, captureWidth: 1920, captureHeight: 1080 }),

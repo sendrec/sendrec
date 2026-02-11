@@ -10,8 +10,10 @@ interface UseDrawingCanvasOptions {
 interface UseDrawingCanvasResult {
   drawMode: boolean;
   drawColor: string;
+  lineWidth: number;
   toggleDrawMode: () => void;
   setDrawColor: (color: string) => void;
+  setLineWidth: (width: number) => void;
   clearCanvas: () => void;
   handlePointerDown: (e: PointerEvent) => void;
   handlePointerMove: (e: PointerEvent) => void;
@@ -26,6 +28,7 @@ export function useDrawingCanvas({
 }: UseDrawingCanvasOptions): UseDrawingCanvasResult {
   const [drawMode, setDrawMode] = useState(false);
   const [drawColor, setDrawColor] = useState("#ff0000");
+  const [lineWidth, setLineWidth] = useState(3);
   const isDrawing = useRef(false);
   const lastPosition = useRef({ x: 0, y: 0 });
 
@@ -73,7 +76,7 @@ export function useDrawingCanvas({
       if (!ctx) return;
 
       const pos = scalePointerToCanvas(e);
-      ctx.lineWidth = 3;
+      ctx.lineWidth = lineWidth;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.strokeStyle = drawColor;
@@ -83,7 +86,7 @@ export function useDrawingCanvas({
       ctx.stroke();
       lastPosition.current = pos;
     },
-    [drawMode, drawColor, canvasRef, scalePointerToCanvas],
+    [drawMode, drawColor, lineWidth, canvasRef, scalePointerToCanvas],
   );
 
   const handlePointerUp = useCallback(() => {
@@ -97,8 +100,10 @@ export function useDrawingCanvas({
   return {
     drawMode,
     drawColor,
+    lineWidth,
     toggleDrawMode,
     setDrawColor,
+    setLineWidth,
     clearCanvas,
     handlePointerDown,
     handlePointerMove,
