@@ -293,7 +293,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         position: "relative",
         display: isRecording ? "block" : "none",
         ...(previewExpanded
-          ? { width: "100vw", left: "50%", transform: "translateX(-50%)", maxWidth: "none" }
+          ? { width: "100vw", maxWidth: "none" }
           : { width: "100%", maxWidth: 960 }),
       }}>
         <video
