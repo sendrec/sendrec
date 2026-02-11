@@ -21,6 +21,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const [webcamEnabled, setWebcamEnabled] = useState(false);
   const [captureWidth, setCaptureWidth] = useState(1920);
   const [captureHeight, setCaptureHeight] = useState(1080);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -288,7 +289,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
       {/* Screen preview with drawing overlay — hidden in idle, visible during recording */}
-      <div style={{ position: "relative", width: "100%", maxWidth: 960, display: isRecording ? "block" : "none" }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: previewExpanded ? "none" : 960, display: isRecording ? "block" : "none" }}>
         <video
           ref={screenVideoRef}
           autoPlay
@@ -320,6 +321,32 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
             pointerEvents: drawMode ? "auto" : "none",
           }}
         />
+        <button
+          onClick={() => setPreviewExpanded((prev) => !prev)}
+          aria-label={previewExpanded ? "Collapse preview" : "Expand preview"}
+          data-testid="expand-preview"
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            zIndex: 10,
+            width: 32,
+            height: 32,
+            borderRadius: 6,
+            border: "none",
+            background: "rgba(0, 0, 0, 0.6)",
+            color: "#fff",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 16,
+            padding: 0,
+          }}
+          title={previewExpanded ? "Collapse" : "Expand"}
+        >
+          {previewExpanded ? "\u2199" : "\u2197"}
+        </button>
       </div>
 
       {/* Hidden compositing canvas — always mounted so ref is available */}
