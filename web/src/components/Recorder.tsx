@@ -281,6 +281,10 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   if (recordingState === "idle") {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
+        {/* Hidden elements needed by startRecording before state changes */}
+        <video ref={screenVideoRef} muted playsInline style={{ display: "none" }} />
+        <canvas ref={compositingCanvasRef} data-testid="compositing-canvas" style={{ display: "none" }} />
+        <canvas ref={drawingCanvasRef} style={{ display: "none" }} />
         {maxDurationSeconds > 0 && (
           <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: 0 }}>
             Maximum recording length: {formatDuration(maxDurationSeconds)}
