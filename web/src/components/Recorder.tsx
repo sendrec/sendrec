@@ -290,10 +290,11 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
       {/* Screen preview with drawing overlay — hidden in idle, visible during recording */}
       <div style={{
-        position: previewExpanded ? "fixed" : "relative",
+        position: "relative",
+        display: isRecording ? "block" : "none",
         ...(previewExpanded
-          ? { top: 0, left: 0, right: 0, bottom: 80, zIndex: 50, background: "#000", display: isRecording ? "flex" : "none", alignItems: "center", justifyContent: "center" }
-          : { width: "100%", maxWidth: 960, display: isRecording ? "block" : "none" }),
+          ? { width: "100vw", marginLeft: "calc(-50vw + 50%)", maxWidth: "none" }
+          : { width: "100%", maxWidth: 960 }),
       }}>
         <video
           ref={screenVideoRef}
