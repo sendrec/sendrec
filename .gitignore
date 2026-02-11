@@ -18,3 +18,4 @@ web/dist/
 .DS_Store
 Thumbs.db
 docs/plans/
+.worktrees/
