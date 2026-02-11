@@ -293,7 +293,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         position: "relative",
         display: isRecording ? "block" : "none",
         ...(previewExpanded
-          ? { width: "100vw", marginLeft: "calc(-50vw + 50%)", maxWidth: "none", maxHeight: "60vh", overflow: "hidden", background: "#000", borderRadius: 0 }
+          ? { width: "100vw", marginLeft: "calc(-50vw + 50%)", maxWidth: "none" }
           : { width: "100%", maxWidth: 960 }),
       }}>
         <video
@@ -304,8 +304,6 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
           data-testid="screen-preview"
           style={{
             width: "100%",
-            maxHeight: previewExpanded ? "60vh" : "none",
-            objectFit: previewExpanded ? "contain" as const : undefined,
             borderRadius: previewExpanded ? 0 : 8,
             background: "#000",
             display: "block",
