@@ -45,5 +45,5 @@ func (s *spaFileServer) serveIndexWithStatus(w http.ResponseWriter, status int) 
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	w.Write(data)
+	_, _ = w.Write(data)
 }

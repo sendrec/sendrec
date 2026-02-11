@@ -49,6 +49,8 @@ export function Layout({ children }: LayoutProps) {
         <Link
           to="/"
           style={{
+            display: "inline-flex",
+            alignItems: "center",
             fontWeight: 700,
             fontSize: "1.125rem",
             color: "var(--color-text)",
@@ -56,7 +58,7 @@ export function Layout({ children }: LayoutProps) {
             textDecoration: "none",
           }}
         >
-          <img src="/images/logo.png" alt="SendRec" width="24" height="24" style={{ width: 24, height: 24, marginRight: 6 }} />
+          <img src="/images/logo.png" alt="SendRec" width="48" height="48" style={{ width: 48, height: 48, marginRight: 6 }} />
           SendRec
         </Link>
 

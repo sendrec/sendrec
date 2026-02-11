@@ -404,9 +404,9 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         </>
       )}
 
-      {/* Recording controls */}
+      {/* Recording controls — above preview when expanded */}
       {isRecording && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center", ...(previewExpanded ? { order: -1 } : {}) }}>
           <div
             style={{
               display: "flex",
