@@ -409,6 +409,31 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             border-top: 1px solid #1e293b;
             padding-top: 1.5rem;
         }
+        .speed-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .speed-btn {
+            background: transparent;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.15s;
+        }
+        .speed-btn:hover {
+            border-color: #00b67a;
+            color: #f8fafc;
+        }
+        .speed-btn.active {
+            border-color: #00b67a;
+            color: #00b67a;
+            background: rgba(0, 182, 122, 0.1);
+        }
         .hidden { display: none; }
         .flex-center { display: flex; align-items: center; gap: 0.5rem; }
         .transcribe-btn { font-size: 0.7rem; padding: 0.2rem 0.6rem; }
@@ -473,6 +498,12 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         <p class="meta">{{.Creator}} · {{.Date}}</p>
         <div class="actions">
             <button class="download-btn" id="download-btn">Download</button>
+            <div class="speed-controls">
+                <button class="speed-btn" data-speed="0.5">0.5x</button>
+                <button class="speed-btn active" data-speed="1">1x</button>
+                <button class="speed-btn" data-speed="1.5">1.5x</button>
+                <button class="speed-btn" data-speed="2">2x</button>
+            </div>
         </div>
         <script nonce="{{.Nonce}}">
             document.getElementById('download-btn').addEventListener('click', function() {
@@ -480,6 +511,17 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     .then(function(r) { return r.json(); })
                     .then(function(data) { if (data.downloadUrl) window.location.href = data.downloadUrl; });
             });
+            (function() {
+                var player = document.getElementById('player');
+                var buttons = document.querySelectorAll('.speed-btn');
+                buttons.forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        player.playbackRate = parseFloat(btn.dataset.speed);
+                        buttons.forEach(function(b) { b.classList.remove('active'); });
+                        btn.classList.add('active');
+                    });
+                });
+            })();
         </script>
         {{if ne .CommentMode "disabled"}}
         <div class="comments-section" id="comments-section">
