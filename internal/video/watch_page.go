@@ -63,6 +63,24 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: #94a3b8;
             font-size: 0.875rem;
         }
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            text-decoration: none;
+            color: #94a3b8;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            transition: color 0.15s;
+        }
+        .logo:hover {
+            color: #00b67a;
+        }
+        .logo img {
+            width: 20px;
+            height: 20px;
+        }
         .branding {
             margin-top: 2rem;
             font-size: 0.75rem;
@@ -485,6 +503,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 </head>
 <body>
     <div class="container">
+        <a href="{{.BaseURL}}" class="logo"><img src="/images/logo.png" alt="SendRec" width="20" height="20">SendRec</a>
         <video id="player" controls crossorigin="anonymous"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
             <source src="{{.VideoURL}}" type="video/webm">
             {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
@@ -1069,6 +1088,7 @@ type watchPageData struct {
 	TranscriptURL    string
 	TranscriptStatus string
 	Segments         []TranscriptSegment
+	BaseURL          string
 }
 
 type expiredPageData struct {
@@ -1260,6 +1280,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		TranscriptURL:    transcriptURL,
 		TranscriptStatus: transcriptStatus,
 		Segments:         segments,
+		BaseURL:          h.baseURL,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
+import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
 
 type RecordingState = "idle" | "recording" | "paused" | "stopped";
 
@@ -17,6 +19,9 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [duration, setDuration] = useState(0);
   const [webcamEnabled, setWebcamEnabled] = useState(false);
+  const [captureWidth, setCaptureWidth] = useState(1920);
+  const [captureHeight, setCaptureHeight] = useState(1080);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -34,6 +39,34 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       node.srcObject = webcamStreamRef.current;
     }
   }, []);
+
+  // Drawing and compositing refs
+  const drawingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const compositingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const {
+    drawMode,
+    drawColor,
+    lineWidth,
+    toggleDrawMode,
+    setDrawColor,
+    setLineWidth,
+    clearCanvas,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerLeave,
+  } = useDrawingCanvas({ canvasRef: drawingCanvasRef, captureWidth, captureHeight });
+
+  const { startCompositing, stopCompositing, getCompositedStream } =
+    useCanvasCompositing({
+      compositingCanvasRef,
+      screenVideoRef,
+      drawingCanvasRef,
+      captureWidth,
+      captureHeight,
+    });
 
   const stopWebcamStream = useCallback(() => {
     if (webcamStreamRef.current) {
@@ -74,9 +107,13 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       webcamRecorderRef.current.stop();
     }
     clearInterval(timerRef.current);
+    stopCompositing();
+    if (screenVideoRef.current) {
+      screenVideoRef.current.srcObject = null;
+    }
     stopAllStreams();
     setRecordingState("stopped");
-  }, [stopAllStreams]);
+  }, [stopAllStreams, stopCompositing]);
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
@@ -129,8 +166,41 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       });
       screenStreamRef.current = screenStream;
 
-      // Record the screen stream directly — no canvas intermediate
-      const recorder = new MediaRecorder(screenStream, {
+      // Get actual capture dimensions
+      const videoTrack = screenStream.getVideoTracks()[0];
+      const settings = videoTrack.getSettings();
+      const width = settings.width ?? 1920;
+      const height = settings.height ?? 1080;
+      setCaptureWidth(width);
+      setCaptureHeight(height);
+
+      // Set canvas dimensions imperatively (before React re-render)
+      if (compositingCanvasRef.current) {
+        compositingCanvasRef.current.width = width;
+        compositingCanvasRef.current.height = height;
+      }
+      if (drawingCanvasRef.current) {
+        drawingCanvasRef.current.width = width;
+        drawingCanvasRef.current.height = height;
+      }
+
+      // Play screen stream on preview video
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = screenStream;
+        await screenVideoRef.current.play();
+      }
+
+      // Start compositing loop
+      startCompositing();
+
+      // Get composited stream with audio from original screen stream
+      const audioTracks = screenStream.getAudioTracks();
+      const compositedStream = getCompositedStream(audioTracks);
+      if (!compositedStream) {
+        throw new Error("Failed to create composited stream");
+      }
+
+      const recorder = new MediaRecorder(compositedStream, {
         mimeType: "video/webm;codecs=vp9,opus",
       });
       mediaRecorderRef.current = recorder;
@@ -205,152 +275,307 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
+      stopCompositing();
       stopAllStreams();
     };
-  }, [stopAllStreams]);
+  }, [stopAllStreams, stopCompositing]);
 
 
-  if (recordingState === "idle") {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
-        {maxDurationSeconds > 0 && (
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: 0 }}>
-            Maximum recording length: {formatDuration(maxDurationSeconds)}
-          </p>
-        )}
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button
-            onClick={toggleWebcam}
-            aria-label={webcamEnabled ? "Disable camera" : "Enable camera"}
-            style={{
-              background: webcamEnabled ? "var(--color-accent)" : "transparent",
-              color: webcamEnabled ? "var(--color-text)" : "var(--color-text-secondary)",
-              border: webcamEnabled ? "none" : "1px solid var(--color-border)",
-              borderRadius: 8,
-              padding: "14px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-          >
-            {webcamEnabled ? "Camera On" : "Camera Off"}
-          </button>
-          <button
-            onClick={startRecording}
-            aria-label="Start recording"
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-text)",
-              borderRadius: 8,
-              padding: "14px 32px",
-              fontSize: 16,
-              fontWeight: 600,
-            }}
-          >
-            Start Recording
-          </button>
-        </div>
-        {webcamEnabled && (
-          <div style={{ position: "relative", marginTop: 8 }}>
-            <video
-              ref={webcamVideoCallbackRef}
-              autoPlay
-              muted
-              playsInline
-              className="pip-preview"
-              style={{ width: 160, height: 120 }}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
-
+  const isIdle = recordingState === "idle";
   const isPaused = recordingState === "paused";
+  const isRecording = !isIdle && recordingState !== "stopped";
   const remaining = maxDurationSeconds > 0 ? maxDurationSeconds - duration : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div
+      {/* Screen preview with drawing overlay — hidden in idle, visible during recording */}
+      <div style={{
+        position: "relative",
+        display: isRecording ? "block" : "none",
+        ...(previewExpanded
+          ? { width: "100vw", maxWidth: "none" }
+          : { width: "100%", maxWidth: 960 }),
+      }}>
+        <video
+          ref={screenVideoRef}
+          autoPlay
+          muted
+          playsInline
+          data-testid="screen-preview"
           style={{
+            width: "100%",
+            borderRadius: previewExpanded ? 0 : 8,
+            background: "#000",
+            display: "block",
+          }}
+        />
+        <canvas
+          ref={drawingCanvasRef}
+          data-testid="drawing-canvas"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerLeave}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            cursor: drawMode ? "crosshair" : "default",
+            touchAction: "none",
+            pointerEvents: drawMode ? "auto" : "none",
+          }}
+        />
+        <button
+          onClick={() => setPreviewExpanded((prev) => !prev)}
+          aria-label={previewExpanded ? "Collapse preview" : "Expand preview"}
+          data-testid="expand-preview"
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            zIndex: 10,
+            width: 32,
+            height: 32,
+            borderRadius: 6,
+            border: "none",
+            background: "rgba(0, 0, 0, 0.6)",
+            color: "#fff",
+            cursor: "pointer",
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            color: isPaused ? "var(--color-text-secondary)" : "var(--color-error)",
-            fontWeight: 600,
-            fontSize: 14,
+            justifyContent: "center",
+            fontSize: 16,
+            padding: 0,
           }}
+          title={previewExpanded ? "Collapse" : "Expand"}
         >
-          <div
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              background: isPaused ? "var(--color-text-secondary)" : "var(--color-error)",
-              animation: isPaused ? "none" : "pulse 1.5s infinite",
-            }}
-          />
-          {formatDuration(duration)}
-          {isPaused && (
-            <span style={{ fontWeight: 400 }}>
-              (Paused)
-            </span>
-          )}
-          {!isPaused && remaining !== null && (
-            <span style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}>
-              ({formatDuration(remaining)} remaining)
-            </span>
-          )}
-        </div>
-
-        {isPaused ? (
-          <button
-            onClick={resumeRecording}
-            aria-label="Resume recording"
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-text)",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-          >
-            Resume
-          </button>
-        ) : (
-          <button
-            onClick={pauseRecording}
-            aria-label="Pause recording"
-            style={{
-              background: "transparent",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-          >
-            Pause
-          </button>
-        )}
-
-        <button
-          onClick={stopRecording}
-          aria-label="Stop recording"
-          style={{
-            background: "var(--color-error)",
-            color: "var(--color-text)",
-            borderRadius: 8,
-            padding: "10px 24px",
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          Stop Recording
+          {previewExpanded ? "\u2199" : "\u2197"}
         </button>
       </div>
+
+      {/* Hidden compositing canvas — always mounted so ref is available */}
+      <canvas
+        ref={compositingCanvasRef}
+        data-testid="compositing-canvas"
+        style={{ display: "none" }}
+      />
+
+      {/* Idle UI */}
+      {isIdle && (
+        <>
+          {maxDurationSeconds > 0 && (
+            <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: 0 }}>
+              Maximum recording length: {formatDuration(maxDurationSeconds)}
+            </p>
+          )}
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <button
+              onClick={toggleWebcam}
+              aria-label={webcamEnabled ? "Disable camera" : "Enable camera"}
+              style={{
+                background: webcamEnabled ? "var(--color-accent)" : "transparent",
+                color: webcamEnabled ? "var(--color-text)" : "var(--color-text-secondary)",
+                border: webcamEnabled ? "none" : "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: "14px 24px",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {webcamEnabled ? "Camera On" : "Camera Off"}
+            </button>
+            <button
+              onClick={startRecording}
+              aria-label="Start recording"
+              style={{
+                background: "var(--color-accent)",
+                color: "var(--color-text)",
+                borderRadius: 8,
+                padding: "14px 32px",
+                fontSize: 16,
+                fontWeight: 600,
+              }}
+            >
+              Start Recording
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Recording controls — above preview when expanded */}
+      {isRecording && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center", ...(previewExpanded ? { order: -1 } : {}) }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              color: isPaused ? "var(--color-text-secondary)" : "var(--color-error)",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            <div
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: isPaused ? "var(--color-text-secondary)" : "var(--color-error)",
+                animation: isPaused ? "none" : "pulse 1.5s infinite",
+              }}
+            />
+            {formatDuration(duration)}
+            {isPaused && (
+              <span style={{ fontWeight: 400 }}>
+                (Paused)
+              </span>
+            )}
+            {!isPaused && remaining !== null && (
+              <span style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}>
+                ({formatDuration(remaining)} remaining)
+              </span>
+            )}
+          </div>
+
+          <button
+            onClick={toggleDrawMode}
+            aria-label={drawMode ? "Disable drawing" : "Enable drawing"}
+            data-testid="draw-toggle"
+            style={{
+              background: drawMode ? "var(--color-accent)" : "transparent",
+              color: drawMode ? "var(--color-text)" : "var(--color-text-secondary)",
+              border: drawMode ? "none" : "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            Draw
+          </button>
+
+          {drawMode && (
+            <input
+              type="color"
+              value={drawColor}
+              onChange={(e) => setDrawColor(e.target.value)}
+              aria-label="Drawing color"
+              data-testid="color-picker"
+              style={{
+                width: 36,
+                height: 36,
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: 2,
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            />
+          )}
+
+          {drawMode && (
+            <button
+              onClick={clearCanvas}
+              aria-label="Clear drawing"
+              data-testid="clear-drawing"
+              style={{
+                background: "transparent",
+                color: "var(--color-text-secondary)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: "10px 24px",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              Clear
+            </button>
+          )}
+
+          {drawMode && (
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }} data-testid="thickness-selector">
+              {[2, 4, 8].map((w) => (
+                <button
+                  key={w}
+                  onClick={() => setLineWidth(w)}
+                  aria-label={`Line width ${w}`}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    border: lineWidth === w ? "2px solid var(--color-accent)" : "1px solid var(--color-border)",
+                    background: "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: w + 2,
+                      height: w + 2,
+                      borderRadius: "50%",
+                      background: "var(--color-text)",
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {isPaused ? (
+            <button
+              onClick={resumeRecording}
+              aria-label="Resume recording"
+              style={{
+                background: "var(--color-accent)",
+                color: "var(--color-text)",
+                borderRadius: 8,
+                padding: "10px 24px",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              Resume
+            </button>
+          ) : (
+            <button
+              onClick={pauseRecording}
+              aria-label="Pause recording"
+              style={{
+                background: "transparent",
+                color: "var(--color-text)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: "10px 24px",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              Pause
+            </button>
+          )}
+
+          <button
+            onClick={stopRecording}
+            aria-label="Stop recording"
+            style={{
+              background: "var(--color-error)",
+              color: "var(--color-text)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            Stop Recording
+          </button>
+        </div>
+      )}
 
       {webcamEnabled && (
         <video

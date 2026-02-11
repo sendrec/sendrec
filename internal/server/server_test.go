@@ -468,6 +468,26 @@ func TestSPAFallbackForDeeplyNestedPaths(t *testing.T) {
 	}
 }
 
+func TestSPAReturns404ForMissingStaticFiles(t *testing.T) {
+	srv := newServerWithSPA(testWebFS())
+
+	paths := []string{"/images/logo1.png", "/assets/missing.js", "/favicon.ico"}
+	for _, path := range paths {
+		rec := executeRequest(srv, http.MethodGet, path)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("%s: expected status 404 for missing static file, got %d", path, rec.Code)
+		}
+		contentType := rec.Header().Get("Content-Type")
+		if contentType != "text/html; charset=utf-8" {
+			t.Errorf("%s: expected Content-Type text/html, got %q", path, contentType)
+		}
+		expected := "<html>app</html>"
+		if rec.Body.String() != expected {
+			t.Errorf("%s: expected index.html content, got %q", path, rec.Body.String())
+		}
+	}
+}
+
 // --- Route Registration (no SPA FS) ---
 
 func TestUnknownRouteReturns404WithoutSPA(t *testing.T) {

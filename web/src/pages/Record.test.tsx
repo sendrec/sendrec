@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import { act } from "react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Record } from "./Record";
 
@@ -158,6 +160,761 @@ describe("Record", () => {
         expect.objectContaining({ method: "PUT", body: webcamBlob })
       );
     });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows loading state initially", async () => {
+    // Mock limits as a promise that never resolves during this test
+    let resolveLimits!: (value: unknown) => void;
+    mockApiFetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveLimits = resolve;
+      })
+    );
+    renderRecord();
+
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
+
+    // Clean up: resolve the promise so React doesn't complain about updates after unmount
+    await act(async () => {
+      resolveLimits({
+        maxVideosPerMonth: 0,
+        maxVideoDurationSeconds: 0,
+        videosUsedThisMonth: 0,
+      });
+    });
+  });
+
+  it("shows uploading state after recording completes", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    // Mock create to hang so we stay in uploading state
+    let resolveCreate!: (value: unknown) => void;
+    mockApiFetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      })
+    );
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    expect(screen.getByText("Uploading...")).toBeInTheDocument();
+    expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
+
+    // Clean up
+    await act(async () => {
+      resolveCreate(null);
+    });
+  });
+
+  it("shows share URL after successful upload", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-1",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "share-abc",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+
+    // Mock PATCH status update
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 45);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Recording complete")).toBeInTheDocument();
+    });
+
+    // Share URL should be displayed
+    expect(screen.getByText(/\/watch\/share-abc/)).toBeInTheDocument();
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows copy link button on share page", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-2",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-xyz",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Copy link")).toBeInTheDocument();
+    });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows watch video link on share page", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-3",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-watch",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      const watchLink = screen.getByText("Watch video");
+      expect(watchLink).toBeInTheDocument();
+      expect(watchLink.closest("a")).toHaveAttribute(
+        "href",
+        expect.stringContaining("/watch/token-watch")
+      );
+      expect(watchLink.closest("a")).toHaveAttribute("target", "_blank");
+    });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows record another button on share page", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-4",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-another",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Record another")).toBeInTheDocument();
+    });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows go to library link on share page", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-5",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-lib",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      const libraryLink = screen.getByText("Go to Library");
+      expect(libraryLink).toBeInTheDocument();
+      expect(libraryLink.closest("a")).toHaveAttribute("href", "/library");
+    });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("clicking record another resets to recorder", async () => {
+    const user = userEvent.setup();
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-6",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-reset",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Record another")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Record another"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Recording complete")).not.toBeInTheDocument();
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows error when upload fails", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-fail",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-fail",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+
+    // Mock the DELETE cleanup call
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Upload failed")).toBeInTheDocument();
+    });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows try again button on error", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-try",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-try",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Try again")).toBeInTheDocument();
+    });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("clicking try again resets to recorder", async () => {
+    const user = userEvent.setup();
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-retry",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-retry",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Try again")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Try again"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Upload failed")).not.toBeInTheDocument();
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("deletes created video when upload fails", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-cleanup",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-cleanup",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+
+    // Mock the DELETE cleanup
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Upload failed")).toBeInTheDocument();
+    });
+
+    // Verify DELETE was called for cleanup
+    const deleteCall = mockApiFetch.mock.calls.find(
+      (call: unknown[]) =>
+        call[0] === "/api/videos/video-cleanup" &&
+        (call[1] as { method: string })?.method === "DELETE"
+    );
+    expect(deleteCall).toBeDefined();
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows error when create API returns null", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    // Mock create to return null (undefined from apiFetch)
+    mockApiFetch.mockResolvedValueOnce(null);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to create video")).toBeInTheDocument();
+    });
+  });
+
+  it("copies share URL to clipboard when copy link is clicked", async () => {
+    const user = userEvent.setup();
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-copy",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-copy",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Copy link")).toBeInTheDocument();
+    });
+
+    // Mock clipboard API
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    await user.click(screen.getByText("Copy link"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
+    });
+
+    expect(writeTextMock).toHaveBeenCalledWith(
+      expect.stringContaining("/watch/token-copy")
+    );
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("creates title with current date and time", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-title",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-title",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 45);
+    });
+
+    await waitFor(() => {
+      const createCall = mockApiFetch.mock.calls.find(
+        (call: unknown[]) =>
+          call[0] === "/api/videos" &&
+          (call[1] as { method: string })?.method === "POST"
+      );
+      expect(createCall).toBeDefined();
+      const body = JSON.parse((createCall![1] as { body: string }).body);
+      expect(body.title).toMatch(/^Recording /);
+    });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("sends PUT to upload URL with screen blob", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-put",
+      uploadUrl: "https://s3.example.com/screen-upload",
+      shareToken: "token-put",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["screen-data"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "https://s3.example.com/screen-upload",
+        expect.objectContaining({
+          method: "PUT",
+          body: blob,
+          headers: { "Content-Type": "video/webm" },
+        })
+      );
+    });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("sends PATCH status update after successful upload", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-patch",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-patch",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Recording complete")).toBeInTheDocument();
+    });
+
+    const patchCall = mockApiFetch.mock.calls.find(
+      (call: unknown[]) =>
+        call[0] === "/api/videos/video-patch" &&
+        (call[1] as { method: string })?.method === "PATCH"
+    );
+    expect(patchCall).toBeDefined();
+    const patchBody = JSON.parse((patchCall![1] as { body: string }).body);
+    expect(patchBody.status).toBe("ready");
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("handles webcam upload failure", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-wcfail",
+      uploadUrl: "https://s3.example.com/screen",
+      shareToken: "token-wcfail",
+      webcamUploadUrl: "https://s3.example.com/webcam",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("webcam")) {
+        return Promise.resolve({ ok: false, status: 500 });
+      }
+      return Promise.resolve({ ok: true });
+    });
+
+    // Mock DELETE cleanup
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const screenBlob = new Blob(["screen"], { type: "video/webm" });
+    const webcamBlob = new Blob(["webcam"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(screenBlob, 30, webcamBlob);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Webcam upload failed")).toBeInTheDocument();
+    });
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows recorder when limits API throws error", async () => {
+    mockApiFetch.mockRejectedValueOnce(new Error("Network error"));
+    renderRecord();
+
+    // When limits fetch fails, limits is null and loadingLimits becomes false.
+    // With null limits, quotaReached is false, so recorder is shown.
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+    // No "remaining" text since limits is null
+    expect(screen.queryByText(/videos remaining/i)).not.toBeInTheDocument();
+  });
+
+  it("falls back to execCommand copy when clipboard API fails", async () => {
+    const user = userEvent.setup();
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-fallback",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-fallback",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Copy link")).toBeInTheDocument();
+    });
+
+    // Mock clipboard API to reject so fallback path is taken
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockRejectedValue(new Error("Not allowed")) },
+      writable: true,
+      configurable: true,
+    });
+
+    // Define document.execCommand for fallback copy (not available in jsdom by default)
+    const execCommandMock = vi.fn().mockReturnValue(true);
+    document.execCommand = execCommandMock;
+
+    await user.click(screen.getByText("Copy link"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
+    });
+
+    expect(execCommandMock).toHaveBeenCalledWith("copy");
 
     globalThis.fetch = originalFetch;
   });

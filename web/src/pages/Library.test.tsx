@@ -647,4 +647,149 @@ describe("Library", () => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos?q=deploy");
     });
   });
+
+  it("extends video share link", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo()]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // POST extend response
+    mockApiFetch.mockResolvedValueOnce([makeVideo()]); // refetch videos
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Extend" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Extend" }));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/extend", { method: "POST" });
+    });
+  });
+
+  it("shows Extending... while extending", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo()]);
+
+    let resolveExtend: () => void;
+    mockApiFetch.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveExtend = resolve;
+      })
+    );
+
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Extend" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Extend" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Extending..." })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Extending..." })).toBeDisabled();
+    });
+
+    // Resolve extend + refetch
+    mockApiFetch.mockResolvedValueOnce([makeVideo()]);
+    resolveExtend!();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Extend" })).toBeInTheDocument();
+    });
+  });
+
+  it("retranscribes video", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo({ transcriptStatus: "none" })]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // POST retranscribe response
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("Transcribe")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Transcribe"));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/retranscribe", { method: "POST" });
+    });
+
+    // Status should update to pending
+    await waitFor(() => {
+      expect(screen.getByText(/Pending transcription/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows Redo transcript for ready transcript", async () => {
+    mockFetch([makeVideo({ transcriptStatus: "ready" })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText("Redo transcript")).toBeInTheDocument();
+    });
+  });
+
+  it("shows singular view count", async () => {
+    mockFetch([makeVideo({ viewCount: 1, uniqueViewCount: 1 })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 view(?!s)/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows expires tomorrow label", async () => {
+    const tomorrow = new Date(Date.now() + 1 * 86400000).toISOString();
+    mockFetch([makeVideo({ shareExpiresAt: tomorrow })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Expires tomorrow/)).toBeInTheDocument();
+    });
+  });
+
+  it("copies link using clipboard API", async () => {
+    const user = userEvent.setup();
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextSpy },
+      writable: true,
+      configurable: true,
+    });
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Copy link" }));
+
+    await waitFor(() => {
+      expect(writeTextSpy).toHaveBeenCalledWith("https://app.sendrec.eu/watch/abc123");
+    });
+  });
+
+  it("shows Copied! after copying link", async () => {
+    const user = userEvent.setup();
+    const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextSpy },
+      writable: true,
+      configurable: true,
+    });
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Copy link" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Copied!" })).toBeInTheDocument();
+    });
+  });
 });
