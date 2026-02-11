@@ -137,7 +137,7 @@ describe("useCanvasCompositing", () => {
     expect(stream).not.toBeNull();
     expect(
       (compositingCanvas.captureStream as ReturnType<typeof vi.fn>),
-    ).toHaveBeenCalledWith(30);
+    ).toHaveBeenCalledWith();
     expect(stream!.addTrack).toHaveBeenCalledWith(mockAudioTrack);
   });
 

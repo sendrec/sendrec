@@ -28,7 +28,7 @@ export function useDrawingCanvas({
 }: UseDrawingCanvasOptions): UseDrawingCanvasResult {
   const [drawMode, setDrawMode] = useState(false);
   const [drawColor, setDrawColor] = useState("#ff0000");
-  const [lineWidth, setLineWidth] = useState(3);
+  const [lineWidth, setLineWidth] = useState(2);
   const isDrawing = useRef(false);
   const lastPosition = useRef({ x: 0, y: 0 });
 

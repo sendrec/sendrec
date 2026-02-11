@@ -281,6 +281,13 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   }, [stopAllStreams, stopCompositing]);
 
 
+  useEffect(() => {
+    if (previewExpanded) {
+      document.documentElement.style.overflowX = "hidden";
+      return () => { document.documentElement.style.overflowX = ""; };
+    }
+  }, [previewExpanded]);
+
   const isIdle = recordingState === "idle";
   const isPaused = recordingState === "paused";
   const isRecording = !isIdle && recordingState !== "stopped";

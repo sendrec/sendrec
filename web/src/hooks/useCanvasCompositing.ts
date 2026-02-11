@@ -58,7 +58,7 @@ export function useCanvasCompositing({
       const canvas = compositingCanvasRef.current;
       if (!canvas) return null;
 
-      const stream = canvas.captureStream(30);
+      const stream = canvas.captureStream();
       audioTracks.forEach((track) => stream.addTrack(track));
       return stream;
     },

@@ -158,17 +158,17 @@ describe("useDrawingCanvas", () => {
     act(() => result.current.handlePointerDown(pointerEvent(0, 0)));
     act(() => result.current.handlePointerMove(pointerEvent(100, 50)));
 
-    expect(ctx.lineWidth).toBe(3);
+    expect(ctx.lineWidth).toBe(2);
     expect(ctx.lineCap).toBe("round");
     expect(ctx.lineJoin).toBe("round");
     expect(ctx.strokeStyle).toBe("#ff0000");
   });
 
-  it("has default lineWidth of 3", () => {
+  it("has default lineWidth of 2", () => {
     const { result } = renderHook(() =>
       useDrawingCanvas({ canvasRef, captureWidth: 1920, captureHeight: 1080 }),
     );
-    expect(result.current.lineWidth).toBe(3);
+    expect(result.current.lineWidth).toBe(2);
   });
 
   it("updates lineWidth via setLineWidth", () => {
