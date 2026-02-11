@@ -77,6 +77,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         .actions {
             margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
         .download-btn {
             display: inline-block;
