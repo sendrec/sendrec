@@ -385,19 +385,34 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		offset = o
 	}
 
-	rows, err := h.db.Query(r.Context(),
-		`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at,
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+
+	baseQuery := `SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at,
 		    (SELECT COUNT(*) FROM video_views vv WHERE vv.video_id = v.id) AS view_count,
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
 		    v.transcript_status
 		 FROM videos v
-		 WHERE v.user_id = $1 AND v.status != 'deleted'
-		 ORDER BY v.created_at DESC
-		 LIMIT $2 OFFSET $3`,
-		userID, limit, offset,
-	)
+		 WHERE v.user_id = $1 AND v.status != 'deleted'`
+
+	var args []any
+	args = append(args, userID)
+
+	if query != "" {
+		args = append(args, "%"+query+"%")
+		baseQuery += ` AND (v.title ILIKE $2 OR EXISTS (
+			SELECT 1 FROM jsonb_array_elements(v.transcript_json) seg
+			WHERE seg->>'text' ILIKE $2
+		))`
+		baseQuery += ` ORDER BY v.created_at DESC LIMIT $3 OFFSET $4`
+		args = append(args, limit, offset)
+	} else {
+		baseQuery += ` ORDER BY v.created_at DESC LIMIT $2 OFFSET $3`
+		args = append(args, limit, offset)
+	}
+
+	rows, err := h.db.Query(r.Context(), baseQuery, args...)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to list videos")
 		return

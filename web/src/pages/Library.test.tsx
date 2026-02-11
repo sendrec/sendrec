@@ -619,4 +619,32 @@ describe("Library", () => {
 
     expect(await screen.findByText("Retry transcript")).toBeInTheDocument();
   });
+
+  it("renders search input", async () => {
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await screen.findByText("My Recording");
+    expect(screen.getByPlaceholderText("Search videos...")).toBeInTheDocument();
+  });
+
+  it("fetches with query param when typing in search", async () => {
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await screen.findByText("My Recording");
+    mockApiFetch.mockClear();
+
+    // Mock the search response
+    mockApiFetch
+      .mockResolvedValueOnce([makeVideo({ title: "Deploy walkthrough" })])
+      .mockResolvedValueOnce(unlimitedLimits);
+
+    const input = screen.getByPlaceholderText("Search videos...");
+    await userEvent.type(input, "deploy");
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos?q=deploy");
+    });
+  });
 });
