@@ -3,6 +3,7 @@ package server
 import (
 	"io/fs"
 	"net/http"
+	stdpath "path"
 	"strings"
 )
 
@@ -26,6 +27,10 @@ func (s *spaFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	_, err := fs.Stat(s.fileSystem, path)
 	if err != nil {
+		if stdpath.Ext(r.URL.Path) != "" {
+			http.NotFound(w, r)
+			return
+		}
 		r.URL.Path = "/"
 	}
 
