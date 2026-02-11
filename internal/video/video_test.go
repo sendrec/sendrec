@@ -2689,6 +2689,60 @@ func TestWatchPage_ContainsDownloadButton(t *testing.T) {
 	}
 }
 
+func TestWatchPage_ContainsSpeedButtons(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status"}).
+				AddRow("vid-1", "Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil), (*string)(nil), "disabled", (*string)(nil), (*string)(nil), "none"),
+		)
+
+	r := chi.NewRouter()
+	r.Get("/watch/{shareToken}", handler.WatchPage)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/"+shareToken, nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+
+	speeds := []string{"0.5x", "1x", "1.5x", "2x"}
+	for _, speed := range speeds {
+		if !strings.Contains(body, ">"+speed+"<") {
+			t.Errorf("expected watch page to contain speed button %q", speed)
+		}
+	}
+
+	if !strings.Contains(body, "speed-btn") {
+		t.Error("expected watch page to contain speed button CSS class")
+	}
+
+	if !strings.Contains(body, "playbackRate") {
+		t.Error("expected watch page to contain playbackRate JavaScript")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
 // --- viewerHash Tests ---
 
 func TestViewerHash_DeterministicOutput(t *testing.T) {
