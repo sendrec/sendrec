@@ -215,6 +215,33 @@ curl -L -o models/ggml-small.bin \
 
 Without the model, transcription is silently skipped and everything else works normally.
 
+### Updating
+
+To update a running instance to the latest version:
+
+```bash
+docker compose pull sendrec
+docker compose up -d sendrec
+```
+
+Database migrations run automatically on startup — no manual steps needed. The app checks for pending migrations and applies them before accepting requests.
+
+To pin a specific version instead of `latest`:
+
+```yaml
+services:
+  sendrec:
+    image: ghcr.io/sendrec/sendrec:v1.17.0
+```
+
+Check the [releases page](https://github.com/sendrec/sendrec/releases) for available versions and changelogs.
+
+**Backup first.** Before major updates, back up your PostgreSQL database:
+
+```bash
+docker compose exec postgres pg_dump -U sendrec sendrec > backup.sql
+```
+
 ## Deployment
 
 Deployments are automated via GitHub Actions. Three environments are available:
