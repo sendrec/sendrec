@@ -289,7 +289,12 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
       {/* Screen preview with drawing overlay — hidden in idle, visible during recording */}
-      <div style={{ position: "relative", width: "100%", maxWidth: previewExpanded ? "none" : 960, display: isRecording ? "block" : "none" }}>
+      <div style={{
+        position: previewExpanded ? "fixed" : "relative",
+        ...(previewExpanded
+          ? { top: 0, left: 0, right: 0, bottom: 80, zIndex: 50, background: "#000", display: isRecording ? "flex" : "none", alignItems: "center", justifyContent: "center" }
+          : { width: "100%", maxWidth: 960, display: isRecording ? "block" : "none" }),
+      }}>
         <video
           ref={screenVideoRef}
           autoPlay
