@@ -77,7 +77,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .logo:hover {
             color: #00b67a;
         }
-        .logo svg {
+        .logo img {
             width: 20px;
             height: 20px;
         }
@@ -503,7 +503,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 </head>
 <body>
     <div class="container">
-        <a href="{{.BaseURL}}" class="logo"><svg width="20" height="20" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="128" height="128" rx="24" fill="#2dd4a8"/><text x="64" y="82" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="60" fill="#fff">SR</text></svg>SendRec</a>
+        <a href="{{.BaseURL}}" class="logo"><img src="/images/logo.png" alt="SendRec" width="20" height="20">SendRec</a>
         <video id="player" controls crossorigin="anonymous"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
             <source src="{{.VideoURL}}" type="video/webm">
             {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}

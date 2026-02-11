@@ -34,10 +34,17 @@ describe("Layout", () => {
 
   it("renders navigation links", () => {
     renderLayout();
-    expect(screen.getByRole("link", { name: "SendRec" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: /SendRec/ })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("href", "/library");
     expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+  });
+
+  it("renders logo image in nav", () => {
+    renderLayout();
+    const logo = screen.getByAltText("SendRec");
+    expect(logo).toBeInTheDocument();
+    expect(logo).toHaveAttribute("src", "/images/logo.png");
   });
 
   it("renders children in main element", () => {

@@ -56,6 +56,7 @@ export function Layout({ children }: LayoutProps) {
             textDecoration: "none",
           }}
         >
+          <img src="/images/logo.png" alt="SendRec" width="20" height="20" style={{ marginRight: 6 }} />
           SendRec
         </Link>
 

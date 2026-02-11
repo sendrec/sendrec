@@ -965,6 +965,9 @@ func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
 	if !strings.Contains(body, `href="`+testBaseURL+`"`) {
 		t.Error("expected logo to link to app base URL")
 	}
+	if !strings.Contains(body, `src="/images/logo.png"`) {
+		t.Error("expected logo to use /images/logo.png, not a data URI")
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
