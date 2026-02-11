@@ -931,6 +931,45 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 	}
 }
 
+func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	shareToken := "brandingtkn1"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "Branding Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+		))
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, `class="logo"`) {
+		t.Error("expected logo element on watch page")
+	}
+	if !strings.Contains(body, `href="`+testBaseURL+`"`) {
+		t.Error("expected logo to link to app base URL")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
 func TestFormatTimestamp_TemplateFuncMap(t *testing.T) {
 	fn := watchFuncs["formatTimestamp"].(func(float64) string)
 
