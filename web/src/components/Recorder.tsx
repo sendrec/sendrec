@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
+import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
 
 type RecordingState = "idle" | "recording" | "paused" | "stopped";
 
@@ -17,6 +19,8 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [duration, setDuration] = useState(0);
   const [webcamEnabled, setWebcamEnabled] = useState(false);
+  const [captureWidth, setCaptureWidth] = useState(1920);
+  const [captureHeight, setCaptureHeight] = useState(1080);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -34,6 +38,32 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       node.srcObject = webcamStreamRef.current;
     }
   }, []);
+
+  // Drawing and compositing refs
+  const drawingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const compositingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const {
+    drawMode,
+    drawColor,
+    toggleDrawMode,
+    setDrawColor,
+    clearCanvas,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerLeave,
+  } = useDrawingCanvas({ canvasRef: drawingCanvasRef, captureWidth, captureHeight });
+
+  const { startCompositing, stopCompositing, getCompositedStream } =
+    useCanvasCompositing({
+      compositingCanvasRef,
+      screenVideoRef,
+      drawingCanvasRef,
+      captureWidth,
+      captureHeight,
+    });
 
   const stopWebcamStream = useCallback(() => {
     if (webcamStreamRef.current) {
@@ -74,9 +104,13 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       webcamRecorderRef.current.stop();
     }
     clearInterval(timerRef.current);
+    stopCompositing();
+    if (screenVideoRef.current) {
+      screenVideoRef.current.srcObject = null;
+    }
     stopAllStreams();
     setRecordingState("stopped");
-  }, [stopAllStreams]);
+  }, [stopAllStreams, stopCompositing]);
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
@@ -129,8 +163,41 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       });
       screenStreamRef.current = screenStream;
 
-      // Record the screen stream directly — no canvas intermediate
-      const recorder = new MediaRecorder(screenStream, {
+      // Get actual capture dimensions
+      const videoTrack = screenStream.getVideoTracks()[0];
+      const settings = videoTrack.getSettings();
+      const width = settings.width ?? 1920;
+      const height = settings.height ?? 1080;
+      setCaptureWidth(width);
+      setCaptureHeight(height);
+
+      // Set canvas dimensions imperatively (before React re-render)
+      if (compositingCanvasRef.current) {
+        compositingCanvasRef.current.width = width;
+        compositingCanvasRef.current.height = height;
+      }
+      if (drawingCanvasRef.current) {
+        drawingCanvasRef.current.width = width;
+        drawingCanvasRef.current.height = height;
+      }
+
+      // Play screen stream on preview video
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = screenStream;
+        await screenVideoRef.current.play();
+      }
+
+      // Start compositing loop
+      startCompositing();
+
+      // Get composited stream with audio from original screen stream
+      const audioTracks = screenStream.getAudioTracks();
+      const compositedStream = getCompositedStream(audioTracks);
+      if (!compositedStream) {
+        throw new Error("Failed to create composited stream");
+      }
+
+      const recorder = new MediaRecorder(compositedStream, {
         mimeType: "video/webm;codecs=vp9,opus",
       });
       mediaRecorderRef.current = recorder;
@@ -205,9 +272,10 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
+      stopCompositing();
       stopAllStreams();
     };
-  }, [stopAllStreams]);
+  }, [stopAllStreams, stopCompositing]);
 
 
   if (recordingState === "idle") {
@@ -270,7 +338,50 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      {/* Screen preview with drawing overlay */}
+      <div style={{ position: "relative", width: "100%", maxWidth: 640 }}>
+        <video
+          ref={screenVideoRef}
+          autoPlay
+          muted
+          playsInline
+          data-testid="screen-preview"
+          style={{
+            width: "100%",
+            borderRadius: 8,
+            background: "#000",
+            display: "block",
+          }}
+        />
+        <canvas
+          ref={drawingCanvasRef}
+          data-testid="drawing-canvas"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerLeave}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            cursor: drawMode ? "crosshair" : "default",
+            touchAction: "none",
+            pointerEvents: drawMode ? "auto" : "none",
+          }}
+        />
+      </div>
+
+      {/* Hidden compositing canvas */}
+      <canvas
+        ref={compositingCanvasRef}
+        data-testid="compositing-canvas"
+        style={{ display: "none" }}
+      />
+
+      {/* Controls toolbar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
         <div
           style={{
             display: "flex",
@@ -302,6 +413,61 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
             </span>
           )}
         </div>
+
+        <button
+          onClick={toggleDrawMode}
+          aria-label={drawMode ? "Disable drawing" : "Enable drawing"}
+          data-testid="draw-toggle"
+          style={{
+            background: drawMode ? "var(--color-accent)" : "transparent",
+            color: drawMode ? "var(--color-text)" : "var(--color-text-secondary)",
+            border: drawMode ? "none" : "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: "10px 24px",
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+        >
+          Draw
+        </button>
+
+        {drawMode && (
+          <input
+            type="color"
+            value={drawColor}
+            onChange={(e) => setDrawColor(e.target.value)}
+            aria-label="Drawing color"
+            data-testid="color-picker"
+            style={{
+              width: 36,
+              height: 36,
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: 2,
+              background: "transparent",
+              cursor: "pointer",
+            }}
+          />
+        )}
+
+        {drawMode && (
+          <button
+            onClick={clearCanvas}
+            aria-label="Clear drawing"
+            data-testid="clear-drawing"
+            style={{
+              background: "transparent",
+              color: "var(--color-text-secondary)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            Clear
+          </button>
+        )}
 
         {isPaused ? (
           <button
