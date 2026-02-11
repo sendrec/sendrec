@@ -3625,3 +3625,83 @@ func TestList_IncludesTranscriptStatus(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+func TestList_SearchByQuery(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
+	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title`).
+		WithArgs(testUserID, "%deploy%", 50, 0).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status"}).
+				AddRow("video-1", "Deploy walkthrough", "ready", 120, "abc123defghi", createdAt, shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none"),
+		)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos", handler.List)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos?q=deploy", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var items []listItem
+	if err := json.Unmarshal(rec.Body.Bytes(), &items); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].Title != "Deploy walkthrough" {
+		t.Errorf("expected title %q, got %q", "Deploy walkthrough", items[0].Title)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestList_EmptyQueryIgnored(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT v.id, v.title`).
+		WithArgs(testUserID, 50, 0).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status"}),
+		)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos", handler.List)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos?q=", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}

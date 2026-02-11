@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { TrimModal } from "../components/TrimModal";
@@ -71,15 +71,18 @@ export function Library() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [trimmingId, setTrimmingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function fetchVideosAndLimits() {
+  const fetchVideosAndLimits = useCallback(async (query = "") => {
+    const searchParam = query ? `?q=${encodeURIComponent(query)}` : "";
     const [videosResult, limitsResult] = await Promise.all([
-      apiFetch<Video[]>("/api/videos"),
+      apiFetch<Video[]>(`/api/videos${searchParam}`),
       apiFetch<LimitsResponse>("/api/videos/limits"),
     ]);
     setVideos(videosResult ?? []);
     setLimits(limitsResult ?? null);
-  }
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -93,7 +96,7 @@ export function Library() {
     }
 
     fetchData();
-  }, []);
+  }, [fetchVideosAndLimits]);
 
   useEffect(() => {
     const hasProcessing = videos.some(
@@ -103,14 +106,22 @@ export function Library() {
 
     const interval = setInterval(async () => {
       try {
-        await fetchVideosAndLimits();
+        await fetchVideosAndLimits(searchQuery);
       } catch {
         // ignore poll errors
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [videos]);
+  }, [videos, searchQuery, fetchVideosAndLimits]);
+
+  function handleSearchChange(value: string) {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchVideosAndLimits(value);
+    }, 300);
+  }
 
   async function deleteVideo(id: string) {
     if (!window.confirm("Delete this recording? This cannot be undone.")) {
@@ -274,6 +285,22 @@ export function Library() {
             </p>
           )}
         </div>
+        <input
+          type="text"
+          placeholder="Search videos..."
+          value={searchQuery}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: "8px 12px",
+            fontSize: 14,
+            color: "var(--color-text)",
+            width: 220,
+            outline: "none",
+          }}
+        />
         <Link
           to="/"
           style={{
