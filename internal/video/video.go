@@ -956,7 +956,7 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var daily []dailyViews
+	daily := make([]dailyViews, 0)
 	if days > 0 {
 		for i := days - 1; i >= 0; i-- {
 			d := now.AddDate(0, 0, -i)

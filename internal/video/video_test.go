@@ -4065,6 +4065,56 @@ func TestAnalytics_EmptyViews(t *testing.T) {
 	}
 }
 
+func TestAnalytics_AllRangeEmptyViews(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-analytics-1"
+
+	mock.ExpectQuery("SELECT id FROM videos").
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	mock.ExpectQuery("SELECT date_trunc").
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics?range=all", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.Daily == nil {
+		t.Fatal("expected daily to be an empty array, got null")
+	}
+	if len(resp.Daily) != 0 {
+		t.Errorf("expected 0 daily entries for 'all' with no views, got %d", len(resp.Daily))
+	}
+	if resp.Summary.TotalViews != 0 {
+		t.Errorf("expected totalViews 0, got %d", resp.Summary.TotalViews)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
 func TestAnalytics_PeakDayAndAverage(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
