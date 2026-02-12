@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -860,4 +862,147 @@ func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type analyticsSummary struct {
+	TotalViews        int64   `json:"totalViews"`
+	UniqueViews       int64   `json:"uniqueViews"`
+	ViewsToday        int64   `json:"viewsToday"`
+	AverageDailyViews float64 `json:"averageDailyViews"`
+	PeakDay           string  `json:"peakDay"`
+	PeakDayViews      int64   `json:"peakDayViews"`
+}
+
+type dailyViews struct {
+	Date        string `json:"date"`
+	Views       int64  `json:"views"`
+	UniqueViews int64  `json:"uniqueViews"`
+}
+
+type analyticsResponse struct {
+	Summary analyticsSummary `json:"summary"`
+	Daily   []dailyViews     `json:"daily"`
+}
+
+func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var id string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	).Scan(&id)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "7d"
+	}
+
+	var days int
+	switch rangeParam {
+	case "7d":
+		days = 7
+	case "30d":
+		days = 30
+	case "all":
+		days = 0
+	default:
+		httputil.WriteError(w, http.StatusBadRequest, "invalid range: must be 7d, 30d, or all")
+		return
+	}
+
+	now := time.Now().UTC().Truncate(24 * time.Hour)
+	var since time.Time
+	if days > 0 {
+		since = now.AddDate(0, 0, -(days - 1))
+	} else {
+		since = time.Time{}
+	}
+
+	rows, err := h.db.Query(r.Context(),
+		`SELECT date_trunc('day', created_at) AS day, COUNT(*) AS views, COUNT(DISTINCT viewer_hash) AS unique_views
+		 FROM video_views WHERE video_id = $1 AND created_at >= $2
+		 GROUP BY day ORDER BY day`,
+		videoID, since,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to query analytics")
+		return
+	}
+	defer rows.Close()
+
+	dataByDate := make(map[string]dailyViews)
+	for rows.Next() {
+		var day time.Time
+		var views, uniqueViews int64
+		if err := rows.Scan(&day, &views, &uniqueViews); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan analytics")
+			return
+		}
+		dateStr := day.Format("2006-01-02")
+		dataByDate[dateStr] = dailyViews{
+			Date:        dateStr,
+			Views:       views,
+			UniqueViews: uniqueViews,
+		}
+	}
+	if err := rows.Err(); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to read analytics")
+		return
+	}
+
+	daily := make([]dailyViews, 0)
+	if days > 0 {
+		for i := days - 1; i >= 0; i-- {
+			d := now.AddDate(0, 0, -i)
+			dateStr := d.Format("2006-01-02")
+			if entry, ok := dataByDate[dateStr]; ok {
+				daily = append(daily, entry)
+			} else {
+				daily = append(daily, dailyViews{Date: dateStr})
+			}
+		}
+	} else {
+		for _, entry := range dataByDate {
+			daily = append(daily, entry)
+		}
+		sortDailyViews(daily)
+	}
+
+	summary := computeSummary(daily, now.Format("2006-01-02"))
+	httputil.WriteJSON(w, http.StatusOK, analyticsResponse{
+		Summary: summary,
+		Daily:   daily,
+	})
+}
+
+func sortDailyViews(daily []dailyViews) {
+	sort.Slice(daily, func(i, j int) bool {
+		return daily[i].Date < daily[j].Date
+	})
+}
+
+func computeSummary(daily []dailyViews, todayStr string) analyticsSummary {
+	var summary analyticsSummary
+	for _, d := range daily {
+		summary.TotalViews += d.Views
+		summary.UniqueViews += d.UniqueViews
+		if d.Date == todayStr {
+			summary.ViewsToday = d.Views
+		}
+		if d.Views > summary.PeakDayViews {
+			summary.PeakDayViews = d.Views
+			summary.PeakDay = d.Date
+		}
+	}
+	if len(daily) > 0 && summary.TotalViews > 0 {
+		avg := float64(summary.TotalViews) / float64(len(daily))
+		summary.AverageDailyViews = math.Round(avg*10) / 10
+	}
+	return summary
 }

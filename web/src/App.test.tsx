@@ -39,6 +39,10 @@ vi.mock("./pages/Settings", () => ({
   Settings: () => <div>Settings Page</div>,
 }));
 
+vi.mock("./pages/Analytics", () => ({
+  Analytics: () => <div>Analytics Page</div>,
+}));
+
 vi.mock("./pages/NotFound", () => ({
   NotFound: () => <div>Not Found Page</div>,
 }));
@@ -96,5 +100,14 @@ describe("App", () => {
 
     expect(screen.getByTestId("layout")).toBeInTheDocument();
     expect(screen.getByText("Record Page")).toBeInTheDocument();
+  });
+
+  it("renders analytics page for authenticated users", () => {
+    mockGetAccessToken.mockReturnValue("valid-token");
+
+    renderApp("/videos/v1/analytics");
+
+    expect(screen.getByTestId("layout")).toBeInTheDocument();
+    expect(screen.getByText("Analytics Page")).toBeInTheDocument();
   });
 });

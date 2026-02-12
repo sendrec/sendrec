@@ -468,6 +468,13 @@ export function Library() {
                     View
                   </a>
                   <span className="action-sep">&middot;</span>
+                  <Link
+                    to={`/videos/${video.id}/analytics`}
+                    className="action-link"
+                  >
+                    Analytics
+                  </Link>
+                  <span className="action-sep">&middot;</span>
                   <button
                     onClick={() => copyLink(video.shareUrl, video.id)}
                     className="action-link"

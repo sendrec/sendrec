@@ -1,6 +1,7 @@
 package video
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -1241,6 +1242,17 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	go func() {
+		ip := clientIP(r)
+		hash := viewerHash(ip, r.UserAgent())
+		if _, err := h.db.Exec(context.Background(),
+			`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
+			videoID, hash,
+		); err != nil {
+			log.Printf("failed to record view for %s: %v", videoID, err)
+		}
+	}()
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)
 	if err != nil {
