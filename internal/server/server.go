@@ -146,6 +146,7 @@ func (s *Server) routes() {
 			r.Put("/{id}/comment-mode", s.videoHandler.SetCommentMode)
 			r.Get("/{id}/comments", s.videoHandler.ListOwnerComments)
 			r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
+			r.Get("/{id}/analytics", s.videoHandler.Analytics)
 		})
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
 		commentLimiter := ratelimit.NewLimiter(0.2, 3)

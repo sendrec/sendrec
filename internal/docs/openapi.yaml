@@ -366,6 +366,54 @@ components:
         text:
           type: string
 
+    AnalyticsSummary:
+      type: object
+      required: [totalViews, uniqueViews, viewsToday, averageDailyViews, peakDay, peakDayViews]
+      properties:
+        totalViews:
+          type: integer
+          format: int64
+        uniqueViews:
+          type: integer
+          format: int64
+        viewsToday:
+          type: integer
+          format: int64
+        averageDailyViews:
+          type: number
+          format: double
+        peakDay:
+          type: string
+          description: Date in YYYY-MM-DD format, empty if no views
+        peakDayViews:
+          type: integer
+          format: int64
+
+    DailyViews:
+      type: object
+      required: [date, views, uniqueViews]
+      properties:
+        date:
+          type: string
+          description: Date in YYYY-MM-DD format
+        views:
+          type: integer
+          format: int64
+        uniqueViews:
+          type: integer
+          format: int64
+
+    AnalyticsResponse:
+      type: object
+      required: [summary, daily]
+      properties:
+        summary:
+          $ref: "#/components/schemas/AnalyticsSummary"
+        daily:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyViews"
+
     HealthResponse:
       type: object
       required: [status]
@@ -1088,6 +1136,53 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/analytics:
+    get:
+      tags: [Videos]
+      summary: Get video analytics
+      description: Returns daily view counts and summary statistics for a video. Rate limited to 2 requests per second with a burst of 10.
+      operationId: getVideoAnalytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, all]
+            default: 7d
+          description: Time range for analytics data
+      responses:
+        "200":
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsResponse"
+        "400":
+          description: Invalid range parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
           content:
             application/json:
               schema:
