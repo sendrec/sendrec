@@ -12,6 +12,10 @@ SendRec is an open-source alternative to Loom for teams that need their data to 
 - **GDPR native** — privacy-first by design, not bolted on after the fact
 - **Open source** — AGPLv3 licensed, self-host or use our managed platform
 - **No US cloud dependency** — no data transfers to the US, no Schrems II risk
+- **Screen recording** — pause/resume, camera overlay (PiP webcam), drawing annotations
+- **Video management** — trimming, download, library search (title + transcript), playback speed controls
+- **Sharing** — expiring links, password protection, video comments with timestamps and emoji
+- **Analytics** — per-video view tracking with daily charts and summary stats
 - **Automatic transcription** — videos are transcribed with whisper.cpp, displayed as subtitles and a clickable transcript panel
 
 ## Quick Start
@@ -64,7 +68,7 @@ Single Go binary that:
 
 Video recordings happen entirely in the browser using `getDisplayMedia` + `MediaRecorder`. Files upload directly to S3 via presigned URLs — the server never touches video bytes.
 
-After upload, the server generates a thumbnail with ffmpeg and transcribes the audio with [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Transcripts are stored as VTT subtitles and a clickable segment panel on the watch page. Transcription is optional — if the whisper model is not available, it is silently skipped.
+After upload, the server generates a thumbnail with ffmpeg and enqueues the video for transcription with [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Transcripts are stored as VTT subtitles and a clickable segment panel on the watch page. Transcription is optional — if the whisper model is not available, it is silently skipped.
 
 ## Self-Hosting
 
