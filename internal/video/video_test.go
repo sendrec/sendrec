@@ -3705,3 +3705,435 @@ func TestList_EmptyQueryIgnored(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+// --- Analytics Tests ---
+
+func TestAnalytics_Returns7DayStats(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-analytics-1"
+
+	mock.ExpectQuery("SELECT id FROM videos").
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	mock.ExpectQuery("SELECT date_trunc").
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"day", "views", "unique_views"}).
+				AddRow(today.AddDate(0, 0, -2), int64(5), int64(3)).
+				AddRow(today, int64(10), int64(7)),
+		)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics?range=7d", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if len(resp.Daily) != 7 {
+		t.Fatalf("expected 7 daily entries, got %d", len(resp.Daily))
+	}
+
+	if resp.Summary.TotalViews != 15 {
+		t.Errorf("expected totalViews 15, got %d", resp.Summary.TotalViews)
+	}
+	if resp.Summary.UniqueViews != 10 {
+		t.Errorf("expected uniqueViews 10, got %d", resp.Summary.UniqueViews)
+	}
+	if resp.Summary.ViewsToday != 10 {
+		t.Errorf("expected viewsToday 10, got %d", resp.Summary.ViewsToday)
+	}
+	if resp.Summary.PeakDayViews != 10 {
+		t.Errorf("expected peakDayViews 10, got %d", resp.Summary.PeakDayViews)
+	}
+	if resp.Summary.PeakDay != today.Format("2006-01-02") {
+		t.Errorf("expected peakDay %q, got %q", today.Format("2006-01-02"), resp.Summary.PeakDay)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "nonexistent-id"
+
+	mock.ExpectQuery("SELECT id FROM videos").
+		WithArgs(videoID, testUserID).
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "video not found" {
+		t.Errorf("expected error %q, got %q", "video not found", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_InvalidRange(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-analytics-1"
+
+	mock.ExpectQuery("SELECT id FROM videos").
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics?range=90d", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "invalid range: must be 7d, 30d, or all" {
+		t.Errorf("expected error %q, got %q", "invalid range: must be 7d, 30d, or all", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_DefaultsTo7d(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-analytics-1"
+
+	mock.ExpectQuery("SELECT id FROM videos").
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	mock.ExpectQuery("SELECT date_trunc").
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if len(resp.Daily) != 7 {
+		t.Errorf("expected 7 daily entries (default 7d range), got %d", len(resp.Daily))
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_30DayRange(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-analytics-1"
+
+	mock.ExpectQuery("SELECT id FROM videos").
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	mock.ExpectQuery("SELECT date_trunc").
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"day", "views", "unique_views"}).
+				AddRow(today.AddDate(0, 0, -15), int64(3), int64(2)).
+				AddRow(today, int64(8), int64(5)),
+		)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics?range=30d", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if len(resp.Daily) != 30 {
+		t.Errorf("expected 30 daily entries, got %d", len(resp.Daily))
+	}
+
+	if resp.Summary.TotalViews != 11 {
+		t.Errorf("expected totalViews 11, got %d", resp.Summary.TotalViews)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_AllRange(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-analytics-1"
+
+	mock.ExpectQuery("SELECT id FROM videos").
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	mock.ExpectQuery("SELECT date_trunc").
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"day", "views", "unique_views"}).
+				AddRow(today.AddDate(0, 0, -60), int64(2), int64(1)).
+				AddRow(today.AddDate(0, 0, -10), int64(4), int64(3)).
+				AddRow(today, int64(6), int64(4)),
+		)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics?range=all", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if len(resp.Daily) != 3 {
+		t.Errorf("expected 3 daily entries (only days with data for 'all'), got %d", len(resp.Daily))
+	}
+
+	if resp.Summary.TotalViews != 12 {
+		t.Errorf("expected totalViews 12, got %d", resp.Summary.TotalViews)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_EmptyViews(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-analytics-1"
+
+	mock.ExpectQuery("SELECT id FROM videos").
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	mock.ExpectQuery("SELECT date_trunc").
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics?range=7d", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if len(resp.Daily) != 7 {
+		t.Errorf("expected 7 daily entries (zero-filled), got %d", len(resp.Daily))
+	}
+
+	if resp.Summary.TotalViews != 0 {
+		t.Errorf("expected totalViews 0, got %d", resp.Summary.TotalViews)
+	}
+	if resp.Summary.UniqueViews != 0 {
+		t.Errorf("expected uniqueViews 0, got %d", resp.Summary.UniqueViews)
+	}
+	if resp.Summary.ViewsToday != 0 {
+		t.Errorf("expected viewsToday 0, got %d", resp.Summary.ViewsToday)
+	}
+	if resp.Summary.AverageDailyViews != 0 {
+		t.Errorf("expected averageDailyViews 0, got %f", resp.Summary.AverageDailyViews)
+	}
+	if resp.Summary.PeakDay != "" {
+		t.Errorf("expected empty peakDay, got %q", resp.Summary.PeakDay)
+	}
+	if resp.Summary.PeakDayViews != 0 {
+		t.Errorf("expected peakDayViews 0, got %d", resp.Summary.PeakDayViews)
+	}
+
+	for _, d := range resp.Daily {
+		if d.Views != 0 || d.UniqueViews != 0 {
+			t.Errorf("expected zero views for day %s, got views=%d unique=%d", d.Date, d.Views, d.UniqueViews)
+		}
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_PeakDayAndAverage(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-analytics-1"
+
+	mock.ExpectQuery("SELECT id FROM videos").
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	peakDate := today.AddDate(0, 0, -3)
+
+	mock.ExpectQuery("SELECT date_trunc").
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"day", "views", "unique_views"}).
+				AddRow(today.AddDate(0, 0, -5), int64(2), int64(1)).
+				AddRow(today.AddDate(0, 0, -4), int64(4), int64(2)).
+				AddRow(peakDate, int64(20), int64(15)).
+				AddRow(today.AddDate(0, 0, -2), int64(3), int64(2)).
+				AddRow(today.AddDate(0, 0, -1), int64(6), int64(4)).
+				AddRow(today, int64(7), int64(5)),
+		)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics?range=7d", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.Summary.PeakDay != peakDate.Format("2006-01-02") {
+		t.Errorf("expected peakDay %q, got %q", peakDate.Format("2006-01-02"), resp.Summary.PeakDay)
+	}
+	if resp.Summary.PeakDayViews != 20 {
+		t.Errorf("expected peakDayViews 20, got %d", resp.Summary.PeakDayViews)
+	}
+
+	// Total views: 2+4+20+3+6+7 = 42, over 7 days = 6.0
+	if resp.Summary.TotalViews != 42 {
+		t.Errorf("expected totalViews 42, got %d", resp.Summary.TotalViews)
+	}
+	if resp.Summary.AverageDailyViews != 6.0 {
+		t.Errorf("expected averageDailyViews 6.0, got %f", resp.Summary.AverageDailyViews)
+	}
+	// Unique: 1+2+15+2+4+5 = 29
+	if resp.Summary.UniqueViews != 29 {
+		t.Errorf("expected uniqueViews 29, got %d", resp.Summary.UniqueViews)
+	}
+	if resp.Summary.ViewsToday != 7 {
+		t.Errorf("expected viewsToday 7, got %d", resp.Summary.ViewsToday)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
