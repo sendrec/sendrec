@@ -771,6 +771,16 @@ describe("Library", () => {
     });
   });
 
+  it("shows analytics link for ready videos", async () => {
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      const analyticsLink = screen.getByRole("link", { name: "Analytics" });
+      expect(analyticsLink).toHaveAttribute("href", "/videos/v1/analytics");
+    });
+  });
+
   it("shows Copied! after copying link", async () => {
     const user = userEvent.setup();
     const writeTextSpy = vi.fn().mockResolvedValue(undefined);
