@@ -147,6 +147,7 @@ func (s *Server) routes() {
 			r.Use(s.authHandler.Middleware)
 			r.Use(maxBodySize(64 * 1024))
 			r.Post("/", s.videoHandler.Create)
+			r.Post("/upload", s.videoHandler.Upload)
 			r.Get("/limits", s.videoHandler.Limits)
 			r.Get("/", s.videoHandler.List)
 			r.Patch("/{id}", s.videoHandler.Update)

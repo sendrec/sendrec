@@ -163,6 +163,34 @@ components:
           type: string
           format: uri
 
+    UploadVideoRequest:
+      type: object
+      required: [title, fileSize, contentType]
+      properties:
+        title:
+          type: string
+          maxLength: 500
+        fileSize:
+          type: integer
+          format: int64
+          description: File size in bytes
+        contentType:
+          type: string
+          enum: [video/mp4]
+          description: MIME type of the video file
+
+    UploadVideoResponse:
+      type: object
+      required: [id, uploadUrl, shareToken]
+      properties:
+        id:
+          type: string
+        uploadUrl:
+          type: string
+          format: uri
+        shareToken:
+          type: string
+
     VideoItem:
       type: object
       required:
@@ -313,7 +341,7 @@ components:
 
     WatchResponse:
       type: object
-      required: [title, videoUrl, duration, creator, createdAt, transcriptStatus]
+      required: [title, videoUrl, duration, creator, createdAt, contentType, transcriptStatus]
       properties:
         title:
           type: string
@@ -327,6 +355,9 @@ components:
         createdAt:
           type: string
           format: date-time
+        contentType:
+          type: string
+          description: MIME type of the video (video/webm or video/mp4)
         thumbnailUrl:
           type: string
           format: uri
@@ -936,6 +967,46 @@ paths:
                   $ref: "#/components/schemas/VideoItem"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/upload:
+    post:
+      tags: [Videos]
+      summary: Upload an existing video file
+      description: Creates a video record for an existing MP4 file and returns a presigned upload URL. Rate limited to 2 requests per second with a burst of 10.
+      operationId: uploadVideo
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadVideoRequest"
+      responses:
+        "201":
+          description: Upload created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadVideoResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Monthly video quota exceeded
           content:
             application/json:
               schema:
