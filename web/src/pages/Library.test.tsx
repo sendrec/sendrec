@@ -28,6 +28,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     commentMode: "disabled",
     commentCount: 0,
     transcriptStatus: "none",
+    viewNotification: null,
     ...overrides,
   };
 }
@@ -800,6 +801,66 @@ describe("Library", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Copied!" })).toBeInTheDocument();
+    });
+  });
+
+  it("shows notification dropdown with account default for null", async () => {
+    mockFetch([makeVideo({ viewNotification: null })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      const select = screen.getByLabelText("Notifications") as HTMLSelectElement;
+      expect(select.value).toBe("");
+    });
+  });
+
+  it("shows notification dropdown with video override value", async () => {
+    mockFetch([makeVideo({ viewNotification: "every" })]);
+    renderLibrary();
+
+    await waitFor(() => {
+      const select = screen.getByLabelText("Notifications") as HTMLSelectElement;
+      expect(select.value).toBe("every");
+    });
+  });
+
+  it("changes notification preference on select", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo({ viewNotification: null })]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // PUT response
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Notifications")).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText("Notifications"), "first");
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/notifications", {
+        method: "PUT",
+        body: JSON.stringify({ viewNotification: "first" }),
+      });
+    });
+  });
+
+  it("clears notification override when selecting account default", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo({ viewNotification: "every" })]);
+    mockApiFetch.mockResolvedValueOnce(undefined); // PUT response
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Notifications")).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText("Notifications"), "");
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/notifications", {
+        method: "PUT",
+        body: JSON.stringify({ viewNotification: null }),
+      });
     });
   });
 });
