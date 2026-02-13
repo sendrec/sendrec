@@ -18,14 +18,22 @@ export function Settings() {
   const [passwordError, setPasswordError] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [viewNotification, setViewNotification] = useState("off");
+  const [notificationMessage, setNotificationMessage] = useState("");
 
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const result = await apiFetch<UserProfile>("/api/user");
+        const [result, notifPrefs] = await Promise.all([
+          apiFetch<UserProfile>("/api/user"),
+          apiFetch<{ viewNotification: string }>("/api/settings/notifications"),
+        ]);
         if (result) {
           setProfile(result);
           setName(result.name);
+        }
+        if (notifPrefs) {
+          setViewNotification(notifPrefs.viewNotification);
         }
       } catch {
         // stay on page, fields will be empty
@@ -83,6 +91,22 @@ export function Settings() {
       setPasswordError(err instanceof Error ? err.message : "Failed to update password");
     } finally {
       setSavingPassword(false);
+    }
+  }
+
+  async function handleNotificationChange(value: string) {
+    setNotificationMessage("");
+    const previous = viewNotification;
+    setViewNotification(value);
+    try {
+      await apiFetch("/api/settings/notifications", {
+        method: "PUT",
+        body: JSON.stringify({ viewNotification: value }),
+      });
+      setNotificationMessage("Preference saved");
+    } catch {
+      setViewNotification(previous);
+      setNotificationMessage("Failed to save");
     }
   }
 
@@ -170,6 +194,42 @@ export function Settings() {
           {savingName ? "Saving..." : "Save name"}
         </button>
       </form>
+
+      <div
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          padding: 24,
+          marginBottom: 24,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Notifications</h2>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+          When someone watches one of your videos, get notified by email.
+        </p>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>View notifications</span>
+          <select
+            value={viewNotification}
+            onChange={(e) => handleNotificationChange(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="off">Off</option>
+            <option value="every">Every view</option>
+            <option value="first">First view only</option>
+            <option value="digest">Daily digest</option>
+          </select>
+        </label>
+
+        {notificationMessage && (
+          <p style={{ color: notificationMessage === "Failed to save" ? "var(--color-error, #e74c3c)" : "var(--color-accent)", fontSize: 14, margin: 0 }}>{notificationMessage}</p>
+        )}
+      </div>
 
       <form
         onSubmit={handlePasswordSubmit}

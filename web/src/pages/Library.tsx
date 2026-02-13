@@ -19,6 +19,7 @@ interface Video {
   commentMode: string;
   commentCount: number;
   transcriptStatus: string;
+  viewNotification: string | null;
 }
 
 interface LimitsResponse {
@@ -235,6 +236,19 @@ export function Library() {
       body: JSON.stringify({ commentMode: nextMode }),
     });
     setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, commentMode: nextMode } : v)));
+  }
+
+  async function changeNotification(video: Video, value: string) {
+    const viewNotification = value === "" ? null : value;
+    try {
+      await apiFetch(`/api/videos/${video.id}/notifications`, {
+        method: "PUT",
+        body: JSON.stringify({ viewNotification }),
+      });
+      setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, viewNotification } : v)));
+    } catch {
+      // no-op: select stays at previous value since state is only updated on success
+    }
   }
 
   if (loading) {
@@ -523,6 +537,30 @@ export function Library() {
                   >
                     {video.hasPassword ? "Remove password" : "Add password"}
                   </button>
+                  <span className="action-sep">&middot;</span>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13 }}>
+                    <span className="action-link" style={{ cursor: "default" }}>View notifications</span>
+                    <select
+                      aria-label="View notifications"
+                      value={video.viewNotification ?? ""}
+                      onChange={(e) => changeNotification(video, e.target.value)}
+                      style={{
+                        background: "var(--color-surface)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 4,
+                        color: "var(--color-text-secondary)",
+                        fontSize: 12,
+                        padding: "2px 4px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="">Account default</option>
+                      <option value="off">Off</option>
+                      <option value="every">Every view</option>
+                      <option value="first">First view only</option>
+                      <option value="digest">Daily digest</option>
+                    </select>
+                  </label>
                   <span style={{ flex: 1 }} />
                   <button
                     onClick={() => deleteVideo(video.id)}

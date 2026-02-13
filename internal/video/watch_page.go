@@ -897,6 +897,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         })();
         </script>
         {{end}}
+        {{if ne .TranscriptStatus "no_audio"}}
         <div class="transcript-section">
             <h2 class="transcript-header">Transcript <button class="download-btn transcribe-btn hidden" id="transcribe-btn">Transcribe</button></h2>
             {{if eq .TranscriptStatus "pending"}}
@@ -913,9 +914,10 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 {{end}}
             </div>
             {{else if eq .TranscriptStatus "failed"}}
-            <p class="transcript-processing">Transcription failed.</p>
+            <p class="transcript-processing hidden" id="transcript-failed">Transcription failed.</p>
             {{end}}
         </div>
+        {{end}}
         <script nonce="{{.Nonce}}">
         (function() {
             var panel = document.getElementById('transcript-panel');
@@ -946,6 +948,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             }
 
             var token = localStorage.getItem('token');
+            var failedMsg = document.getElementById('transcript-failed');
+            if (token && failedMsg) failedMsg.classList.remove('hidden');
             var btn = document.getElementById('transcribe-btn');
             if (token && btn) {
                 var status = '{{.TranscriptStatus}}';
@@ -1198,16 +1202,21 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var transcriptJSON *string
 	var transcriptStatus string
 	var videoID string
+	var ownerID string
+	var ownerEmail string
+	var viewNotification *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
-		        v.transcript_key, v.transcript_json, v.transcript_status
+		        v.transcript_key, v.transcript_json, v.transcript_status,
+		        v.user_id, u.email, v.view_notification
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &commentMode,
-		&transcriptKey, &transcriptJSON, &transcriptStatus)
+		&transcriptKey, &transcriptJSON, &transcriptStatus,
+		&ownerID, &ownerEmail, &viewNotification)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1243,6 +1252,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	viewerUserID := h.viewerUserIDFromRequest(r)
+
 	go func() {
 		ip := clientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
@@ -1252,6 +1263,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			log.Printf("failed to record view for %s: %v", videoID, err)
 		}
+		h.resolveAndNotify(videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 	}()
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)

@@ -1,7 +1,7 @@
 openapi: "3.0.3"
 info:
   title: SendRec API
-  version: "1.15.0"
+  version: "1.22.0"
   description: API for SendRec, an open-source EU-native async video messaging platform.
   license:
     name: MIT
@@ -22,6 +22,8 @@ tags:
     description: User profile management
   - name: Videos
     description: Video CRUD, sharing, and management
+  - name: Settings
+    description: User account settings and notification preferences
   - name: Watch
     description: Public video watching and interaction
 
@@ -203,6 +205,37 @@ components:
           format: int64
         transcriptStatus:
           type: string
+        viewNotification:
+          type: string
+          nullable: true
+          enum: [null, "off", "every", "first", "digest"]
+          description: Per-video notification override. Null means use account default.
+
+    NotificationPreferencesResponse:
+      type: object
+      required: [viewNotification]
+      properties:
+        viewNotification:
+          type: string
+          enum: [off, every, first, digest]
+
+    UpdateNotificationPreferencesRequest:
+      type: object
+      required: [viewNotification]
+      properties:
+        viewNotification:
+          type: string
+          enum: [off, every, first, digest]
+
+    SetVideoNotificationRequest:
+      type: object
+      required: [viewNotification]
+      properties:
+        viewNotification:
+          type: string
+          nullable: true
+          enum: [null, "off", "every", "first", "digest"]
+          description: Set to null to clear the per-video override and use account default.
 
     VideoLimits:
       type: object
@@ -667,6 +700,98 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Wrong current password or unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/notifications:
+    get:
+      tags: [Settings]
+      summary: Get notification preferences
+      description: Returns the current user's account-wide notification preferences.
+      operationId: getNotificationPreferences
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notification preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreferencesResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Settings]
+      summary: Update notification preferences
+      description: Sets the account-wide notification preference for view notifications.
+      operationId: updateNotificationPreferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationPreferencesRequest"
+      responses:
+        "204":
+          description: Preferences updated
+        "400":
+          description: Invalid notification mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/notifications:
+    put:
+      tags: [Videos]
+      summary: Set per-video notification override
+      description: Sets the notification preference for a specific video. Send null to clear the override and use the account default.
+      operationId: setVideoNotification
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVideoNotificationRequest"
+      responses:
+        "204":
+          description: Notification preference updated
+        "400":
+          description: Invalid notification mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
           content:
             application/json:
               schema:

@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/email"
 	"github.com/sendrec/sendrec/internal/httputil"
 )
 
@@ -35,6 +36,11 @@ type CommentNotifier interface {
 	SendCommentNotification(ctx context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error
 }
 
+type ViewNotifier interface {
+	SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int) error
+	SendDigestNotification(ctx context.Context, toEmail, toName string, videos []email.DigestVideoSummary) error
+}
+
 type Handler struct {
 	db                      database.DBTX
 	storage                 ObjectStorage
@@ -45,10 +51,15 @@ type Handler struct {
 	hmacSecret              string
 	secureCookies           bool
 	commentNotifier         CommentNotifier
+	viewNotifier            ViewNotifier
 }
 
 func (h *Handler) SetCommentNotifier(n CommentNotifier) {
 	h.commentNotifier = n
+}
+
+func (h *Handler) SetViewNotifier(n ViewNotifier) {
+	h.viewNotifier = n
 }
 
 func videoFileKey(userID, shareToken string) string {
@@ -101,7 +112,8 @@ type listItem struct {
 	HasPassword     bool   `json:"hasPassword"`
 	CommentMode      string `json:"commentMode"`
 	CommentCount     int64  `json:"commentCount"`
-	TranscriptStatus string `json:"transcriptStatus"`
+	TranscriptStatus  string  `json:"transcriptStatus"`
+	ViewNotification  *string `json:"viewNotification"`
 }
 
 type updateRequest struct {
@@ -394,7 +406,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
-		    v.transcript_status
+		    v.transcript_status, v.view_notification
 		 FROM videos v
 		 WHERE v.user_id = $1 AND v.status != 'deleted'`
 
@@ -428,7 +440,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var shareExpiresAt time.Time
 		var thumbnailKey *string
 		var sharePassword *string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -534,16 +546,21 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var transcriptKey *string
 	var transcriptJSON *string
 	var transcriptStatus string
+	var ownerID string
+	var ownerEmail string
+	var viewNotification *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password,
-		        v.transcript_key, v.transcript_json, v.transcript_status
+		        v.transcript_key, v.transcript_json, v.transcript_status,
+		        v.user_id, u.email, v.view_notification
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword,
-		&transcriptKey, &transcriptJSON, &transcriptStatus)
+		&transcriptKey, &transcriptJSON, &transcriptStatus,
+		&ownerID, &ownerEmail, &viewNotification)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -561,6 +578,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	viewerUserID := h.viewerUserIDFromRequest(r)
+
 	go func() {
 		ip := clientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
@@ -570,6 +589,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			log.Printf("failed to record view for %s: %v", videoID, err)
 		}
+		h.resolveAndNotify(videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 	}()
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)

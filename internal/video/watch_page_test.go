@@ -19,6 +19,7 @@ var watchPageColumns = []string{
 	"id", "title", "file_key", "name", "created_at", "share_expires_at",
 	"thumbnail_key", "share_password", "comment_mode",
 	"transcript_key", "transcript_json", "transcript_status",
+	"user_id", "email", "view_notification",
 }
 
 func watchPageRequest(shareToken string) *http.Request {
@@ -86,6 +87,7 @@ func TestWatchPage_Expired_Returns410(t *testing.T) {
 			"vid-1", "Old Video", "recordings/u1/old.webm", "Alice", createdAt, expiredAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -121,6 +123,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 			"vid-1", "My Demo", "recordings/u1/abc.webm", "Bob Smith", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -168,6 +171,7 @@ func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
 			"vid-1", "Speed Test", "recordings/u1/speed.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -220,6 +224,7 @@ func TestWatchPage_WithThumbnail_RendersPosterAndOGImage(t *testing.T) {
 			"vid-1", "Thumb Video", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			&thumbKey, (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -259,6 +264,7 @@ func TestWatchPage_WithoutThumbnail_NoPosterOrOGImage(t *testing.T) {
 			"vid-1", "No Thumb", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -298,6 +304,7 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 			"vid-1", "Comments Video", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "anonymous",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -345,6 +352,7 @@ func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
 			"vid-1", "No Comments", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -387,6 +395,7 @@ func TestWatchPage_NameRequired_RendersNameField(t *testing.T) {
 			"vid-1", "Name Required", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "name_required",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -426,6 +435,7 @@ func TestWatchPage_NameEmailRequired_RendersBothFields(t *testing.T) {
 			"vid-1", "Email Required", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "name_email_required",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -472,6 +482,7 @@ func TestWatchPage_TranscriptReady_RendersSegments(t *testing.T) {
 			"vid-1", "Transcribed", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			&transcriptKey, &segStr, "ready",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -524,6 +535,7 @@ func TestWatchPage_TranscriptPending_ShowsQueueMessage(t *testing.T) {
 			"vid-1", "Pending Trans", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "pending",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -560,6 +572,7 @@ func TestWatchPage_TranscriptProcessing_ShowsProgressMessage(t *testing.T) {
 			"vid-1", "Processing Trans", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "processing",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -596,6 +609,7 @@ func TestWatchPage_TranscriptFailed_ShowsFailedMessage(t *testing.T) {
 			"vid-1", "Failed Trans", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "failed",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -632,6 +646,7 @@ func TestWatchPage_StorageError_Returns500(t *testing.T) {
 			"vid-1", "Storage Error", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -664,6 +679,7 @@ func TestWatchPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 			"vid-1", "Protected Video", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), &passwordHash, "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -707,6 +723,7 @@ func TestWatchPage_PasswordProtected_ValidCookie_ShowsPlayer(t *testing.T) {
 			"vid-1", "Protected OK", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), &passwordHash, "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	sig := signWatchCookie(testHMACSecret, shareToken, passwordHash)
@@ -753,6 +770,7 @@ func TestWatchPage_OGMetaTags(t *testing.T) {
 			"vid-1", "OG Tags Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -797,6 +815,7 @@ func TestWatchPage_CrossOriginAttribute(t *testing.T) {
 			"vid-1", "CORS Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -833,6 +852,7 @@ func TestWatchPage_CSPNonce(t *testing.T) {
 			"vid-1", "Nonce Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -874,6 +894,7 @@ func TestWatchPage_TitleInHTMLTitle(t *testing.T) {
 			"vid-1", "My Special Recording", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -910,6 +931,7 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 			"vid-1", "Autoplay", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -950,6 +972,7 @@ func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
 			"vid-1", "Branding Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -1013,6 +1036,7 @@ func TestWatchPage_RecordsView(t *testing.T) {
 			"vid-1", "My Demo", "recordings/u1/abc.webm", "Bob Smith", createdAt, expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil),
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).

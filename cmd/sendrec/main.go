@@ -93,6 +93,8 @@ func main() {
 		Password:          os.Getenv("LISTMONK_PASSWORD"),
 		TemplateID:        int(getEnvInt64("LISTMONK_TEMPLATE_ID", 0)),
 		CommentTemplateID: int(getEnvInt64("LISTMONK_COMMENT_TEMPLATE_ID", 0)),
+		ViewTemplateID:    int(getEnvInt64("LISTMONK_VIEW_TEMPLATE_ID", 0)),
+		Allowlist:         email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
 	})
 
 	srv := server.New(server.Config{
@@ -109,12 +111,14 @@ func main() {
 		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
 		EmailSender:             emailClient,
 		CommentNotifier:         emailClient,
+		ViewNotifier:            emailClient,
 	})
 
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	defer cleanupCancel()
 	video.StartCleanupLoop(cleanupCtx, db.Pool, store, 10*time.Minute)
 	video.StartTranscriptionWorker(cleanupCtx, db.Pool, store, 5*time.Second)
+	video.StartDigestWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),

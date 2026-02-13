@@ -34,6 +34,7 @@ type Config struct {
 	EnableDocs              bool
 	EmailSender             auth.EmailSender
 	CommentNotifier         video.CommentNotifier
+	ViewNotifier            video.ViewNotifier
 }
 
 type Server struct {
@@ -75,6 +76,9 @@ func New(cfg Config) *Server {
 		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes, cfg.MaxVideosPerMonth, cfg.MaxVideoDurationSeconds, jwtSecret, secureCookies)
 		if cfg.CommentNotifier != nil {
 			s.videoHandler.SetCommentNotifier(cfg.CommentNotifier)
+		}
+		if cfg.ViewNotifier != nil {
+			s.videoHandler.SetViewNotifier(cfg.ViewNotifier)
 		}
 	}
 
@@ -128,6 +132,13 @@ func (s *Server) routes() {
 	}
 
 	if s.videoHandler != nil {
+		s.router.Route("/api/settings", func(r chi.Router) {
+			r.Use(s.authHandler.Middleware)
+			r.Use(maxBodySize(64 * 1024))
+			r.Get("/notifications", s.videoHandler.GetNotificationPreferences)
+			r.Put("/notifications", s.videoHandler.PutNotificationPreferences)
+		})
+
 		videoLimiter := ratelimit.NewLimiter(2, 10)
 		s.router.Route("/api/videos", func(r chi.Router) {
 			r.Use(videoLimiter.Middleware)
@@ -147,6 +158,7 @@ func (s *Server) routes() {
 			r.Get("/{id}/comments", s.videoHandler.ListOwnerComments)
 			r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
 			r.Get("/{id}/analytics", s.videoHandler.Analytics)
+			r.Put("/{id}/notifications", s.videoHandler.SetVideoNotification)
 		})
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
 		commentLimiter := ratelimit.NewLimiter(0.2, 3)

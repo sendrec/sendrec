@@ -34,7 +34,9 @@ describe("Settings", () => {
   });
 
   it("loads and displays profile", async () => {
-    mockApiFetch.mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" });
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" });
     renderSettings();
 
     await waitFor(() => {
@@ -44,7 +46,9 @@ describe("Settings", () => {
   });
 
   it("disables email field", async () => {
-    mockApiFetch.mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" });
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" });
     renderSettings();
 
     await waitFor(() => {
@@ -53,7 +57,9 @@ describe("Settings", () => {
   });
 
   it("disables save button when name is unchanged", async () => {
-    mockApiFetch.mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" });
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" });
     renderSettings();
 
     await waitFor(() => {
@@ -63,7 +69,9 @@ describe("Settings", () => {
 
   it("enables save button when name changes", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" });
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" });
     renderSettings();
 
     await waitFor(() => {
@@ -80,6 +88,7 @@ describe("Settings", () => {
     const user = userEvent.setup();
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce(undefined);
     renderSettings();
 
@@ -105,6 +114,7 @@ describe("Settings", () => {
     const user = userEvent.setup();
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
       .mockRejectedValueOnce(new Error("Failed to update name"));
     renderSettings();
 
@@ -123,7 +133,9 @@ describe("Settings", () => {
 
   it("shows error when passwords do not match", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" });
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" });
     renderSettings();
 
     await waitFor(() => {
@@ -142,6 +154,7 @@ describe("Settings", () => {
     const user = userEvent.setup();
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce(undefined);
     renderSettings();
 
@@ -168,6 +181,7 @@ describe("Settings", () => {
     const user = userEvent.setup();
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce(undefined);
     renderSettings();
 
@@ -187,5 +201,70 @@ describe("Settings", () => {
     expect(screen.getByLabelText("Current password")).toHaveValue("");
     expect(screen.getByLabelText(/^New password/)).toHaveValue("");
     expect(screen.getByLabelText("Confirm new password")).toHaveValue("");
+  });
+
+  it("loads and displays notification preference", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "every" });
+    renderSettings();
+
+    await waitFor(() => {
+      const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
+      expect(select.value).toBe("every");
+    });
+  });
+
+  it("defaults notification preference to off", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" });
+    renderSettings();
+
+    await waitFor(() => {
+      const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
+      expect(select.value).toBe("off");
+    });
+  });
+
+  it("updates notification preference on change", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce(undefined); // PUT response
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("View notifications")).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText("View notifications"), "digest");
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/settings/notifications", {
+        method: "PUT",
+        body: JSON.stringify({ viewNotification: "digest" }),
+      });
+    });
+  });
+
+  it("shows saved confirmation after notification change", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce(undefined); // PUT response
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("View notifications")).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText("View notifications"), "every");
+
+    await waitFor(() => {
+      expect(screen.getByText("Preference saved")).toBeInTheDocument();
+    });
   });
 });
