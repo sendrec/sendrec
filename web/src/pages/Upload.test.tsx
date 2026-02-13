@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Upload } from "./Upload";
@@ -18,9 +18,9 @@ function renderUpload() {
   );
 }
 
-function createMockFile(name: string, size: number): File {
+function createMockFile(name: string, size: number, type = "video/mp4"): File {
   const content = new Uint8Array(size);
-  return new File([content], name, { type: "video/mp4" });
+  return new File([content], name, { type });
 }
 
 describe("Upload", () => {
@@ -37,6 +37,13 @@ describe("Upload", () => {
     renderUpload();
     expect(screen.getByText("Upload Video")).toBeInTheDocument();
     expect(screen.getByTestId("file-input")).toBeInTheDocument();
+  });
+
+  it("renders dropzone with instructions", () => {
+    renderUpload();
+    expect(screen.getByText("Drag and drop your video here")).toBeInTheDocument();
+    expect(screen.getByText("or click to browse")).toBeInTheDocument();
+    expect(screen.getByText("MP4, WebM")).toBeInTheDocument();
   });
 
   it("does not show title or upload button before file is selected", () => {
@@ -56,6 +63,45 @@ describe("Upload", () => {
     const titleInput = screen.getByLabelText("Title") as HTMLInputElement;
     expect(titleInput.value).toBe("my-presentation");
     expect(screen.getByText("Upload")).toBeInTheDocument();
+  });
+
+  it("shows file info after selection", async () => {
+    const user = userEvent.setup();
+    renderUpload();
+
+    const file = createMockFile("demo.mp4", 5 * 1024 * 1024);
+    await user.upload(screen.getByTestId("file-input"), file);
+
+    expect(screen.getByText("demo.mp4")).toBeInTheDocument();
+    expect(screen.getByText(/5\.0 MB/)).toBeInTheDocument();
+  });
+
+  it("accepts file via drag and drop", () => {
+    renderUpload();
+
+    const file = createMockFile("dropped.mp4", 2048);
+    const dropzone = screen.getByRole("button", { name: /drag and drop/i });
+
+    fireEvent.drop(dropzone, {
+      dataTransfer: { files: [file] },
+    });
+
+    expect(screen.getByText("dropped.mp4")).toBeInTheDocument();
+    expect(screen.getByLabelText("Title")).toHaveValue("dropped");
+  });
+
+  it("rejects unsupported file types on drop", () => {
+    renderUpload();
+
+    const file = createMockFile("movie.avi", 2048, "video/avi");
+    const dropzone = screen.getByRole("button", { name: /drag and drop/i });
+
+    fireEvent.drop(dropzone, {
+      dataTransfer: { files: [file] },
+    });
+
+    expect(screen.getByText("Only MP4 and WebM files are supported")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Title")).not.toBeInTheDocument();
   });
 
   it("uploads file and shows share URL on success", async () => {
@@ -119,7 +165,7 @@ describe("Upload", () => {
     expect(screen.getByText("Try again")).toBeInTheDocument();
   });
 
-  it("shows uploading state", async () => {
+  it("shows uploading state with progress bar", async () => {
     const user = userEvent.setup();
     let resolveUpload: (value: unknown) => void;
     mockApiFetch.mockReturnValueOnce(new Promise((r) => { resolveUpload = r; }));
@@ -131,6 +177,7 @@ describe("Upload", () => {
     await user.click(screen.getByText("Upload"));
 
     expect(screen.getByText("Uploading...")).toBeInTheDocument();
+    expect(screen.getByText("demo.mp4")).toBeInTheDocument();
 
     resolveUpload!({
       id: "video-1",
