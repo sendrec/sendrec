@@ -119,6 +119,8 @@ func (s *Server) routes() {
 			r.Post("/logout", s.authHandler.Logout)
 			r.Post("/forgot-password", s.authHandler.ForgotPassword)
 			r.Post("/reset-password", s.authHandler.ResetPassword)
+			r.Post("/confirm-email", s.authHandler.ConfirmEmail)
+			r.Post("/resend-confirmation", s.authHandler.ResendConfirmation)
 		})
 	}
 

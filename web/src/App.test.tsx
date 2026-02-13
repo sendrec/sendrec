@@ -27,6 +27,14 @@ vi.mock("./pages/ResetPassword", () => ({
   ResetPassword: () => <div>Reset Password Page</div>,
 }));
 
+vi.mock("./pages/CheckEmail", () => ({
+  CheckEmail: () => <div>Check Email Page</div>,
+}));
+
+vi.mock("./pages/ConfirmEmail", () => ({
+  ConfirmEmail: () => <div>Confirm Email Page</div>,
+}));
+
 vi.mock("./pages/Record", () => ({
   Record: () => <div>Record Page</div>,
 }));

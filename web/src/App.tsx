@@ -8,6 +8,8 @@ import { Record } from "./pages/Record";
 import { Register } from "./pages/Register";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
+import { CheckEmail } from "./pages/CheckEmail";
+import { ConfirmEmail } from "./pages/ConfirmEmail";
 import { NotFound } from "./pages/NotFound";
 import { Settings } from "./pages/Settings";
 import { Analytics } from "./pages/Analytics";
@@ -43,6 +45,8 @@ export function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/check-email" element={<CheckEmail />} />
+      <Route path="/confirm-email" element={<ConfirmEmail />} />
       <Route
         path="/"
         element={

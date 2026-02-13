@@ -112,7 +112,8 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 | `LISTMONK_TEMPLATE_ID` | Template ID for share link emails |
 | `LISTMONK_COMMENT_TEMPLATE_ID` | Template ID for new comment notifications |
 | `LISTMONK_VIEW_TEMPLATE_ID` | Template ID for view notifications (instant and digest) |
-| `EMAIL_ALLOWLIST` | Comma-separated list of allowed recipient domains (`@example.com`) and addresses (`alice@example.com`). When set, emails are only sent to matching recipients. Useful for staging/preview environments |
+| `LISTMONK_CONFIRM_TEMPLATE_ID` | Template ID for email confirmation on signup. Template variables: `{{ .Tx.Data.name }}`, `{{ .Tx.Data.confirmLink }}`. Confirmation emails bypass the allowlist and are always sent |
+| `EMAIL_ALLOWLIST` | Comma-separated list of allowed recipient domains (`@example.com`) and addresses (`alice@example.com`). When set, emails are only sent to matching recipients (except confirmation emails). Useful for staging/preview environments |
 
 ## S3_PUBLIC_ENDPOINT explained
 

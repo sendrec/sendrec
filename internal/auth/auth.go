@@ -27,6 +27,7 @@ const userIDKey contextKey = "userID"
 
 type EmailSender interface {
 	SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error
+	SendConfirmation(ctx context.Context, toEmail, toName, confirmLink string) error
 }
 
 type Handler struct {
@@ -70,8 +71,9 @@ type messageResponse struct {
 }
 
 const resetTokenExpiry = 1 * time.Hour
+const confirmTokenExpiry = 24 * time.Hour
 
-func generateResetToken() (raw string, hash string, err error) {
+func generateSecureToken() (raw string, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", "", fmt.Errorf("generate random bytes: %w", err)
@@ -82,7 +84,7 @@ func generateResetToken() (raw string, hash string, err error) {
 	return raw, hash, nil
 }
 
-func hashResetToken(raw string) string {
+func hashToken(raw string) string {
 	h := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(h[:])
 }
@@ -135,14 +137,37 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
+	if _, err := h.db.Exec(r.Context(),
+		"UPDATE email_confirmations SET used_at = now() WHERE user_id = $1 AND used_at IS NULL",
+		userID,
+	); err != nil {
+		log.Printf("register: failed to invalidate old confirmation tokens: %v", err)
+	}
+
+	rawToken, tokenHash, err := generateSecureToken()
 	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate tokens")
+		log.Printf("register: failed to generate confirmation token: %v", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to create account")
 		return
 	}
 
-	h.setRefreshTokenCookie(w, refreshToken)
-	httputil.WriteJSON(w, http.StatusCreated, tokenResponse{AccessToken: accessToken})
+	if _, err := h.db.Exec(r.Context(),
+		"INSERT INTO email_confirmations (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
+		tokenHash, userID, time.Now().Add(confirmTokenExpiry),
+	); err != nil {
+		log.Printf("register: failed to store confirmation token: %v", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to create account")
+		return
+	}
+
+	confirmLink := h.baseURL + "/confirm-email?token=" + rawToken
+	if h.emailSender != nil {
+		if err := h.emailSender.SendConfirmation(r.Context(), req.Email, req.Name, confirmLink); err != nil {
+			log.Printf("register: failed to send confirmation email: %v", err)
+		}
+	}
+
+	httputil.WriteJSON(w, http.StatusCreated, messageResponse{Message: "Account created. Check your email to confirm your address."})
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -158,9 +183,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID, hashedPassword string
+	var emailVerified bool
 	err := h.db.QueryRow(r.Context(),
-		"SELECT id, password FROM users WHERE email = $1", req.Email,
-	).Scan(&userID, &hashedPassword)
+		"SELECT id, password, email_verified FROM users WHERE email = $1", req.Email,
+	).Scan(&userID, &hashedPassword, &emailVerified)
 	if err != nil {
 		httputil.WriteError(w, http.StatusUnauthorized, "invalid email or password")
 		return
@@ -168,6 +194,13 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(req.Password)); err != nil {
 		httputil.WriteError(w, http.StatusUnauthorized, "invalid email or password")
+		return
+	}
+
+	if !emailVerified {
+		httputil.WriteJSON(w, http.StatusForbidden, map[string]string{
+			"error": "email_not_verified",
+		})
 		return
 	}
 
@@ -272,7 +305,7 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		log.Printf("forgot-password: failed to invalidate old tokens: %v", err)
 	}
 
-	rawToken, tokenHash, err := generateResetToken()
+	rawToken, tokenHash, err := generateSecureToken()
 	if err != nil {
 		log.Printf("forgot-password: failed to generate token: %v", err)
 		httputil.WriteJSON(w, http.StatusOK, response)
@@ -325,7 +358,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenHash := hashResetToken(req.Token)
+	tokenHash := hashToken(req.Token)
 
 	var userID string
 	err := h.db.QueryRow(r.Context(),
@@ -367,6 +400,119 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, messageResponse{Message: "Password updated successfully"})
+}
+
+type confirmEmailRequest struct {
+	Token string `json:"token"`
+}
+
+func (h *Handler) ConfirmEmail(w http.ResponseWriter, r *http.Request) {
+	var req confirmEmailRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Token == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "token is required")
+		return
+	}
+
+	tokenHash := hashToken(req.Token)
+
+	var userID string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT user_id FROM email_confirmations WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()",
+		tokenHash,
+	).Scan(&userID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid or expired confirmation link")
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"UPDATE email_confirmations SET used_at = now() WHERE token_hash = $1",
+		tokenHash,
+	); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to process confirmation")
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"UPDATE users SET email_verified = true, updated_at = now() WHERE id = $1",
+		userID,
+	); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to verify email")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, messageResponse{Message: "Email confirmed successfully. You can now sign in."})
+}
+
+type resendConfirmationRequest struct {
+	Email string `json:"email"`
+}
+
+func (h *Handler) ResendConfirmation(w http.ResponseWriter, r *http.Request) {
+	var req resendConfirmationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Email == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	response := messageResponse{Message: "If an unverified account with that email exists, we've sent a confirmation link"}
+
+	var userID, userName string
+	var emailVerified bool
+	err := h.db.QueryRow(r.Context(),
+		"SELECT id, name, email_verified FROM users WHERE email = $1", req.Email,
+	).Scan(&userID, &userName, &emailVerified)
+	if err != nil {
+		httputil.WriteJSON(w, http.StatusOK, response)
+		return
+	}
+
+	if emailVerified {
+		httputil.WriteJSON(w, http.StatusOK, response)
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"UPDATE email_confirmations SET used_at = now() WHERE user_id = $1 AND used_at IS NULL",
+		userID,
+	); err != nil {
+		log.Printf("resend-confirmation: failed to invalidate old tokens: %v", err)
+	}
+
+	rawToken, tokenHash, err := generateSecureToken()
+	if err != nil {
+		log.Printf("resend-confirmation: failed to generate token: %v", err)
+		httputil.WriteJSON(w, http.StatusOK, response)
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"INSERT INTO email_confirmations (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
+		tokenHash, userID, time.Now().Add(confirmTokenExpiry),
+	); err != nil {
+		log.Printf("resend-confirmation: failed to store token: %v", err)
+		httputil.WriteJSON(w, http.StatusOK, response)
+		return
+	}
+
+	confirmLink := h.baseURL + "/confirm-email?token=" + rawToken
+	if h.emailSender != nil {
+		if err := h.emailSender.SendConfirmation(r.Context(), req.Email, userName, confirmLink); err != nil {
+			log.Printf("resend-confirmation: failed to send email: %v", err)
+		}
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, response)
 }
 
 type userResponse struct {

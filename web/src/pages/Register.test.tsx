@@ -11,10 +11,8 @@ vi.mock("react-router-dom", async () => {
 });
 
 const mockApiFetch = vi.fn();
-const mockSetAccessToken = vi.fn();
 vi.mock("../api/client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
-  setAccessToken: (...args: unknown[]) => mockSetAccessToken(...args),
 }));
 
 function renderRegister() {
@@ -28,7 +26,6 @@ function renderRegister() {
 describe("Register", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
-    mockSetAccessToken.mockReset();
     mockNavigate.mockReset();
   });
 
@@ -45,9 +42,9 @@ describe("Register", () => {
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
   });
 
-  it("registers and navigates to home on success", async () => {
+  it("registers and navigates to check-email on success", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockResolvedValueOnce({ accessToken: "tok-456" });
+    mockApiFetch.mockResolvedValueOnce({ message: "Account created. Check your email to confirm." });
     renderRegister();
 
     await user.type(screen.getByLabelText("Name"), "Alice");
@@ -60,8 +57,7 @@ describe("Register", () => {
       method: "POST",
       body: JSON.stringify({ email: "alice@example.com", password: "password123", name: "Alice" }),
     });
-    expect(mockSetAccessToken).toHaveBeenCalledWith("tok-456");
-    expect(mockNavigate).toHaveBeenCalledWith("/");
+    expect(mockNavigate).toHaveBeenCalledWith("/check-email", { state: { email: "alice@example.com" } });
   });
 
   it("shows error on failed registration", async () => {
