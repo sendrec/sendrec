@@ -78,6 +78,21 @@ components:
           minLength: 8
           maxLength: 72
 
+    ConfirmEmailRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    ResendConfirmationRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
     AuthResponse:
       type: object
       required: [accessToken]
@@ -498,16 +513,11 @@ paths:
               $ref: "#/components/schemas/RegisterRequest"
       responses:
         "201":
-          description: Registration successful
-          headers:
-            Set-Cookie:
-              description: refresh_token cookie
-              schema:
-                type: string
+          description: Account created. A confirmation email is sent.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
+                $ref: "#/components/schemas/MessageResponse"
         "400":
           description: Validation error
           content:
@@ -553,6 +563,12 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Email not verified. Error body contains `{"error": "email_not_verified"}`.
           content:
             application/json:
               schema:
@@ -640,6 +656,58 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "400":
           description: Invalid or expired token, or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/confirm-email:
+    post:
+      tags: [Authentication]
+      summary: Confirm email address
+      description: Verifies the confirmation token from the email link and activates the account.
+      operationId: confirmEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmEmailRequest"
+      responses:
+        "200":
+          description: Email confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/resend-confirmation:
+    post:
+      tags: [Authentication]
+      summary: Resend confirmation email
+      description: Always returns 200 to prevent email enumeration. If the email exists and is unverified, a new confirmation email is sent. Token expires in 24 hours.
+      operationId: resendConfirmation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendConfirmationRequest"
+      responses:
+        "200":
+          description: Confirmation email sent if account exists and is unverified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Validation error
           content:
             application/json:
               schema:
