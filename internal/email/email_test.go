@@ -12,6 +12,11 @@ import (
 func TestSendPasswordReset_Success(t *testing.T) {
 	var receivedBody txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{"id":1}}`))
+			return
+		}
 		if r.URL.Path != "/api/tx" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
@@ -56,6 +61,10 @@ func TestSendPasswordReset_Success(t *testing.T) {
 
 func TestSendPasswordReset_ServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
@@ -87,6 +96,10 @@ func TestSendCommentNotification_UsesCommentTemplateID(t *testing.T) {
 	var received txRequest
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatalf("read body: %v", err)
@@ -149,6 +162,10 @@ func TestSendPasswordReset_StillUsesTemplateID(t *testing.T) {
 	var received txRequest
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatalf("read body: %v", err)
@@ -182,6 +199,10 @@ func TestSendPasswordReset_StillUsesTemplateID(t *testing.T) {
 func TestSendViewNotification_Success(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatalf("read body: %v", err)
@@ -248,6 +269,10 @@ func TestSendViewNotification_SkipsWhenTemplateIDZero(t *testing.T) {
 func TestSendViewNotification_DigestFlag(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &received)
 		w.WriteHeader(http.StatusOK)

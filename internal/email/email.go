@@ -39,11 +39,38 @@ type txRequest struct {
 	ContentType     string            `json:"content_type"`
 }
 
+type subscriberRequest struct {
+	Email  string `json:"email"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
+	body := subscriberRequest{Email: email, Name: name, Status: "enabled"}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+"/api/subscribers", bytes.NewReader(jsonBody))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(c.config.Username, c.config.Password)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return
+	}
+	_ = resp.Body.Close()
+}
+
 func (c *Client) SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error {
 	if c.config.BaseURL == "" {
 		log.Printf("email not configured — password reset requested for %s (link not logged for security)", toEmail)
 		return nil
 	}
+
+	c.ensureSubscriber(ctx, toEmail, toName)
 
 	body := txRequest{
 		SubscriberEmail: toEmail,
@@ -91,6 +118,8 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 		log.Printf("LISTMONK_COMMENT_TEMPLATE_ID not set — skipping comment notification for %q", videoTitle)
 		return nil
 	}
+
+	c.ensureSubscriber(ctx, toEmail, toName)
 
 	body := txRequest{
 		SubscriberEmail: toEmail,
@@ -141,6 +170,8 @@ func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, vide
 		log.Printf("LISTMONK_VIEW_TEMPLATE_ID not set — skipping view notification for %q", videoTitle)
 		return nil
 	}
+
+	c.ensureSubscriber(ctx, toEmail, toName)
 
 	body := txRequest{
 		SubscriberEmail: toEmail,
