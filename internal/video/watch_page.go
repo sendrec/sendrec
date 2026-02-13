@@ -915,7 +915,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 {{end}}
             </div>
             {{else if eq .TranscriptStatus "failed"}}
-            <p class="transcript-processing">Transcription failed.</p>
+            <p class="transcript-processing hidden" id="transcript-failed">Transcription failed.</p>
             {{end}}
         </div>
         <script nonce="{{.Nonce}}">
@@ -948,6 +948,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             }
 
             var token = localStorage.getItem('token');
+            var failedMsg = document.getElementById('transcript-failed');
+            if (token && failedMsg) failedMsg.classList.remove('hidden');
             var btn = document.getElementById('transcribe-btn');
             if (token && btn) {
                 var status = '{{.TranscriptStatus}}';
