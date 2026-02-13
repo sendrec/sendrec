@@ -513,6 +513,75 @@ func TestAllowlist_CaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestSendConfirmation_BypassesAllowlist(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "user",
+		Password:          "pass",
+		ConfirmTemplateID: 7,
+		Allowlist:         []string{"@sendrec.eu"},
+	})
+
+	err := client.SendConfirmation(context.Background(),
+		"stranger@example.com", "Stranger", "https://app.sendrec.eu/confirm-email?token=abc123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.TemplateID != 7 {
+		t.Errorf("expected template_id=7, got %d", received.TemplateID)
+	}
+	if received.SubscriberEmail != "stranger@example.com" {
+		t.Errorf("expected subscriber email stranger@example.com, got %q", received.SubscriberEmail)
+	}
+	confirmLink, ok := received.Data["confirmLink"]
+	if !ok || confirmLink != "https://app.sendrec.eu/confirm-email?token=abc123" {
+		t.Errorf("expected confirmLink in data, got %v", received.Data)
+	}
+}
+
+func TestSendConfirmation_SkipsWhenTemplateIDZero(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "user",
+		Password:          "pass",
+		ConfirmTemplateID: 0,
+	})
+
+	err := client.SendConfirmation(context.Background(),
+		"alice@example.com", "Alice", "https://example.com/confirm-email?token=abc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if serverHit {
+		t.Error("expected no HTTP request when ConfirmTemplateID is zero")
+	}
+}
+
 func TestParseAllowlist(t *testing.T) {
 	tests := []struct {
 		input    string

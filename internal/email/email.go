@@ -13,13 +13,14 @@ import (
 )
 
 type Config struct {
-	BaseURL           string
-	Username          string
-	Password          string
-	TemplateID        int
-	CommentTemplateID int
-	ViewTemplateID    int
-	Allowlist         []string
+	BaseURL            string
+	Username           string
+	Password           string
+	TemplateID         int
+	CommentTemplateID  int
+	ViewTemplateID     int
+	ConfirmTemplateID  int
+	Allowlist          []string
 }
 
 type Client struct {
@@ -220,6 +221,34 @@ func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, vide
 			"watchURL":   watchURL,
 			"viewCount":  strconv.Itoa(viewCount),
 			"isDigest":   "false",
+		},
+		ContentType: "html",
+	}
+
+	return c.sendTx(ctx, body)
+}
+
+func (c *Client) SendConfirmation(ctx context.Context, toEmail, toName, confirmLink string) error {
+	if c.config.BaseURL == "" {
+		log.Printf("email not configured — confirmation email for %s (link not logged for security)", toEmail)
+		return nil
+	}
+
+	if c.config.ConfirmTemplateID == 0 {
+		log.Printf("LISTMONK_CONFIRM_TEMPLATE_ID not set — skipping confirmation email for %s", toEmail)
+		return nil
+	}
+
+	// Confirmation emails bypass the allowlist — they must always be sent,
+	// even on staging/preview, so new users can complete registration.
+	c.ensureSubscriber(ctx, toEmail, toName)
+
+	body := txRequest{
+		SubscriberEmail: toEmail,
+		TemplateID:      c.config.ConfirmTemplateID,
+		Data: map[string]any{
+			"confirmLink": confirmLink,
+			"name":        toName,
 		},
 		ContentType: "html",
 	}

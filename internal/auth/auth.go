@@ -71,7 +71,7 @@ type messageResponse struct {
 
 const resetTokenExpiry = 1 * time.Hour
 
-func generateResetToken() (raw string, hash string, err error) {
+func generateSecureToken() (raw string, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", "", fmt.Errorf("generate random bytes: %w", err)
@@ -82,7 +82,7 @@ func generateResetToken() (raw string, hash string, err error) {
 	return raw, hash, nil
 }
 
-func hashResetToken(raw string) string {
+func hashToken(raw string) string {
 	h := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(h[:])
 }
@@ -272,7 +272,7 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		log.Printf("forgot-password: failed to invalidate old tokens: %v", err)
 	}
 
-	rawToken, tokenHash, err := generateResetToken()
+	rawToken, tokenHash, err := generateSecureToken()
 	if err != nil {
 		log.Printf("forgot-password: failed to generate token: %v", err)
 		httputil.WriteJSON(w, http.StatusOK, response)
@@ -325,7 +325,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenHash := hashResetToken(req.Token)
+	tokenHash := hashToken(req.Token)
 
 	var userID string
 	err := h.db.QueryRow(r.Context(),

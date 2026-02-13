@@ -973,7 +973,7 @@ func TestResetPassword_Success(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	rawToken, tokenHash, _ := generateResetToken()
+	rawToken, tokenHash, _ := generateSecureToken()
 
 	mock.ExpectQuery(`SELECT user_id FROM password_resets`).
 		WithArgs(tokenHash).
