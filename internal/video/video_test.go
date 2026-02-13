@@ -176,6 +176,7 @@ func TestExtensionForContentType(t *testing.T) {
 	}{
 		{"video/mp4", ".mp4"},
 		{"video/webm", ".webm"},
+		{"video/quicktime", ".mov"},
 		{"", ".webm"},
 		{"video/unknown", ".webm"},
 	}
@@ -195,6 +196,7 @@ func TestVideoFileKey(t *testing.T) {
 	}{
 		{"user1", "token1", "video/webm", "recordings/user1/token1.webm"},
 		{"user1", "token1", "video/mp4", "recordings/user1/token1.mp4"},
+		{"user1", "token1", "video/quicktime", "recordings/user1/token1.mov"},
 	}
 	for _, tt := range tests {
 		if got := videoFileKey(tt.userID, tt.shareToken, tt.contentType); got != tt.expected {

@@ -43,7 +43,7 @@ describe("Upload", () => {
     renderUpload();
     expect(screen.getByText("Drag and drop your video here")).toBeInTheDocument();
     expect(screen.getByText("or click to browse")).toBeInTheDocument();
-    expect(screen.getByText("MP4, WebM")).toBeInTheDocument();
+    expect(screen.getByText("MP4, WebM, MOV")).toBeInTheDocument();
   });
 
   it("does not show title or upload button before file is selected", () => {
@@ -100,7 +100,7 @@ describe("Upload", () => {
       dataTransfer: { files: [file] },
     });
 
-    expect(screen.getByText("Only MP4 and WebM files are supported")).toBeInTheDocument();
+    expect(screen.getByText("Only MP4, WebM, and MOV files are supported")).toBeInTheDocument();
     expect(screen.queryByLabelText("Title")).not.toBeInTheDocument();
   });
 

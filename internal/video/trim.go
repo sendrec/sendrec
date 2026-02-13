@@ -11,10 +11,12 @@ import (
 )
 
 func videoCodecForContentType(ct string) string {
-	if ct == "video/mp4" {
+	switch ct {
+	case "video/mp4", "video/quicktime":
 		return "libx264"
+	default:
+		return "libvpx-vp9"
 	}
-	return "libvpx-vp9"
 }
 
 func trimVideo(inputPath, outputPath, contentType string, startSeconds, endSeconds float64) error {

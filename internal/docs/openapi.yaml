@@ -176,7 +176,7 @@ components:
           description: File size in bytes
         contentType:
           type: string
-          enum: [video/mp4, video/webm]
+          enum: [video/mp4, video/webm, video/quicktime]
           description: MIME type of the video file
 
     UploadVideoResponse:

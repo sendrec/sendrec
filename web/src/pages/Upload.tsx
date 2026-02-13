@@ -62,8 +62,8 @@ export function Upload() {
     const dropped = e.dataTransfer.files[0];
     if (!dropped) return;
 
-    if (dropped.type !== "video/mp4" && dropped.type !== "video/webm") {
-      setError("Only MP4 and WebM files are supported");
+    if (dropped.type !== "video/mp4" && dropped.type !== "video/webm" && dropped.type !== "video/quicktime") {
+      setError("Only MP4, WebM, and MOV files are supported");
       return;
     }
 
@@ -79,7 +79,7 @@ export function Upload() {
     let videoId: string | null = null;
 
     try {
-      const fileContentType = file.type === "video/webm" ? "video/webm" : "video/mp4";
+      const fileContentType = file.type === "video/webm" ? "video/webm" : file.type === "video/quicktime" ? "video/quicktime" : "video/mp4";
 
       setProgress(10);
 
@@ -167,7 +167,7 @@ export function Upload() {
 
   if (uploading) {
     return (
-      <div className="page-container page-container--centered">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
         <div style={{ width: "100%", maxWidth: 480 }}>
           <div style={{
             background: "var(--color-surface)",
@@ -209,7 +209,7 @@ export function Upload() {
 
   if (error) {
     return (
-      <div className="page-container page-container--centered">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
         <div style={{ width: "100%", maxWidth: 480 }}>
           <div style={{
             background: "var(--color-surface)",
@@ -250,7 +250,7 @@ export function Upload() {
 
   if (shareUrl) {
     return (
-      <div className="page-container page-container--centered">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
         <div style={{ width: "100%", maxWidth: 480 }}>
           <div style={{
             background: "var(--color-surface)",
@@ -351,7 +351,7 @@ export function Upload() {
   }
 
   return (
-    <div className="page-container page-container--centered">
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
       <h1 style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 600, marginBottom: 24, textAlign: "center" }}>
         Upload Video
       </h1>
@@ -360,7 +360,7 @@ export function Upload() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="video/mp4,video/webm"
+          accept="video/mp4,video/webm,video/quicktime,.mov"
           onChange={handleFileSelect}
           data-testid="file-input"
           style={{ display: "none" }}
@@ -396,7 +396,7 @@ export function Upload() {
                   {file.name}
                 </p>
                 <p style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
-                  {formatFileSize(file.size)} &middot; {file.type === "video/webm" ? "WebM" : "MP4"}
+                  {formatFileSize(file.size)} &middot; {file.type === "video/webm" ? "WebM" : file.type === "video/quicktime" ? "MOV" : "MP4"}
                 </p>
               </div>
               <button
@@ -434,7 +434,7 @@ export function Upload() {
                 padding: "4px 12px",
                 borderRadius: 4,
               }}>
-                MP4, WebM
+                MP4, WebM, MOV
               </span>
             </>
           )}

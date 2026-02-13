@@ -63,10 +63,14 @@ func (h *Handler) SetViewNotifier(n ViewNotifier) {
 }
 
 func extensionForContentType(ct string) string {
-	if ct == "video/mp4" {
+	switch ct {
+	case "video/mp4":
 		return ".mp4"
+	case "video/quicktime":
+		return ".mov"
+	default:
+		return ".webm"
 	}
-	return ".webm"
 }
 
 func videoFileKey(userID, shareToken, contentType string) string {
@@ -258,8 +262,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.ContentType != "video/mp4" && req.ContentType != "video/webm" {
-		httputil.WriteError(w, http.StatusBadRequest, "only video/mp4 and video/webm uploads are supported")
+	if req.ContentType != "video/mp4" && req.ContentType != "video/webm" && req.ContentType != "video/quicktime" {
+		httputil.WriteError(w, http.StatusBadRequest, "only video/mp4, video/webm, and video/quicktime uploads are supported")
 		return
 	}
 
