@@ -30,7 +30,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
     <meta property="og:title" content="{{.Title}}">
     <meta property="og:type" content="video.other">
     <meta property="og:video" content="{{.VideoURL}}">
-    <meta property="og:video:type" content="video/webm">
+    <meta property="og:video:type" content="{{.ContentType}}">
     {{if .ThumbnailURL}}<meta property="og:image" content="{{.ThumbnailURL}}">{{end}}
     <meta property="og:site_name" content="SendRec">
     <style nonce="{{.Nonce}}">
@@ -506,7 +506,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
     <div class="container">
         <a href="{{.BaseURL}}" class="logo"><img src="/images/logo.png" alt="SendRec" width="20" height="20">SendRec</a>
         <video id="player" controls crossorigin="anonymous"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
-            <source src="{{.VideoURL}}" type="video/webm">
+            <source src="{{.VideoURL}}" type="{{.ContentType}}">
             {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
             Your browser does not support video playback.
         </video>
@@ -1094,6 +1094,7 @@ type watchPageData struct {
 	TranscriptStatus string
 	Segments         []TranscriptSegment
 	BaseURL          string
+	ContentType      string
 }
 
 type expiredPageData struct {
@@ -1205,18 +1206,19 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var ownerID string
 	var ownerEmail string
 	var viewNotification *string
+	var contentType string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
 		        v.transcript_key, v.transcript_json, v.transcript_status,
-		        v.user_id, u.email, v.view_notification
+		        v.user_id, u.email, v.view_notification, v.content_type
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &commentMode,
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
-		&ownerID, &ownerEmail, &viewNotification)
+		&ownerID, &ownerEmail, &viewNotification, &contentType)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1305,6 +1307,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		TranscriptStatus: transcriptStatus,
 		Segments:         segments,
 		BaseURL:          h.baseURL,
+		ContentType:      contentType,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

@@ -10,12 +10,21 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 )
 
-func trimVideo(inputPath, outputPath string, startSeconds, endSeconds float64) error {
+func videoCodecForContentType(ct string) string {
+	switch ct {
+	case "video/mp4", "video/quicktime":
+		return "libx264"
+	default:
+		return "libvpx-vp9"
+	}
+}
+
+func trimVideo(inputPath, outputPath, contentType string, startSeconds, endSeconds float64) error {
 	cmd := exec.Command("ffmpeg",
 		"-i", inputPath,
 		"-ss", fmt.Sprintf("%.3f", startSeconds),
 		"-to", fmt.Sprintf("%.3f", endSeconds),
-		"-c:v", "libvpx-vp9",
+		"-c:v", videoCodecForContentType(contentType),
 		"-c:a", "copy",
 		"-y",
 		outputPath,
@@ -27,7 +36,7 @@ func trimVideo(inputPath, outputPath string, startSeconds, endSeconds float64) e
 	return nil
 }
 
-func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, thumbnailKey string, startSeconds, endSeconds float64) {
+func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, thumbnailKey, contentType string, startSeconds, endSeconds float64) {
 	log.Printf("trim: starting for video %s (%.1f-%.1f)", videoID, startSeconds, endSeconds)
 
 	setReadyFallback := func() {
@@ -39,7 +48,8 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 		}
 	}
 
-	tmpInput, err := os.CreateTemp("", "sendrec-trim-input-*.webm")
+	ext := extensionForContentType(contentType)
+	tmpInput, err := os.CreateTemp("", "sendrec-trim-input-*"+ext)
 	if err != nil {
 		log.Printf("trim: failed to create temp input file: %v", err)
 		setReadyFallback()
@@ -55,7 +65,7 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 		return
 	}
 
-	tmpOutput, err := os.CreateTemp("", "sendrec-trim-output-*.webm")
+	tmpOutput, err := os.CreateTemp("", "sendrec-trim-output-*"+ext)
 	if err != nil {
 		log.Printf("trim: failed to create temp output file: %v", err)
 		setReadyFallback()
@@ -65,13 +75,13 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	if err := trimVideo(tmpInputPath, tmpOutputPath, startSeconds, endSeconds); err != nil {
+	if err := trimVideo(tmpInputPath, tmpOutputPath, contentType, startSeconds, endSeconds); err != nil {
 		log.Printf("trim: ffmpeg failed for %s: %v", videoID, err)
 		setReadyFallback()
 		return
 	}
 
-	if err := storage.UploadFile(ctx, fileKey, tmpOutputPath, "video/webm"); err != nil {
+	if err := storage.UploadFile(ctx, fileKey, tmpOutputPath, contentType); err != nil {
 		log.Printf("trim: failed to upload trimmed video %s: %v", videoID, err)
 		setReadyFallback()
 		return

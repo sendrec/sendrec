@@ -13,6 +13,7 @@ import { ConfirmEmail } from "./pages/ConfirmEmail";
 import { NotFound } from "./pages/NotFound";
 import { Settings } from "./pages/Settings";
 import { Analytics } from "./pages/Analytics";
+import { Upload } from "./pages/Upload";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(!getAccessToken());
@@ -52,6 +53,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <Record />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/upload"
+        element={
+          <ProtectedRoute>
+            <Upload />
           </ProtectedRoute>
         }
       />

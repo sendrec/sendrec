@@ -10,14 +10,14 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 )
 
-func compositeOverlay(screenPath, webcamPath, outputPath string) error {
+func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) error {
 	cmd := exec.Command("ffmpeg",
 		"-i", screenPath,
 		"-i", webcamPath,
 		"-filter_complex", "[1:v]scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[0:v][pip]overlay=W-w-20:H-h-20",
 		"-map", "0:a?",
 		"-c:a", "copy",
-		"-c:v", "libvpx-vp9",
+		"-c:v", videoCodecForContentType(contentType),
 		"-y",
 		outputPath,
 	)
@@ -28,7 +28,7 @@ func compositeOverlay(screenPath, webcamPath, outputPath string) error {
 	return nil
 }
 
-func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey string) {
+func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey, contentType string) {
 	log.Printf("composite: starting webcam overlay for video %s", videoID)
 
 	setReadyFallback := func() {
@@ -40,7 +40,8 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 		}
 	}
 
-	tmpScreen, err := os.CreateTemp("", "sendrec-composite-screen-*.webm")
+	ext := extensionForContentType(contentType)
+	tmpScreen, err := os.CreateTemp("", "sendrec-composite-screen-*"+ext)
 	if err != nil {
 		log.Printf("composite: failed to create temp screen file: %v", err)
 		setReadyFallback()
@@ -56,7 +57,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 		return
 	}
 
-	tmpWebcam, err := os.CreateTemp("", "sendrec-composite-webcam-*.webm")
+	tmpWebcam, err := os.CreateTemp("", "sendrec-composite-webcam-*"+ext)
 	if err != nil {
 		log.Printf("composite: failed to create temp webcam file: %v", err)
 		setReadyFallback()
@@ -72,7 +73,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 		return
 	}
 
-	tmpOutput, err := os.CreateTemp("", "sendrec-composite-output-*.webm")
+	tmpOutput, err := os.CreateTemp("", "sendrec-composite-output-*"+ext)
 	if err != nil {
 		log.Printf("composite: failed to create temp output file: %v", err)
 		setReadyFallback()
@@ -82,13 +83,13 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	if err := compositeOverlay(tmpScreenPath, tmpWebcamPath, tmpOutputPath); err != nil {
+	if err := compositeOverlay(tmpScreenPath, tmpWebcamPath, tmpOutputPath, contentType); err != nil {
 		log.Printf("composite: ffmpeg failed for %s: %v", videoID, err)
 		setReadyFallback()
 		return
 	}
 
-	if err := storage.UploadFile(ctx, screenKey, tmpOutputPath, "video/webm"); err != nil {
+	if err := storage.UploadFile(ctx, screenKey, tmpOutputPath, contentType); err != nil {
 		log.Printf("composite: failed to upload composited video %s: %v", videoID, err)
 		setReadyFallback()
 		return

@@ -1,0 +1,1 @@
+ALTER TABLE videos DROP COLUMN IF EXISTS content_type;

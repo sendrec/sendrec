@@ -62,8 +62,19 @@ func (h *Handler) SetViewNotifier(n ViewNotifier) {
 	h.viewNotifier = n
 }
 
-func videoFileKey(userID, shareToken string) string {
-	return fmt.Sprintf("recordings/%s/%s.webm", userID, shareToken)
+func extensionForContentType(ct string) string {
+	switch ct {
+	case "video/mp4":
+		return ".mp4"
+	case "video/quicktime":
+		return ".mov"
+	default:
+		return ".webm"
+	}
+}
+
+func videoFileKey(userID, shareToken, contentType string) string {
+	return fmt.Sprintf("recordings/%s/%s%s", userID, shareToken, extensionForContentType(contentType))
 }
 
 func webcamFileKey(userID, shareToken string) string {
@@ -127,6 +138,7 @@ type watchResponse struct {
 	Duration         int                 `json:"duration"`
 	Creator          string              `json:"creator"`
 	CreatedAt        string              `json:"createdAt"`
+	ContentType      string              `json:"contentType"`
 	ThumbnailURL     string              `json:"thumbnailUrl,omitempty"`
 	TranscriptStatus string              `json:"transcriptStatus"`
 	TranscriptURL    string              `json:"transcriptUrl,omitempty"`
@@ -192,7 +204,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fileKey := videoFileKey(userID, shareToken)
+	fileKey := videoFileKey(userID, shareToken, "video/webm")
 
 	var webcamKey *string
 	if req.WebcamFileSize > 0 {
@@ -233,6 +245,89 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusCreated, resp)
+}
+
+type uploadRequest struct {
+	Title       string `json:"title"`
+	FileSize    int64  `json:"fileSize"`
+	ContentType string `json:"contentType"`
+}
+
+func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+
+	var req uploadRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.ContentType != "video/mp4" && req.ContentType != "video/webm" && req.ContentType != "video/quicktime" {
+		httputil.WriteError(w, http.StatusBadRequest, "only video/mp4, video/webm, and video/quicktime uploads are supported")
+		return
+	}
+
+	if req.FileSize <= 0 {
+		httputil.WriteError(w, http.StatusBadRequest, "fileSize must be positive")
+		return
+	}
+
+	if h.maxUploadBytes > 0 && req.FileSize > h.maxUploadBytes {
+		httputil.WriteError(w, http.StatusBadRequest, "file too large")
+		return
+	}
+
+	if h.maxVideosPerMonth > 0 {
+		count, err := h.countVideosThisMonth(r.Context(), userID)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to check video limit")
+			return
+		}
+		if count >= h.maxVideosPerMonth {
+			httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("monthly video limit of %d reached", h.maxVideosPerMonth))
+			return
+		}
+	}
+
+	title := req.Title
+	if title == "" {
+		title = "Untitled Video"
+	}
+	if len(title) > 500 {
+		httputil.WriteError(w, http.StatusBadRequest, "title is too long")
+		return
+	}
+
+	shareToken, err := generateShareToken()
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate share token")
+		return
+	}
+
+	fileKey := videoFileKey(userID, shareToken, req.ContentType)
+
+	var videoID string
+	err = h.db.QueryRow(r.Context(),
+		`INSERT INTO videos (user_id, title, duration, file_size, file_key, share_token, content_type)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		userID, title, 0, req.FileSize, fileKey, shareToken, req.ContentType,
+	).Scan(&videoID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to create video")
+		return
+	}
+
+	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), fileKey, req.ContentType, req.FileSize, 30*time.Minute)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate upload URL")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusCreated, createResponse{
+		ID:         videoID,
+		UploadURL:  uploadURL,
+		ShareToken: shareToken,
+	})
 }
 
 func (h *Handler) countVideosThisMonth(ctx context.Context, userID string) (int, error) {
@@ -295,11 +390,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		var fileSize int64
 		var shareToken string
 		var webcamKey *string
+		var expectedContentType string
+		var duration int
 		err := h.db.QueryRow(r.Context(),
-			`SELECT file_key, file_size, share_token, webcam_key FROM videos
+			`SELECT file_key, file_size, share_token, webcam_key, content_type, duration FROM videos
 			 WHERE id = $1 AND user_id = $2 AND status = 'uploading'`,
 			videoID, userID,
-		).Scan(&fileKey, &fileSize, &shareToken, &webcamKey)
+		).Scan(&fileKey, &fileSize, &shareToken, &webcamKey, &expectedContentType, &duration)
 		if err != nil {
 			httputil.WriteError(w, http.StatusNotFound, "video not found")
 			return
@@ -318,7 +415,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusBadRequest, "uploaded file size mismatch")
 			return
 		}
-		if contentType != "video/webm" {
+		if contentType != expectedContentType {
 			httputil.WriteError(w, http.StatusBadRequest, "uploaded file invalid type")
 			return
 		}
@@ -348,11 +445,15 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 				h.db, h.storage,
 				videoID, fileKey, *webcamKey,
 				thumbnailFileKey(userID, shareToken),
+				expectedContentType,
 			)
 		} else {
 			go GenerateThumbnail(context.Background(), h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken))
 			if err := EnqueueTranscription(r.Context(), h.db, videoID); err != nil {
 				log.Printf("failed to enqueue transcription for %s: %v", videoID, err)
+			}
+			if duration == 0 {
+				go probeDuration(context.Background(), h.db, h.storage, videoID, fileKey)
 			}
 		}
 	}
@@ -549,18 +650,19 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var ownerID string
 	var ownerEmail string
 	var viewNotification *string
+	var contentType string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password,
 		        v.transcript_key, v.transcript_json, v.transcript_status,
-		        v.user_id, u.email, v.view_notification
+		        v.user_id, u.email, v.view_notification, v.content_type
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword,
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
-		&ownerID, &ownerEmail, &viewNotification)
+		&ownerID, &ownerEmail, &viewNotification, &contentType)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -622,6 +724,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		Duration:         duration,
 		Creator:          creator,
 		CreatedAt:        createdAt.Format(time.RFC3339),
+		ContentType:      contentType,
 		ThumbnailURL:     thumbnailURL,
 		TranscriptStatus: transcriptStatus,
 		TranscriptURL:    transcriptURL,
@@ -635,16 +738,17 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 
 	var title string
 	var fileKey string
+	var contentType string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT title, file_key FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
+		`SELECT title, file_key, content_type FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
 		videoID, userID,
-	).Scan(&title, &fileKey)
+	).Scan(&title, &fileKey, &contentType)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
 
-	filename := title + ".webm"
+	filename := title + extensionForContentType(contentType)
 	downloadURL, err := h.storage.GenerateDownloadURLWithDisposition(r.Context(), fileKey, filename, 1*time.Hour)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate download URL")
@@ -661,11 +765,12 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 	var fileKey string
 	var shareExpiresAt time.Time
 	var sharePassword *string
+	var contentType string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT title, file_key, share_expires_at, share_password FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
+		`SELECT title, file_key, share_expires_at, share_password, content_type FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
 		shareToken,
-	).Scan(&title, &fileKey, &shareExpiresAt, &sharePassword)
+	).Scan(&title, &fileKey, &shareExpiresAt, &sharePassword, &contentType)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -683,7 +788,7 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	filename := title + ".webm"
+	filename := title + extensionForContentType(contentType)
 	downloadURL, err := h.storage.GenerateDownloadURLWithDisposition(r.Context(), fileKey, filename, 1*time.Hour)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate download URL")
@@ -794,10 +899,11 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 	var fileKey string
 	var shareToken string
 	var status string
+	var contentType string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT duration, file_key, share_token, status FROM videos WHERE id = $1 AND user_id = $2`,
+		`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = $1 AND user_id = $2`,
 		videoID, userID,
-	).Scan(&duration, &fileKey, &shareToken, &status)
+	).Scan(&duration, &fileKey, &shareToken, &status, &contentType)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -834,6 +940,7 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 		h.db, h.storage,
 		videoID, fileKey,
 		thumbnailFileKey(userID, shareToken),
+		contentType,
 		req.StartSeconds, req.EndSeconds,
 	)
 

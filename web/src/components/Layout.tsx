@@ -67,6 +67,13 @@ export function Layout({ children }: LayoutProps) {
         </Link>
 
         <Link
+          to="/upload"
+          style={isActive("/upload") ? activeLinkStyle : inactiveLinkStyle}
+        >
+          Upload
+        </Link>
+
+        <Link
           to="/library"
           style={isActive("/library") ? activeLinkStyle : inactiveLinkStyle}
         >
