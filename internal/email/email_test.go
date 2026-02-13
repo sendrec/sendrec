@@ -296,3 +296,214 @@ func TestSendViewNotification_DigestFlag(t *testing.T) {
 		t.Errorf("expected viewCount=42, got %s", received.Data["viewCount"])
 	}
 }
+
+func TestAllowlist_EmptyAllowsAll(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "user",
+		Password:       "pass",
+		ViewTemplateID: 99,
+	})
+
+	_ = client.SendViewNotification(context.Background(),
+		"anyone@anywhere.com", "Anyone", "Video", "https://example.com/watch/abc", 1, false)
+
+	if !serverHit {
+		t.Error("expected email to be sent when allowlist is empty")
+	}
+}
+
+func TestAllowlist_BlocksNonMatchingEmail(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "user",
+		Password:       "pass",
+		ViewTemplateID: 99,
+		Allowlist:      []string{"@sendrec.eu"},
+	})
+
+	err := client.SendViewNotification(context.Background(),
+		"stranger@example.com", "Stranger", "Video", "https://example.com/watch/abc", 1, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if serverHit {
+		t.Error("expected email to be blocked for non-matching address")
+	}
+}
+
+func TestAllowlist_AllowsDomainMatch(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "user",
+		Password:       "pass",
+		ViewTemplateID: 99,
+		Allowlist:      []string{"@sendrec.eu"},
+	})
+
+	_ = client.SendViewNotification(context.Background(),
+		"alice@sendrec.eu", "Alice", "Video", "https://example.com/watch/abc", 1, false)
+
+	if !serverHit {
+		t.Error("expected email to be sent for domain match")
+	}
+}
+
+func TestAllowlist_AllowsExactEmailMatch(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "user",
+		Password:       "pass",
+		ViewTemplateID: 99,
+		Allowlist:      []string{"alice@example.com"},
+	})
+
+	_ = client.SendViewNotification(context.Background(),
+		"alice@example.com", "Alice", "Video", "https://example.com/watch/abc", 1, false)
+
+	if !serverHit {
+		t.Error("expected email to be sent for exact email match")
+	}
+}
+
+func TestAllowlist_MultipleDomains(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "user",
+		Password:       "pass",
+		ViewTemplateID: 99,
+		Allowlist:      []string{"@sendrec.eu", "bob@test.com"},
+	})
+
+	_ = client.SendViewNotification(context.Background(),
+		"bob@test.com", "Bob", "Video", "https://example.com/watch/abc", 1, false)
+
+	if !serverHit {
+		t.Error("expected email to be sent for exact match in multi-entry allowlist")
+	}
+}
+
+func TestAllowlist_BlocksAllSendMethods(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "user",
+		Password:          "pass",
+		TemplateID:        1,
+		CommentTemplateID: 2,
+		ViewTemplateID:    3,
+		Allowlist:         []string{"@sendrec.eu"},
+	})
+
+	_ = client.SendPasswordReset(context.Background(),
+		"blocked@example.com", "Blocked", "https://example.com/reset")
+	if serverHit {
+		t.Error("expected SendPasswordReset to be blocked")
+	}
+
+	serverHit = false
+	_ = client.SendCommentNotification(context.Background(),
+		"blocked@example.com", "Blocked", "Video", "Bob", "Nice!", "https://example.com/watch/abc")
+	if serverHit {
+		t.Error("expected SendCommentNotification to be blocked")
+	}
+
+	serverHit = false
+	_ = client.SendViewNotification(context.Background(),
+		"blocked@example.com", "Blocked", "Video", "https://example.com/watch/abc", 1, false)
+	if serverHit {
+		t.Error("expected SendViewNotification to be blocked")
+	}
+}
+
+func TestAllowlist_CaseInsensitive(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "user",
+		Password:       "pass",
+		ViewTemplateID: 99,
+		Allowlist:      []string{"@SendRec.EU"},
+	})
+
+	_ = client.SendViewNotification(context.Background(),
+		"Alice@sendrec.eu", "Alice", "Video", "https://example.com/watch/abc", 1, false)
+
+	if !serverHit {
+		t.Error("expected case-insensitive domain match")
+	}
+}
+
+func TestParseAllowlist(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected []string
+	}{
+		{"", nil},
+		{"@sendrec.eu", []string{"@sendrec.eu"}},
+		{"@sendrec.eu,alice@test.com", []string{"@sendrec.eu", "alice@test.com"}},
+		{"  @sendrec.eu , alice@test.com  ", []string{"@sendrec.eu", "alice@test.com"}},
+	}
+
+	for _, tt := range tests {
+		result := ParseAllowlist(tt.input)
+		if len(result) != len(tt.expected) {
+			t.Errorf("ParseAllowlist(%q): got %v, want %v", tt.input, result, tt.expected)
+			continue
+		}
+		for i := range result {
+			if result[i] != tt.expected[i] {
+				t.Errorf("ParseAllowlist(%q)[%d]: got %q, want %q", tt.input, i, result[i], tt.expected[i])
+			}
+		}
+	}
+}
+

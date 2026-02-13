@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -18,6 +19,7 @@ type Config struct {
 	TemplateID        int
 	CommentTemplateID int
 	ViewTemplateID    int
+	Allowlist         []string
 }
 
 type Client struct {
@@ -45,6 +47,42 @@ type subscriberRequest struct {
 	Status string `json:"status"`
 }
 
+// ParseAllowlist parses a comma-separated string of email addresses and
+// @domain entries into a slice suitable for Config.Allowlist.
+func ParseAllowlist(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+func (c *Client) isAllowed(recipientEmail string) bool {
+	if len(c.config.Allowlist) == 0 {
+		return true
+	}
+	lower := strings.ToLower(recipientEmail)
+	for _, entry := range c.config.Allowlist {
+		entryLower := strings.ToLower(entry)
+		if strings.HasPrefix(entryLower, "@") {
+			if strings.HasSuffix(lower, entryLower) {
+				return true
+			}
+		} else if lower == entryLower {
+			return true
+		}
+	}
+	log.Printf("email blocked by allowlist: %s", recipientEmail)
+	return false
+}
+
 func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
 	body := subscriberRequest{Email: email, Name: name, Status: "enabled"}
 	jsonBody, err := json.Marshal(body)
@@ -67,6 +105,10 @@ func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
 func (c *Client) SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error {
 	if c.config.BaseURL == "" {
 		log.Printf("email not configured — password reset requested for %s (link not logged for security)", toEmail)
+		return nil
+	}
+
+	if !c.isAllowed(toEmail) {
 		return nil
 	}
 
@@ -119,6 +161,10 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 		return nil
 	}
 
+	if !c.isAllowed(toEmail) {
+		return nil
+	}
+
 	c.ensureSubscriber(ctx, toEmail, toName)
 
 	body := txRequest{
@@ -168,6 +214,10 @@ func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, vide
 
 	if c.config.ViewTemplateID == 0 {
 		log.Printf("LISTMONK_VIEW_TEMPLATE_ID not set — skipping view notification for %q", videoTitle)
+		return nil
+	}
+
+	if !c.isAllowed(toEmail) {
 		return nil
 	}
 

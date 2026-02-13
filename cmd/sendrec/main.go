@@ -94,6 +94,7 @@ func main() {
 		TemplateID:        int(getEnvInt64("LISTMONK_TEMPLATE_ID", 0)),
 		CommentTemplateID: int(getEnvInt64("LISTMONK_COMMENT_TEMPLATE_ID", 0)),
 		ViewTemplateID:    int(getEnvInt64("LISTMONK_VIEW_TEMPLATE_ID", 0)),
+		Allowlist:         email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
 	})
 
 	srv := server.New(server.Config{
