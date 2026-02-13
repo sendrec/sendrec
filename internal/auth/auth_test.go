@@ -64,6 +64,15 @@ func decodeErrorResponse(t *testing.T, rec *httptest.ResponseRecorder) string {
 	return body.Error
 }
 
+func decodeMessageResponse(t *testing.T, rec *httptest.ResponseRecorder) messageResponse {
+	t.Helper()
+	var resp messageResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	return resp
+}
+
 func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
 	for _, c := range cookies {
 		if c.Name == name {
@@ -83,7 +92,13 @@ func TestRegister_Success(t *testing.T) {
 		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
 
-	expectInsertRefreshToken(mock, "user-uuid-1")
+	mock.ExpectExec(`UPDATE email_confirmations SET used_at`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	mock.ExpectExec(`INSERT INTO email_confirmations`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(body))
@@ -95,36 +110,9 @@ func TestRegister_Success(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
 	}
 
-	resp := decodeTokenResponse(t, rec)
-	if resp.AccessToken == "" {
-		t.Error("expected non-empty access token")
-	}
-
-	claims, err := ValidateToken(testSecret, resp.AccessToken)
-	if err != nil {
-		t.Fatalf("validate access token: %v", err)
-	}
-	if claims.UserID != "user-uuid-1" {
-		t.Errorf("expected userID %q, got %q", "user-uuid-1", claims.UserID)
-	}
-	if claims.TokenType != "access" {
-		t.Errorf("expected token type %q, got %q", "access", claims.TokenType)
-	}
-
-	cookie := findCookie(rec.Result().Cookies(), "refresh_token")
-	if cookie == nil {
-		t.Fatal("expected refresh_token cookie to be set")
-	}
-	if cookie.HttpOnly != true {
-		t.Error("expected refresh_token cookie to be HttpOnly")
-	}
-
-	refreshClaims, err := ValidateToken(testSecret, cookie.Value)
-	if err != nil {
-		t.Fatalf("validate refresh token: %v", err)
-	}
-	if refreshClaims.TokenType != "refresh" {
-		t.Errorf("expected refresh token type, got %q", refreshClaims.TokenType)
+	resp := decodeMessageResponse(t, rec)
+	if resp.Message == "" {
+		t.Error("expected non-empty message")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -282,6 +270,246 @@ func TestRegister_DBError(t *testing.T) {
 	}
 }
 
+func TestRegister_SendsConfirmationEmail(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	emailSender := &mockEmailSender{}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
+	mock.ExpectQuery(`INSERT INTO users`).
+		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
+
+	mock.ExpectExec(`UPDATE email_confirmations SET used_at`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	mock.ExpectExec(`INSERT INTO email_confirmations`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.Register(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if emailSender.lastEmail != "alice@example.com" {
+		t.Errorf("expected email sent to alice@example.com, got %q", emailSender.lastEmail)
+	}
+	if !strings.Contains(emailSender.lastConfirmLink, "/confirm-email?token=") {
+		t.Errorf("expected confirm link to contain /confirm-email?token=, got %q", emailSender.lastConfirmLink)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// --- ConfirmEmail ---
+
+func TestConfirmEmail_Success(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	rawToken, tokenHash, _ := generateSecureToken()
+
+	mock.ExpectQuery(`SELECT user_id FROM email_confirmations`).
+		WithArgs(tokenHash).
+		WillReturnRows(pgxmock.NewRows([]string{"user_id"}).AddRow("user-uuid-1"))
+
+	mock.ExpectExec(`UPDATE email_confirmations SET used_at`).
+		WithArgs(tokenHash).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	mock.ExpectExec(`UPDATE users SET email_verified`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := `{"token":"` + rawToken + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/confirm-email", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ConfirmEmail(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	resp := decodeMessageResponse(t, rec)
+	if !strings.Contains(resp.Message, "confirmed") {
+		t.Errorf("expected message to contain 'confirmed', got %q", resp.Message)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestConfirmEmail_InvalidToken(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT user_id FROM email_confirmations`).
+		WithArgs(pgxmock.AnyArg()).
+		WillReturnError(pgx.ErrNoRows)
+
+	body := `{"token":"invalid-token"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/confirm-email", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ConfirmEmail(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+	errMsg := decodeErrorResponse(t, rec)
+	if errMsg != "invalid or expired confirmation link" {
+		t.Errorf("expected invalid token error, got %q", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestConfirmEmail_MissingToken(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	body := `{"token":""}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/confirm-email", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ConfirmEmail(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	_ = mock
+}
+
+// --- ResendConfirmation ---
+
+func TestResendConfirmation_Success(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	emailSender := &mockEmailSender{}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
+	mock.ExpectQuery(`SELECT id, name, email_verified FROM users WHERE email`).
+		WithArgs("alice@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "email_verified"}).AddRow("user-uuid-1", "Alice", false))
+
+	mock.ExpectExec(`UPDATE email_confirmations SET used_at`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	mock.ExpectExec(`INSERT INTO email_confirmations`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := `{"email":"alice@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/resend-confirmation", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResendConfirmation(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if emailSender.lastEmail != "alice@example.com" {
+		t.Errorf("expected email sent to alice@example.com, got %q", emailSender.lastEmail)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestResendConfirmation_UnknownEmail_StillReturns200(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	emailSender := &mockEmailSender{}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
+	mock.ExpectQuery(`SELECT id, name, email_verified FROM users WHERE email`).
+		WithArgs("nobody@example.com").
+		WillReturnError(pgx.ErrNoRows)
+
+	body := `{"email":"nobody@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/resend-confirmation", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResendConfirmation(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	if emailSender.lastEmail != "" {
+		t.Error("should not send email for unknown user")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestResendConfirmation_AlreadyVerified_StillReturns200(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	emailSender := &mockEmailSender{}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
+	mock.ExpectQuery(`SELECT id, name, email_verified FROM users WHERE email`).
+		WithArgs("alice@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "email_verified"}).AddRow("user-uuid-1", "Alice", true))
+
+	body := `{"email":"alice@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/resend-confirmation", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResendConfirmation(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	if emailSender.lastEmail != "" {
+		t.Error("should not send email for already verified user")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestResendConfirmation_MissingEmail(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	body := `{"email":""}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/resend-confirmation", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResendConfirmation(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	_ = mock
+}
+
 // --- Login ---
 
 func TestLogin_Success(t *testing.T) {
@@ -290,10 +518,10 @@ func TestLogin_Success(t *testing.T) {
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctpassword"), bcrypt.DefaultCost)
 
-	mock.ExpectQuery(`SELECT id, password FROM users WHERE email`).
+	mock.ExpectQuery(`SELECT id, password, email_verified FROM users WHERE email`).
 		WithArgs("alice@example.com").
-		WillReturnRows(pgxmock.NewRows([]string{"id", "password"}).
-			AddRow("user-uuid-1", string(hashedPassword)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "password", "email_verified"}).
+			AddRow("user-uuid-1", string(hashedPassword), true))
 
 	expectInsertRefreshToken(mock, "user-uuid-1")
 
@@ -323,6 +551,36 @@ func TestLogin_Success(t *testing.T) {
 	cookie := findCookie(rec.Result().Cookies(), "refresh_token")
 	if cookie == nil {
 		t.Fatal("expected refresh_token cookie to be set")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+func TestLogin_UnverifiedEmail(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctpassword"), bcrypt.DefaultCost)
+
+	mock.ExpectQuery(`SELECT id, password, email_verified FROM users WHERE email`).
+		WithArgs("alice@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "password", "email_verified"}).
+			AddRow("user-uuid-1", string(hashedPassword), false))
+
+	body := `{"email":"alice@example.com","password":"correctpassword"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.Login(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected status %d, got %d", http.StatusForbidden, rec.Code)
+	}
+	errMsg := decodeErrorResponse(t, rec)
+	if errMsg != "email_not_verified" {
+		t.Errorf("expected email_not_verified error, got %q", errMsg)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -361,7 +619,7 @@ func TestLogin_WrongEmail(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT id, password FROM users WHERE email`).
+	mock.ExpectQuery(`SELECT id, password, email_verified FROM users WHERE email`).
 		WithArgs("nobody@example.com").
 		WillReturnError(pgx.ErrNoRows)
 
@@ -390,10 +648,10 @@ func TestLogin_WrongPassword(t *testing.T) {
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctpassword"), bcrypt.DefaultCost)
 
-	mock.ExpectQuery(`SELECT id, password FROM users WHERE email`).
+	mock.ExpectQuery(`SELECT id, password, email_verified FROM users WHERE email`).
 		WithArgs("alice@example.com").
-		WillReturnRows(pgxmock.NewRows([]string{"id", "password"}).
-			AddRow("user-uuid-1", string(hashedPassword)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "password", "email_verified"}).
+			AddRow("user-uuid-1", string(hashedPassword), true))
 
 	body := `{"email":"alice@example.com","password":"wrongpassword"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
@@ -782,7 +1040,7 @@ func TestUserIDFromContext_ReturnsEmptyWhenNotSet(t *testing.T) {
 
 // --- Cookie attributes ---
 
-func TestRegister_RefreshCookieAttributes(t *testing.T) {
+func TestRegister_NoTokensIssued(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatalf("create pgxmock pool: %v", err)
@@ -795,7 +1053,13 @@ func TestRegister_RefreshCookieAttributes(t *testing.T) {
 		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
 
-	expectInsertRefreshToken(mock, "user-uuid-1")
+	mock.ExpectExec(`UPDATE email_confirmations SET used_at`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	mock.ExpectExec(`INSERT INTO email_confirmations`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(body))
@@ -803,26 +1067,18 @@ func TestRegister_RefreshCookieAttributes(t *testing.T) {
 
 	handler.Register(rec, req)
 
-	cookie := findCookie(rec.Result().Cookies(), "refresh_token")
-	if cookie == nil {
-		t.Fatal("expected refresh_token cookie")
-	}
-	if cookie.Path != "/api/auth" {
-		t.Errorf("expected path %q, got %q", "/api/auth", cookie.Path)
-	}
-	if !cookie.HttpOnly {
-		t.Error("expected HttpOnly cookie")
-	}
-	if !cookie.Secure {
-		t.Error("expected Secure cookie when secureCookies=true")
-	}
-	if cookie.SameSite != http.SameSiteStrictMode {
-		t.Errorf("expected SameSiteStrictMode, got %v", cookie.SameSite)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
 	}
 
-	expectedMaxAge := int(RefreshTokenDuration / time.Second)
-	if cookie.MaxAge != expectedMaxAge {
-		t.Errorf("expected MaxAge %d, got %d", expectedMaxAge, cookie.MaxAge)
+	resp := decodeMessageResponse(t, rec)
+	if resp.Message == "" {
+		t.Error("expected non-empty message")
+	}
+
+	cookie := findCookie(rec.Result().Cookies(), "refresh_token")
+	if cookie != nil {
+		t.Error("expected no refresh_token cookie to be set")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -833,16 +1089,24 @@ func TestRegister_RefreshCookieAttributes(t *testing.T) {
 // --- mock email sender ---
 
 type mockEmailSender struct {
-	lastEmail     string
-	lastName      string
-	lastResetLink string
-	sendErr       error
+	lastEmail       string
+	lastName        string
+	lastResetLink   string
+	lastConfirmLink string
+	sendErr         error
 }
 
 func (m *mockEmailSender) SendPasswordReset(_ context.Context, toEmail, toName, resetLink string) error {
 	m.lastEmail = toEmail
 	m.lastName = toName
 	m.lastResetLink = resetLink
+	return m.sendErr
+}
+
+func (m *mockEmailSender) SendConfirmation(_ context.Context, toEmail, toName, confirmLink string) error {
+	m.lastEmail = toEmail
+	m.lastName = toName
+	m.lastConfirmLink = confirmLink
 	return m.sendErr
 }
 
