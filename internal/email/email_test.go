@@ -178,3 +178,96 @@ func TestSendPasswordReset_StillUsesTemplateID(t *testing.T) {
 		t.Errorf("expected template_id=10, got %d", received.TemplateID)
 	}
 }
+
+func TestSendViewNotification_Success(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "user",
+		Password:       "pass",
+		ViewTemplateID: 99,
+	})
+
+	err := client.SendViewNotification(context.Background(),
+		"alice@example.com", "Alice", "My Video", "https://example.com/watch/abc", 5, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.TemplateID != 99 {
+		t.Errorf("expected template_id=99, got %d", received.TemplateID)
+	}
+	if received.Data["videoTitle"] != "My Video" {
+		t.Errorf("expected videoTitle=My Video, got %s", received.Data["videoTitle"])
+	}
+	if received.Data["viewCount"] != "5" {
+		t.Errorf("expected viewCount=5, got %s", received.Data["viewCount"])
+	}
+	if received.Data["isDigest"] != "false" {
+		t.Errorf("expected isDigest=false, got %s", received.Data["isDigest"])
+	}
+}
+
+func TestSendViewNotification_SkipsWhenTemplateIDZero(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "user",
+		Password:       "pass",
+		ViewTemplateID: 0,
+	})
+
+	err := client.SendViewNotification(context.Background(),
+		"alice@example.com", "Alice", "My Video", "https://example.com/watch/abc", 1, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if serverHit {
+		t.Error("expected no HTTP request when ViewTemplateID is zero")
+	}
+}
+
+func TestSendViewNotification_DigestFlag(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &received)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "user",
+		Password:       "pass",
+		ViewTemplateID: 99,
+	})
+
+	_ = client.SendViewNotification(context.Background(),
+		"alice@example.com", "Alice", "My Video", "https://example.com/watch/abc", 42, true)
+
+	if received.Data["isDigest"] != "true" {
+		t.Errorf("expected isDigest=true, got %s", received.Data["isDigest"])
+	}
+	if received.Data["viewCount"] != "42" {
+		t.Errorf("expected viewCount=42, got %s", received.Data["viewCount"])
+	}
+}

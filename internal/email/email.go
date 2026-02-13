@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type Config struct {
 	Password          string
 	TemplateID        int
 	CommentTemplateID int
+	ViewTemplateID    int
 }
 
 type Client struct {
@@ -119,6 +121,56 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("send comment notification: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("listmonk returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int, isDigest bool) error {
+	if c.config.BaseURL == "" {
+		log.Printf("email not configured — view notification for %q skipped", videoTitle)
+		return nil
+	}
+
+	if c.config.ViewTemplateID == 0 {
+		log.Printf("LISTMONK_VIEW_TEMPLATE_ID not set — skipping view notification for %q", videoTitle)
+		return nil
+	}
+
+	body := txRequest{
+		SubscriberEmail: toEmail,
+		TemplateID:      c.config.ViewTemplateID,
+		Data: map[string]string{
+			"name":       toName,
+			"videoTitle": videoTitle,
+			"watchURL":   watchURL,
+			"viewCount":  strconv.Itoa(viewCount),
+			"isDigest":   strconv.FormatBool(isDigest),
+		},
+		ContentType: "html",
+	}
+
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshal email request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+"/api/tx", bytes.NewReader(jsonBody))
+	if err != nil {
+		return fmt.Errorf("create email request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(c.config.Username, c.config.Password)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("send view notification: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
