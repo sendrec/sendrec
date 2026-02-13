@@ -247,7 +247,7 @@ export function Library() {
       });
       setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, viewNotification } : v)));
     } catch {
-      setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v } : v)));
+      // no-op: select stays at previous value since state is only updated on success
     }
   }
 

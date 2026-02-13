@@ -96,6 +96,7 @@ export function Settings() {
 
   async function handleNotificationChange(value: string) {
     setNotificationMessage("");
+    const previous = viewNotification;
     setViewNotification(value);
     try {
       await apiFetch("/api/settings/notifications", {
@@ -104,6 +105,7 @@ export function Settings() {
       });
       setNotificationMessage("Preference saved");
     } catch {
+      setViewNotification(previous);
       setNotificationMessage("Failed to save");
     }
   }
