@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { apiFetch, setAccessToken } from "../api/client";
+import { apiFetch } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
 
 export function Register() {
@@ -10,7 +10,7 @@ export function Register() {
     password: string;
     name: string;
   }) {
-    const result = await apiFetch<{ accessToken: string }>(
+    await apiFetch<{ message: string }>(
       "/api/auth/register",
       {
         method: "POST",
@@ -22,10 +22,7 @@ export function Register() {
       }
     );
 
-    if (result) {
-      setAccessToken(result.accessToken);
-      navigate("/");
-    }
+    navigate("/check-email", { state: { email: data.email } });
   }
 
   return (

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { apiFetch, setAccessToken } from "../api/client";
+import { ApiError, apiFetch, setAccessToken } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
 
 export function Login() {
@@ -9,20 +9,28 @@ export function Login() {
     email: string;
     password: string;
   }) {
-    const result = await apiFetch<{ accessToken: string }>(
-      "/api/auth/login",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-        }),
-      }
-    );
+    try {
+      const result = await apiFetch<{ accessToken: string }>(
+        "/api/auth/login",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            email: data.email,
+            password: data.password,
+          }),
+        }
+      );
 
-    if (result) {
-      setAccessToken(result.accessToken);
-      navigate("/");
+      if (result) {
+        setAccessToken(result.accessToken);
+        navigate("/");
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403 && err.message === "email_not_verified") {
+        navigate("/check-email", { state: { email: data.email } });
+        return;
+      }
+      throw err;
     }
   }
 

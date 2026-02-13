@@ -10,9 +10,25 @@ vi.mock("react-router-dom", async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-const mockApiFetch = vi.fn();
-const mockSetAccessToken = vi.fn();
+const { MockApiError, mockApiFetch, mockSetAccessToken } = vi.hoisted(() => {
+  class MockApiError extends Error {
+    constructor(
+      public readonly status: number,
+      message: string
+    ) {
+      super(message);
+      this.name = "ApiError";
+    }
+  }
+  return {
+    MockApiError,
+    mockApiFetch: vi.fn(),
+    mockSetAccessToken: vi.fn(),
+  };
+});
+
 vi.mock("../api/client", () => ({
+  ApiError: MockApiError,
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
   setAccessToken: (...args: unknown[]) => mockSetAccessToken(...args),
 }));
@@ -71,5 +87,17 @@ describe("Login", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(screen.getByText("Invalid credentials")).toBeInTheDocument();
+  });
+
+  it("redirects to check-email on unverified email error", async () => {
+    const user = userEvent.setup();
+    mockApiFetch.mockRejectedValueOnce(new MockApiError(403, "email_not_verified"));
+    renderLogin();
+
+    await user.type(screen.getByLabelText("Email"), "alice@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(mockNavigate).toHaveBeenCalledWith("/check-email", { state: { email: "alice@example.com" } });
   });
 });
