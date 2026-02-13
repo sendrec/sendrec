@@ -152,6 +152,8 @@ func (h *Handler) resolveAndNotify(videoID, ownerID, ownerEmail, ownerName, vide
 	}
 
 	if mode == "first" {
+		// Note: small race window — two simultaneous viewers could both see viewCount==1.
+		// Acceptable at current scale; use advisory lock or sent-flag column if needed later.
 		var viewCount int64
 		err := h.db.QueryRow(context.Background(),
 			`SELECT COUNT(*) FROM video_views WHERE video_id = $1`,

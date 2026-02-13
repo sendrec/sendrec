@@ -24,12 +24,14 @@ export function Settings() {
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const result = await apiFetch<UserProfile>("/api/user");
+        const [result, notifPrefs] = await Promise.all([
+          apiFetch<UserProfile>("/api/user"),
+          apiFetch<{ viewNotification: string }>("/api/settings/notifications"),
+        ]);
         if (result) {
           setProfile(result);
           setName(result.name);
         }
-        const notifPrefs = await apiFetch<{ viewNotification: string }>("/api/settings/notifications");
         if (notifPrefs) {
           setViewNotification(notifPrefs.viewNotification);
         }
@@ -223,7 +225,7 @@ export function Settings() {
         </label>
 
         {notificationMessage && (
-          <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{notificationMessage}</p>
+          <p style={{ color: notificationMessage === "Failed to save" ? "var(--color-error, #e74c3c)" : "var(--color-accent)", fontSize: 14, margin: 0 }}>{notificationMessage}</p>
         )}
       </div>
 

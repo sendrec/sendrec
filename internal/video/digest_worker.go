@@ -64,10 +64,15 @@ func processDigest(ctx context.Context, db database.DBTX, notifier ViewNotifier,
 		})
 	}
 
+	totalVideos := 0
 	for userID, d := range digests {
 		if err := notifier.SendDigestNotification(ctx, d.email, d.name, d.videos); err != nil {
 			log.Printf("digest-worker: failed to send digest for user %s: %v", userID, err)
 		}
+		totalVideos += len(d.videos)
+	}
+	if len(digests) > 0 {
+		log.Printf("digest-worker: sent %d digest emails covering %d videos", len(digests), totalVideos)
 	}
 }
 

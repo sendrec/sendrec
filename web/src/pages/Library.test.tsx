@@ -809,7 +809,7 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      const select = screen.getByLabelText("Notifications") as HTMLSelectElement;
+      const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
       expect(select.value).toBe("");
     });
   });
@@ -819,7 +819,7 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      const select = screen.getByLabelText("Notifications") as HTMLSelectElement;
+      const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
       expect(select.value).toBe("every");
     });
   });
@@ -831,10 +831,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Notifications")).toBeInTheDocument();
+      expect(screen.getByLabelText("View notifications")).toBeInTheDocument();
     });
 
-    await user.selectOptions(screen.getByLabelText("Notifications"), "first");
+    await user.selectOptions(screen.getByLabelText("View notifications"), "first");
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/notifications", {
@@ -851,10 +851,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Notifications")).toBeInTheDocument();
+      expect(screen.getByLabelText("View notifications")).toBeInTheDocument();
     });
 
-    await user.selectOptions(screen.getByLabelText("Notifications"), "");
+    await user.selectOptions(screen.getByLabelText("View notifications"), "");
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/notifications", {

@@ -240,11 +240,15 @@ export function Library() {
 
   async function changeNotification(video: Video, value: string) {
     const viewNotification = value === "" ? null : value;
-    await apiFetch(`/api/videos/${video.id}/notifications`, {
-      method: "PUT",
-      body: JSON.stringify({ viewNotification }),
-    });
-    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, viewNotification } : v)));
+    try {
+      await apiFetch(`/api/videos/${video.id}/notifications`, {
+        method: "PUT",
+        body: JSON.stringify({ viewNotification }),
+      });
+      setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, viewNotification } : v)));
+    } catch {
+      setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v } : v)));
+    }
   }
 
   if (loading) {
@@ -535,9 +539,9 @@ export function Library() {
                   </button>
                   <span className="action-sep">&middot;</span>
                   <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-                    <span className="action-link" style={{ cursor: "default" }}>Notifications</span>
+                    <span className="action-link" style={{ cursor: "default" }}>View notifications</span>
                     <select
-                      aria-label="Notifications"
+                      aria-label="View notifications"
                       value={video.viewNotification ?? ""}
                       onChange={(e) => changeNotification(video, e.target.value)}
                       style={{
