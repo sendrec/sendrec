@@ -1,9 +1,11 @@
 # Go
 bin/
+sendrec
 
 # Node
 web/node_modules/
 web/dist/
+web/coverage/
 
 # Environment
 .env
