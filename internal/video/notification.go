@@ -112,8 +112,24 @@ func (h *Handler) SetVideoNotification(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) resolveAndNotify(videoID, userID, ownerEmail, ownerName, videoTitle, shareToken string, videoViewNotification *string) {
+func (h *Handler) viewerUserIDFromRequest(r *http.Request) string {
+	cookie, err := r.Cookie("refresh_token")
+	if err != nil {
+		return ""
+	}
+	claims, err := auth.ValidateToken(h.hmacSecret, cookie.Value)
+	if err != nil || claims.TokenType != "refresh" {
+		return ""
+	}
+	return claims.UserID
+}
+
+func (h *Handler) resolveAndNotify(videoID, ownerID, ownerEmail, ownerName, videoTitle, shareToken, viewerUserID string, videoViewNotification *string) {
 	if h.viewNotifier == nil {
+		return
+	}
+
+	if viewerUserID != "" && viewerUserID == ownerID {
 		return
 	}
 
@@ -124,7 +140,7 @@ func (h *Handler) resolveAndNotify(videoID, userID, ownerEmail, ownerName, video
 		var accountMode string
 		err := h.db.QueryRow(context.Background(),
 			`SELECT view_notification FROM notification_preferences WHERE user_id = $1`,
-			userID,
+			ownerID,
 		).Scan(&accountMode)
 		if err == nil {
 			mode = accountMode

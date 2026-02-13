@@ -1252,6 +1252,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	viewerUserID := h.viewerUserIDFromRequest(r)
+
 	go func() {
 		ip := clientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
@@ -1261,7 +1263,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			log.Printf("failed to record view for %s: %v", videoID, err)
 		}
-		h.resolveAndNotify(videoID, ownerID, ownerEmail, creator, title, shareToken, viewNotification)
+		h.resolveAndNotify(videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 	}()
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)

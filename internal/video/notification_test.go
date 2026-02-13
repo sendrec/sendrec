@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
+	"github.com/sendrec/sendrec/internal/auth"
 )
 
 // --- GetNotificationPreferences Tests ---
@@ -243,6 +244,125 @@ func TestSetVideoNotification_NotOwner(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// --- viewerUserIDFromRequest Tests ---
+
+func TestViewerUserIDFromRequest_ValidRefreshToken(t *testing.T) {
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	tokenID := "test-token-id"
+	refreshToken, err := auth.GenerateRefreshToken(testJWTSecret, testUserID, tokenID)
+	if err != nil {
+		t.Fatalf("failed to generate refresh token: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/abc", nil)
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: refreshToken})
+
+	viewerID := handler.viewerUserIDFromRequest(req)
+	if viewerID != testUserID {
+		t.Errorf("expected %q, got %q", testUserID, viewerID)
+	}
+}
+
+func TestViewerUserIDFromRequest_NoCookie(t *testing.T) {
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/abc", nil)
+
+	viewerID := handler.viewerUserIDFromRequest(req)
+	if viewerID != "" {
+		t.Errorf("expected empty, got %q", viewerID)
+	}
+}
+
+func TestViewerUserIDFromRequest_InvalidToken(t *testing.T) {
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/abc", nil)
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "invalid-token"})
+
+	viewerID := handler.viewerUserIDFromRequest(req)
+	if viewerID != "" {
+		t.Errorf("expected empty, got %q", viewerID)
+	}
+}
+
+func TestViewerUserIDFromRequest_AccessTokenRejected(t *testing.T) {
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	accessToken, err := auth.GenerateAccessToken(testJWTSecret, testUserID)
+	if err != nil {
+		t.Fatalf("failed to generate access token: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/abc", nil)
+	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: accessToken})
+
+	viewerID := handler.viewerUserIDFromRequest(req)
+	if viewerID != "" {
+		t.Errorf("expected empty for access token in cookie, got %q", viewerID)
+	}
+}
+
+// --- resolveAndNotify owner-skip Tests ---
+
+func TestResolveAndNotify_SkipsWhenViewerIsOwner(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	notifier := &mockViewNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler.SetViewNotifier(notifier)
+
+	every := "every"
+	handler.resolveAndNotify("vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", testUserID, &every)
+
+	if notifier.called {
+		t.Error("expected notification to be skipped when viewer is owner")
+	}
+}
+
+func TestResolveAndNotify_SendsWhenViewerIsDifferent(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	notifier := &mockViewNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler.SetViewNotifier(notifier)
+
+	every := "every"
+	handler.resolveAndNotify("vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "different-user-id", &every)
+
+	if !notifier.called {
+		t.Error("expected notification to be sent when viewer is different from owner")
+	}
+}
+
+func TestResolveAndNotify_SendsWhenViewerIsAnonymous(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	notifier := &mockViewNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler.SetViewNotifier(notifier)
+
+	every := "every"
+	handler.resolveAndNotify("vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", &every)
+
+	if !notifier.called {
+		t.Error("expected notification to be sent when viewer is anonymous")
 	}
 }
 
