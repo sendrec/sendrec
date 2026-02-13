@@ -33,12 +33,14 @@ export function Upload() {
     let videoId: string | null = null;
 
     try {
+      const fileContentType = file.type === "video/webm" ? "video/webm" : "video/mp4";
+
       const result = await apiFetch<UploadResponse>("/api/videos/upload", {
         method: "POST",
         body: JSON.stringify({
           title: title || file.name.replace(/\.[^.]+$/, ""),
           fileSize: file.size,
-          contentType: "video/mp4",
+          contentType: fileContentType,
         }),
       });
 
@@ -51,7 +53,7 @@ export function Upload() {
       const uploadResp = await fetch(result.uploadUrl, {
         method: "PUT",
         body: file,
-        headers: { "Content-Type": "video/mp4" },
+        headers: { "Content-Type": fileContentType },
       });
 
       if (!uploadResp.ok) {
@@ -235,7 +237,7 @@ export function Upload() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="video/mp4"
+          accept="video/mp4,video/webm"
           onChange={handleFileSelect}
           style={{ fontSize: 14 }}
           data-testid="file-input"

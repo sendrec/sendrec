@@ -906,7 +906,7 @@ func TestUpload_InvalidContentType(t *testing.T) {
 	body, _ := json.Marshal(uploadRequest{
 		Title:       "My Video",
 		FileSize:    5000000,
-		ContentType: "video/webm",
+		ContentType: "video/avi",
 	})
 
 	r := chi.NewRouter()

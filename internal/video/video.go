@@ -258,8 +258,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.ContentType != "video/mp4" {
-		httputil.WriteError(w, http.StatusBadRequest, "only video/mp4 uploads are supported")
+	if req.ContentType != "video/mp4" && req.ContentType != "video/webm" {
+		httputil.WriteError(w, http.StatusBadRequest, "only video/mp4 and video/webm uploads are supported")
 		return
 	}
 
