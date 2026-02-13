@@ -111,6 +111,7 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 | `LISTMONK_PASSWORD` | Listmonk API password |
 | `LISTMONK_TEMPLATE_ID` | Template ID for share link emails |
 | `LISTMONK_COMMENT_TEMPLATE_ID` | Template ID for new comment notifications |
+| `LISTMONK_VIEW_TEMPLATE_ID` | Template ID for view notifications (instant and digest) |
 
 ## S3_PUBLIC_ENDPOINT explained
 
