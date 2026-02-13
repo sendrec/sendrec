@@ -1,7 +1,9 @@
 package video
 
 import (
+	"errors"
 	"os"
+	"os/exec"
 	"testing"
 )
 
@@ -108,6 +110,39 @@ func TestParseWhisperJSON_InvalidJSON(t *testing.T) {
 	_, err = parseWhisperJSON(tmpFile.Name())
 	if err == nil {
 		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestExtractAudio_NoAudioStream(t *testing.T) {
+	// Create a minimal video-only WebM file using ffmpeg
+	tmpVideo, err := os.CreateTemp("", "test-no-audio-*.webm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpVideoPath := tmpVideo.Name()
+	_ = tmpVideo.Close()
+	defer func() { _ = os.Remove(tmpVideoPath) }()
+
+	// Generate a 1-second silent video with no audio stream
+	cmd := exec.Command("ffmpeg",
+		"-f", "lavfi", "-i", "color=c=black:s=320x240:d=1",
+		"-an", "-c:v", "libvpx-vp9", "-y", tmpVideoPath,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Skipf("ffmpeg not available: %v: %s", err, string(output))
+	}
+
+	tmpAudio, err := os.CreateTemp("", "test-no-audio-*.wav")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpAudioPath := tmpAudio.Name()
+	_ = tmpAudio.Close()
+	defer func() { _ = os.Remove(tmpAudioPath) }()
+
+	err = extractAudio(tmpVideoPath, tmpAudioPath)
+	if !errors.Is(err, errNoAudio) {
+		t.Errorf("expected errNoAudio, got: %v", err)
 	}
 }
 

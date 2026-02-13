@@ -3,6 +3,7 @@ package video
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -43,7 +44,27 @@ func isTranscriptionAvailable() bool {
 	return true
 }
 
+var errNoAudio = fmt.Errorf("video has no audio stream")
+
+func hasAudioStream(inputPath string) bool {
+	cmd := exec.Command("ffprobe",
+		"-v", "error",
+		"-select_streams", "a",
+		"-show_entries", "stream=codec_type",
+		"-of", "csv=p=0",
+		inputPath,
+	)
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(output)) != ""
+}
+
 func extractAudio(inputPath, outputPath string) error {
+	if !hasAudioStream(inputPath) {
+		return errNoAudio
+	}
 	cmd := exec.Command("ffmpeg",
 		"-i", inputPath,
 		"-ar", "16000",
@@ -197,6 +218,16 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 	defer func() { _ = os.Remove(tmpAudioPath) }()
 
 	if err := extractAudio(tmpVideoPath, tmpAudioPath); err != nil {
+		if errors.Is(err, errNoAudio) {
+			log.Printf("transcribe: video %s has no audio stream, setting status to none", videoID)
+			if _, dbErr := db.Exec(ctx,
+				`UPDATE videos SET transcript_status = 'none', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
+				videoID,
+			); dbErr != nil {
+				log.Printf("transcribe: failed to reset status for %s: %v", videoID, dbErr)
+			}
+			return
+		}
 		log.Printf("transcribe: audio extraction failed for %s: %v", videoID, err)
 		setFailed()
 		return
