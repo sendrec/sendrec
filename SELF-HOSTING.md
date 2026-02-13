@@ -11,7 +11,7 @@ cp .env.example .env
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-Open http://localhost:8080, register an account, and start recording.
+Open http://localhost:8080, register an account, and start recording or uploading videos.
 
 ## Production setup
 
@@ -85,8 +85,8 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `MAX_UPLOAD_BYTES` | Maximum upload size in bytes | `524288000` (500 MB) |
-| `MAX_VIDEOS_PER_MONTH` | Maximum videos a user can record per month. Set to `0` for unlimited | `25` |
+| `MAX_UPLOAD_BYTES` | Maximum upload size in bytes (applies to both recordings and file uploads) | `524288000` (500 MB) |
+| `MAX_VIDEOS_PER_MONTH` | Maximum videos a user can create per month (recordings + uploads). Set to `0` for unlimited | `25` |
 | `MAX_VIDEO_DURATION_SECONDS` | Maximum recording duration in seconds. Set to `0` for unlimited | `300` (5 min) |
 
 ### API Documentation
@@ -117,7 +117,7 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 
 ## S3_PUBLIC_ENDPOINT explained
 
-Video uploads and downloads use presigned S3 URLs. The app generates these URLs using `S3_PUBLIC_ENDPOINT` so the browser can reach the storage service directly.
+Video recordings and file uploads use presigned S3 URLs. The app generates these URLs using `S3_PUBLIC_ENDPOINT` so the browser can upload directly to storage (MP4, WebM, and MOV files are supported).
 
 - **In development:** MinIO is exposed on `localhost:9000`, no `S3_PUBLIC_ENDPOINT` needed
 - **In production:** MinIO typically runs behind a reverse proxy. `S3_ENDPOINT` points to the internal Docker hostname (`http://minio:9000`), but browsers can't reach that. Set `S3_PUBLIC_ENDPOINT` to the external URL (e.g. `https://storage.example.com`) so presigned URLs work
@@ -171,7 +171,7 @@ To pin a specific version instead of `latest`:
 ```yaml
 services:
   sendrec:
-    image: ghcr.io/sendrec/sendrec:v1.21.0
+    image: ghcr.io/sendrec/sendrec:v1.24.1
 ```
 
 Check the [releases page](https://github.com/sendrec/sendrec/releases) for available versions and changelogs.
