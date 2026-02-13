@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/email"
 	"github.com/sendrec/sendrec/internal/httputil"
 )
 
@@ -36,7 +37,8 @@ type CommentNotifier interface {
 }
 
 type ViewNotifier interface {
-	SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int, isDigest bool) error
+	SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int) error
+	SendDigestNotification(ctx context.Context, toEmail, toName string, videos []email.DigestVideoSummary) error
 }
 
 type Handler struct {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/email"
 )
 
 const digestHourUTC = 9
@@ -16,6 +17,12 @@ func durationUntilNextRun(now time.Time) time.Duration {
 		next = next.Add(24 * time.Hour)
 	}
 	return next.Sub(now)
+}
+
+type userDigest struct {
+	email  string
+	name   string
+	videos []email.DigestVideoSummary
 }
 
 func processDigest(ctx context.Context, db database.DBTX, notifier ViewNotifier, baseURL string) {
@@ -29,23 +36,37 @@ func processDigest(ctx context.Context, db database.DBTX, notifier ViewNotifier,
 		 WHERE vv.created_at >= NOW() - INTERVAL '24 hours'
 		   AND COALESCE(v.view_notification, np.view_notification, 'off') = 'digest'
 		   AND v.status != 'deleted'
-		 GROUP BY v.id, v.title, v.share_token, v.user_id, u.email, u.name`)
+		 GROUP BY v.id, v.title, v.share_token, v.user_id, u.email, u.name
+		 ORDER BY v.user_id, view_count DESC`)
 	if err != nil {
 		log.Printf("digest-worker: query failed: %v", err)
 		return
 	}
 	defer rows.Close()
 
+	digests := make(map[string]*userDigest)
 	for rows.Next() {
-		var videoID, title, shareToken, userID, email, name string
+		var videoID, title, shareToken, userID, ownerEmail, name string
 		var viewCount int64
-		if err := rows.Scan(&videoID, &title, &shareToken, &userID, &email, &name, &viewCount); err != nil {
+		if err := rows.Scan(&videoID, &title, &shareToken, &userID, &ownerEmail, &name, &viewCount); err != nil {
 			log.Printf("digest-worker: scan failed: %v", err)
 			continue
 		}
-		watchURL := baseURL + "/watch/" + shareToken
-		if err := notifier.SendViewNotification(ctx, email, name, title, watchURL, int(viewCount), true); err != nil {
-			log.Printf("digest-worker: failed to send digest for %s: %v", videoID, err)
+		d, ok := digests[userID]
+		if !ok {
+			d = &userDigest{email: ownerEmail, name: name}
+			digests[userID] = d
+		}
+		d.videos = append(d.videos, email.DigestVideoSummary{
+			Title:     title,
+			ViewCount: int(viewCount),
+			WatchURL:  baseURL + "/watch/" + shareToken,
+		})
+	}
+
+	for userID, d := range digests {
+		if err := notifier.SendDigestNotification(ctx, d.email, d.name, d.videos); err != nil {
+			log.Printf("digest-worker: failed to send digest for user %s: %v", userID, err)
 		}
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/sendrec/sendrec/internal/auth"
+	"github.com/sendrec/sendrec/internal/email"
 )
 
 // --- GetNotificationPreferences Tests ---
@@ -369,16 +370,39 @@ func TestResolveAndNotify_SendsWhenViewerIsAnonymous(t *testing.T) {
 // --- mock view notifier ---
 
 type mockViewNotifier struct {
-	called    bool
-	toEmail   string
-	toName    string
-	viewCount int
+	called       bool
+	toEmail      string
+	toName       string
+	viewCount    int
+	digestCalled bool
+	digestVideos []email.DigestVideoSummary
 }
 
-func (m *mockViewNotifier) SendViewNotification(_ context.Context, toEmail, toName, _ string, _ string, viewCount int, _ bool) error {
+func (m *mockViewNotifier) SendViewNotification(_ context.Context, toEmail, toName, _ string, _ string, viewCount int) error {
 	m.called = true
 	m.toEmail = toEmail
 	m.toName = toName
 	m.viewCount = viewCount
+	return nil
+}
+
+func (m *mockViewNotifier) SendDigestNotification(_ context.Context, toEmail, toName string, videos []email.DigestVideoSummary) error {
+	m.digestCalled = true
+	m.toEmail = toEmail
+	m.toName = toName
+	m.digestVideos = videos
+	return nil
+}
+
+type countingDigestNotifier struct {
+	callCount *int
+}
+
+func (m *countingDigestNotifier) SendViewNotification(context.Context, string, string, string, string, int) error {
+	return nil
+}
+
+func (m *countingDigestNotifier) SendDigestNotification(_ context.Context, _, _ string, _ []email.DigestVideoSummary) error {
+	*m.callCount++
 	return nil
 }

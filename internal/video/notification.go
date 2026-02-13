@@ -167,7 +167,7 @@ func (h *Handler) resolveAndNotify(videoID, ownerID, ownerEmail, ownerName, vide
 	}
 
 	watchURL := h.baseURL + "/watch/" + shareToken
-	if err := h.viewNotifier.SendViewNotification(context.Background(), ownerEmail, ownerName, videoTitle, watchURL, 1, false); err != nil {
+	if err := h.viewNotifier.SendViewNotification(context.Background(), ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
 		log.Printf("failed to send view notification for %s: %v", videoID, err)
 	}
 }

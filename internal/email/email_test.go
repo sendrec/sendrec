@@ -222,7 +222,7 @@ func TestSendViewNotification_Success(t *testing.T) {
 	})
 
 	err := client.SendViewNotification(context.Background(),
-		"alice@example.com", "Alice", "My Video", "https://example.com/watch/abc", 5, false)
+		"alice@example.com", "Alice", "My Video", "https://example.com/watch/abc", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestSendViewNotification_SkipsWhenTemplateIDZero(t *testing.T) {
 	})
 
 	err := client.SendViewNotification(context.Background(),
-		"alice@example.com", "Alice", "My Video", "https://example.com/watch/abc", 1, false)
+		"alice@example.com", "Alice", "My Video", "https://example.com/watch/abc", 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -266,15 +266,15 @@ func TestSendViewNotification_SkipsWhenTemplateIDZero(t *testing.T) {
 	}
 }
 
-func TestSendViewNotification_DigestFlag(t *testing.T) {
-	var received txRequest
+func TestSendDigestNotification_Success(t *testing.T) {
+	var receivedRaw json.RawMessage
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/subscribers" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &received)
+		receivedRaw = body
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -286,14 +286,45 @@ func TestSendViewNotification_DigestFlag(t *testing.T) {
 		ViewTemplateID: 99,
 	})
 
-	_ = client.SendViewNotification(context.Background(),
-		"alice@example.com", "Alice", "My Video", "https://example.com/watch/abc", 42, true)
-
-	if received.Data["isDigest"] != "true" {
-		t.Errorf("expected isDigest=true, got %s", received.Data["isDigest"])
+	videos := []DigestVideoSummary{
+		{Title: "Video One", ViewCount: 10, WatchURL: "https://example.com/watch/abc"},
+		{Title: "Video Two", ViewCount: 3, WatchURL: "https://example.com/watch/def"},
 	}
-	if received.Data["viewCount"] != "42" {
-		t.Errorf("expected viewCount=42, got %s", received.Data["viewCount"])
+
+	err := client.SendDigestNotification(context.Background(), "alice@example.com", "Alice", videos)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var parsed struct {
+		TemplateID int `json:"template_id"`
+		Data       struct {
+			IsDigest   string                `json:"isDigest"`
+			TotalViews string                `json:"totalViews"`
+			Videos     []DigestVideoSummary  `json:"videos"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(receivedRaw, &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if parsed.TemplateID != 99 {
+		t.Errorf("expected template_id=99, got %d", parsed.TemplateID)
+	}
+	if parsed.Data.IsDigest != "true" {
+		t.Errorf("expected isDigest=true, got %s", parsed.Data.IsDigest)
+	}
+	if parsed.Data.TotalViews != "13" {
+		t.Errorf("expected totalViews=13, got %s", parsed.Data.TotalViews)
+	}
+	if len(parsed.Data.Videos) != 2 {
+		t.Fatalf("expected 2 videos, got %d", len(parsed.Data.Videos))
+	}
+	if parsed.Data.Videos[0].Title != "Video One" {
+		t.Errorf("expected first video title 'Video One', got %q", parsed.Data.Videos[0].Title)
+	}
+	if parsed.Data.Videos[0].ViewCount != 10 {
+		t.Errorf("expected first video 10 views, got %d", parsed.Data.Videos[0].ViewCount)
 	}
 }
 
@@ -313,7 +344,7 @@ func TestAllowlist_EmptyAllowsAll(t *testing.T) {
 	})
 
 	_ = client.SendViewNotification(context.Background(),
-		"anyone@anywhere.com", "Anyone", "Video", "https://example.com/watch/abc", 1, false)
+		"anyone@anywhere.com", "Anyone", "Video", "https://example.com/watch/abc", 1)
 
 	if !serverHit {
 		t.Error("expected email to be sent when allowlist is empty")
@@ -337,7 +368,7 @@ func TestAllowlist_BlocksNonMatchingEmail(t *testing.T) {
 	})
 
 	err := client.SendViewNotification(context.Background(),
-		"stranger@example.com", "Stranger", "Video", "https://example.com/watch/abc", 1, false)
+		"stranger@example.com", "Stranger", "Video", "https://example.com/watch/abc", 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -364,7 +395,7 @@ func TestAllowlist_AllowsDomainMatch(t *testing.T) {
 	})
 
 	_ = client.SendViewNotification(context.Background(),
-		"alice@sendrec.eu", "Alice", "Video", "https://example.com/watch/abc", 1, false)
+		"alice@sendrec.eu", "Alice", "Video", "https://example.com/watch/abc", 1)
 
 	if !serverHit {
 		t.Error("expected email to be sent for domain match")
@@ -388,7 +419,7 @@ func TestAllowlist_AllowsExactEmailMatch(t *testing.T) {
 	})
 
 	_ = client.SendViewNotification(context.Background(),
-		"alice@example.com", "Alice", "Video", "https://example.com/watch/abc", 1, false)
+		"alice@example.com", "Alice", "Video", "https://example.com/watch/abc", 1)
 
 	if !serverHit {
 		t.Error("expected email to be sent for exact email match")
@@ -412,7 +443,7 @@ func TestAllowlist_MultipleDomains(t *testing.T) {
 	})
 
 	_ = client.SendViewNotification(context.Background(),
-		"bob@test.com", "Bob", "Video", "https://example.com/watch/abc", 1, false)
+		"bob@test.com", "Bob", "Video", "https://example.com/watch/abc", 1)
 
 	if !serverHit {
 		t.Error("expected email to be sent for exact match in multi-entry allowlist")
@@ -452,7 +483,7 @@ func TestAllowlist_BlocksAllSendMethods(t *testing.T) {
 
 	serverHit = false
 	_ = client.SendViewNotification(context.Background(),
-		"blocked@example.com", "Blocked", "Video", "https://example.com/watch/abc", 1, false)
+		"blocked@example.com", "Blocked", "Video", "https://example.com/watch/abc", 1)
 	if serverHit {
 		t.Error("expected SendViewNotification to be blocked")
 	}
@@ -475,7 +506,7 @@ func TestAllowlist_CaseInsensitive(t *testing.T) {
 	})
 
 	_ = client.SendViewNotification(context.Background(),
-		"Alice@sendrec.eu", "Alice", "Video", "https://example.com/watch/abc", 1, false)
+		"Alice@sendrec.eu", "Alice", "Video", "https://example.com/watch/abc", 1)
 
 	if !serverHit {
 		t.Error("expected case-insensitive domain match")

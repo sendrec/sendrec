@@ -35,10 +35,17 @@ func New(cfg Config) *Client {
 }
 
 type txRequest struct {
-	SubscriberEmail string            `json:"subscriber_email"`
-	TemplateID      int               `json:"template_id"`
-	Data            map[string]string `json:"data"`
-	ContentType     string            `json:"content_type"`
+	SubscriberEmail string         `json:"subscriber_email"`
+	TemplateID      int            `json:"template_id"`
+	Data            map[string]any `json:"data"`
+	ContentType     string         `json:"content_type"`
+}
+
+// DigestVideoSummary represents a single video in a digest email.
+type DigestVideoSummary struct {
+	Title     string `json:"title"`
+	ViewCount int    `json:"viewCount"`
+	WatchURL  string `json:"watchURL"`
 }
 
 type subscriberRequest struct {
@@ -102,28 +109,7 @@ func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
 	_ = resp.Body.Close()
 }
 
-func (c *Client) SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error {
-	if c.config.BaseURL == "" {
-		log.Printf("email not configured — password reset requested for %s (link not logged for security)", toEmail)
-		return nil
-	}
-
-	if !c.isAllowed(toEmail) {
-		return nil
-	}
-
-	c.ensureSubscriber(ctx, toEmail, toName)
-
-	body := txRequest{
-		SubscriberEmail: toEmail,
-		TemplateID:      c.config.TemplateID,
-		Data: map[string]string{
-			"resetLink": resetLink,
-			"name":      toName,
-		},
-		ContentType: "html",
-	}
-
+func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshal email request: %w", err)
@@ -150,6 +136,31 @@ func (c *Client) SendPasswordReset(ctx context.Context, toEmail, toName, resetLi
 	return nil
 }
 
+func (c *Client) SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error {
+	if c.config.BaseURL == "" {
+		log.Printf("email not configured — password reset requested for %s (link not logged for security)", toEmail)
+		return nil
+	}
+
+	if !c.isAllowed(toEmail) {
+		return nil
+	}
+
+	c.ensureSubscriber(ctx, toEmail, toName)
+
+	body := txRequest{
+		SubscriberEmail: toEmail,
+		TemplateID:      c.config.TemplateID,
+		Data: map[string]any{
+			"resetLink": resetLink,
+			"name":      toName,
+		},
+		ContentType: "html",
+	}
+
+	return c.sendTx(ctx, body)
+}
+
 func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error {
 	if c.config.BaseURL == "" {
 		log.Printf("email not configured — new comment on %q by %s", videoTitle, commentAuthor)
@@ -170,7 +181,7 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 	body := txRequest{
 		SubscriberEmail: toEmail,
 		TemplateID:      c.config.CommentTemplateID,
-		Data: map[string]string{
+		Data: map[string]any{
 			"name":          toName,
 			"videoTitle":    videoTitle,
 			"commentAuthor": commentAuthor,
@@ -180,33 +191,10 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 		ContentType: "html",
 	}
 
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("marshal email request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+"/api/tx", bytes.NewReader(jsonBody))
-	if err != nil {
-		return fmt.Errorf("create email request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(c.config.Username, c.config.Password)
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return fmt.Errorf("send comment notification: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("listmonk returned status %d", resp.StatusCode)
-	}
-
-	return nil
+	return c.sendTx(ctx, body)
 }
 
-func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int, isDigest bool) error {
+func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int) error {
 	if c.config.BaseURL == "" {
 		log.Printf("email not configured — view notification for %q skipped", videoTitle)
 		return nil
@@ -226,38 +214,52 @@ func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, vide
 	body := txRequest{
 		SubscriberEmail: toEmail,
 		TemplateID:      c.config.ViewTemplateID,
-		Data: map[string]string{
+		Data: map[string]any{
 			"name":       toName,
 			"videoTitle": videoTitle,
 			"watchURL":   watchURL,
 			"viewCount":  strconv.Itoa(viewCount),
-			"isDigest":   strconv.FormatBool(isDigest),
+			"isDigest":   "false",
 		},
 		ContentType: "html",
 	}
 
-	jsonBody, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("marshal email request: %w", err)
+	return c.sendTx(ctx, body)
+}
+
+func (c *Client) SendDigestNotification(ctx context.Context, toEmail, toName string, videos []DigestVideoSummary) error {
+	if c.config.BaseURL == "" {
+		log.Printf("email not configured — digest notification skipped")
+		return nil
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+"/api/tx", bytes.NewReader(jsonBody))
-	if err != nil {
-		return fmt.Errorf("create email request: %w", err)
+	if c.config.ViewTemplateID == 0 {
+		log.Printf("LISTMONK_VIEW_TEMPLATE_ID not set — skipping digest notification")
+		return nil
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(c.config.Username, c.config.Password)
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return fmt.Errorf("send view notification: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("listmonk returned status %d", resp.StatusCode)
+	if !c.isAllowed(toEmail) {
+		return nil
 	}
 
-	return nil
+	c.ensureSubscriber(ctx, toEmail, toName)
+
+	totalViews := 0
+	for _, v := range videos {
+		totalViews += v.ViewCount
+	}
+
+	body := txRequest{
+		SubscriberEmail: toEmail,
+		TemplateID:      c.config.ViewTemplateID,
+		Data: map[string]any{
+			"name":       toName,
+			"isDigest":   "true",
+			"totalViews": strconv.Itoa(totalViews),
+			"videos":     videos,
+		},
+		ContentType: "html",
+	}
+
+	return c.sendTx(ctx, body)
 }
