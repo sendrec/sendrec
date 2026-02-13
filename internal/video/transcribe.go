@@ -219,12 +219,12 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 
 	if err := extractAudio(tmpVideoPath, tmpAudioPath); err != nil {
 		if errors.Is(err, errNoAudio) {
-			log.Printf("transcribe: video %s has no audio stream, setting status to none", videoID)
+			log.Printf("transcribe: video %s has no audio stream", videoID)
 			if _, dbErr := db.Exec(ctx,
-				`UPDATE videos SET transcript_status = 'none', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
+				`UPDATE videos SET transcript_status = 'no_audio', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
 				videoID,
 			); dbErr != nil {
-				log.Printf("transcribe: failed to reset status for %s: %v", videoID, dbErr)
+				log.Printf("transcribe: failed to set no_audio status for %s: %v", videoID, dbErr)
 			}
 			return
 		}

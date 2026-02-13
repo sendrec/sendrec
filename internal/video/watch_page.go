@@ -899,6 +899,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         })();
         </script>
         {{end}}
+        {{if ne .TranscriptStatus "no_audio"}}
         <div class="transcript-section">
             <h2 class="transcript-header">Transcript <button class="download-btn transcribe-btn hidden" id="transcribe-btn">Transcribe</button></h2>
             {{if eq .TranscriptStatus "pending"}}
@@ -918,6 +919,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             <p class="transcript-processing hidden" id="transcript-failed">Transcription failed.</p>
             {{end}}
         </div>
+        {{end}}
         <script nonce="{{.Nonce}}">
         (function() {
             var panel = document.getElementById('transcript-panel');
