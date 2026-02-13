@@ -1,8 +1,10 @@
 package video
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -108,4 +110,48 @@ func (h *Handler) SetVideoNotification(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) resolveAndNotify(videoID, userID, ownerEmail, ownerName, videoTitle, shareToken string, videoViewNotification *string) {
+	if h.viewNotifier == nil {
+		return
+	}
+
+	mode := "off"
+	if videoViewNotification != nil {
+		mode = *videoViewNotification
+	} else {
+		var accountMode string
+		err := h.db.QueryRow(context.Background(),
+			`SELECT view_notification FROM notification_preferences WHERE user_id = $1`,
+			userID,
+		).Scan(&accountMode)
+		if err == nil {
+			mode = accountMode
+		}
+	}
+
+	if mode == "off" || mode == "digest" {
+		return
+	}
+
+	if mode == "first" {
+		var viewCount int64
+		err := h.db.QueryRow(context.Background(),
+			`SELECT COUNT(*) FROM video_views WHERE video_id = $1`,
+			videoID,
+		).Scan(&viewCount)
+		if err != nil {
+			log.Printf("failed to count views for first notification: %v", err)
+			return
+		}
+		if viewCount != 1 {
+			return
+		}
+	}
+
+	watchURL := h.baseURL + "/watch/" + shareToken
+	if err := h.viewNotifier.SendViewNotification(context.Background(), ownerEmail, ownerName, videoTitle, watchURL, 1, false); err != nil {
+		log.Printf("failed to send view notification for %s: %v", videoID, err)
+	}
 }
