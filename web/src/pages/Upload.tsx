@@ -167,7 +167,7 @@ export function Upload() {
 
   if (uploading) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
         <div style={{ width: "100%", maxWidth: 480 }}>
           <div style={{
             background: "var(--color-surface)",
@@ -209,7 +209,7 @@ export function Upload() {
 
   if (error) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
         <div style={{ width: "100%", maxWidth: 480 }}>
           <div style={{
             background: "var(--color-surface)",
@@ -250,7 +250,7 @@ export function Upload() {
 
   if (shareUrl) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
         <div style={{ width: "100%", maxWidth: 480 }}>
           <div style={{
             background: "var(--color-surface)",
@@ -351,7 +351,7 @@ export function Upload() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
       <h1 style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 600, marginBottom: 24, textAlign: "center" }}>
         Upload Video
       </h1>
