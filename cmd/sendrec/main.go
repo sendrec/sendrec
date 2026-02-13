@@ -93,6 +93,7 @@ func main() {
 		Password:          os.Getenv("LISTMONK_PASSWORD"),
 		TemplateID:        int(getEnvInt64("LISTMONK_TEMPLATE_ID", 0)),
 		CommentTemplateID: int(getEnvInt64("LISTMONK_COMMENT_TEMPLATE_ID", 0)),
+		ViewTemplateID:    int(getEnvInt64("LISTMONK_VIEW_TEMPLATE_ID", 0)),
 	})
 
 	srv := server.New(server.Config{
@@ -109,6 +110,7 @@ func main() {
 		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
 		EmailSender:             emailClient,
 		CommentNotifier:         emailClient,
+		ViewNotifier:            emailClient,
 	})
 
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())

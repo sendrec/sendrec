@@ -35,6 +35,10 @@ type CommentNotifier interface {
 	SendCommentNotification(ctx context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error
 }
 
+type ViewNotifier interface {
+	SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int, isDigest bool) error
+}
+
 type Handler struct {
 	db                      database.DBTX
 	storage                 ObjectStorage
@@ -45,10 +49,15 @@ type Handler struct {
 	hmacSecret              string
 	secureCookies           bool
 	commentNotifier         CommentNotifier
+	viewNotifier            ViewNotifier
 }
 
 func (h *Handler) SetCommentNotifier(n CommentNotifier) {
 	h.commentNotifier = n
+}
+
+func (h *Handler) SetViewNotifier(n ViewNotifier) {
+	h.viewNotifier = n
 }
 
 func videoFileKey(userID, shareToken string) string {

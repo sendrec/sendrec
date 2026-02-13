@@ -34,6 +34,7 @@ type Config struct {
 	EnableDocs              bool
 	EmailSender             auth.EmailSender
 	CommentNotifier         video.CommentNotifier
+	ViewNotifier            video.ViewNotifier
 }
 
 type Server struct {
@@ -75,6 +76,9 @@ func New(cfg Config) *Server {
 		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes, cfg.MaxVideosPerMonth, cfg.MaxVideoDurationSeconds, jwtSecret, secureCookies)
 		if cfg.CommentNotifier != nil {
 			s.videoHandler.SetCommentNotifier(cfg.CommentNotifier)
+		}
+		if cfg.ViewNotifier != nil {
+			s.videoHandler.SetViewNotifier(cfg.ViewNotifier)
 		}
 	}
 
