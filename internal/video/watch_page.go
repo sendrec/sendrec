@@ -1282,7 +1282,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var transcriptURL string
-	var segments []TranscriptSegment
+	segments := make([]TranscriptSegment, 0)
 	if transcriptKey != nil {
 		if u, err := h.storage.GenerateDownloadURL(r.Context(), *transcriptKey, 1*time.Hour); err == nil {
 			transcriptURL = u

@@ -152,7 +152,7 @@ func parseWhisperJSON(jsonPath string) ([]TranscriptSegment, error) {
 		return nil, fmt.Errorf("parse whisper JSON: %w", err)
 	}
 
-	var segments []TranscriptSegment
+	segments := make([]TranscriptSegment, 0)
 	for _, seg := range result.Transcription {
 		text := strings.TrimSpace(seg.Text)
 		if text == "" {
