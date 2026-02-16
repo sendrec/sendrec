@@ -15,6 +15,45 @@ Open http://localhost:8080, register an account, and start recording or uploadin
 
 ## Production setup
 
+SendRec uses [Garage](https://garagehq.deuxfleurs.fr/) for S3-compatible object storage. Garage is lightweight (uses ~50 MB RAM), open source (AGPL-3.0), and purpose-built for self-hosted deployments. Any S3-compatible storage works — just change the `S3_ENDPOINT` and credentials.
+
+First, create a `garage.toml` configuration file:
+
+```toml
+# garage.toml
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "<generate with: openssl rand -hex 32>"
+
+[s3_api]
+s3_region = "eu-central-1"
+api_bind_addr = "[::]:3900"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "<generate with: openssl rand -base64 32>"
+```
+
+Then create a `garage-init.sh` script that sets up the bucket and credentials on first start:
+
+```bash
+#!/bin/sh
+set -e
+until garage status > /dev/null 2>&1; do sleep 1; done
+NODE_ID=$(garage status 2>/dev/null | grep -oE '[a-f0-9]{16}' | head -1)
+garage layout assign -z dc1 -c 1G "${NODE_ID}" 2>/dev/null || true
+garage layout apply --version 1 2>/dev/null || true
+garage key import --yes "${S3_ACCESS_KEY}" "${S3_SECRET_KEY}" 2>/dev/null || true
+garage bucket create "${S3_BUCKET}" 2>/dev/null || true
+garage bucket allow --read --write --owner "${S3_BUCKET}" --key "${S3_ACCESS_KEY}" 2>/dev/null || true
+```
+
 ```yaml
 # docker-compose.yml
 services:
@@ -26,14 +65,18 @@ services:
       - DATABASE_URL=postgres://sendrec:secret@postgres:5432/sendrec?sslmode=disable
       - JWT_SECRET=change-me-to-a-long-random-string
       - BASE_URL=https://videos.example.com
-      - S3_ENDPOINT=http://minio:9000
+      - S3_ENDPOINT=http://garage:3900
       - S3_PUBLIC_ENDPOINT=https://storage.example.com
       - S3_BUCKET=recordings
-      - S3_ACCESS_KEY=minioadmin
-      - S3_SECRET_KEY=minioadmin
+      - S3_ACCESS_KEY=your-access-key
+      - S3_SECRET_KEY=your-secret-key
+      - AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+      - AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
     depends_on:
-      - postgres
-      - minio
+      garage-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:18-alpine
@@ -43,22 +86,41 @@ services:
       POSTGRES_DB: sendrec
     volumes:
       - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sendrec"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  minio:
-    image: quay.io/minio/minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+  garage:
+    image: dxflrs/garage:v2.2.0
+    restart: unless-stopped
     volumes:
-      - s3-data:/data
+      - ./garage.toml:/etc/garage.toml:ro
+      - s3-meta:/var/lib/garage/meta
+      - s3-data:/var/lib/garage/data
+
+  garage-init:
+    image: dxflrs/garage:v2.2.0
+    depends_on:
+      garage:
+        condition: service_started
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - ./garage-init.sh:/garage-init.sh:ro
+    environment:
+      - S3_ACCESS_KEY=your-access-key
+      - S3_SECRET_KEY=your-secret-key
+      - S3_BUCKET=recordings
+    entrypoint: ["/bin/sh", "/garage-init.sh"]
 
 volumes:
   db-data:
+  s3-meta:
   s3-data:
 ```
 
-Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy should route your app domain to port 8080 and your storage domain to MinIO port 9000.
+Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy should route your app domain to port 8080 and your storage domain to Garage port 3900.
 
 ## Environment variables
 
@@ -70,16 +132,18 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 | `JWT_SECRET` | Secret for signing auth tokens. Must be set in production (app exits if empty when `BASE_URL` is HTTPS) |
 | `BASE_URL` | Public URL of the app (e.g. `https://videos.example.com`). Used for CORS, share links, and cookies |
 
-### Storage (S3 / MinIO)
+### Storage (S3-compatible)
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `S3_ENDPOINT` | S3-compatible API endpoint. For MinIO in Docker, use the internal hostname (e.g. `http://minio:9000`) | `http://localhost:9000` |
-| `S3_PUBLIC_ENDPOINT` | Public URL for the same S3 service, used to generate presigned URLs that browsers can reach. When MinIO runs behind a reverse proxy, this should be the external URL (e.g. `https://storage.example.com`). If not set, `S3_ENDPOINT` is used — which works in dev but breaks in Docker where `S3_ENDPOINT` points to an internal hostname | — |
+| `S3_ENDPOINT` | S3-compatible API endpoint. For Garage in Docker, use the internal hostname (e.g. `http://garage:3900`) | `http://localhost:3900` |
+| `S3_PUBLIC_ENDPOINT` | Public URL for the same S3 service, used to generate presigned URLs that browsers can reach. When Garage runs behind a reverse proxy, this should be the external URL (e.g. `https://storage.example.com`). If not set, `S3_ENDPOINT` is used — which works in dev but breaks in Docker where `S3_ENDPOINT` points to an internal hostname | — |
 | `S3_BUCKET` | Bucket name for video storage | `recordings` |
 | `S3_ACCESS_KEY` | S3 access key | — |
 | `S3_SECRET_KEY` | S3 secret key | — |
-| `S3_REGION` | S3 region | `eu-central-1` |
+| `S3_REGION` | S3 region. Must match the `s3_region` in your `garage.toml` | `eu-central-1` |
+| `AWS_REQUEST_CHECKSUM_CALCULATION` | Set to `when_required` for S3-compatible storage providers | — |
+| `AWS_RESPONSE_CHECKSUM_VALIDATION` | Set to `when_required` for S3-compatible storage providers | — |
 
 ### Limits
 
@@ -139,8 +203,19 @@ API keys for machine-to-machine access (used by the Nextcloud integration for vi
 
 Video recordings and file uploads use presigned S3 URLs. The app generates these URLs using `S3_PUBLIC_ENDPOINT` so the browser can upload directly to storage (MP4, WebM, and MOV files are supported).
 
-- **In development:** MinIO is exposed on `localhost:9000`, no `S3_PUBLIC_ENDPOINT` needed
-- **In production:** MinIO typically runs behind a reverse proxy. `S3_ENDPOINT` points to the internal Docker hostname (`http://minio:9000`), but browsers can't reach that. Set `S3_PUBLIC_ENDPOINT` to the external URL (e.g. `https://storage.example.com`) so presigned URLs work
+- **In development:** Garage is exposed on `localhost:3900`, no `S3_PUBLIC_ENDPOINT` needed
+- **In production:** Garage typically runs behind a reverse proxy. `S3_ENDPOINT` points to the internal Docker hostname (`http://garage:3900`), but browsers can't reach that. Set `S3_PUBLIC_ENDPOINT` to the external URL (e.g. `https://storage.example.com`) so presigned URLs work
+
+## Using other S3-compatible storage
+
+SendRec works with any S3-compatible storage provider. Just set the `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `S3_BUCKET` environment variables. Examples:
+
+- **Hetzner Object Storage:** `S3_ENDPOINT=https://fsn1.your-objectstorage.com`
+- **Cloudflare R2:** `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`
+- **Backblaze B2:** `S3_ENDPOINT=https://s3.eu-central-003.backblazeb2.com`
+- **AWS S3:** `S3_ENDPOINT=https://s3.eu-central-1.amazonaws.com`
+
+When using a managed S3 provider, you don't need the `garage` and `garage-init` services in your Docker Compose file — just the `sendrec` and `postgres` services.
 
 ## Removing usage limits
 
@@ -210,6 +285,6 @@ videos.example.com {
 }
 
 storage.example.com {
-    reverse_proxy minio:9000
+    reverse_proxy garage:3900
 }
 ```

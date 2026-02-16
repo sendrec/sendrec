@@ -57,7 +57,7 @@ make test
 - **Frontend:** React 19, TypeScript 5.9, Vite 7
 - **Backend:** Go (single binary, chi router)
 - **Database:** PostgreSQL 18
-- **Storage:** S3-compatible object storage (MinIO for dev, Hetzner Object Storage for prod)
+- **Storage:** S3-compatible object storage (Garage for dev and self-hosting)
 - **Transcription:** [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (optional, runs server-side)
 - **Deployment:** Docker Compose
 

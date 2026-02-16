@@ -50,11 +50,11 @@ func main() {
 	log.Println("database migrations applied")
 
 	store, err := storage.New(ctx, storage.Config{
-		Endpoint:       getEnv("S3_ENDPOINT", "http://localhost:9000"),
+		Endpoint:       getEnv("S3_ENDPOINT", "http://localhost:3900"),
 		PublicEndpoint: os.Getenv("S3_PUBLIC_ENDPOINT"),
 		Bucket:         getEnv("S3_BUCKET", "sendrec"),
-		AccessKey:      getEnv("S3_ACCESS_KEY", "minioadmin"),
-		SecretKey:      getEnv("S3_SECRET_KEY", "minioadmin"),
+		AccessKey:      getEnv("S3_ACCESS_KEY", "sendrec-dev-key"),
+		SecretKey:      getEnv("S3_SECRET_KEY", "sendrec-dev-secret"),
 		Region:         getEnv("S3_REGION", "eu-central-1"),
 		MaxUploadBytes: getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
 	})
