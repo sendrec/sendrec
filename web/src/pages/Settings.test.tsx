@@ -37,7 +37,8 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
-      .mockResolvedValueOnce({ brandingEnabled: false });
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
     renderSettings();
 
     await waitFor(() => {
@@ -50,7 +51,8 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
-      .mockResolvedValueOnce({ brandingEnabled: false });
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
     renderSettings();
 
     await waitFor(() => {
@@ -62,7 +64,8 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
-      .mockResolvedValueOnce({ brandingEnabled: false });
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
     renderSettings();
 
     await waitFor(() => {
@@ -75,7 +78,8 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
-      .mockResolvedValueOnce({ brandingEnabled: false });
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
     renderSettings();
 
     await waitFor(() => {
@@ -94,7 +98,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce([]) // api-keys
+      .mockResolvedValueOnce(undefined); // PATCH response
     renderSettings();
 
     await waitFor(() => {
@@ -121,6 +126,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Failed to update name"));
     renderSettings();
 
@@ -142,7 +148,8 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
-      .mockResolvedValueOnce({ brandingEnabled: false });
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
     renderSettings();
 
     await waitFor(() => {
@@ -163,7 +170,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce([]) // api-keys
+      .mockResolvedValueOnce(undefined); // PATCH response
     renderSettings();
 
     await waitFor(() => {
@@ -191,7 +199,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce([]) // api-keys
+      .mockResolvedValueOnce(undefined); // PATCH response
     renderSettings();
 
     await waitFor(() => {
@@ -216,7 +225,8 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "every" })
-      .mockResolvedValueOnce({ brandingEnabled: false });
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
     renderSettings();
 
     await waitFor(() => {
@@ -229,7 +239,8 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
-      .mockResolvedValueOnce({ brandingEnabled: false });
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
     renderSettings();
 
     await waitFor(() => {
@@ -244,6 +255,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]) // api-keys
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -267,6 +279,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]) // api-keys
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -286,6 +299,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null });
     renderSettings();
 
@@ -298,7 +312,8 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
-      .mockResolvedValueOnce({ brandingEnabled: false });
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
     renderSettings();
 
     await waitFor(() => {
@@ -312,6 +327,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null });
     renderSettings();
 
@@ -326,6 +342,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null })
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
@@ -348,6 +365,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null });
     renderSettings();
 
@@ -358,5 +376,105 @@ describe("Settings", () => {
     await user.click(screen.getByRole("button", { name: "Reset to defaults" }));
 
     expect(screen.queryByDisplayValue("Acme Corp")).not.toBeInTheDocument();
+  });
+
+  it("shows API Keys section", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("API Keys")).toBeInTheDocument();
+    });
+  });
+
+  it("displays existing API keys", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([
+        { id: "key-1", name: "My Nextcloud", createdAt: "2026-02-16T10:00:00Z", lastUsedAt: "2026-02-16T12:00:00Z" },
+        { id: "key-2", name: "", createdAt: "2026-02-15T10:00:00Z", lastUsedAt: null },
+      ]);
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("My Nextcloud")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Unnamed key")).toBeInTheDocument();
+  });
+
+  it("creates a new API key and shows it", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ id: "new-key-1", key: "sr_abc123", name: "Test Key", createdAt: "2026-02-16T10:00:00Z" });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("API Keys")).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText("e.g. My Nextcloud"), "Test Key");
+    await user.click(screen.getByRole("button", { name: "Create key" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("sr_abc123")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Copy this key now — it won't be shown again")).toBeInTheDocument();
+    expect(screen.getByText("Test Key")).toBeInTheDocument();
+  });
+
+  it("deletes an API key", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([
+        { id: "key-1", name: "My Key", createdAt: "2026-02-16T10:00:00Z", lastUsedAt: null },
+      ])
+      .mockResolvedValueOnce(undefined); // DELETE response
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("My Key")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("My Key")).not.toBeInTheDocument();
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/settings/api-keys/key-1", { method: "DELETE" });
+  });
+
+  it("shows error when API key creation fails", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("maximum number of API keys reached"));
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("API Keys")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Create key" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("maximum number of API keys reached")).toBeInTheDocument();
+    });
   });
 });
