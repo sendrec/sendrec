@@ -41,6 +41,7 @@ export function Settings() {
   const [brandingMessage, setBrandingMessage] = useState("");
   const [brandingError, setBrandingError] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -157,6 +158,7 @@ export function Settings() {
         method: "PUT",
         body: JSON.stringify({
           companyName: branding.companyName || null,
+          logoKey: branding.logoKey === "none" ? "none" : branding.logoKey || null,
           colorBackground: branding.colorBackground || null,
           colorSurface: branding.colorSurface || null,
           colorText: branding.colorText || null,
@@ -178,6 +180,52 @@ export function Settings() {
       colorBackground: null, colorSurface: null, colorText: null, colorAccent: null,
       footerText: null,
     });
+  }
+
+  async function handleLogoUpload(file: File) {
+    if (file.type !== "image/png" && file.type !== "image/svg+xml") {
+      setBrandingError("Logo must be PNG or SVG");
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      setBrandingError("Logo must be 512KB or smaller");
+      return;
+    }
+
+    setUploadingLogo(true);
+    setBrandingError("");
+    try {
+      const result = await apiFetch<{ uploadUrl: string; logoKey: string }>("/api/settings/branding/logo", {
+        method: "POST",
+        body: JSON.stringify({ contentType: file.type, contentLength: file.size }),
+      });
+      if (!result) throw new Error("Failed to get upload URL");
+
+      const uploadResp = await fetch(result.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!uploadResp.ok) throw new Error("Failed to upload logo");
+
+      setBranding((prev) => ({ ...prev, logoKey: result.logoKey }));
+      setBrandingMessage("Logo uploaded");
+    } catch (err) {
+      setBrandingError(err instanceof Error ? err.message : "Failed to upload logo");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  async function handleLogoRemove() {
+    setBrandingError("");
+    try {
+      await apiFetch("/api/settings/branding/logo", { method: "DELETE" });
+      setBranding((prev) => ({ ...prev, logoKey: null }));
+      setBrandingMessage("Logo removed");
+    } catch (err) {
+      setBrandingError(err instanceof Error ? err.message : "Failed to remove logo");
+    }
   }
 
   if (!profile) {
@@ -331,6 +379,96 @@ export function Settings() {
               style={inputStyle}
             />
           </label>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Logo</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              {branding.logoKey && branding.logoKey !== "none" ? (
+                <>
+                  <span style={{ color: "var(--color-text)", fontSize: 14 }}>
+                    {branding.logoKey.split("/").pop()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleLogoRemove}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-error, #e74c3c)",
+                      border: "1px solid var(--color-error, #e74c3c)",
+                      borderRadius: 4,
+                      padding: "4px 10px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : branding.logoKey === "none" ? (
+                <>
+                  <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Logo hidden</span>
+                  <button
+                    type="button"
+                    onClick={handleLogoRemove}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-text-secondary)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 4,
+                      padding: "4px 10px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Show default logo
+                  </button>
+                </>
+              ) : (
+                <>
+                  <label
+                    style={{
+                      background: "var(--color-bg)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 4,
+                      padding: "6px 12px",
+                      fontSize: 14,
+                      color: "var(--color-text-secondary)",
+                      cursor: uploadingLogo ? "default" : "pointer",
+                      opacity: uploadingLogo ? 0.7 : 1,
+                    }}
+                  >
+                    {uploadingLogo ? "Uploading..." : "Upload logo (PNG or SVG, max 512KB)"}
+                    <input
+                      type="file"
+                      accept="image/png,image/svg+xml"
+                      style={{ display: "none" }}
+                      disabled={uploadingLogo}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleLogoUpload(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setBranding((prev) => ({ ...prev, logoKey: "none" }))}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-text-secondary)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 4,
+                      padding: "6px 12px",
+                      fontSize: 14,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Hide logo
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
 
           <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Footer text</span>

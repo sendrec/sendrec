@@ -53,6 +53,7 @@ type brandingSettingsResponse struct {
 
 type setBrandingRequest struct {
 	CompanyName     *string `json:"companyName"`
+	LogoKey         *string `json:"logoKey"`
 	ColorBackground *string `json:"colorBackground"`
 	ColorSurface    *string `json:"colorSurface"`
 	ColorText       *string `json:"colorText"`
@@ -110,7 +111,10 @@ func resolveBranding(ctx context.Context, storage ObjectStorage, userBranding br
 	applyOverrides(&cfg, videoBranding)
 
 	logoKey := resolveLogoKey(userBranding.LogoKey, videoBranding.LogoKey)
-	if logoKey != "" {
+	if logoKey == "none" {
+		cfg.LogoURL = ""
+		cfg.HasCustomLogo = true
+	} else if logoKey != "" {
 		url, err := storage.GenerateDownloadURL(ctx, logoKey, 1*time.Hour)
 		if err == nil {
 			cfg.LogoURL = url
@@ -210,12 +214,12 @@ func (h *Handler) PutBrandingSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := h.db.Exec(r.Context(),
-		`INSERT INTO user_branding (user_id, company_name, color_background, color_surface, color_text, color_accent, footer_text)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`INSERT INTO user_branding (user_id, company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 ON CONFLICT (user_id) DO UPDATE SET
-		   company_name = $2, color_background = $3, color_surface = $4,
-		   color_text = $5, color_accent = $6, footer_text = $7, updated_at = now()`,
-		userID, req.CompanyName, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText,
+		   company_name = $2, logo_key = $3, color_background = $4, color_surface = $5,
+		   color_text = $6, color_accent = $7, footer_text = $8, updated_at = now()`,
+		userID, req.CompanyName, req.LogoKey, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText,
 	); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to save branding settings")
 		return

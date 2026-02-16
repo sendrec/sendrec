@@ -192,7 +192,7 @@ func TestPutBrandingSettings_Success(t *testing.T) {
 	colorBg := "#112233"
 
 	mock.ExpectExec(`INSERT INTO user_branding`).
-		WithArgs(testUserID, &companyName, &colorBg, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil)).
+		WithArgs(testUserID, &companyName, (*string)(nil), &colorBg, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil)).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	body, _ := json.Marshal(setBrandingRequest{

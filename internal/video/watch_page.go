@@ -510,7 +510,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 </head>
 <body>
     <div class="container">
-        <a href="{{.BaseURL}}" class="logo"><img src="{{.Branding.LogoURL}}" alt="{{.Branding.CompanyName}}" width="20" height="20">{{.Branding.CompanyName}}</a>
+        <a href="{{.BaseURL}}" class="logo">{{if .Branding.LogoURL}}<img src="{{.Branding.LogoURL}}" alt="{{.Branding.CompanyName}}" width="20" height="20">{{end}}{{.Branding.CompanyName}}</a>
         <video id="player" controls crossorigin="anonymous"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
             <source src="{{.VideoURL}}" type="{{.ContentType}}">
             {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
