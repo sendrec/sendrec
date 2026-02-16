@@ -111,6 +111,7 @@ func main() {
 		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
 		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",
+		AllowedFrameAncestors:   os.Getenv("ALLOWED_FRAME_ANCESTORS"),
 		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
 		APIKey:                  os.Getenv("API_KEY"),
 		EmailSender:             emailClient,

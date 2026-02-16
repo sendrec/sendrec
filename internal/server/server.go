@@ -33,6 +33,7 @@ type Config struct {
 	S3PublicEndpoint        string
 	EnableDocs              bool
 	BrandingEnabled         bool
+	AllowedFrameAncestors   string
 	AnalyticsScript         string
 	APIKey                  string
 	EmailSender             auth.EmailSender
@@ -55,8 +56,9 @@ func New(cfg Config) *Server {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders(SecurityConfig{
-		BaseURL:         cfg.BaseURL,
-		StorageEndpoint: cfg.S3PublicEndpoint,
+		BaseURL:               cfg.BaseURL,
+		StorageEndpoint:       cfg.S3PublicEndpoint,
+		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
 	}))
 
 	s := &Server{router: r, pinger: cfg.Pinger, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, apiKey: cfg.APIKey}

@@ -8,8 +8,9 @@ import (
 )
 
 type SecurityConfig struct {
-	BaseURL         string
-	StorageEndpoint string
+	BaseURL               string
+	StorageEndpoint       string
+	AllowedFrameAncestors string
 }
 
 func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
@@ -18,6 +19,11 @@ func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
 	storageSuffix := ""
 	if cfg.StorageEndpoint != "" {
 		storageSuffix = " " + cfg.StorageEndpoint
+	}
+
+	frameAncestors := "'self'"
+	if cfg.AllowedFrameAncestors != "" {
+		frameAncestors = "'self' " + cfg.AllowedFrameAncestors
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -31,8 +37,8 @@ func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
 			w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(), screen-wake-lock=(), display-capture=(self)")
 
 			csp := fmt.Sprintf(
-				"default-src 'self'; img-src 'self' data:%s; media-src 'self' data:%s; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'%s; frame-ancestors 'self';",
-				storageSuffix, storageSuffix, nonce, nonce, storageSuffix,
+				"default-src 'self'; img-src 'self' data:%s; media-src 'self' data:%s; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'%s; frame-ancestors %s;",
+				storageSuffix, storageSuffix, nonce, nonce, storageSuffix, frameAncestors,
 			)
 			w.Header().Set("Content-Security-Policy", csp)
 
