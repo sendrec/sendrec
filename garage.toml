@@ -6,17 +6,14 @@ replication_factor = 1
 
 rpc_bind_addr = "[::]:3901"
 rpc_public_addr = "127.0.0.1:3901"
+# Dev-only placeholder. Generate a real secret for production: openssl rand -hex 32
 rpc_secret = "0000000000000000000000000000000000000000000000000000000000000000"
 
 [s3_api]
 s3_region = "eu-central-1"
 api_bind_addr = "[::]:3900"
 
-[s3_web]
-bind_addr = "[::]:3902"
-root_domain = ".web.garage.localhost"
-index = "index.html"
-
 [admin]
 api_bind_addr = "[::]:3903"
+# Dev-only placeholder. Generate a real token for production: openssl rand -base64 32
 admin_token = "sendrec-dev-admin-token"

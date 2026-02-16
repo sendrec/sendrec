@@ -33,10 +33,14 @@ make docker-up
 # Start only the dependencies
 docker compose -f docker-compose.dev.yml up postgres garage garage-init -d
 
+# Export Garage-generated S3 credentials for local use
+eval $(docker run --rm -v app_garage-keys:/keys:ro alpine cat /keys/env)
+export S3_ACCESS_KEY S3_SECRET_KEY
+
 # Frontend dev server with hot reload (port 5173, proxies API to 8080)
 make dev-web
 
-# Go server (in another terminal)
+# Go server (in another terminal, also needs the same exports above)
 make run
 ```
 

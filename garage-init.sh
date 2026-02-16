@@ -38,7 +38,8 @@ if [ -n "${KEY_ID}" ] && [ -n "${SECRET}" ]; then
   mkdir -p "$(dirname "${GARAGE_KEYS_FILE}")"
   printf 'S3_ACCESS_KEY=%s\nS3_SECRET_KEY=%s\n' "${KEY_ID}" "${SECRET}" > "${GARAGE_KEYS_FILE}"
 else
-  echo "WARNING: Could not extract key credentials"
+  echo "ERROR: Could not extract key credentials"
+  exit 1
 fi
 
 echo "Creating bucket '${S3_BUCKET}'..."

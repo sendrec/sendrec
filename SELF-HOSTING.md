@@ -70,6 +70,8 @@ SECRET=$(echo "${KEY_INFO}" | grep "Secret key" | sed 's/.*: *//')
 if [ -n "${KEY_ID}" ] && [ -n "${SECRET}" ]; then
   mkdir -p "$(dirname "${GARAGE_KEYS_FILE}")"
   printf 'S3_ACCESS_KEY=%s\nS3_SECRET_KEY=%s\n' "${KEY_ID}" "${SECRET}" > "${GARAGE_KEYS_FILE}"
+else
+  echo "ERROR: Could not extract key credentials"; exit 1
 fi
 
 garage bucket create "${S3_BUCKET}" 2>/dev/null || true
@@ -83,6 +85,7 @@ fi
 services:
   sendrec:
     image: ghcr.io/sendrec/sendrec:latest
+    restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
