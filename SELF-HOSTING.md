@@ -101,6 +101,12 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 |----------|-------------|---------|
 | `BRANDING_ENABLED` | Allow users to customize watch page branding (logo, colors, footer) | `false` |
 
+### Analytics (optional)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `UMAMI_WEBSITE_ID` | [Umami](https://umami.is) website ID for watch page analytics. Requires an Umami instance and a reverse proxy rule to forward `/script.js` and `/api/send` to it | — |
+
 ### Transcription (optional)
 
 | Variable | Description | Default |

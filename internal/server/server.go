@@ -33,6 +33,7 @@ type Config struct {
 	S3PublicEndpoint        string
 	EnableDocs              bool
 	BrandingEnabled         bool
+	UmamiWebsiteID          string
 	EmailSender             auth.EmailSender
 	CommentNotifier         video.CommentNotifier
 	ViewNotifier            video.ViewNotifier
@@ -83,6 +84,9 @@ func New(cfg Config) *Server {
 		}
 		if cfg.BrandingEnabled {
 			s.videoHandler.SetBrandingEnabled(true)
+		}
+		if cfg.UmamiWebsiteID != "" {
+			s.videoHandler.SetUmamiWebsiteID(cfg.UmamiWebsiteID)
 		}
 	}
 

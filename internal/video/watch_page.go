@@ -997,6 +997,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </script>
         <p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Shared via <a href="https://sendrec.eu">SendRec</a>{{if not .Branding.FooterText}} — open-source video messaging{{end}}</p>
     </div>
+{{if .UmamiWebsiteID}}<script defer src="/script.js" data-website-id="{{.UmamiWebsiteID}}" nonce="{{.Nonce}}"></script>{{end}}
 </body>
 </html>`))
 
@@ -1102,6 +1103,7 @@ type watchPageData struct {
 	BaseURL          string
 	ContentType      string
 	Branding         brandingConfig
+	UmamiWebsiteID   string
 }
 
 type expiredPageData struct {
@@ -1338,6 +1340,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		BaseURL:          h.baseURL,
 		ContentType:      contentType,
 		Branding:         branding,
+		UmamiWebsiteID:   h.umamiWebsiteID,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}
