@@ -1,6 +1,7 @@
 package video
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -712,7 +713,7 @@ func TestSetVideoBranding_InvalidColor(t *testing.T) {
 func TestResolveBranding_DefaultsOnly(t *testing.T) {
 	storage := &mockStorage{}
 	cfg := resolveBranding(
-		nil,
+		context.TODO(),
 		storage,
 		brandingSettingsResponse{},
 		brandingSettingsResponse{},
@@ -741,7 +742,7 @@ func TestResolveBranding_UserOverrides(t *testing.T) {
 	colorBg := "#111111"
 
 	cfg := resolveBranding(
-		nil,
+		context.TODO(),
 		storage,
 		brandingSettingsResponse{
 			CompanyName:     &companyName,
@@ -769,7 +770,7 @@ func TestResolveBranding_VideoOverridesUser(t *testing.T) {
 	videoBg := "#222222"
 
 	cfg := resolveBranding(
-		nil,
+		context.TODO(),
 		storage,
 		brandingSettingsResponse{
 			CompanyName:     &userCompany,
@@ -794,7 +795,7 @@ func TestResolveBranding_CustomLogo(t *testing.T) {
 	logoKey := "branding/user/logo.png"
 
 	cfg := resolveBranding(
-		nil,
+		context.TODO(),
 		storage,
 		brandingSettingsResponse{
 			LogoKey: &logoKey,
