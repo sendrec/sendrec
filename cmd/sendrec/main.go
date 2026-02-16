@@ -110,7 +110,7 @@ func main() {
 		MaxVideoDurationSeconds: int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),
 		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
-		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",
+		BrandingEnabled:         getEnv("BRANDING_ENABLED", brandingDefault(baseURL)) == "true",
 		EmailSender:             emailClient,
 		CommentNotifier:         emailClient,
 		ViewNotifier:            emailClient,
@@ -150,6 +150,13 @@ func main() {
 		log.Fatalf("shutdown failed: %v", err)
 	}
 	log.Println("shutdown complete")
+}
+
+func brandingDefault(baseURL string) string {
+	if baseURL == "https://app.sendrec.eu" {
+		return "false"
+	}
+	return "true"
 }
 
 func getEnv(key, fallback string) string {
