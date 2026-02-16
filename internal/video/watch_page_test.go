@@ -1136,3 +1136,122 @@ func TestWatchPage_NotFound_HasNonceInTemplate(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+func TestInjectScriptNonce(t *testing.T) {
+	tests := []struct {
+		name   string
+		script string
+		nonce  string
+		want   string
+	}{
+		{"empty script", "", "abc", ""},
+		{"umami", `<script defer src="/script.js" data-website-id="xxx"></script>`, "n123",
+			`<script nonce="n123" defer src="/script.js" data-website-id="xxx"></script>`},
+		{"plausible", `<script defer data-domain="example.com" src="https://plausible.io/js/script.js"></script>`, "n456",
+			`<script nonce="n456" defer data-domain="example.com" src="https://plausible.io/js/script.js"></script>`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := string(injectScriptNonce(tt.script, tt.nonce))
+			if got != tt.want {
+				t.Errorf("injectScriptNonce(%q, %q) = %q, want %q", tt.script, tt.nonce, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWatchPage_AnalyticsScriptRendered(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler.SetAnalyticsScript(`<script defer src="/script.js" data-website-id="test-id"></script>`)
+
+	shareToken := "analytics123"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "Analytics Test", "recordings/u1/abc.webm", "Bob", createdAt, expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+		))
+
+	mock.ExpectExec(`INSERT INTO video_views`).
+		WithArgs("vid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `nonce="test-nonce"`) {
+		t.Error("expected nonce in analytics script")
+	}
+	if !strings.Contains(body, `data-website-id="test-id"`) {
+		t.Error("expected analytics script with data-website-id")
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestWatchPage_NoAnalyticsWhenEmpty(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	shareToken := "noanalytics1"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "No Analytics", "recordings/u1/abc.webm", "Bob", createdAt, expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+		))
+
+	mock.ExpectExec(`INSERT INTO video_views`).
+		WithArgs("vid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if strings.Contains(body, "data-website-id") {
+		t.Error("expected no analytics script when not configured")
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}

@@ -53,7 +53,7 @@ type Handler struct {
 	commentNotifier         CommentNotifier
 	viewNotifier            ViewNotifier
 	brandingEnabled         bool
-	umamiWebsiteID          string
+	analyticsScript         string
 }
 
 func (h *Handler) SetCommentNotifier(n CommentNotifier) {
@@ -68,8 +68,8 @@ func (h *Handler) SetBrandingEnabled(enabled bool) {
 	h.brandingEnabled = enabled
 }
 
-func (h *Handler) SetUmamiWebsiteID(id string) {
-	h.umamiWebsiteID = id
+func (h *Handler) SetAnalyticsScript(script string) {
+	h.analyticsScript = script
 }
 
 func extensionForContentType(ct string) string {

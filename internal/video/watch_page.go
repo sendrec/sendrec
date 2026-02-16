@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -997,7 +998,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </script>
         <p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Shared via <a href="https://sendrec.eu">SendRec</a>{{if not .Branding.FooterText}} — open-source video messaging{{end}}</p>
     </div>
-{{if .UmamiWebsiteID}}<script defer src="/script.js" data-website-id="{{.UmamiWebsiteID}}" nonce="{{.Nonce}}"></script>{{end}}
+{{.AnalyticsScript}}
 </body>
 </html>`))
 
@@ -1103,7 +1104,7 @@ type watchPageData struct {
 	BaseURL          string
 	ContentType      string
 	Branding         brandingConfig
-	UmamiWebsiteID   string
+	AnalyticsScript  template.HTML
 }
 
 type expiredPageData struct {
@@ -1197,6 +1198,14 @@ var passwordPageTemplate = template.Must(template.New("password").Parse(`<!DOCTY
     </script>
 </body>
 </html>`))
+
+func injectScriptNonce(scriptTag, nonce string) template.HTML {
+	if scriptTag == "" {
+		return ""
+	}
+	injected := strings.Replace(scriptTag, "<script", "<script nonce=\""+nonce+"\"", 1)
+	return template.HTML(injected)
+}
 
 func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	shareToken := chi.URLParam(r, "shareToken")
@@ -1340,7 +1349,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		BaseURL:          h.baseURL,
 		ContentType:      contentType,
 		Branding:         branding,
-		UmamiWebsiteID:   h.umamiWebsiteID,
+		AnalyticsScript:  injectScriptNonce(h.analyticsScript, nonce),
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

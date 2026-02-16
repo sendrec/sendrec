@@ -105,7 +105,7 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `UMAMI_WEBSITE_ID` | [Umami](https://umami.is) website ID for watch page analytics. Requires an Umami instance and a reverse proxy rule to forward `/script.js` and `/api/send` to it | — |
+| `ANALYTICS_SCRIPT` | A `<script>` tag to inject on every watch page. Works with any analytics provider (Umami, Plausible, Matomo, etc.). The CSP nonce is added automatically. Example: `<script defer src="/script.js" data-website-id="xxx"></script>` | — |
 
 ### Transcription (optional)
 

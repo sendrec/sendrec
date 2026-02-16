@@ -111,7 +111,7 @@ func main() {
 		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
 		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",
-		UmamiWebsiteID:          os.Getenv("UMAMI_WEBSITE_ID"),
+		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
 		EmailSender:             emailClient,
 		CommentNotifier:         emailClient,
 		ViewNotifier:            emailClient,
