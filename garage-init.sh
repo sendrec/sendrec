@@ -50,4 +50,13 @@ if [ -n "${KEY_ID}" ]; then
   garage bucket allow --read --write --owner "${S3_BUCKET}" --key "${KEY_ID}" 2>/dev/null || true
 fi
 
+echo "Configuring CORS..."
+BUCKET_ID=$(garage json-api GetBucketInfo "{\"globalAlias\":\"${S3_BUCKET}\"}" 2>/dev/null | grep '"id"' | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')
+if [ -n "${BUCKET_ID}" ]; then
+  garage json-api UpdateBucket "{\"id\":\"${BUCKET_ID}\",\"body\":{\"corsConfig\":{\"set\":[{\"allowedOrigins\":[\"*\"],\"allowedMethods\":[\"GET\",\"PUT\",\"HEAD\"],\"allowedHeaders\":[\"*\"],\"exposeHeaders\":[\"ETag\"],\"maxAgeSeconds\":3600}]}}}" > /dev/null 2>&1 || true
+  echo "CORS configured."
+else
+  echo "WARNING: Could not configure CORS (bucket ID not found)"
+fi
+
 echo "Garage initialization complete."
