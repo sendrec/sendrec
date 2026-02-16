@@ -6,6 +6,18 @@ interface UserProfile {
   email: string;
 }
 
+interface BrandingSettings {
+  companyName: string | null;
+  logoKey: string | null;
+  colorBackground: string | null;
+  colorSurface: string | null;
+  colorText: string | null;
+  colorAccent: string | null;
+  footerText: string | null;
+}
+
+const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
+
 export function Settings() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [name, setName] = useState("");
@@ -20,13 +32,24 @@ export function Settings() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [viewNotification, setViewNotification] = useState("off");
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [brandingEnabled, setBrandingEnabled] = useState(false);
+  const [branding, setBranding] = useState<BrandingSettings>({
+    companyName: null, logoKey: null,
+    colorBackground: null, colorSurface: null, colorText: null, colorAccent: null,
+    footerText: null,
+  });
+  const [brandingMessage, setBrandingMessage] = useState("");
+  const [brandingError, setBrandingError] = useState("");
+  const [savingBranding, setSavingBranding] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const [result, notifPrefs] = await Promise.all([
+        const [result, notifPrefs, limits] = await Promise.all([
           apiFetch<UserProfile>("/api/user"),
           apiFetch<{ viewNotification: string }>("/api/settings/notifications"),
+          apiFetch<{ brandingEnabled: boolean }>("/api/videos/limits"),
         ]);
         if (result) {
           setProfile(result);
@@ -34,6 +57,13 @@ export function Settings() {
         }
         if (notifPrefs) {
           setViewNotification(notifPrefs.viewNotification);
+        }
+        if (limits?.brandingEnabled) {
+          setBrandingEnabled(true);
+          const brandingData = await apiFetch<BrandingSettings>("/api/settings/branding");
+          if (brandingData) {
+            setBranding(brandingData);
+          }
         }
       } catch {
         // stay on page, fields will be empty
@@ -107,6 +137,94 @@ export function Settings() {
     } catch {
       setViewNotification(previous);
       setNotificationMessage("Failed to save");
+    }
+  }
+
+  async function handleBrandingSave(event: FormEvent) {
+    event.preventDefault();
+    setBrandingError("");
+    setBrandingMessage("");
+
+    for (const [key, value] of Object.entries(branding)) {
+      if (key.startsWith("color") && value && !hexColorPattern.test(value)) {
+        setBrandingError(`Invalid color for ${key}`);
+        return;
+      }
+    }
+
+    setSavingBranding(true);
+    try {
+      await apiFetch("/api/settings/branding", {
+        method: "PUT",
+        body: JSON.stringify({
+          companyName: branding.companyName || null,
+          logoKey: branding.logoKey === "none" ? "none" : branding.logoKey || null,
+          colorBackground: branding.colorBackground || null,
+          colorSurface: branding.colorSurface || null,
+          colorText: branding.colorText || null,
+          colorAccent: branding.colorAccent || null,
+          footerText: branding.footerText || null,
+        }),
+      });
+      setBrandingMessage("Branding saved");
+    } catch (err) {
+      setBrandingError(err instanceof Error ? err.message : "Failed to save branding");
+    } finally {
+      setSavingBranding(false);
+    }
+  }
+
+  function handleBrandingReset() {
+    setBranding({
+      companyName: null, logoKey: null,
+      colorBackground: null, colorSurface: null, colorText: null, colorAccent: null,
+      footerText: null,
+    });
+  }
+
+  async function handleLogoUpload(file: File) {
+    if (file.type !== "image/png" && file.type !== "image/svg+xml") {
+      setBrandingError("Logo must be PNG or SVG");
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      setBrandingError("Logo must be 512KB or smaller");
+      return;
+    }
+
+    setUploadingLogo(true);
+    setBrandingError("");
+    try {
+      const result = await apiFetch<{ uploadUrl: string; logoKey: string }>("/api/settings/branding/logo", {
+        method: "POST",
+        body: JSON.stringify({ contentType: file.type, contentLength: file.size }),
+      });
+      if (!result) throw new Error("Failed to get upload URL");
+
+      const uploadResp = await fetch(result.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!uploadResp.ok) throw new Error("Failed to upload logo");
+
+      setBranding((prev) => ({ ...prev, logoKey: result.logoKey }));
+      setBrandingMessage("Logo uploaded");
+    } catch (err) {
+      setBrandingError(err instanceof Error ? err.message : "Failed to upload logo");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  async function handleLogoRemove() {
+    setBrandingError("");
+    try {
+      await apiFetch("/api/settings/branding/logo", { method: "DELETE" });
+      setBranding((prev) => ({ ...prev, logoKey: null }));
+      setBrandingMessage("Logo removed");
+    } catch (err) {
+      setBrandingError(err instanceof Error ? err.message : "Failed to remove logo");
     }
   }
 
@@ -230,6 +348,237 @@ export function Settings() {
           <p style={{ color: notificationMessage === "Failed to save" ? "var(--color-error, #e74c3c)" : "var(--color-accent)", fontSize: 14, margin: 0 }}>{notificationMessage}</p>
         )}
       </div>
+
+      {brandingEnabled && (
+        <form
+          onSubmit={handleBrandingSave}
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: 24,
+            marginBottom: 24,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Branding</h2>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+            Customize how your shared video pages look to viewers.
+          </p>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Company name</span>
+            <input
+              type="text"
+              value={branding.companyName ?? ""}
+              onChange={(e) => setBranding({ ...branding, companyName: e.target.value || null })}
+              placeholder="SendRec"
+              maxLength={200}
+              style={inputStyle}
+            />
+          </label>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Logo</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              {branding.logoKey && branding.logoKey !== "none" ? (
+                <>
+                  <span style={{ color: "var(--color-text)", fontSize: 14 }}>
+                    {branding.logoKey.split("/").pop()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleLogoRemove}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-error, #e74c3c)",
+                      border: "1px solid var(--color-error, #e74c3c)",
+                      borderRadius: 4,
+                      padding: "4px 10px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : branding.logoKey === "none" ? (
+                <>
+                  <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Logo hidden</span>
+                  <button
+                    type="button"
+                    onClick={handleLogoRemove}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-text-secondary)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 4,
+                      padding: "4px 10px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Show default logo
+                  </button>
+                </>
+              ) : (
+                <>
+                  <label
+                    style={{
+                      background: "var(--color-bg)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 4,
+                      padding: "6px 12px",
+                      fontSize: 14,
+                      color: "var(--color-text-secondary)",
+                      cursor: uploadingLogo ? "default" : "pointer",
+                      opacity: uploadingLogo ? 0.7 : 1,
+                    }}
+                  >
+                    {uploadingLogo ? "Uploading..." : "Upload logo (PNG or SVG, max 512KB)"}
+                    <input
+                      type="file"
+                      accept="image/png,image/svg+xml"
+                      style={{ display: "none" }}
+                      disabled={uploadingLogo}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleLogoUpload(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setBranding((prev) => ({ ...prev, logoKey: "none" }))}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-text-secondary)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 4,
+                      padding: "6px 12px",
+                      fontSize: 14,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Hide logo
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Footer text</span>
+            <textarea
+              value={branding.footerText ?? ""}
+              onChange={(e) => setBranding({ ...branding, footerText: e.target.value || null })}
+              placeholder="Custom footer message"
+              maxLength={500}
+              rows={2}
+              style={{ ...inputStyle, resize: "vertical" as const }}
+            />
+          </label>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {(["colorBackground", "colorSurface", "colorText", "colorAccent"] as const).map((key) => {
+              const labels: Record<string, string> = {
+                colorBackground: "Background",
+                colorSurface: "Surface",
+                colorText: "Text",
+                colorAccent: "Accent",
+              };
+              const defaults: Record<string, string> = {
+                colorBackground: "#0a1628",
+                colorSurface: "#1e293b",
+                colorText: "#ffffff",
+                colorAccent: "#00b67a",
+              };
+              return (
+                <label key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>{labels[key]}</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="color"
+                      value={branding[key] ?? defaults[key]}
+                      onChange={(e) => setBranding({ ...branding, [key]: e.target.value })}
+                      style={{ width: 36, height: 36, border: "none", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }}
+                    />
+                    <input
+                      type="text"
+                      value={branding[key] ?? ""}
+                      onChange={(e) => setBranding({ ...branding, [key]: e.target.value || null })}
+                      placeholder={defaults[key]}
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          <div
+            style={{
+              borderRadius: 8,
+              padding: 16,
+              background: branding.colorBackground ?? "#0a1628",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>Preview</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ color: branding.colorAccent ?? "#00b67a", fontWeight: 600 }}>
+                {branding.companyName || "SendRec"}
+              </span>
+            </div>
+            <div style={{ background: branding.colorSurface ?? "#1e293b", borderRadius: 6, padding: 12 }}>
+              <span style={{ color: branding.colorText ?? "#ffffff", fontSize: 14 }}>Sample video title</span>
+            </div>
+          </div>
+
+          {brandingError && (
+            <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{brandingError}</p>
+          )}
+          {brandingMessage && (
+            <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{brandingMessage}</p>
+          )}
+
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              type="submit"
+              disabled={savingBranding}
+              style={{
+                background: "var(--color-accent)",
+                color: "var(--color-text)",
+                borderRadius: 4,
+                padding: "10px 16px",
+                fontSize: 14,
+                fontWeight: 600,
+                opacity: savingBranding ? 0.7 : 1,
+              }}
+            >
+              {savingBranding ? "Saving..." : "Save branding"}
+            </button>
+            <button
+              type="button"
+              onClick={handleBrandingReset}
+              style={{
+                background: "transparent",
+                color: "var(--color-text-secondary)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 4,
+                padding: "10px 16px",
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              Reset to defaults
+            </button>
+          </div>
+        </form>
+      )}
 
       <form
         onSubmit={handlePasswordSubmit}

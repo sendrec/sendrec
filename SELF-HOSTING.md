@@ -95,6 +95,12 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 |----------|-------------|---------|
 | `API_DOCS_ENABLED` | Serve interactive API docs at `/api/docs` | `false` |
 
+### Branding
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BRANDING_ENABLED` | Allow users to customize watch page branding (logo, colors, footer) | `false` |
+
 ### Transcription (optional)
 
 | Variable | Description | Default |

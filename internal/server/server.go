@@ -32,6 +32,7 @@ type Config struct {
 	MaxVideoDurationSeconds int
 	S3PublicEndpoint        string
 	EnableDocs              bool
+	BrandingEnabled         bool
 	EmailSender             auth.EmailSender
 	CommentNotifier         video.CommentNotifier
 	ViewNotifier            video.ViewNotifier
@@ -79,6 +80,9 @@ func New(cfg Config) *Server {
 		}
 		if cfg.ViewNotifier != nil {
 			s.videoHandler.SetViewNotifier(cfg.ViewNotifier)
+		}
+		if cfg.BrandingEnabled {
+			s.videoHandler.SetBrandingEnabled(true)
 		}
 	}
 
@@ -139,6 +143,10 @@ func (s *Server) routes() {
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/notifications", s.videoHandler.GetNotificationPreferences)
 			r.Put("/notifications", s.videoHandler.PutNotificationPreferences)
+			r.Get("/branding", s.videoHandler.GetBrandingSettings)
+			r.Put("/branding", s.videoHandler.PutBrandingSettings)
+			r.Post("/branding/logo", s.videoHandler.UploadBrandingLogo)
+			r.Delete("/branding/logo", s.videoHandler.DeleteBrandingLogo)
 		})
 
 		videoLimiter := ratelimit.NewLimiter(2, 10)
@@ -162,6 +170,8 @@ func (s *Server) routes() {
 			r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
 			r.Get("/{id}/analytics", s.videoHandler.Analytics)
 			r.Put("/{id}/notifications", s.videoHandler.SetVideoNotification)
+			r.Get("/{id}/branding", s.videoHandler.GetVideoBranding)
+			r.Put("/{id}/branding", s.videoHandler.SetVideoBranding)
 		})
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
 		commentLimiter := ratelimit.NewLimiter(0.2, 3)
