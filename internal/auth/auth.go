@@ -650,6 +650,10 @@ func UserIDFromContext(ctx context.Context) string {
 	return userID
 }
 
+func ContextWithUserID(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, userIDKey, userID)
+}
+
 func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",

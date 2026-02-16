@@ -112,6 +112,7 @@ func main() {
 		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
 		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",
 		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
+		APIKey:                  os.Getenv("API_KEY"),
 		EmailSender:             emailClient,
 		CommentNotifier:         emailClient,
 		ViewNotifier:            emailClient,
