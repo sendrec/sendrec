@@ -36,7 +36,8 @@ describe("Settings", () => {
   it("loads and displays profile", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
-      .mockResolvedValueOnce({ viewNotification: "off" });
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false });
     renderSettings();
 
     await waitFor(() => {
@@ -48,7 +49,8 @@ describe("Settings", () => {
   it("disables email field", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
-      .mockResolvedValueOnce({ viewNotification: "off" });
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false });
     renderSettings();
 
     await waitFor(() => {
@@ -59,7 +61,8 @@ describe("Settings", () => {
   it("disables save button when name is unchanged", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
-      .mockResolvedValueOnce({ viewNotification: "off" });
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false });
     renderSettings();
 
     await waitFor(() => {
@@ -71,7 +74,8 @@ describe("Settings", () => {
     const user = userEvent.setup();
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
-      .mockResolvedValueOnce({ viewNotification: "off" });
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false });
     renderSettings();
 
     await waitFor(() => {
@@ -89,6 +93,7 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce(undefined);
     renderSettings();
 
@@ -115,6 +120,7 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
       .mockRejectedValueOnce(new Error("Failed to update name"));
     renderSettings();
 
@@ -135,7 +141,8 @@ describe("Settings", () => {
     const user = userEvent.setup();
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
-      .mockResolvedValueOnce({ viewNotification: "off" });
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false });
     renderSettings();
 
     await waitFor(() => {
@@ -155,6 +162,7 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce(undefined);
     renderSettings();
 
@@ -182,6 +190,7 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce(undefined);
     renderSettings();
 
@@ -206,7 +215,8 @@ describe("Settings", () => {
   it("loads and displays notification preference", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
-      .mockResolvedValueOnce({ viewNotification: "every" });
+      .mockResolvedValueOnce({ viewNotification: "every" })
+      .mockResolvedValueOnce({ brandingEnabled: false });
     renderSettings();
 
     await waitFor(() => {
@@ -218,7 +228,8 @@ describe("Settings", () => {
   it("defaults notification preference to off", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
-      .mockResolvedValueOnce({ viewNotification: "off" });
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false });
     renderSettings();
 
     await waitFor(() => {
@@ -232,6 +243,7 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -254,6 +266,7 @@ describe("Settings", () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -266,5 +279,84 @@ describe("Settings", () => {
     await waitFor(() => {
       expect(screen.getByText("Preference saved")).toBeInTheDocument();
     });
+  });
+
+  it("shows branding section when enabled", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding")).toBeInTheDocument();
+    });
+  });
+
+  it("hides branding section when disabled", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("alice@example.com")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Branding")).not.toBeInTheDocument();
+  });
+
+  it("loads existing branding settings", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+  });
+
+  it("saves branding settings", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null })
+      .mockResolvedValueOnce(undefined); // PUT response
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding")).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText("SendRec"), "My Company");
+    await user.click(screen.getByRole("button", { name: "Save branding" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding saved")).toBeInTheDocument();
+    });
+  });
+
+  it("resets branding to defaults", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Reset to defaults" }));
+
+    expect(screen.queryByDisplayValue("Acme Corp")).not.toBeInTheDocument();
   });
 });

@@ -52,6 +52,7 @@ type Handler struct {
 	secureCookies           bool
 	commentNotifier         CommentNotifier
 	viewNotifier            ViewNotifier
+	brandingEnabled         bool
 }
 
 func (h *Handler) SetCommentNotifier(n CommentNotifier) {
@@ -60,6 +61,10 @@ func (h *Handler) SetCommentNotifier(n CommentNotifier) {
 
 func (h *Handler) SetViewNotifier(n ViewNotifier) {
 	h.viewNotifier = n
+}
+
+func (h *Handler) SetBrandingEnabled(enabled bool) {
+	h.brandingEnabled = enabled
 }
 
 func extensionForContentType(ct string) string {
@@ -143,6 +148,7 @@ type watchResponse struct {
 	TranscriptStatus string              `json:"transcriptStatus"`
 	TranscriptURL    string              `json:"transcriptUrl,omitempty"`
 	Segments         []TranscriptSegment `json:"segments,omitempty"`
+	Branding         brandingConfig      `json:"branding"`
 }
 
 func generateShareToken() (string, error) {
@@ -340,9 +346,10 @@ func (h *Handler) countVideosThisMonth(ctx context.Context, userID string) (int,
 }
 
 type limitsResponse struct {
-	MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
-	MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
-	VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+	MaxVideosPerMonth       int  `json:"maxVideosPerMonth"`
+	MaxVideoDurationSeconds int  `json:"maxVideoDurationSeconds"`
+	VideosUsedThisMonth     int  `json:"videosUsedThisMonth"`
+	BrandingEnabled         bool `json:"brandingEnabled"`
 }
 
 func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
@@ -362,6 +369,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		MaxVideosPerMonth:       h.maxVideosPerMonth,
 		MaxVideoDurationSeconds: h.maxVideoDurationSeconds,
 		VideosUsedThisMonth:     videosUsed,
+		BrandingEnabled:         h.brandingEnabled,
 	})
 }
 
@@ -651,18 +659,25 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var ownerEmail string
 	var viewNotification *string
 	var contentType string
+	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText *string
+	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password,
 		        v.transcript_key, v.transcript_json, v.transcript_status,
-		        v.user_id, u.email, v.view_notification, v.content_type
+		        v.user_id, u.email, v.view_notification, v.content_type,
+		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text,
+		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
+		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword,
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
-		&ownerID, &ownerEmail, &viewNotification, &contentType)
+		&ownerID, &ownerEmail, &viewNotification, &contentType,
+		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText,
+		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -679,6 +694,19 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	branding := resolveBranding(r.Context(), h.storage,
+		brandingSettingsResponse{
+			CompanyName: ubCompanyName, LogoKey: ubLogoKey,
+			ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
+			ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
+		},
+		brandingSettingsResponse{
+			CompanyName: vbCompanyName, LogoKey: vbLogoKey,
+			ColorBackground: vbColorBg, ColorSurface: vbColorSurface,
+			ColorText: vbColorText, ColorAccent: vbColorAccent, FooterText: vbFooterText,
+		},
+	)
 
 	viewerUserID := h.viewerUserIDFromRequest(r)
 
@@ -729,6 +757,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		TranscriptStatus: transcriptStatus,
 		TranscriptURL:    transcriptURL,
 		Segments:         segments,
+		Branding:         branding,
 	})
 }
 

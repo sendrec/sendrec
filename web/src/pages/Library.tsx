@@ -26,6 +26,16 @@ interface LimitsResponse {
   maxVideosPerMonth: number;
   maxVideoDurationSeconds: number;
   videosUsedThisMonth: number;
+  brandingEnabled: boolean;
+}
+
+interface VideoBranding {
+  companyName: string | null;
+  colorBackground: string | null;
+  colorSurface: string | null;
+  colorText: string | null;
+  colorAccent: string | null;
+  footerText: string | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -74,6 +84,12 @@ export function Library() {
   const [trimmingId, setTrimmingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [brandingVideoId, setBrandingVideoId] = useState<string | null>(null);
+  const [videoBranding, setVideoBranding] = useState<VideoBranding>({
+    companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null,
+  });
+  const [savingBranding, setSavingBranding] = useState(false);
+  const [brandingMessage, setBrandingMessage] = useState("");
 
   const fetchVideosAndLimits = useCallback(async (query = "") => {
     const searchParam = query ? `?q=${encodeURIComponent(query)}` : "";
@@ -248,6 +264,43 @@ export function Library() {
       setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, viewNotification } : v)));
     } catch {
       // no-op: select stays at previous value since state is only updated on success
+    }
+  }
+
+  async function openBranding(videoId: string) {
+    setBrandingVideoId(videoId);
+    setBrandingMessage("");
+    try {
+      const data = await apiFetch<VideoBranding>(`/api/videos/${videoId}/branding`);
+      if (data) setVideoBranding(data);
+      else setVideoBranding({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null });
+    } catch {
+      setVideoBranding({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null });
+    }
+  }
+
+  async function saveBranding() {
+    if (!brandingVideoId) return;
+    setSavingBranding(true);
+    setBrandingMessage("");
+    try {
+      await apiFetch(`/api/videos/${brandingVideoId}/branding`, {
+        method: "PUT",
+        body: JSON.stringify({
+          companyName: videoBranding.companyName || null,
+          colorBackground: videoBranding.colorBackground || null,
+          colorSurface: videoBranding.colorSurface || null,
+          colorText: videoBranding.colorText || null,
+          colorAccent: videoBranding.colorAccent || null,
+          footerText: videoBranding.footerText || null,
+        }),
+      });
+      setBrandingMessage("Saved");
+      setTimeout(() => setBrandingVideoId(null), 1000);
+    } catch (err) {
+      setBrandingMessage(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingBranding(false);
     }
   }
 
@@ -561,6 +614,17 @@ export function Library() {
                       <option value="digest">Daily digest</option>
                     </select>
                   </label>
+                  {limits?.brandingEnabled && (
+                    <>
+                      <span className="action-sep">&middot;</span>
+                      <button
+                        onClick={() => openBranding(video.id)}
+                        className="action-link"
+                      >
+                        Branding
+                      </button>
+                    </>
+                  )}
                   <span style={{ flex: 1 }} />
                   <button
                     onClick={() => deleteVideo(video.id)}
@@ -576,6 +640,113 @@ export function Library() {
           </div>
         ))}
       </div>
+
+      {brandingVideoId && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex",
+            alignItems: "center", justifyContent: "center", zIndex: 100,
+          }}
+          onClick={() => setBrandingVideoId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--color-surface)", borderRadius: 12, padding: 24,
+              width: 400, maxHeight: "80vh", overflow: "auto",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            <h3 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Video Branding</h3>
+            <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 16px" }}>
+              Override your account branding for this video. Leave empty to inherit.
+            </p>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>Company name</span>
+              <input
+                type="text"
+                value={videoBranding.companyName ?? ""}
+                onChange={(e) => setVideoBranding({ ...videoBranding, companyName: e.target.value || null })}
+                placeholder="Inherit from account"
+                maxLength={200}
+                style={{
+                  background: "var(--color-bg)", border: "1px solid var(--color-border)",
+                  borderRadius: 4, color: "var(--color-text)", padding: "8px 12px", fontSize: 14, width: "100%",
+                }}
+              />
+            </label>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+              {(["colorBackground", "colorSurface", "colorText", "colorAccent"] as const).map((key) => {
+                const labels: Record<string, string> = {
+                  colorBackground: "Background", colorSurface: "Surface", colorText: "Text", colorAccent: "Accent",
+                };
+                return (
+                  <label key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>{labels[key]}</span>
+                    <input
+                      type="text"
+                      value={videoBranding[key] ?? ""}
+                      onChange={(e) => setVideoBranding({ ...videoBranding, [key]: e.target.value || null })}
+                      placeholder="Inherit"
+                      style={{
+                        background: "var(--color-bg)", border: "1px solid var(--color-border)",
+                        borderRadius: 4, color: "var(--color-text)", padding: "6px 10px", fontSize: 13, width: "100%",
+                      }}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>Footer text</span>
+              <input
+                type="text"
+                value={videoBranding.footerText ?? ""}
+                onChange={(e) => setVideoBranding({ ...videoBranding, footerText: e.target.value || null })}
+                placeholder="Inherit from account"
+                maxLength={500}
+                style={{
+                  background: "var(--color-bg)", border: "1px solid var(--color-border)",
+                  borderRadius: 4, color: "var(--color-text)", padding: "8px 12px", fontSize: 14, width: "100%",
+                }}
+              />
+            </label>
+
+            {brandingMessage && (
+              <p style={{ color: brandingMessage === "Saved" ? "var(--color-accent)" : "var(--color-error)", fontSize: 13, margin: "0 0 12px" }}>
+                {brandingMessage}
+              </p>
+            )}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={saveBranding}
+                disabled={savingBranding}
+                style={{
+                  background: "var(--color-accent)", color: "var(--color-text)",
+                  borderRadius: 4, padding: "8px 16px", fontSize: 14, fontWeight: 600,
+                  opacity: savingBranding ? 0.7 : 1, border: "none", cursor: "pointer",
+                }}
+              >
+                {savingBranding ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={() => setBrandingVideoId(null)}
+                style={{
+                  background: "transparent", color: "var(--color-text-secondary)",
+                  border: "1px solid var(--color-border)", borderRadius: 4,
+                  padding: "8px 16px", fontSize: 14, cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {trimmingId && (() => {
         const video = videos.find((v) => v.id === trimmingId);

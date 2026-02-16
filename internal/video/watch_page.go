@@ -26,18 +26,24 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{.Title}} — SendRec</title>
+    <title>{{.Title}} — {{.Branding.CompanyName}}</title>
     <meta property="og:title" content="{{.Title}}">
     <meta property="og:type" content="video.other">
     <meta property="og:video" content="{{.VideoURL}}">
     <meta property="og:video:type" content="{{.ContentType}}">
     {{if .ThumbnailURL}}<meta property="og:image" content="{{.ThumbnailURL}}">{{end}}
-    <meta property="og:site_name" content="SendRec">
+    <meta property="og:site_name" content="{{.Branding.CompanyName}}">
     <style nonce="{{.Nonce}}">
+        :root {
+            --brand-bg: {{.Branding.ColorBackground}};
+            --brand-surface: {{.Branding.ColorSurface}};
+            --brand-text: {{.Branding.ColorText}};
+            --brand-accent: {{.Branding.ColorAccent}};
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #0a1628;
-            color: #ffffff;
+            background: var(--brand-bg);
+            color: var(--brand-text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             min-height: 100vh;
             display: flex;
@@ -76,7 +82,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             transition: color 0.15s;
         }
         .logo:hover {
-            color: #00b67a;
+            color: var(--brand-accent);
         }
         .logo img {
             width: 20px;
@@ -88,7 +94,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: #64748b;
         }
         .branding a {
-            color: #00b67a;
+            color: var(--brand-accent);
             text-decoration: none;
         }
         .branding a:hover {
@@ -103,8 +109,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .download-btn {
             display: inline-block;
             background: transparent;
-            color: #00b67a;
-            border: 1px solid #00b67a;
+            color: var(--brand-accent);
+            border: 1px solid var(--brand-accent);
             padding: 0.5rem 1.25rem;
             border-radius: 6px;
             font-size: 0.875rem;
@@ -117,7 +123,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         .comments-section {
             margin-top: 2rem;
-            border-top: 1px solid #1e293b;
+            border-top: 1px solid var(--brand-surface);
             padding-top: 1.5rem;
         }
         .comments-header {
@@ -126,7 +132,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             margin-bottom: 1rem;
         }
         .comment {
-            background: #1e293b;
+            background: var(--brand-surface);
             border-radius: 8px;
             padding: 0.875rem 1rem;
             margin-bottom: 0.75rem;
@@ -144,7 +150,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: #e2e8f0;
         }
         .comment-owner-badge {
-            background: #00b67a;
+            background: var(--brand-accent);
             color: #fff;
             font-size: 0.6875rem;
             font-weight: 600;
@@ -183,7 +189,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             padding: 0.625rem 0.75rem;
             border-radius: 6px;
             border: 1px solid #334155;
-            background: #1e293b;
+            background: var(--brand-surface);
             color: #fff;
             font-size: 0.875rem;
             font-family: inherit;
@@ -191,7 +197,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         .comment-form input:focus,
         .comment-form textarea:focus {
-            border-color: #00b67a;
+            border-color: var(--brand-accent);
         }
         .comment-form textarea {
             min-height: 80px;
@@ -212,7 +218,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             gap: 0.375rem;
         }
         .comment-submit {
-            background: #00b67a;
+            background: var(--brand-accent);
             color: #fff;
             border: none;
             padding: 0.5rem 1.25rem;
@@ -237,7 +243,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .markers-bar {
             position: relative;
             height: 8px;
-            background: #1e293b;
+            background: var(--brand-surface);
             border-radius: 4px;
             margin-top: 0.75rem;
             cursor: pointer;
@@ -246,7 +252,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             position: absolute;
             width: 6px;
             height: 6px;
-            background: #00b67a;
+            background: var(--brand-accent);
             border-radius: 50%;
             top: 1px;
             transform: translateX(-50%);
@@ -290,7 +296,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             100% { box-shadow: 0 0 0 0 rgba(0, 182, 122, 0); }
         }
         .comment-timestamp {
-            background: #00b67a;
+            background: var(--brand-accent);
             color: #fff;
             font-size: 0.75rem;
             font-weight: 600;
@@ -321,7 +327,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         .timestamp-toggle.active {
             background: rgba(0, 182, 122, 0.15);
-            color: #00b67a;
+            color: var(--brand-accent);
             font-weight: 600;
         }
         .timestamp-toggle.active:hover {
@@ -378,7 +384,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             line-height: 1;
         }
         .emoji-trigger:hover {
-            border-color: #00b67a;
+            border-color: var(--brand-accent);
         }
         .emoji-grid {
             display: none;
@@ -424,11 +430,11 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             background: transparent;
         }
         .emoji-btn:hover {
-            background: #1e293b;
+            background: var(--brand-surface);
         }
         .transcript-section {
             margin-top: 2rem;
-            border-top: 1px solid #1e293b;
+            border-top: 1px solid var(--brand-surface);
             padding-top: 1.5rem;
         }
         .speed-controls {
@@ -448,12 +454,12 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             transition: all 0.15s;
         }
         .speed-btn:hover {
-            border-color: #00b67a;
+            border-color: var(--brand-accent);
             color: #f8fafc;
         }
         .speed-btn.active {
-            border-color: #00b67a;
-            color: #00b67a;
+            border-color: var(--brand-accent);
+            color: var(--brand-accent);
             background: rgba(0, 182, 122, 0.1);
         }
         .hidden { display: none; }
@@ -483,7 +489,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             background: rgba(0, 182, 122, 0.1);
         }
         .transcript-timestamp {
-            color: #00b67a;
+            color: var(--brand-accent);
             font-size: 0.8125rem;
             font-weight: 600;
             white-space: nowrap;
@@ -504,7 +510,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 </head>
 <body>
     <div class="container">
-        <a href="{{.BaseURL}}" class="logo"><img src="/images/logo.png" alt="SendRec" width="20" height="20">SendRec</a>
+        <a href="{{.BaseURL}}" class="logo"><img src="{{.Branding.LogoURL}}" alt="{{.Branding.CompanyName}}" width="20" height="20">{{.Branding.CompanyName}}</a>
         <video id="player" controls crossorigin="anonymous"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
             <source src="{{.VideoURL}}" type="{{.ContentType}}">
             {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
@@ -989,7 +995,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         })();
         {{end}}
         </script>
-        <p class="branding">Shared via <a href="https://sendrec.eu">SendRec</a> — open-source video messaging</p>
+        <p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Shared via <a href="https://sendrec.eu">SendRec</a>{{if not .Branding.FooterText}} — open-source video messaging{{end}}</p>
     </div>
 </body>
 </html>`))
@@ -1095,6 +1101,7 @@ type watchPageData struct {
 	Segments         []TranscriptSegment
 	BaseURL          string
 	ContentType      string
+	Branding         brandingConfig
 }
 
 type expiredPageData struct {
@@ -1105,6 +1112,7 @@ type passwordPageData struct {
 	Title      string
 	ShareToken string
 	Nonce      string
+	Branding   brandingConfig
 }
 
 var passwordPageTemplate = template.Must(template.New("password").Parse(`<!DOCTYPE html>
@@ -1112,12 +1120,12 @@ var passwordPageTemplate = template.Must(template.New("password").Parse(`<!DOCTY
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{.Title}} — SendRec</title>
+    <title>{{.Title}} — {{.Branding.CompanyName}}</title>
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #0a1628;
-            color: #ffffff;
+            background: {{.Branding.ColorBackground}};
+            color: {{.Branding.ColorText}};
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             min-height: 100vh;
             display: flex;
@@ -1133,16 +1141,16 @@ var passwordPageTemplate = template.Must(template.New("password").Parse(`<!DOCTY
             padding: 0.75rem 1rem;
             border-radius: 8px;
             border: 1px solid #334155;
-            background: #1e293b;
+            background: {{.Branding.ColorSurface}};
             color: #fff;
             font-size: 1rem;
             margin-bottom: 1rem;
             outline: none;
         }
-        input[type="password"]:focus { border-color: #00b67a; }
+        input[type="password"]:focus { border-color: {{.Branding.ColorAccent}}; }
         button {
             width: 100%;
-            background: #00b67a;
+            background: {{.Branding.ColorAccent}};
             color: #fff;
             padding: 0.75rem 1.5rem;
             border: none;
@@ -1207,18 +1215,25 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var ownerEmail string
 	var viewNotification *string
 	var contentType string
+	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText *string
+	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
 		        v.transcript_key, v.transcript_json, v.transcript_status,
-		        v.user_id, u.email, v.view_notification, v.content_type
+		        v.user_id, u.email, v.view_notification, v.content_type,
+		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text,
+		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
+		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &commentMode,
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
-		&ownerID, &ownerEmail, &viewNotification, &contentType)
+		&ownerID, &ownerEmail, &viewNotification, &contentType,
+		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText,
+		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1230,6 +1245,19 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nonce := httputil.NonceFromContext(r.Context())
+
+	branding := resolveBranding(r.Context(), h.storage,
+		brandingSettingsResponse{
+			CompanyName: ubCompanyName, LogoKey: ubLogoKey,
+			ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
+			ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
+		},
+		brandingSettingsResponse{
+			CompanyName: vbCompanyName, LogoKey: vbLogoKey,
+			ColorBackground: vbColorBg, ColorSurface: vbColorSurface,
+			ColorText: vbColorText, ColorAccent: vbColorAccent, FooterText: vbFooterText,
+		},
+	)
 
 	if time.Now().After(shareExpiresAt) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1247,6 +1275,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 				Title:      title,
 				ShareToken: shareToken,
 				Nonce:      nonce,
+				Branding:   branding,
 			}); err != nil {
 				log.Printf("failed to render password page: %v", err)
 			}
@@ -1308,6 +1337,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Segments:         segments,
 		BaseURL:          h.baseURL,
 		ContentType:      contentType,
+		Branding:         branding,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

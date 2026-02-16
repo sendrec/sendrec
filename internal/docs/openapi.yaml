@@ -280,9 +280,120 @@ components:
           enum: [null, "off", "every", "first", "digest"]
           description: Set to null to clear the per-video override and use account default.
 
+    BrandingSettingsResponse:
+      type: object
+      properties:
+        companyName:
+          type: string
+          nullable: true
+          maxLength: 200
+        logoKey:
+          type: string
+          nullable: true
+        colorBackground:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        colorSurface:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        colorText:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        colorAccent:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        footerText:
+          type: string
+          nullable: true
+          maxLength: 500
+
+    SetBrandingRequest:
+      type: object
+      properties:
+        companyName:
+          type: string
+          nullable: true
+          maxLength: 200
+        colorBackground:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        colorSurface:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        colorText:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        colorAccent:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        footerText:
+          type: string
+          nullable: true
+          maxLength: 500
+
+    LogoUploadRequest:
+      type: object
+      required: [contentType, contentLength]
+      properties:
+        contentType:
+          type: string
+          enum: [image/png, image/svg+xml]
+        contentLength:
+          type: integer
+          minimum: 1
+          maximum: 524288
+          description: File size in bytes (max 512KB)
+
+    LogoUploadResponse:
+      type: object
+      required: [uploadUrl, logoKey]
+      properties:
+        uploadUrl:
+          type: string
+          description: Presigned S3 URL for direct upload
+        logoKey:
+          type: string
+          description: S3 object key for the logo
+
+    SetVideoBrandingRequest:
+      type: object
+      properties:
+        companyName:
+          type: string
+          nullable: true
+          maxLength: 200
+        colorBackground:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        colorSurface:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        colorText:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        colorAccent:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        footerText:
+          type: string
+          nullable: true
+          maxLength: 500
+
     VideoLimits:
       type: object
-      required: [maxVideosPerMonth, maxVideoDurationSeconds, videosUsedThisMonth]
+      required: [maxVideosPerMonth, maxVideoDurationSeconds, videosUsedThisMonth, brandingEnabled]
       properties:
         maxVideosPerMonth:
           type: integer
@@ -290,6 +401,9 @@ components:
           type: integer
         videosUsedThisMonth:
           type: integer
+        brandingEnabled:
+          type: boolean
+          description: Whether watch page branding customization is enabled
 
     UpdateVideoRequest:
       type: object
@@ -849,6 +963,216 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/branding:
+    get:
+      tags: [Settings]
+      summary: Get branding settings
+      description: Returns the current user's watch page branding customization. Null fields use SendRec defaults. Requires branding to be enabled.
+      operationId: getBrandingSettings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Branding settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingSettingsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Branding not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Settings]
+      summary: Update branding settings
+      description: Sets the account-wide watch page branding. Null or empty fields are stored as NULL (use SendRec defaults). Requires branding to be enabled.
+      operationId: updateBrandingSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetBrandingRequest"
+      responses:
+        "204":
+          description: Branding updated
+        "400":
+          description: Validation error (invalid color, name too long)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Branding not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/branding/logo:
+    post:
+      tags: [Settings]
+      summary: Upload branding logo
+      description: Returns a presigned S3 URL for uploading a custom logo. PNG or SVG, max 512KB. Requires branding to be enabled.
+      operationId: uploadBrandingLogo
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoUploadRequest"
+      responses:
+        "200":
+          description: Upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoUploadResponse"
+        "400":
+          description: Invalid content type or size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Branding not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Settings]
+      summary: Delete branding logo
+      description: Removes the custom logo from S3 and clears the logo key. Requires branding to be enabled.
+      operationId: deleteBrandingLogo
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Logo deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Branding not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/branding:
+    get:
+      tags: [Videos]
+      summary: Get per-video branding overrides
+      description: Returns the raw branding overrides for a specific video (not merged with user defaults). Owner only. Requires branding to be enabled.
+      operationId: getVideoBranding
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Video branding overrides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingSettingsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Branding not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Videos]
+      summary: Set per-video branding overrides
+      description: Sets branding overrides for a specific video. Null or empty fields clear the override (inherit from user defaults). Owner only. Requires branding to be enabled.
+      operationId: setVideoBranding
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVideoBrandingRequest"
+      responses:
+        "204":
+          description: Video branding updated
+        "400":
+          description: Validation error (invalid color, name too long)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Branding not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
           content:
             application/json:
               schema:

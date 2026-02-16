@@ -10,7 +10,7 @@ vi.mock("../api/client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
-const unlimitedLimits = { maxVideosPerMonth: 0, maxVideoDurationSeconds: 0, videosUsedThisMonth: 0 };
+const unlimitedLimits = { maxVideosPerMonth: 0, maxVideoDurationSeconds: 0, videosUsedThisMonth: 0, brandingEnabled: false };
 
 function makeVideo(overrides: Record<string, unknown> = {}) {
   return {
@@ -204,6 +204,7 @@ describe("Library", () => {
       maxVideosPerMonth: 25,
       maxVideoDurationSeconds: 300,
       videosUsedThisMonth: 12,
+      brandingEnabled: false,
     });
     renderLibrary();
 
@@ -217,6 +218,7 @@ describe("Library", () => {
       maxVideosPerMonth: 25,
       maxVideoDurationSeconds: 300,
       videosUsedThisMonth: 10,
+      brandingEnabled: false,
     });
     renderLibrary();
 
@@ -861,6 +863,27 @@ describe("Library", () => {
         method: "PUT",
         body: JSON.stringify({ viewNotification: null }),
       });
+    });
+  });
+
+  describe("branding", () => {
+    it("shows branding action when enabled", async () => {
+      mockFetch([makeVideo()], { ...unlimitedLimits, brandingEnabled: true });
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("Branding")).toBeInTheDocument();
+      });
+    });
+
+    it("hides branding action when disabled", async () => {
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("View")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("Branding")).not.toBeInTheDocument();
     });
   });
 });
