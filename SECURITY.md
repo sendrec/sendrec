@@ -26,9 +26,10 @@ This policy covers the SendRec application:
 
 | Version | Supported |
 | ------- | --------- |
+| Latest release | Yes |
 | main    | Yes       |
 
-We currently support only the latest code on the `main` branch. As we introduce releases, this table will be updated.
+We support the latest release and the `main` branch. Check the [releases page](https://github.com/sendrec/sendrec/releases) for available versions.
 
 ## Recognition
 

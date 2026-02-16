@@ -18,6 +18,7 @@ SendRec is an open-source alternative to Loom for teams that need their data to 
 - **Sharing** — expiring links, password protection, video comments with timestamps and emoji
 - **Analytics** — per-video view tracking with daily charts and summary stats
 - **View notifications** — instant, first-view, or daily digest email notifications when someone watches your video
+- **Custom branding** — personalize watch pages with your logo, company name, colors, and footer text (per-user defaults with per-video overrides)
 - **Email confirmation** — new accounts require email verification before access
 - **Automatic transcription** — videos are transcribed with whisper.cpp, displayed as subtitles and a clickable transcript panel
 

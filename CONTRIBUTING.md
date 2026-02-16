@@ -44,6 +44,7 @@ make run
 
 ```bash
 make test                   # Go tests
+cd web && pnpm test         # Frontend tests
 cd web && pnpm typecheck    # Frontend type checking
 ```
 

@@ -177,7 +177,7 @@ To pin a specific version instead of `latest`:
 ```yaml
 services:
   sendrec:
-    image: ghcr.io/sendrec/sendrec:v1.24.1
+    image: ghcr.io/sendrec/sendrec:v1.25.0
 ```
 
 Check the [releases page](https://github.com/sendrec/sendrec/releases) for available versions and changelogs.
