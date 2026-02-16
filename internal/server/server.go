@@ -33,6 +33,7 @@ type Config struct {
 	S3PublicEndpoint        string
 	EnableDocs              bool
 	BrandingEnabled         bool
+	AllowedFrameAncestors   string
 	AnalyticsScript         string
 	EmailSender             auth.EmailSender
 	CommentNotifier         video.CommentNotifier
@@ -44,6 +45,7 @@ type Server struct {
 	pinger       Pinger
 	authHandler  *auth.Handler
 	videoHandler *video.Handler
+	db           database.DBTX
 	webFS        fs.FS
 	enableDocs   bool
 }
@@ -53,11 +55,12 @@ func New(cfg Config) *Server {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders(SecurityConfig{
-		BaseURL:         cfg.BaseURL,
-		StorageEndpoint: cfg.S3PublicEndpoint,
+		BaseURL:               cfg.BaseURL,
+		StorageEndpoint:       cfg.S3PublicEndpoint,
+		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
 	}))
 
-	s := &Server{router: r, pinger: cfg.Pinger, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs}
+	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -96,6 +99,24 @@ func New(cfg Config) *Server {
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
+}
+
+func apiKeyOrJWTMiddleware(db database.DBTX, jwtMiddleware func(http.Handler) http.Handler) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authHeader := r.Header.Get("Authorization")
+			token, found := strings.CutPrefix(authHeader, "Bearer ")
+			if found {
+				userID, err := auth.LookupAPIKey(r.Context(), db, token)
+				if err == nil {
+					ctx := auth.ContextWithUserID(r.Context(), userID)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+			jwtMiddleware(next).ServeHTTP(w, r)
+		})
+	}
 }
 
 func maxBodySize(maxBytes int64) func(http.Handler) http.Handler {
@@ -151,31 +172,38 @@ func (s *Server) routes() {
 			r.Put("/branding", s.videoHandler.PutBrandingSettings)
 			r.Post("/branding/logo", s.videoHandler.UploadBrandingLogo)
 			r.Delete("/branding/logo", s.videoHandler.DeleteBrandingLogo)
+			r.Post("/api-keys", auth.GenerateAPIKey(s.db))
+			r.Get("/api-keys", auth.ListAPIKeys(s.db))
+			r.Delete("/api-keys/{id}", auth.DeleteAPIKey(s.db))
 		})
 
 		videoLimiter := ratelimit.NewLimiter(2, 10)
 		s.router.Route("/api/videos", func(r chi.Router) {
 			r.Use(videoLimiter.Middleware)
-			r.Use(s.authHandler.Middleware)
 			r.Use(maxBodySize(64 * 1024))
-			r.Post("/", s.videoHandler.Create)
-			r.Post("/upload", s.videoHandler.Upload)
-			r.Get("/limits", s.videoHandler.Limits)
-			r.Get("/", s.videoHandler.List)
-			r.Patch("/{id}", s.videoHandler.Update)
-			r.Delete("/{id}", s.videoHandler.Delete)
-			r.Post("/{id}/extend", s.videoHandler.Extend)
-			r.Get("/{id}/download", s.videoHandler.Download)
-			r.Post("/{id}/trim", s.videoHandler.Trim)
-			r.Post("/{id}/retranscribe", s.videoHandler.Retranscribe)
-			r.Put("/{id}/password", s.videoHandler.SetPassword)
-			r.Put("/{id}/comment-mode", s.videoHandler.SetCommentMode)
-			r.Get("/{id}/comments", s.videoHandler.ListOwnerComments)
-			r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
-			r.Get("/{id}/analytics", s.videoHandler.Analytics)
-			r.Put("/{id}/notifications", s.videoHandler.SetVideoNotification)
-			r.Get("/{id}/branding", s.videoHandler.GetVideoBranding)
-			r.Put("/{id}/branding", s.videoHandler.SetVideoBranding)
+			// List accepts API key OR JWT
+			r.With(apiKeyOrJWTMiddleware(s.db, s.authHandler.Middleware)).Get("/", s.videoHandler.List)
+			// All other endpoints require JWT
+			r.Group(func(r chi.Router) {
+				r.Use(s.authHandler.Middleware)
+				r.Post("/", s.videoHandler.Create)
+				r.Post("/upload", s.videoHandler.Upload)
+				r.Get("/limits", s.videoHandler.Limits)
+				r.Patch("/{id}", s.videoHandler.Update)
+				r.Delete("/{id}", s.videoHandler.Delete)
+				r.Post("/{id}/extend", s.videoHandler.Extend)
+				r.Get("/{id}/download", s.videoHandler.Download)
+				r.Post("/{id}/trim", s.videoHandler.Trim)
+				r.Post("/{id}/retranscribe", s.videoHandler.Retranscribe)
+				r.Put("/{id}/password", s.videoHandler.SetPassword)
+				r.Put("/{id}/comment-mode", s.videoHandler.SetCommentMode)
+				r.Get("/{id}/comments", s.videoHandler.ListOwnerComments)
+				r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
+				r.Get("/{id}/analytics", s.videoHandler.Analytics)
+				r.Put("/{id}/notifications", s.videoHandler.SetVideoNotification)
+				r.Get("/{id}/branding", s.videoHandler.GetVideoBranding)
+				r.Put("/{id}/branding", s.videoHandler.SetVideoBranding)
+			})
 		})
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
 		commentLimiter := ratelimit.NewLimiter(0.2, 3)
@@ -184,6 +212,7 @@ func (s *Server) routes() {
 		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/verify", s.videoHandler.VerifyWatchPassword)
 		s.router.Get("/api/watch/{shareToken}/comments", s.videoHandler.ListWatchComments)
 		s.router.With(commentLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/comments", s.videoHandler.PostWatchComment)
+		s.router.Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 	}
 

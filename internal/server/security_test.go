@@ -158,3 +158,30 @@ func TestSecurityHeaders_NoHSTSOnHTTP(t *testing.T) {
 		t.Errorf("expected no HSTS for HTTP base URL, got: %s", hsts)
 	}
 }
+
+func TestSecurityHeaders_FrameAncestorsDefault(t *testing.T) {
+	handler := securityHeaders(SecurityConfig{BaseURL: "https://app.test"})
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler(inner).ServeHTTP(rec, req)
+	csp := rec.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "frame-ancestors 'self'") {
+		t.Errorf("CSP should contain frame-ancestors 'self', got: %s", csp)
+	}
+}
+
+func TestSecurityHeaders_FrameAncestorsCustom(t *testing.T) {
+	handler := securityHeaders(SecurityConfig{
+		BaseURL:               "https://app.test",
+		AllowedFrameAncestors: "https://nextcloud.example.com https://other.example.com",
+	})
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler(inner).ServeHTTP(rec, req)
+	csp := rec.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "frame-ancestors 'self' https://nextcloud.example.com https://other.example.com") {
+		t.Errorf("CSP should contain custom frame-ancestors, got: %s", csp)
+	}
+}

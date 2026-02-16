@@ -522,23 +522,26 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
 		    v.transcript_status, v.view_notification
 		 FROM videos v
-		 WHERE v.user_id = $1 AND v.status != 'deleted'`
+		 WHERE v.status != 'deleted'`
 
 	var args []any
+	paramIdx := 1
+
+	baseQuery += fmt.Sprintf(` AND v.user_id = $%d`, paramIdx)
 	args = append(args, userID)
+	paramIdx++
 
 	if query != "" {
 		args = append(args, "%"+query+"%")
-		baseQuery += ` AND (v.title ILIKE $2 OR EXISTS (
+		baseQuery += fmt.Sprintf(` AND (v.title ILIKE $%d OR EXISTS (
 			SELECT 1 FROM jsonb_array_elements(v.transcript_json) seg
-			WHERE seg->>'text' ILIKE $2
-		))`
-		baseQuery += ` ORDER BY v.created_at DESC LIMIT $3 OFFSET $4`
-		args = append(args, limit, offset)
-	} else {
-		baseQuery += ` ORDER BY v.created_at DESC LIMIT $2 OFFSET $3`
-		args = append(args, limit, offset)
+			WHERE seg->>'text' ILIKE $%d
+		))`, paramIdx, paramIdx)
+		paramIdx++
 	}
+
+	baseQuery += fmt.Sprintf(` ORDER BY v.created_at DESC LIMIT $%d OFFSET $%d`, paramIdx, paramIdx+1)
+	args = append(args, limit, offset)
 
 	rows, err := h.db.Query(r.Context(), baseQuery, args...)
 	if err != nil {

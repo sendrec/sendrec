@@ -6,6 +6,13 @@ interface UserProfile {
   email: string;
 }
 
+interface APIKeyItem {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 interface BrandingSettings {
   companyName: string | null;
   logoKey: string | null;
@@ -32,6 +39,12 @@ export function Settings() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [viewNotification, setViewNotification] = useState("off");
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [apiKeys, setApiKeys] = useState<APIKeyItem[]>([]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [generatedKey, setGeneratedKey] = useState("");
+  const [apiKeyError, setApiKeyError] = useState("");
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
   const [brandingEnabled, setBrandingEnabled] = useState(false);
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: null, logoKey: null,
@@ -46,10 +59,11 @@ export function Settings() {
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const [result, notifPrefs, limits] = await Promise.all([
+        const [result, notifPrefs, limits, keys] = await Promise.all([
           apiFetch<UserProfile>("/api/user"),
           apiFetch<{ viewNotification: string }>("/api/settings/notifications"),
           apiFetch<{ brandingEnabled: boolean }>("/api/videos/limits"),
+          apiFetch<APIKeyItem[]>("/api/settings/api-keys"),
         ]);
         if (result) {
           setProfile(result);
@@ -57,6 +71,9 @@ export function Settings() {
         }
         if (notifPrefs) {
           setViewNotification(notifPrefs.viewNotification);
+        }
+        if (keys) {
+          setApiKeys(keys);
         }
         if (limits?.brandingEnabled) {
           setBrandingEnabled(true);
@@ -137,6 +154,37 @@ export function Settings() {
     } catch {
       setViewNotification(previous);
       setNotificationMessage("Failed to save");
+    }
+  }
+
+  async function handleCreateAPIKey(event: FormEvent) {
+    event.preventDefault();
+    setApiKeyError("");
+    setGeneratedKey("");
+    setCreatingKey(true);
+    try {
+      const result = await apiFetch<{ id: string; key: string; name: string; createdAt: string }>("/api/settings/api-keys", {
+        method: "POST",
+        body: JSON.stringify({ name: newKeyName.trim() }),
+      });
+      if (!result) throw new Error("Failed to create API key");
+      setGeneratedKey(result.key);
+      setApiKeys((prev) => [{ id: result.id, name: result.name, createdAt: result.createdAt, lastUsedAt: null }, ...prev]);
+      setNewKeyName("");
+    } catch (err) {
+      setApiKeyError(err instanceof Error ? err.message : "Failed to create API key");
+    } finally {
+      setCreatingKey(false);
+    }
+  }
+
+  async function handleDeleteAPIKey(id: string) {
+    setApiKeyError("");
+    try {
+      await apiFetch(`/api/settings/api-keys/${id}`, { method: "DELETE" });
+      setApiKeys((prev) => prev.filter((k) => k.id !== id));
+    } catch (err) {
+      setApiKeyError(err instanceof Error ? err.message : "Failed to delete API key");
     }
   }
 
@@ -346,6 +394,154 @@ export function Settings() {
 
         {notificationMessage && (
           <p style={{ color: notificationMessage === "Failed to save" ? "var(--color-error, #e74c3c)" : "var(--color-accent)", fontSize: 14, margin: 0 }}>{notificationMessage}</p>
+        )}
+      </div>
+
+      <div
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          padding: 24,
+          marginBottom: 24,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>API Keys</h2>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+          Generate API keys for integrations like Nextcloud. Keys are shown only once when created.
+        </p>
+
+        <form onSubmit={handleCreateAPIKey} style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Label</span>
+            <input
+              type="text"
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              placeholder="e.g. My Nextcloud"
+              maxLength={100}
+              style={inputStyle}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={creatingKey}
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              borderRadius: 4,
+              padding: "8px 16px",
+              fontSize: 14,
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              opacity: creatingKey ? 0.7 : 1,
+            }}
+          >
+            {creatingKey ? "Creating..." : "Create key"}
+          </button>
+        </form>
+
+        {generatedKey && (
+          <div
+            style={{
+              background: "var(--color-bg)",
+              border: "1px solid var(--color-accent)",
+              borderRadius: 4,
+              padding: 12,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0, fontWeight: 600 }}>
+              Copy this key now — it won't be shown again
+            </p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <code
+                style={{
+                  color: "var(--color-text)",
+                  fontSize: 13,
+                  background: "var(--color-surface)",
+                  padding: "6px 10px",
+                  borderRadius: 4,
+                  flex: 1,
+                  wordBreak: "break-all",
+                }}
+              >
+                {generatedKey}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(generatedKey);
+                  setCopiedKey(true);
+                  setTimeout(() => setCopiedKey(false), 2000);
+                }}
+                style={{
+                  background: "transparent",
+                  color: "var(--color-text-secondary)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 4,
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {copiedKey ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {apiKeyError && (
+          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{apiKeyError}</p>
+        )}
+
+        {apiKeys.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {apiKeys.map((key) => (
+              <div
+                key={key.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  background: "var(--color-bg)",
+                  borderRadius: 4,
+                  padding: "10px 12px",
+                }}
+              >
+                <div>
+                  <span style={{ color: "var(--color-text)", fontSize: 14 }}>
+                    {key.name || "Unnamed key"}
+                  </span>
+                  <div style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
+                    Created {new Date(key.createdAt).toLocaleDateString()}
+                    {key.lastUsedAt && ` · Last used ${new Date(key.lastUsedAt).toLocaleDateString()}`}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteAPIKey(key.id)}
+                  style={{
+                    background: "transparent",
+                    color: "var(--color-error, #e74c3c)",
+                    border: "1px solid var(--color-error, #e74c3c)",
+                    borderRadius: 4,
+                    padding: "4px 10px",
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

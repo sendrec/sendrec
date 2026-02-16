@@ -445,6 +445,61 @@ components:
           type: string
           enum: [disabled, anonymous, name_required, name_email_required]
 
+    APIKeyItem:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    GenerateAPIKeyResponse:
+      type: object
+      required: [id, key, name, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          description: Plaintext API key (returned only once, starts with `sr_`)
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    OEmbedResponse:
+      type: object
+      required: [title, duration, authorName, watchUrl, createdAt]
+      properties:
+        title:
+          type: string
+        duration:
+          type: integer
+          description: Duration in seconds
+        thumbnailUrl:
+          type: string
+          format: uri
+          description: Presigned thumbnail URL (omitted if no thumbnail)
+        authorName:
+          type: string
+        watchUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+
     DownloadResponse:
       type: object
       required: [downloadUrl]
@@ -1087,6 +1142,99 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: Branding not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/api-keys:
+    get:
+      tags: [Settings]
+      summary: List API keys
+      description: Returns all API keys for the authenticated user. Keys are not returned in plaintext.
+      operationId: listAPIKeys
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/APIKeyItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Settings]
+      summary: Generate API key
+      description: |
+        Creates a new API key for the authenticated user. The plaintext key is returned only once in the response.
+        Maximum 10 keys per user. Keys use the `sr_` prefix.
+      operationId: generateAPIKey
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  description: Optional label for the key (e.g. "My Nextcloud")
+      responses:
+        "201":
+          description: API key created (plaintext key returned only once)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateAPIKeyResponse"
+        "400":
+          description: Validation error or key limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/api-keys/{id}:
+    delete:
+      tags: [Settings]
+      summary: Delete API key
+      operationId: deleteAPIKey
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: API key deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: API key not found
           content:
             application/json:
               schema:
@@ -1771,6 +1919,40 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{shareToken}/oembed:
+    get:
+      tags: [Watch]
+      summary: Get video metadata (oEmbed)
+      description: |
+        Returns basic metadata for a shared video. Used by Nextcloud and other platforms for link previews.
+        No authentication required. Returns 404 if video not found, 410 if share link expired.
+      operationId: oEmbed
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Video metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OEmbedResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Share link expired
           content:
             application/json:
               schema:

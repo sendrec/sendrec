@@ -4478,3 +4478,206 @@ func TestAnalytics_PeakDayAndAverage(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+// --- OEmbed Tests ---
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+func TestOEmbed_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	downloadURL := "https://s3.example.com/thumb?signed=abc"
+	storage := &mockStorage{downloadURL: downloadURL}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 10, 14, 30, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.duration, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title", "duration", "name", "created_at", "share_expires_at", "thumbnail_key"}).
+				AddRow("Demo Recording", 180, "Alex Neamtu", createdAt, shareExpiresAt, stringPtr("thumbnails/user-1/abc.jpg")),
+		)
+
+	r := chi.NewRouter()
+	r.Get("/api/videos/{shareToken}/oembed", handler.OEmbed)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/videos/"+shareToken+"/oembed", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp oEmbedResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.Title != "Demo Recording" {
+		t.Errorf("expected title %q, got %q", "Demo Recording", resp.Title)
+	}
+	if resp.Duration != 180 {
+		t.Errorf("expected duration %d, got %d", 180, resp.Duration)
+	}
+	if resp.AuthorName != "Alex Neamtu" {
+		t.Errorf("expected author %q, got %q", "Alex Neamtu", resp.AuthorName)
+	}
+	if resp.ThumbnailURL != downloadURL {
+		t.Errorf("expected thumbnail URL %q, got %q", downloadURL, resp.ThumbnailURL)
+	}
+	expectedWatchURL := testBaseURL + "/watch/" + shareToken
+	if resp.WatchURL != expectedWatchURL {
+		t.Errorf("expected watch URL %q, got %q", expectedWatchURL, resp.WatchURL)
+	}
+	if resp.CreatedAt != createdAt.Format(time.RFC3339) {
+		t.Errorf("expected created_at %q, got %q", createdAt.Format(time.RFC3339), resp.CreatedAt)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestOEmbed_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "nonexistent12"
+
+	mock.ExpectQuery(`SELECT v.title, v.duration, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
+		WithArgs(shareToken).
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.Get("/api/videos/{shareToken}/oembed", handler.OEmbed)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/videos/"+shareToken+"/oembed", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "video not found" {
+		t.Errorf("expected error %q, got %q", "video not found", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestOEmbed_ExpiredLink(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(-1 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.duration, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title", "duration", "name", "created_at", "share_expires_at", "thumbnail_key"}).
+				AddRow("Demo Recording", 180, "Alex Neamtu", createdAt, shareExpiresAt, (*string)(nil)),
+		)
+
+	r := chi.NewRouter()
+	r.Get("/api/videos/{shareToken}/oembed", handler.OEmbed)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/videos/"+shareToken+"/oembed", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusGone {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusGone, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "link expired" {
+		t.Errorf("expected error %q, got %q", "link expired", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestOEmbed_NoThumbnail(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/thumb?signed=abc"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 10, 14, 30, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.title, v.duration, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title", "duration", "name", "created_at", "share_expires_at", "thumbnail_key"}).
+				AddRow("No Thumb Video", 60, "Jane Doe", createdAt, shareExpiresAt, (*string)(nil)),
+		)
+
+	r := chi.NewRouter()
+	r.Get("/api/videos/{shareToken}/oembed", handler.OEmbed)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/videos/"+shareToken+"/oembed", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp oEmbedResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.Title != "No Thumb Video" {
+		t.Errorf("expected title %q, got %q", "No Thumb Video", resp.Title)
+	}
+	if resp.ThumbnailURL != "" {
+		t.Errorf("expected empty thumbnail URL, got %q", resp.ThumbnailURL)
+	}
+	if resp.Duration != 60 {
+		t.Errorf("expected duration %d, got %d", 60, resp.Duration)
+	}
+	if resp.AuthorName != "Jane Doe" {
+		t.Errorf("expected author %q, got %q", "Jane Doe", resp.AuthorName)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
