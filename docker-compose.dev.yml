@@ -4,13 +4,13 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+    volumes:
+      - garage-keys:/run/garage-keys:ro
     environment:
       - DATABASE_URL=postgres://sendrec:${SENDREC_DB_PASSWORD:-sendrec}@postgres:5432/sendrec?sslmode=disable
       - S3_ENDPOINT=http://garage:3900
       - S3_REGION=${S3_REGION:-eu-central-1}
       - S3_BUCKET=recordings
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-sendrec-dev-key}
-      - S3_SECRET_KEY=${S3_SECRET_KEY:-sendrec-dev-secret}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - BASE_URL=${BASE_URL:-http://localhost:8080}
       - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-524288000}
@@ -51,16 +51,19 @@ services:
       - "3903:3903"
 
   garage-init:
-    image: dxflrs/garage:v2.2.0
+    build:
+      context: .
+      dockerfile: Dockerfile.garage-init
+    network_mode: "service:garage"
     depends_on:
       garage:
         condition: service_started
     volumes:
       - ./garage.toml:/etc/garage.toml:ro
+      - sendrec-storage-meta:/var/lib/garage/meta:ro
+      - garage-keys:/run/garage-keys
       - ./garage-init.sh:/garage-init.sh:ro
     environment:
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-sendrec-dev-key}
-      - S3_SECRET_KEY=${S3_SECRET_KEY:-sendrec-dev-secret}
       - S3_BUCKET=recordings
     entrypoint: ["/bin/sh", "/garage-init.sh"]
 
@@ -68,3 +71,4 @@ volumes:
   sendrec-db:
   sendrec-storage-meta:
   sendrec-storage-data:
+  garage-keys:

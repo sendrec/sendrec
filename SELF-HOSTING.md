@@ -40,18 +40,42 @@ api_bind_addr = "[::]:3903"
 admin_token = "<generate with: openssl rand -base64 32>"
 ```
 
-Then create a `garage-init.sh` script that sets up the bucket and credentials on first start:
+Then create a `garage-init.sh` script that sets up the bucket and credentials on first start. Garage generates its own key IDs (prefixed with `GK`), so the init script creates a key and writes the credentials to a shared volume that the app reads on startup. The init container uses a small Dockerfile (`Dockerfile.garage-init`) that copies the `garage` binary from the Garage image into Alpine:
+
+```dockerfile
+# Dockerfile.garage-init
+FROM dxflrs/garage:v2.2.0 AS garage
+FROM alpine:3.21
+COPY --from=garage /garage /usr/local/bin/garage
+```
 
 ```bash
 #!/bin/sh
 set -e
+S3_BUCKET="${S3_BUCKET:-recordings}"
+GARAGE_KEYS_FILE="${GARAGE_KEYS_FILE:-/run/garage-keys/env}"
+
 until garage status > /dev/null 2>&1; do sleep 1; done
 NODE_ID=$(garage status 2>/dev/null | grep -oE '[a-f0-9]{16}' | head -1)
 garage layout assign -z dc1 -c 1G "${NODE_ID}" 2>/dev/null || true
 garage layout apply --version 1 2>/dev/null || true
-garage key import --yes "${S3_ACCESS_KEY}" "${S3_SECRET_KEY}" 2>/dev/null || true
+
+KEY_INFO=$(garage key create sendrec-key 2>/dev/null || true)
+if [ -z "${KEY_INFO}" ]; then
+  KEY_INFO=$(garage key info sendrec-key 2>/dev/null || true)
+fi
+KEY_ID=$(echo "${KEY_INFO}" | grep -oE 'GK[a-f0-9]{24}' | head -1)
+SECRET=$(echo "${KEY_INFO}" | grep "Secret key" | sed 's/.*: *//')
+
+if [ -n "${KEY_ID}" ] && [ -n "${SECRET}" ]; then
+  mkdir -p "$(dirname "${GARAGE_KEYS_FILE}")"
+  printf 'S3_ACCESS_KEY=%s\nS3_SECRET_KEY=%s\n' "${KEY_ID}" "${SECRET}" > "${GARAGE_KEYS_FILE}"
+fi
+
 garage bucket create "${S3_BUCKET}" 2>/dev/null || true
-garage bucket allow --read --write --owner "${S3_BUCKET}" --key "${S3_ACCESS_KEY}" 2>/dev/null || true
+if [ -n "${KEY_ID}" ]; then
+  garage bucket allow --read --write --owner "${S3_BUCKET}" --key "${KEY_ID}" 2>/dev/null || true
+fi
 ```
 
 ```yaml
@@ -61,6 +85,8 @@ services:
     image: ghcr.io/sendrec/sendrec:latest
     ports:
       - "8080:8080"
+    volumes:
+      - garage-keys:/run/garage-keys:ro
     environment:
       - DATABASE_URL=postgres://sendrec:secret@postgres:5432/sendrec?sslmode=disable
       - JWT_SECRET=change-me-to-a-long-random-string
@@ -68,8 +94,6 @@ services:
       - S3_ENDPOINT=http://garage:3900
       - S3_PUBLIC_ENDPOINT=https://storage.example.com
       - S3_BUCKET=recordings
-      - S3_ACCESS_KEY=your-access-key
-      - S3_SECRET_KEY=your-secret-key
       - AWS_REQUEST_CHECKSUM_CALCULATION=when_required
       - AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
     depends_on:
@@ -101,16 +125,19 @@ services:
       - s3-data:/var/lib/garage/data
 
   garage-init:
-    image: dxflrs/garage:v2.2.0
+    build:
+      context: .
+      dockerfile: Dockerfile.garage-init
+    network_mode: "service:garage"
     depends_on:
       garage:
         condition: service_started
     volumes:
       - ./garage.toml:/etc/garage.toml:ro
+      - s3-meta:/var/lib/garage/meta:ro
+      - garage-keys:/run/garage-keys
       - ./garage-init.sh:/garage-init.sh:ro
     environment:
-      - S3_ACCESS_KEY=your-access-key
-      - S3_SECRET_KEY=your-secret-key
       - S3_BUCKET=recordings
     entrypoint: ["/bin/sh", "/garage-init.sh"]
 
@@ -118,6 +145,7 @@ volumes:
   db-data:
   s3-meta:
   s3-data:
+  garage-keys:
 ```
 
 Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy should route your app domain to port 8080 and your storage domain to Garage port 3900.
@@ -139,8 +167,8 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 | `S3_ENDPOINT` | S3-compatible API endpoint. For Garage in Docker, use the internal hostname (e.g. `http://garage:3900`) | `http://localhost:3900` |
 | `S3_PUBLIC_ENDPOINT` | Public URL for the same S3 service, used to generate presigned URLs that browsers can reach. When Garage runs behind a reverse proxy, this should be the external URL (e.g. `https://storage.example.com`). If not set, `S3_ENDPOINT` is used — which works in dev but breaks in Docker where `S3_ENDPOINT` points to an internal hostname | — |
 | `S3_BUCKET` | Bucket name for video storage | `recordings` |
-| `S3_ACCESS_KEY` | S3 access key | — |
-| `S3_SECRET_KEY` | S3 secret key | — |
+| `S3_ACCESS_KEY` | S3 access key. When using Garage with the init script, this is auto-generated and passed via shared volume | — |
+| `S3_SECRET_KEY` | S3 secret key. When using Garage with the init script, this is auto-generated and passed via shared volume | — |
 | `S3_REGION` | S3 region. Must match the `s3_region` in your `garage.toml` | `eu-central-1` |
 | `AWS_REQUEST_CHECKSUM_CALCULATION` | Set to `when_required` for S3-compatible storage providers | — |
 | `AWS_RESPONSE_CHECKSUM_VALIDATION` | Set to `when_required` for S3-compatible storage providers | — |
