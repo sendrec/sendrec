@@ -445,6 +445,28 @@ components:
           type: string
           enum: [disabled, anonymous, name_required, name_email_required]
 
+    OEmbedResponse:
+      type: object
+      required: [title, duration, authorName, watchUrl, createdAt]
+      properties:
+        title:
+          type: string
+        duration:
+          type: integer
+          description: Duration in seconds
+        thumbnailUrl:
+          type: string
+          format: uri
+          description: Presigned thumbnail URL (omitted if no thumbnail)
+        authorName:
+          type: string
+        watchUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+
     DownloadResponse:
       type: object
       required: [downloadUrl]
@@ -1771,6 +1793,40 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{shareToken}/oembed:
+    get:
+      tags: [Watch]
+      summary: Get video metadata (oEmbed)
+      description: |
+        Returns basic metadata for a shared video. Used by Nextcloud and other platforms for link previews.
+        No authentication required. Returns 404 if video not found, 410 if share link expired.
+      operationId: oEmbed
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Video metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OEmbedResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Share link expired
           content:
             application/json:
               schema:

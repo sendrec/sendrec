@@ -107,6 +107,13 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 |----------|-------------|---------|
 | `ANALYTICS_SCRIPT` | A `<script>` tag to inject on every watch page. Works with any analytics provider (Umami, Plausible, Matomo, etc.). The CSP nonce is added automatically. Example: `<script defer src="/script.js" data-website-id="xxx"></script>` | — |
 
+### Nextcloud integration (optional)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `API_KEY` | API key for machine-to-machine access (used by Nextcloud integration for video search). Generate with `openssl rand -hex 32` | — |
+| `ALLOWED_FRAME_ANCESTORS` | Space-separated list of domains allowed to embed SendRec in iframes (CSP `frame-ancestors`). Set to your Nextcloud URL for rich link previews. Example: `https://nextcloud.example.com` | `'self'` |
+
 ### Transcription (optional)
 
 | Variable | Description | Default |
