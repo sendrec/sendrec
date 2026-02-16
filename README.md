@@ -118,6 +118,7 @@ SendRec is licensed under the [GNU Affero General Public License v3.0](LICENSE).
 ## Links
 
 - **Website:** [sendrec.eu](https://sendrec.eu)
+- **Changelog:** [GitHub Releases](https://github.com/sendrec/sendrec/releases)
 - **API docs:** [app.sendrec.eu/api/docs](https://app.sendrec.eu/api/docs)
 - **Blog:** [sendrec.eu/blog](https://sendrec.eu/blog)
 - **Email:** hello@sendrec.eu
