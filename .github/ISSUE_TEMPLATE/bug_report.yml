@@ -38,7 +38,7 @@ body:
       options:
         - Frontend (React)
         - Backend (Go API)
-        - Storage (S3/MinIO)
+        - Storage (S3/Garage)
         - Database
         - Docker / Deployment
         - Other

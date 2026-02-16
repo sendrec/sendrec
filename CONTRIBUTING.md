@@ -23,7 +23,7 @@ cp .env.example .env
 ```bash
 make docker-up
 # App runs at http://localhost:8080
-# MinIO console at http://localhost:9001 (minioadmin/minioadmin)
+# Garage S3 API at http://localhost:3900
 # PostgreSQL at localhost:5433
 ```
 
@@ -31,12 +31,16 @@ make docker-up
 
 ```bash
 # Start only the dependencies
-docker compose -f docker-compose.dev.yml up postgres minio -d
+docker compose -f docker-compose.dev.yml up postgres garage garage-init -d
+
+# Export Garage-generated S3 credentials for local use
+eval $(docker run --rm -v app_garage-keys:/keys:ro alpine cat /keys/env)
+export S3_ACCESS_KEY S3_SECRET_KEY
 
 # Frontend dev server with hot reload (port 5173, proxies API to 8080)
 make dev-web
 
-# Go server (in another terminal)
+# Go server (in another terminal, also needs the same exports above)
 make run
 ```
 
