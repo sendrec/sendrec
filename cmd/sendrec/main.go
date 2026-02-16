@@ -113,7 +113,6 @@ func main() {
 		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",
 		AllowedFrameAncestors:   os.Getenv("ALLOWED_FRAME_ANCESTORS"),
 		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
-		APIKey:                  os.Getenv("API_KEY"),
 		EmailSender:             emailClient,
 		CommentNotifier:         emailClient,
 		ViewNotifier:            emailClient,

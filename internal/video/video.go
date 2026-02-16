@@ -499,7 +499,6 @@ const maxPageSize = 100
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
-	isAPIKey := userID == "__api_key__"
 
 	limit := defaultPageSize
 	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
@@ -528,11 +527,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	var args []any
 	paramIdx := 1
 
-	if !isAPIKey {
-		baseQuery += fmt.Sprintf(` AND v.user_id = $%d`, paramIdx)
-		args = append(args, userID)
-		paramIdx++
-	}
+	baseQuery += fmt.Sprintf(` AND v.user_id = $%d`, paramIdx)
+	args = append(args, userID)
+	paramIdx++
 
 	if query != "" {
 		args = append(args, "%"+query+"%")

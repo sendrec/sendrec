@@ -35,7 +35,6 @@ type Config struct {
 	BrandingEnabled         bool
 	AllowedFrameAncestors   string
 	AnalyticsScript         string
-	APIKey                  string
 	EmailSender             auth.EmailSender
 	CommentNotifier         video.CommentNotifier
 	ViewNotifier            video.ViewNotifier
@@ -46,9 +45,9 @@ type Server struct {
 	pinger       Pinger
 	authHandler  *auth.Handler
 	videoHandler *video.Handler
+	db           database.DBTX
 	webFS        fs.FS
 	enableDocs   bool
-	apiKey       string
 }
 
 func New(cfg Config) *Server {
@@ -61,7 +60,7 @@ func New(cfg Config) *Server {
 		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
 	}))
 
-	s := &Server{router: r, pinger: cfg.Pinger, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, apiKey: cfg.APIKey}
+	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -102,14 +101,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
 }
 
-func apiKeyOrJWTMiddleware(apiKey string, jwtMiddleware func(http.Handler) http.Handler) func(http.Handler) http.Handler {
+func apiKeyOrJWTMiddleware(db database.DBTX, jwtMiddleware func(http.Handler) http.Handler) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if apiKey != "" {
-				authHeader := r.Header.Get("Authorization")
-				token, found := strings.CutPrefix(authHeader, "Bearer ")
-				if found && token == apiKey {
-					ctx := auth.ContextWithUserID(r.Context(), "__api_key__")
+			authHeader := r.Header.Get("Authorization")
+			token, found := strings.CutPrefix(authHeader, "Bearer ")
+			if found {
+				userID, err := auth.LookupAPIKey(r.Context(), db, token)
+				if err == nil {
+					ctx := auth.ContextWithUserID(r.Context(), userID)
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}
@@ -172,6 +172,9 @@ func (s *Server) routes() {
 			r.Put("/branding", s.videoHandler.PutBrandingSettings)
 			r.Post("/branding/logo", s.videoHandler.UploadBrandingLogo)
 			r.Delete("/branding/logo", s.videoHandler.DeleteBrandingLogo)
+			r.Post("/api-keys", auth.GenerateAPIKey(s.db))
+			r.Get("/api-keys", auth.ListAPIKeys(s.db))
+			r.Delete("/api-keys/{id}", auth.DeleteAPIKey(s.db))
 		})
 
 		videoLimiter := ratelimit.NewLimiter(2, 10)
@@ -179,7 +182,7 @@ func (s *Server) routes() {
 			r.Use(videoLimiter.Middleware)
 			r.Use(maxBodySize(64 * 1024))
 			// List accepts API key OR JWT
-			r.With(apiKeyOrJWTMiddleware(s.apiKey, s.authHandler.Middleware)).Get("/", s.videoHandler.List)
+			r.With(apiKeyOrJWTMiddleware(s.db, s.authHandler.Middleware)).Get("/", s.videoHandler.List)
 			// All other endpoints require JWT
 			r.Group(func(r chi.Router) {
 				r.Use(s.authHandler.Middleware)

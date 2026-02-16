@@ -111,8 +111,9 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `API_KEY` | API key for machine-to-machine access (used by Nextcloud integration for video search). Generate with `openssl rand -hex 32` | — |
 | `ALLOWED_FRAME_ANCESTORS` | Space-separated list of domains allowed to embed SendRec in iframes (CSP `frame-ancestors`). Set to your Nextcloud URL for rich link previews. Example: `https://nextcloud.example.com` | `'self'` |
+
+API keys for machine-to-machine access (used by the Nextcloud integration for video search) are managed per-user in **Settings > API Keys**. Each user generates their own keys — no server-side configuration needed.
 
 ### Transcription (optional)
 
