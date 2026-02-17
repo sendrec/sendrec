@@ -201,6 +201,7 @@ func (s *Server) routes() {
 				r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
 				r.Get("/{id}/analytics", s.videoHandler.Analytics)
 				r.Put("/{id}/notifications", s.videoHandler.SetVideoNotification)
+				r.Put("/{id}/download-enabled", s.videoHandler.SetDownloadEnabled)
 				r.Get("/{id}/branding", s.videoHandler.GetVideoBranding)
 				r.Put("/{id}/branding", s.videoHandler.SetVideoBranding)
 			})

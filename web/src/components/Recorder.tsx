@@ -64,8 +64,6 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       compositingCanvasRef,
       screenVideoRef,
       drawingCanvasRef,
-      captureWidth,
-      captureHeight,
     });
 
   const stopWebcamStream = useCallback(() => {
@@ -161,20 +159,24 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   async function startRecording() {
     try {
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { width: 1920, height: 1080 },
+        video: true,
         audio: true,
       });
       screenStreamRef.current = screenStream;
 
-      // Get actual capture dimensions
-      const videoTrack = screenStream.getVideoTracks()[0];
-      const settings = videoTrack.getSettings();
-      const width = settings.width ?? 1920;
-      const height = settings.height ?? 1080;
+      // Play screen stream on preview video first
+      if (screenVideoRef.current) {
+        screenVideoRef.current.srcObject = screenStream;
+        await screenVideoRef.current.play();
+      }
+
+      // Get actual video frame dimensions (not constrained settings)
+      const width = screenVideoRef.current?.videoWidth || 1920;
+      const height = screenVideoRef.current?.videoHeight || 1080;
       setCaptureWidth(width);
       setCaptureHeight(height);
 
-      // Set canvas dimensions imperatively (before React re-render)
+      // Set canvas dimensions to match actual video frames
       if (compositingCanvasRef.current) {
         compositingCanvasRef.current.width = width;
         compositingCanvasRef.current.height = height;
@@ -184,16 +186,10 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         drawingCanvasRef.current.height = height;
       }
 
-      // Play screen stream on preview video
-      if (screenVideoRef.current) {
-        screenVideoRef.current.srcObject = screenStream;
-        await screenVideoRef.current.play();
-      }
-
       // Start compositing loop
       startCompositing();
 
-      // Get composited stream with audio from original screen stream
+      // Record composited stream (screen + drawing annotations)
       const audioTracks = screenStream.getAudioTracks();
       const compositedStream = getCompositedStream(audioTracks);
       if (!compositedStream) {

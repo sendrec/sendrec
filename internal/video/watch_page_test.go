@@ -22,6 +22,7 @@ var watchPageColumns = []string{
 	"user_id", "email", "view_notification", "content_type",
 	"ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text",
 	"vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text",
+	"download_enabled",
 }
 
 func watchPageRequest(shareToken string) *http.Request {
@@ -92,6 +93,7 @@ func TestWatchPage_Expired_Returns410(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -130,6 +132,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -180,6 +183,7 @@ func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -235,6 +239,7 @@ func TestWatchPage_WithThumbnail_RendersPosterAndOGImage(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -277,6 +282,7 @@ func TestWatchPage_WithoutThumbnail_NoPosterOrOGImage(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -319,6 +325,7 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -369,6 +376,7 @@ func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -414,6 +422,7 @@ func TestWatchPage_NameRequired_RendersNameField(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -456,6 +465,7 @@ func TestWatchPage_NameEmailRequired_RendersBothFields(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -505,6 +515,7 @@ func TestWatchPage_TranscriptReady_RendersSegments(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -560,6 +571,7 @@ func TestWatchPage_TranscriptPending_ShowsQueueMessage(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -599,6 +611,7 @@ func TestWatchPage_TranscriptProcessing_ShowsProgressMessage(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -638,6 +651,7 @@ func TestWatchPage_TranscriptFailed_ShowsFailedMessage(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -677,6 +691,7 @@ func TestWatchPage_StorageError_Returns500(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -712,6 +727,7 @@ func TestWatchPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -758,6 +774,7 @@ func TestWatchPage_PasswordProtected_ValidCookie_ShowsPlayer(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	sig := signWatchCookie(testHMACSecret, shareToken, passwordHash)
@@ -807,6 +824,7 @@ func TestWatchPage_OGMetaTags(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -854,6 +872,7 @@ func TestWatchPage_CrossOriginAttribute(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -893,6 +912,7 @@ func TestWatchPage_PlaysInlineAttribute(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -932,6 +952,7 @@ func TestWatchPage_CSPNonce(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -976,6 +997,7 @@ func TestWatchPage_TitleInHTMLTitle(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -1015,6 +1037,7 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -1058,6 +1081,7 @@ func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -1124,6 +1148,7 @@ func TestWatchPage_RecordsView(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -1223,6 +1248,7 @@ func TestWatchPage_AnalyticsScriptRendered(t *testing.T) {
 			"owner-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -1272,6 +1298,7 @@ func TestWatchPage_NoAnalyticsWhenEmpty(t *testing.T) {
 			"owner-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -1317,6 +1344,7 @@ func TestWatchPage_ResponsiveCSS(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -1359,6 +1387,7 @@ func TestWatchPage_SafariWebMWarningElement(t *testing.T) {
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -1373,6 +1402,98 @@ func TestWatchPage_SafariWebMWarningElement(t *testing.T) {
 	}
 	if !strings.Contains(body, "browser-warning") {
 		t.Error("expected browser-warning CSS class")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestWatchPage_DownloadEnabled_ShowsButton(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	shareToken := "dlenabledtk1"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "Download On", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
+		))
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, `id="download-btn"`) {
+		t.Error("expected download button element in response when download is enabled")
+	}
+	if strings.Contains(body, `controlsList="nodownload"`) {
+		t.Error("expected no controlsList=nodownload when download is enabled")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestWatchPage_DownloadDisabled_HidesButton(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	shareToken := "dldisabledtk"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "Download Off", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			false,
+		))
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if strings.Contains(body, `id="download-btn"`) {
+		t.Error("expected no download button element in response when download is disabled")
+	}
+	if !strings.Contains(body, `controlsList="nodownload"`) {
+		t.Error("expected controlsList=nodownload on video element when download is disabled")
+	}
+	if !strings.Contains(body, `oncontextmenu="return false;"`) {
+		t.Error("expected context menu disabled on video element when download is disabled")
+	}
+	if strings.Contains(body, `og:video`) {
+		t.Error("expected no og:video meta tag when download is disabled")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)

@@ -136,6 +136,7 @@ type listItem struct {
 	CommentCount     int64  `json:"commentCount"`
 	TranscriptStatus  string  `json:"transcriptStatus"`
 	ViewNotification  *string `json:"viewNotification"`
+	DownloadEnabled   bool    `json:"downloadEnabled"`
 }
 
 type updateRequest struct {
@@ -536,7 +537,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
-		    v.transcript_status, v.view_notification
+		    v.transcript_status, v.view_notification, v.download_enabled
 		 FROM videos v
 		 WHERE v.status != 'deleted'`
 
@@ -574,7 +575,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var shareExpiresAt time.Time
 		var thumbnailKey *string
 		var sharePassword *string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -823,13 +824,19 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 	var shareExpiresAt time.Time
 	var sharePassword *string
 	var contentType string
+	var downloadEnabled bool
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT title, file_key, share_expires_at, share_password, content_type FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
+		`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
 		shareToken,
-	).Scan(&title, &fileKey, &shareExpiresAt, &sharePassword, &contentType)
+	).Scan(&title, &fileKey, &shareExpiresAt, &sharePassword, &contentType, &downloadEnabled)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	if !downloadEnabled {
+		httputil.WriteError(w, http.StatusForbidden, "downloads are disabled for this video")
 		return
 	}
 
@@ -853,6 +860,36 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, map[string]string{"downloadUrl": downloadURL})
+}
+
+type setDownloadEnabledRequest struct {
+	DownloadEnabled bool `json:"downloadEnabled"`
+}
+
+func (h *Handler) SetDownloadEnabled(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setDownloadEnabledRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET download_enabled = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
+		req.DownloadEnabled, videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not update download setting")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func viewerHash(ip, userAgent string) string {

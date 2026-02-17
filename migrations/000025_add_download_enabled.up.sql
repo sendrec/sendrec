@@ -1,0 +1,1 @@
+ALTER TABLE videos ADD COLUMN download_enabled BOOLEAN NOT NULL DEFAULT true;

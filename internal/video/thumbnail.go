@@ -19,7 +19,7 @@ func extractFrame(inputPath, outputPath string) error {
 		"-i", inputPath,
 		"-ss", "2",
 		"-frames:v", "1",
-		"-vf", "scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2",
+		"-vf", "scale=640:-1",
 		"-q:v", "5",
 		"-y",
 		outputPath,

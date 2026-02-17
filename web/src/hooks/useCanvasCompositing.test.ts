@@ -59,8 +59,6 @@ describe("useCanvasCompositing", () => {
         compositingCanvasRef,
         screenVideoRef,
         drawingCanvasRef,
-        captureWidth: 1920,
-        captureHeight: 1080,
       }),
     );
 
@@ -75,8 +73,6 @@ describe("useCanvasCompositing", () => {
         compositingCanvasRef,
         screenVideoRef,
         drawingCanvasRef,
-        captureWidth: 1920,
-        captureHeight: 1080,
       }),
     );
 
@@ -90,16 +86,12 @@ describe("useCanvasCompositing", () => {
       screenVideo,
       0,
       0,
-      1920,
-      1080,
     );
     expect(compositingCtx.drawImage).toHaveBeenNthCalledWith(
       2,
       drawingCanvas,
       0,
       0,
-      1920,
-      1080,
     );
   });
 
@@ -109,8 +101,6 @@ describe("useCanvasCompositing", () => {
         compositingCanvasRef,
         screenVideoRef,
         drawingCanvasRef,
-        captureWidth: 1920,
-        captureHeight: 1080,
       }),
     );
 
@@ -127,8 +117,6 @@ describe("useCanvasCompositing", () => {
         compositingCanvasRef,
         screenVideoRef,
         drawingCanvasRef,
-        captureWidth: 1920,
-        captureHeight: 1080,
       }),
     );
 
@@ -147,8 +135,6 @@ describe("useCanvasCompositing", () => {
         compositingCanvasRef,
         screenVideoRef,
         drawingCanvasRef,
-        captureWidth: 1920,
-        captureHeight: 1080,
       }),
     );
 
