@@ -226,6 +226,7 @@ func TestCreate_Success(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-123"))
 
@@ -281,6 +282,7 @@ func TestCreate_DefaultTitleWhenEmpty(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Untitled Recording",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -355,6 +357,7 @@ func TestCreate_DatabaseError(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnError(errors.New("connection refused"))
 
@@ -398,6 +401,7 @@ func TestCreate_StorageError(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Test Video",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -489,6 +493,7 @@ func TestCreate_AllowsDurationWithinLimit(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-ok"))
 
@@ -527,6 +532,7 @@ func TestCreate_AllowsAnyDurationWhenLimitIsZero(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Very Long Video",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -621,6 +627,7 @@ func TestCreate_AllowsWhenBelowMonthlyLimit(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-25"))
 
@@ -660,6 +667,7 @@ func TestCreate_SkipsMonthlyCheckWhenLimitIsZero(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Unlimited Video",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -748,6 +756,7 @@ func TestCreate_WithWebcam_ReturnsWebcamUploadURL(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-webcam"))
 
@@ -803,6 +812,7 @@ func TestCreate_WithoutWebcam_OmitsWebcamUploadURL(t *testing.T) {
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-noweb"))
 
@@ -828,6 +838,91 @@ func TestCreate_WithoutWebcam_OmitsWebcamUploadURL(t *testing.T) {
 	}
 	if _, exists := resp["webcamUploadUrl"]; exists {
 		t.Errorf("expected webcamUploadUrl to be absent, got %v", resp["webcamUploadUrl"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_WithContentTypeMp4(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"Camera Recording",
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			"video/mp4",
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-mp4"))
+
+	body, _ := json.Marshal(createRequest{
+		Title:       "Camera Recording",
+		Duration:    30,
+		FileSize:    2000000,
+		ContentType: "video/mp4",
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	var resp createResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.ID != "video-mp4" {
+		t.Errorf("expected video ID %q, got %q", "video-mp4", resp.ID)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_RejectsInvalidContentType(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	body, _ := json.Marshal(createRequest{
+		Title:       "Bad Type",
+		Duration:    30,
+		FileSize:    2000000,
+		ContentType: "video/avi",
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -2027,6 +2122,7 @@ func TestCreate_FileKeyContainsUserIDAndShareToken(t *testing.T) {
 		WithArgs(
 			testUserID,
 			"Test Video",
+			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),

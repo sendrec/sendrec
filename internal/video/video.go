@@ -109,6 +109,7 @@ type createRequest struct {
 	Duration       int    `json:"duration"`
 	FileSize       int64  `json:"fileSize"`
 	WebcamFileSize int64  `json:"webcamFileSize,omitempty"`
+	ContentType    string `json:"contentType,omitempty"`
 }
 
 type createResponse struct {
@@ -209,13 +210,22 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	contentType := req.ContentType
+	if contentType == "" {
+		contentType = "video/webm"
+	}
+	if contentType != "video/webm" && contentType != "video/mp4" {
+		httputil.WriteError(w, http.StatusBadRequest, "only video/webm and video/mp4 recordings are supported")
+		return
+	}
+
 	shareToken, err := generateShareToken()
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate share token")
 		return
 	}
 
-	fileKey := videoFileKey(userID, shareToken, "video/webm")
+	fileKey := videoFileKey(userID, shareToken, contentType)
 
 	var webcamKey *string
 	if req.WebcamFileSize > 0 {
@@ -225,16 +235,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var videoID string
 	err = h.db.QueryRow(r.Context(),
-		`INSERT INTO videos (user_id, title, duration, file_size, file_key, share_token, webcam_key)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-		userID, title, req.Duration, req.FileSize, fileKey, shareToken, webcamKey,
+		`INSERT INTO videos (user_id, title, duration, file_size, file_key, share_token, webcam_key, content_type)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		userID, title, req.Duration, req.FileSize, fileKey, shareToken, webcamKey, contentType,
 	).Scan(&videoID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create video")
 		return
 	}
 
-	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), fileKey, "video/webm", req.FileSize, 30*time.Minute)
+	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), fileKey, contentType, req.FileSize, 30*time.Minute)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate upload URL")
 		return
