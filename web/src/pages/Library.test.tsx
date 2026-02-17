@@ -864,7 +864,7 @@ describe("Library", () => {
       expect.stringContaining("/embed/")
     );
 
-    expect(screen.getByRole("button", { name: "Copied!" })).toBeInTheDocument();
+    expect(screen.getByText("Embed code copied")).toBeInTheDocument();
   });
 
   it("shows analytics link for ready videos", async () => {
@@ -877,7 +877,7 @@ describe("Library", () => {
     });
   });
 
-  it("shows Copied! after copying link", async () => {
+  it("shows toast after copying link", async () => {
     const user = userEvent.setup();
     const writeTextSpy = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
@@ -895,7 +895,7 @@ describe("Library", () => {
     await user.click(screen.getByRole("button", { name: "Copy link" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Copied!" })).toBeInTheDocument();
+      expect(screen.getByText("Link copied")).toBeInTheDocument();
     });
   });
 
