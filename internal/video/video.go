@@ -1101,6 +1101,21 @@ func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	var shareExpiresAt *time.Time
+	err := h.db.QueryRow(r.Context(),
+		`SELECT share_expires_at FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	).Scan(&shareExpiresAt)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	if shareExpiresAt == nil {
+		httputil.WriteError(w, http.StatusBadRequest, "link does not expire")
+		return
+	}
+
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now()
 		 WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
