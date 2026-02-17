@@ -81,6 +81,7 @@ export function Library() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [extendingId, setExtendingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedEmbedId, setCopiedEmbedId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -657,14 +658,13 @@ export function Library() {
                           onClick={() => {
                             const snippet = `<iframe src="${window.location.origin}/embed/${video.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
                             navigator.clipboard.writeText(snippet);
-                            setCopiedId(video.id);
-                            setTimeout(() => setCopiedId(null), 2000);
-                            setOpenMenuId(null);
+                            setCopiedEmbedId(video.id);
+                            setTimeout(() => setCopiedEmbedId(null), 2000);
                           }}
                           className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: copiedEmbedId === video.id ? "var(--color-accent)" : undefined }}
                         >
-                          Embed
+                          {copiedEmbedId === video.id ? "Copied!" : "Embed"}
                         </button>
                         <button
                           onClick={() => { toggleLinkExpiry(video); setOpenMenuId(null); }}

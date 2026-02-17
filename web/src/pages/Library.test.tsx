@@ -863,6 +863,8 @@ describe("Library", () => {
     expect(writeTextMock).toHaveBeenCalledWith(
       expect.stringContaining("/embed/")
     );
+
+    expect(screen.getByRole("button", { name: "Copied!" })).toBeInTheDocument();
   });
 
   it("shows analytics link for ready videos", async () => {
