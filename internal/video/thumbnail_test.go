@@ -370,3 +370,72 @@ func TestUploadThumbnail_VideoNotFound(t *testing.T) {
 		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
 }
+
+// --- ResetThumbnail handler ---
+
+func TestResetThumbnail_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-reset-1"
+	shareToken := "resettoken123"
+	fileKey := "recordings/" + testUserID + "/resettoken123.webm"
+	thumbKey := "recordings/" + testUserID + "/resettoken123.jpg"
+
+	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"share_token", "file_key", "thumbnail_key"}).AddRow(shareToken, fileKey, &thumbKey))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Delete("/api/videos/{id}/thumbnail", handler.ResetThumbnail)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodDelete, "/api/videos/"+videoID+"/thumbnail", nil))
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusAccepted, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestResetThumbnail_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+		WithArgs("nonexistent-video", testUserID).
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Delete("/api/videos/{id}/thumbnail", handler.ResetThumbnail)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodDelete, "/api/videos/nonexistent-video/thumbnail", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	resetErrMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if resetErrMsg != "video not found" {
+		t.Errorf("unexpected error: %s", resetErrMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}

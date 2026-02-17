@@ -73,6 +73,32 @@ func (h *Handler) UploadThumbnail(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, thumbnailUploadResponse{UploadURL: uploadURL})
 }
 
+func (h *Handler) ResetThumbnail(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var shareToken, fileKey string
+	var thumbKey *string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
+		videoID, userID,
+	).Scan(&shareToken, &fileKey, &thumbKey)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	thumbnailKey := thumbnailFileKey(userID, shareToken)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	go func() {
+		defer cancel()
+		GenerateThumbnail(ctx, h.db, h.storage, videoID, fileKey, thumbnailKey)
+	}()
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func thumbnailFileKey(userID, shareToken string) string {
 	return fmt.Sprintf("recordings/%s/%s.jpg", userID, shareToken)
 }
