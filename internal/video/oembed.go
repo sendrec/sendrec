@@ -24,7 +24,7 @@ func (h *Handler) OEmbed(w http.ResponseWriter, r *http.Request) {
 	var duration int
 	var authorName string
 	var createdAt time.Time
-	var shareExpiresAt time.Time
+	var shareExpiresAt *time.Time
 	var thumbnailKey *string
 
 	err := h.db.QueryRow(r.Context(),
@@ -39,7 +39,7 @@ func (h *Handler) OEmbed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if time.Now().After(shareExpiresAt) {
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
 	}

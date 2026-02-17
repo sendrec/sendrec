@@ -87,7 +87,7 @@ func TestWatchPage_Expired_Returns410(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Old Video", "recordings/u1/old.webm", "Alice", createdAt, expiredAt,
+			"vid-1", "Old Video", "recordings/u1/old.webm", "Alice", createdAt, &expiredAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -126,7 +126,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "My Demo", "recordings/u1/abc.webm", "Bob Smith", createdAt, expiresAt,
+			"vid-1", "My Demo", "recordings/u1/abc.webm", "Bob Smith", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -177,7 +177,7 @@ func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Speed Test", "recordings/u1/speed.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Speed Test", "recordings/u1/speed.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -233,7 +233,7 @@ func TestWatchPage_WithThumbnail_RendersPosterAndOGImage(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Thumb Video", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Thumb Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			&thumbKey, (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -276,7 +276,7 @@ func TestWatchPage_WithoutThumbnail_NoPosterOrOGImage(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "No Thumb", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "No Thumb", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -319,7 +319,7 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Comments Video", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Comments Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "anonymous",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -370,7 +370,7 @@ func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "No Comments", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "No Comments", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -416,7 +416,7 @@ func TestWatchPage_NameRequired_RendersNameField(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Name Required", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Name Required", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "name_required",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -459,7 +459,7 @@ func TestWatchPage_NameEmailRequired_RendersBothFields(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Email Required", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Email Required", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "name_email_required",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -509,7 +509,7 @@ func TestWatchPage_TranscriptReady_RendersSegments(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Transcribed", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Transcribed", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			&transcriptKey, &segStr, "ready",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -565,7 +565,7 @@ func TestWatchPage_TranscriptPending_ShowsQueueMessage(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Pending Trans", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Pending Trans", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "pending",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -605,7 +605,7 @@ func TestWatchPage_TranscriptProcessing_ShowsProgressMessage(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Processing Trans", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Processing Trans", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "processing",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -645,7 +645,7 @@ func TestWatchPage_TranscriptFailed_ShowsFailedMessage(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Failed Trans", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Failed Trans", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "failed",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -685,7 +685,7 @@ func TestWatchPage_StorageError_Returns500(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Storage Error", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Storage Error", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -721,7 +721,7 @@ func TestWatchPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Protected Video", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Protected Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), &passwordHash, "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -768,7 +768,7 @@ func TestWatchPage_PasswordProtected_ValidCookie_ShowsPlayer(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Protected OK", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Protected OK", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), &passwordHash, "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -818,7 +818,7 @@ func TestWatchPage_OGMetaTags(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "OG Tags Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "OG Tags Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -866,7 +866,7 @@ func TestWatchPage_CrossOriginAttribute(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "CORS Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "CORS Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -906,7 +906,7 @@ func TestWatchPage_PlaysInlineAttribute(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Inline Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Inline Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -946,7 +946,7 @@ func TestWatchPage_CSPNonce(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Nonce Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Nonce Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -991,7 +991,7 @@ func TestWatchPage_TitleInHTMLTitle(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "My Special Recording", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "My Special Recording", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1031,7 +1031,7 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Autoplay", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Autoplay", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1075,7 +1075,7 @@ func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Branding Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Branding Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1142,7 +1142,7 @@ func TestWatchPage_RecordsView(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "My Demo", "recordings/u1/abc.webm", "Bob Smith", createdAt, expiresAt,
+			"vid-1", "My Demo", "recordings/u1/abc.webm", "Bob Smith", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1242,7 +1242,7 @@ func TestWatchPage_AnalyticsScriptRendered(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Analytics Test", "recordings/u1/abc.webm", "Bob", createdAt, expiresAt,
+			"vid-1", "Analytics Test", "recordings/u1/abc.webm", "Bob", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1292,7 +1292,7 @@ func TestWatchPage_NoAnalyticsWhenEmpty(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "No Analytics", "recordings/u1/abc.webm", "Bob", createdAt, expiresAt,
+			"vid-1", "No Analytics", "recordings/u1/abc.webm", "Bob", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1338,7 +1338,7 @@ func TestWatchPage_ResponsiveCSS(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Responsive", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Responsive", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1381,7 +1381,7 @@ func TestWatchPage_SafariWebMWarningElement(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Safari Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Safari Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1424,7 +1424,7 @@ func TestWatchPage_DownloadEnabled_ShowsButton(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Download On", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Download On", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1467,7 +1467,7 @@ func TestWatchPage_DownloadDisabled_HidesButton(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "Download Off", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "Download Off", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1519,7 +1519,7 @@ func TestWatchPage_CustomCSS_Injected(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "CSS Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "CSS Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1561,7 +1561,7 @@ func TestWatchPage_NoCustomCSS(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
-			"vid-1", "No CSS Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			"vid-1", "No CSS Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
@@ -1579,6 +1579,53 @@ func TestWatchPage_NoCustomCSS(t *testing.T) {
 
 	if strings.Contains(body, "font-family: 'Inter'") {
 		t.Error("expected no custom CSS when NULL")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestWatchPage_NeverExpires(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	createdAt := time.Now().Add(-30 * 24 * time.Hour)
+
+	mock.ExpectQuery("SELECT v.id").
+		WithArgs("token-never").
+		WillReturnRows(
+			pgxmock.NewRows(watchPageColumns).AddRow(
+				"vid-1", "Never Expire Video", "recordings/u1/abc.webm", "Bob", createdAt, (*time.Time)(nil),
+				(*string)(nil), (*string)(nil), "disabled",
+				(*string)(nil), (*string)(nil), "none",
+				"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+				(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+				(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+				true,
+			),
+		)
+
+	mock.ExpectExec("INSERT INTO video_views").
+		WithArgs("vid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	req := watchPageRequest("token-never")
+	rec := serveWatchPage(handler, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Never Expire Video") {
+		t.Error("expected video title in response")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

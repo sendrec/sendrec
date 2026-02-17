@@ -676,7 +676,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var fileKey string
 	var creator string
 	var createdAt time.Time
-	var shareExpiresAt time.Time
+	var shareExpiresAt *time.Time
 	var thumbnailKey *string
 	var sharePassword *string
 	var transcriptKey *string
@@ -710,7 +710,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if time.Now().After(shareExpiresAt) {
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
 	}
@@ -822,7 +822,7 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 
 	var title string
 	var fileKey string
-	var shareExpiresAt time.Time
+	var shareExpiresAt *time.Time
 	var sharePassword *string
 	var contentType string
 	var downloadEnabled bool
@@ -841,7 +841,7 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if time.Now().After(shareExpiresAt) {
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
 	}
