@@ -11,7 +11,7 @@ interface Video {
   shareToken: string;
   shareUrl: string;
   createdAt: string;
-  shareExpiresAt: string;
+  shareExpiresAt: string | null;
   viewCount: number;
   uniqueViewCount: number;
   thumbnailUrl?: string;
@@ -58,7 +58,10 @@ const commentModeLabels: Record<string, string> = {
 
 const commentModeOrder = ["disabled", "anonymous", "name_required", "name_email_required"];
 
-function expiryLabel(shareExpiresAt: string): { text: string; expired: boolean } {
+function expiryLabel(shareExpiresAt: string | null): { text: string; expired: boolean } {
+  if (shareExpiresAt === null) {
+    return { text: "Never expires", expired: false };
+  }
   const expiry = new Date(shareExpiresAt);
   const now = new Date();
   if (expiry <= now) {
@@ -204,6 +207,16 @@ export function Library() {
     } finally {
       setExtendingId(null);
     }
+  }
+
+  async function toggleLinkExpiry(video: Video) {
+    const neverExpires = video.shareExpiresAt !== null;
+    await apiFetch(`/api/videos/${video.id}/link-expiry`, {
+      method: "PUT",
+      body: JSON.stringify({ neverExpires }),
+    });
+    const result = await apiFetch<Video[]>("/api/videos");
+    setVideos(result ?? []);
   }
 
   async function addPassword(id: string) {
@@ -496,7 +509,7 @@ export function Library() {
                   {video.status === "ready" && (() => {
                     const expiry = expiryLabel(video.shareExpiresAt);
                     return (
-                      <span style={{ color: expiry.expired ? "var(--color-error)" : "var(--color-text-secondary)", marginLeft: 8 }}>
+                      <span style={{ color: video.shareExpiresAt === null ? "var(--color-accent)" : expiry.expired ? "var(--color-error)" : "var(--color-text-secondary)", marginLeft: 8 }}>
                         &middot; {expiry.text}
                       </span>
                     );
@@ -575,14 +588,25 @@ export function Library() {
                   >
                     Trim
                   </button>
+                  {video.shareExpiresAt !== null && (
+                    <>
+                      <span className="action-sep">&middot;</span>
+                      <button
+                        onClick={() => extendVideo(video.id)}
+                        disabled={extendingId === video.id}
+                        className="action-link"
+                        style={{ opacity: extendingId === video.id ? 0.5 : undefined }}
+                      >
+                        {extendingId === video.id ? "Extending..." : "Extend"}
+                      </button>
+                    </>
+                  )}
                   <span className="action-sep">&middot;</span>
                   <button
-                    onClick={() => extendVideo(video.id)}
-                    disabled={extendingId === video.id}
+                    onClick={() => toggleLinkExpiry(video)}
                     className="action-link"
-                    style={{ opacity: extendingId === video.id ? 0.5 : undefined }}
                   >
-                    {extendingId === video.id ? "Extending..." : "Extend"}
+                    {video.shareExpiresAt === null ? "Set expiry" : "Remove expiry"}
                   </button>
                   <span className="action-sep">&middot;</span>
                   <button

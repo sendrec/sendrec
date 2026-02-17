@@ -928,4 +928,80 @@ describe("Library", () => {
       });
     });
   });
+
+  describe("link expiry toggle", () => {
+    it("shows Never expires when shareExpiresAt is null", async () => {
+      mockFetch([makeVideo({ shareExpiresAt: null })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Never expires/)).toBeInTheDocument();
+      });
+    });
+
+    it("hides Extend button when shareExpiresAt is null", async () => {
+      mockFetch([makeVideo({ shareExpiresAt: null })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Never expires/)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText("Extend")).not.toBeInTheDocument();
+    });
+
+    it("shows Set expiry button when shareExpiresAt is null", async () => {
+      mockFetch([makeVideo({ shareExpiresAt: null })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("Set expiry")).toBeInTheDocument();
+      });
+    });
+
+    it("shows Remove expiry button when shareExpiresAt is set", async () => {
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("Remove expiry")).toBeInTheDocument();
+      });
+    });
+
+    it("calls API to remove expiry", async () => {
+      mockFetch([makeVideo()]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      mockApiFetch.mockResolvedValueOnce([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("Remove expiry")).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByText("Remove expiry"));
+
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/link-expiry", {
+        method: "PUT",
+        body: JSON.stringify({ neverExpires: true }),
+      });
+    });
+
+    it("calls API to set expiry", async () => {
+      mockFetch([makeVideo({ shareExpiresAt: null })]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      mockApiFetch.mockResolvedValueOnce([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("Set expiry")).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByText("Set expiry"));
+
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/link-expiry", {
+        method: "PUT",
+        body: JSON.stringify({ neverExpires: false }),
+      });
+    });
+  });
 });

@@ -1258,7 +1258,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var fileKey string
 	var creator string
 	var createdAt time.Time
-	var shareExpiresAt time.Time
+	var shareExpiresAt *time.Time
 	var thumbnailKey *string
 	var sharePassword *string
 	var commentMode string
@@ -1318,7 +1318,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 
-	if time.Now().After(shareExpiresAt) {
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusGone)
 		if err := expiredPageTemplate.Execute(w, expiredPageData{Nonce: nonce}); err != nil {

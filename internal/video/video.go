@@ -127,7 +127,7 @@ type listItem struct {
 	ShareToken      string `json:"shareToken"`
 	ShareURL        string `json:"shareUrl"`
 	CreatedAt       string `json:"createdAt"`
-	ShareExpiresAt  string `json:"shareExpiresAt"`
+	ShareExpiresAt  *string `json:"shareExpiresAt"`
 	ViewCount       int64  `json:"viewCount"`
 	UniqueViewCount int64  `json:"uniqueViewCount"`
 	ThumbnailURL    string `json:"thumbnailUrl,omitempty"`
@@ -572,7 +572,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item listItem
 		var createdAt time.Time
-		var shareExpiresAt time.Time
+		var shareExpiresAt *time.Time
 		var thumbnailKey *string
 		var sharePassword *string
 		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled); err != nil {
@@ -580,7 +580,10 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		item.CreatedAt = createdAt.Format(time.RFC3339)
-		item.ShareExpiresAt = shareExpiresAt.Format(time.RFC3339)
+		if shareExpiresAt != nil {
+			formatted := shareExpiresAt.Format(time.RFC3339)
+			item.ShareExpiresAt = &formatted
+		}
 		item.ShareURL = h.baseURL + "/watch/" + item.ShareToken
 		item.HasPassword = sharePassword != nil
 		if thumbnailKey != nil {
@@ -676,7 +679,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var fileKey string
 	var creator string
 	var createdAt time.Time
-	var shareExpiresAt time.Time
+	var shareExpiresAt *time.Time
 	var thumbnailKey *string
 	var sharePassword *string
 	var transcriptKey *string
@@ -710,7 +713,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if time.Now().After(shareExpiresAt) {
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
 	}
@@ -822,7 +825,7 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 
 	var title string
 	var fileKey string
-	var shareExpiresAt time.Time
+	var shareExpiresAt *time.Time
 	var sharePassword *string
 	var contentType string
 	var downloadEnabled bool
@@ -841,7 +844,7 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if time.Now().After(shareExpiresAt) {
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
 	}
@@ -883,6 +886,41 @@ func (h *Handler) SetDownloadEnabled(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update download setting")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+
+type setLinkExpiryRequest struct {
+	NeverExpires bool `json:"neverExpires"`
+}
+
+func (h *Handler) SetLinkExpiry(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setLinkExpiryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	var query string
+	if req.NeverExpires {
+		query = `UPDATE videos SET share_expires_at = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+	} else {
+		query = `UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+	}
+
+	tag, err := h.db.Exec(r.Context(), query, videoID, userID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not update link expiry")
 		return
 	}
 	if tag.RowsAffected() == 0 {
@@ -1065,6 +1103,21 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
+
+	var shareExpiresAt *time.Time
+	err := h.db.QueryRow(r.Context(),
+		`SELECT share_expires_at FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	).Scan(&shareExpiresAt)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	if shareExpiresAt == nil {
+		httputil.WriteError(w, http.StatusBadRequest, "link does not expire")
+		return
+	}
 
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now()
