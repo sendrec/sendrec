@@ -29,6 +29,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     commentCount: 0,
     transcriptStatus: "none",
     viewNotification: null,
+    downloadEnabled: true,
     ...overrides,
   };
 }
@@ -888,6 +889,43 @@ describe("Library", () => {
         expect(screen.getByText("View")).toBeInTheDocument();
       });
       expect(screen.queryByText("Branding")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("download toggle", () => {
+    it("shows Downloads on when enabled", async () => {
+      mockFetch([makeVideo({ downloadEnabled: true })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("Downloads on")).toBeInTheDocument();
+      });
+    });
+
+    it("shows Downloads off when disabled", async () => {
+      mockFetch([makeVideo({ downloadEnabled: false })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("Downloads off")).toBeInTheDocument();
+      });
+    });
+
+    it("calls API to toggle download off", async () => {
+      mockFetch([makeVideo({ downloadEnabled: true })]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("Downloads on")).toBeInTheDocument();
+      });
+
+      await userEvent.click(screen.getByText("Downloads on"));
+
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/download-enabled", {
+        method: "PUT",
+        body: JSON.stringify({ downloadEnabled: false }),
+      });
     });
   });
 });

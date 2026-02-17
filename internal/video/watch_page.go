@@ -30,8 +30,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
     <title>{{.Title}} — {{.Branding.CompanyName}}</title>
     <meta property="og:title" content="{{.Title}}">
     <meta property="og:type" content="video.other">
-    <meta property="og:video" content="{{.VideoURL}}">
-    <meta property="og:video:type" content="{{.ContentType}}">
+    {{if .DownloadEnabled}}<meta property="og:video" content="{{.VideoURL}}">
+    <meta property="og:video:type" content="{{.ContentType}}">{{end}}
     {{if .ThumbnailURL}}<meta property="og:image" content="{{.ThumbnailURL}}">{{end}}
     <meta property="og:site_name" content="{{.Branding.CompanyName}}">
     <style nonce="{{.Nonce}}">
@@ -534,7 +534,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 <body>
     <div class="container">
         <a href="{{.BaseURL}}" class="logo">{{if .Branding.LogoURL}}<img src="{{.Branding.LogoURL}}" alt="{{.Branding.CompanyName}}" width="20" height="20">{{end}}{{.Branding.CompanyName}}</a>
-        <video id="player" controls playsinline webkit-playsinline crossorigin="anonymous"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
+        <video id="player" controls playsinline webkit-playsinline crossorigin="anonymous"{{if not .DownloadEnabled}} controlsList="nodownload" oncontextmenu="return false;"{{end}}{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
             <source src="{{.VideoURL}}" type="{{.ContentType}}">
             {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
             Your browser does not support video playback.
@@ -564,7 +564,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
         <div class="actions">
-            <button class="download-btn" id="download-btn">Download</button>
+            {{if .DownloadEnabled}}<button class="download-btn" id="download-btn">Download</button>{{end}}
             <div class="speed-controls">
                 <button class="speed-btn" data-speed="0.5">0.5x</button>
                 <button class="speed-btn active" data-speed="1">1x</button>
@@ -573,11 +573,13 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             </div>
         </div>
         <script nonce="{{.Nonce}}">
+            {{if .DownloadEnabled}}
             document.getElementById('download-btn').addEventListener('click', function() {
                 fetch('/api/watch/{{.ShareToken}}/download')
                     .then(function(r) { return r.json(); })
                     .then(function(data) { if (data.downloadUrl) window.location.href = data.downloadUrl; });
             });
+            {{end}}
             (function() {
                 var player = document.getElementById('player');
                 var buttons = document.querySelectorAll('.speed-btn');
@@ -1144,6 +1146,7 @@ type watchPageData struct {
 	ContentType      string
 	Branding         brandingConfig
 	AnalyticsScript  template.HTML
+	DownloadEnabled  bool
 }
 
 type expiredPageData struct {
@@ -1267,13 +1270,15 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var contentType string
 	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
+	var downloadEnabled bool
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
 		        v.transcript_key, v.transcript_json, v.transcript_status,
 		        v.user_id, u.email, v.view_notification, v.content_type,
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text,
-		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text
+		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
+		        v.download_enabled
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
@@ -1283,7 +1288,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
 		&ownerID, &ownerEmail, &viewNotification, &contentType,
 		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText,
-		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText)
+		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
+		&downloadEnabled)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1391,6 +1397,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		ContentType:      contentType,
 		Branding:         branding,
 		AnalyticsScript:  injectScriptNonce(h.analyticsScript, nonce),
+		DownloadEnabled:  downloadEnabled,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

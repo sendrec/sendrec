@@ -5,8 +5,6 @@ interface UseCanvasCompositingOptions {
   compositingCanvasRef: RefObject<HTMLCanvasElement | null>;
   screenVideoRef: RefObject<HTMLVideoElement | null>;
   drawingCanvasRef: RefObject<HTMLCanvasElement | null>;
-  captureWidth: number;
-  captureHeight: number;
 }
 
 interface UseCanvasCompositingResult {
@@ -19,8 +17,6 @@ export function useCanvasCompositing({
   compositingCanvasRef,
   screenVideoRef,
   drawingCanvasRef,
-  captureWidth,
-  captureHeight,
 }: UseCanvasCompositingOptions): UseCanvasCompositingResult {
   const animFrameRef = useRef(0);
   const isRunning = useRef(false);
@@ -35,13 +31,13 @@ export function useCanvasCompositing({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.drawImage(video, 0, 0, captureWidth, captureHeight);
+    ctx.drawImage(video, 0, 0);
     if (drawing) {
-      ctx.drawImage(drawing, 0, 0, captureWidth, captureHeight);
+      ctx.drawImage(drawing, 0, 0);
     }
 
     animFrameRef.current = requestAnimationFrame(compositeFrame);
-  }, [compositingCanvasRef, screenVideoRef, drawingCanvasRef, captureWidth, captureHeight]);
+  }, [compositingCanvasRef, screenVideoRef, drawingCanvasRef]);
 
   const startCompositing = useCallback(() => {
     isRunning.current = true;

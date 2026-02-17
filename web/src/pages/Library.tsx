@@ -20,6 +20,7 @@ interface Video {
   commentCount: number;
   transcriptStatus: string;
   viewNotification: string | null;
+  downloadEnabled: boolean;
 }
 
 interface LimitsResponse {
@@ -183,6 +184,15 @@ export function Library() {
     } finally {
       setDownloadingId(null);
     }
+  }
+
+  async function toggleDownload(video: Video) {
+    const newValue = !video.downloadEnabled;
+    await apiFetch(`/api/videos/${video.id}/download-enabled`, {
+      method: "PUT",
+      body: JSON.stringify({ downloadEnabled: newValue }),
+    });
+    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, downloadEnabled: newValue } : v)));
   }
 
   async function extendVideo(id: string) {
@@ -549,6 +559,14 @@ export function Library() {
                     style={{ opacity: downloadingId === video.id ? 0.5 : undefined }}
                   >
                     {downloadingId === video.id ? "Downloading..." : "Download"}
+                  </button>
+                  <span className="action-sep">&middot;</span>
+                  <button
+                    onClick={() => toggleDownload(video)}
+                    className="action-link"
+                    style={{ color: video.downloadEnabled ? "var(--color-accent)" : undefined }}
+                  >
+                    {video.downloadEnabled ? "Downloads on" : "Downloads off"}
                   </button>
                   <span className="action-sep">&middot;</span>
                   <button
