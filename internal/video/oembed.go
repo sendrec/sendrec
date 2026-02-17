@@ -9,11 +9,16 @@ import (
 )
 
 type oEmbedResponse struct {
+	Type         string `json:"type"`
+	Version      string `json:"version"`
 	Title        string `json:"title"`
 	Duration     int    `json:"duration"`
 	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
 	AuthorName   string `json:"authorName"`
 	WatchURL     string `json:"watchUrl"`
+	HTML         string `json:"html"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
 	CreatedAt    string `json:"createdAt"`
 }
 
@@ -51,12 +56,20 @@ func (h *Handler) OEmbed(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	embedURL := h.baseURL + "/embed/" + shareToken
+	iframeHTML := `<iframe src="` + embedURL + `" width="640" height="360" frameborder="0" allowfullscreen></iframe>`
+
 	httputil.WriteJSON(w, http.StatusOK, oEmbedResponse{
+		Type:         "video",
+		Version:      "1.0",
 		Title:        title,
 		Duration:     duration,
 		ThumbnailURL: thumbnailURL,
 		AuthorName:   authorName,
 		WatchURL:     h.baseURL + "/watch/" + shareToken,
+		HTML:         iframeHTML,
+		Width:        640,
+		Height:       360,
 		CreatedAt:    createdAt.Format(time.RFC3339),
 	})
 }

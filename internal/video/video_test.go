@@ -4924,6 +4924,23 @@ func TestOEmbed_Success(t *testing.T) {
 		t.Errorf("expected created_at %q, got %q", createdAt.Format(time.RFC3339), resp.CreatedAt)
 	}
 
+	if resp.Type != "video" {
+		t.Errorf("expected type %q, got %q", "video", resp.Type)
+	}
+	if resp.Version != "1.0" {
+		t.Errorf("expected version %q, got %q", "1.0", resp.Version)
+	}
+	expectedHTML := `<iframe src="` + testBaseURL + `/embed/` + shareToken + `" width="640" height="360" frameborder="0" allowfullscreen></iframe>`
+	if resp.HTML != expectedHTML {
+		t.Errorf("expected html %q, got %q", expectedHTML, resp.HTML)
+	}
+	if resp.Width != 640 {
+		t.Errorf("expected width %d, got %d", 640, resp.Width)
+	}
+	if resp.Height != 360 {
+		t.Errorf("expected height %d, got %d", 360, resp.Height)
+	}
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
