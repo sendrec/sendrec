@@ -48,6 +48,15 @@ function renderLibrary() {
   );
 }
 
+async function openOverflowMenu(user?: ReturnType<typeof userEvent.setup>) {
+  const moreButton = screen.getByRole("button", { name: "More actions" });
+  if (user) {
+    await user.click(moreButton);
+  } else {
+    await userEvent.click(moreButton);
+  }
+}
+
 describe("Library", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
@@ -124,6 +133,37 @@ describe("Library", () => {
     });
   });
 
+  it("shows overflow menu when clicking More actions button", async () => {
+    mockFetch([makeVideo()]);
+    renderLibrary();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Trim")).not.toBeInTheDocument();
+
+    await openOverflowMenu();
+
+    expect(screen.getByText("Trim")).toBeInTheDocument();
+    expect(screen.getByText("Downloads on")).toBeInTheDocument();
+  });
+
+  it("closes overflow menu on Escape", async () => {
+    const user = userEvent.setup();
+    mockFetch([makeVideo()]);
+    renderLibrary();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    });
+
+    await openOverflowMenu(user);
+    expect(screen.getByText("Trim")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(screen.queryByText("Trim")).not.toBeInTheDocument();
+    });
+  });
+
   it("renders copy link and delete buttons for ready videos", async () => {
     mockFetch([makeVideo()]);
     renderLibrary();
@@ -132,6 +172,7 @@ describe("Library", () => {
       expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
     });
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+    await openOverflowMenu();
     expect(screen.getByRole("button", { name: "Extend" })).toBeInTheDocument();
   });
 
@@ -270,8 +311,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Remove password" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    expect(screen.getByRole("button", { name: "Remove password" })).toBeInTheDocument();
   });
 
   it("shows 'Add password' button when hasPassword is false", async () => {
@@ -279,8 +322,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Add password" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    expect(screen.getByRole("button", { name: "Add password" })).toBeInTheDocument();
     expect(screen.queryByText("Password protected")).not.toBeInTheDocument();
   });
 
@@ -294,9 +339,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Add password" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.click(screen.getByRole("button", { name: "Add password" }));
 
     await waitFor(() => {
@@ -317,9 +363,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Remove password" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.click(screen.getByRole("button", { name: "Remove password" }));
 
     await waitFor(() => {
@@ -337,9 +384,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Add password" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.click(screen.getByRole("button", { name: "Add password" }));
 
     // Should not have called password API (only initial fetch + limits fetch)
@@ -420,8 +468,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Trim" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    expect(screen.getByRole("button", { name: "Trim" })).toBeInTheDocument();
   });
 
   it("opens trim modal and updates status to processing after trim", async () => {
@@ -432,19 +482,17 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Trim" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.click(screen.getByRole("button", { name: "Trim" }));
 
     // TrimModal should be visible
     expect(screen.getByText("Trim Video")).toBeInTheDocument();
 
-    // Click trim in the modal
-    const trimButtons = screen.getAllByRole("button", { name: "Trim" });
-    // The modal's Trim button is the one inside the modal
-    const modalTrimButton = trimButtons.find((btn) => btn.closest("[style*='position: fixed']"));
-    await user.click(modalTrimButton!);
+    // The only Trim button now is in the modal (overflow menu closed)
+    await user.click(screen.getByRole("button", { name: "Trim" }));
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/trim", {
@@ -468,15 +516,15 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Trim" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.click(screen.getByRole("button", { name: "Trim" }));
     expect(screen.getByText("Trim Video")).toBeInTheDocument();
 
-    const trimButtons = screen.getAllByRole("button", { name: "Trim" });
-    const modalTrimButton = trimButtons.find((btn) => btn.closest("[style*='position: fixed']"));
-    await user.click(modalTrimButton!);
+    // The only Trim button now is in the modal (overflow menu closed)
+    await user.click(screen.getByRole("button", { name: "Trim" }));
 
     await waitFor(() => {
       expect(screen.getByText("processing...")).toBeInTheDocument();
@@ -513,8 +561,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Comments: anonymous \(5\)/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    expect(screen.getByRole("button", { name: /Comments: anonymous \(5\)/ })).toBeInTheDocument();
   });
 
   it("shows 'Comments off' when comments are disabled", async () => {
@@ -522,8 +572,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Comments off" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    expect(screen.getByRole("button", { name: "Comments off" })).toBeInTheDocument();
   });
 
   it("cycles comment mode on click", async () => {
@@ -533,9 +585,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Comments off" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.click(screen.getByRole("button", { name: "Comments off" }));
 
     await waitFor(() => {
@@ -545,7 +598,8 @@ describe("Library", () => {
       });
     });
 
-    // UI should now show the next mode
+    // Menu closed after action, reopen to check updated label
+    await openOverflowMenu(user);
     expect(screen.getByRole("button", { name: /Comments: anonymous/ })).toBeInTheDocument();
   });
 
@@ -664,9 +718,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Extend" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.click(screen.getByRole("button", { name: "Extend" }));
 
     await waitFor(() => {
@@ -688,11 +743,14 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Extend" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.click(screen.getByRole("button", { name: "Extend" }));
 
+    // Menu closed after click, reopen to see Extending... state
+    await openOverflowMenu(user);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Extending..." })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Extending..." })).toBeDisabled();
@@ -816,9 +874,11 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
-      expect(select.value).toBe("");
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
+    expect(select.value).toBe("");
   });
 
   it("shows notification dropdown with video override value", async () => {
@@ -826,9 +886,11 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
-      expect(select.value).toBe("every");
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
+    expect(select.value).toBe("every");
   });
 
   it("changes notification preference on select", async () => {
@@ -838,9 +900,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByLabelText("View notifications")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.selectOptions(screen.getByLabelText("View notifications"), "first");
 
     await waitFor(() => {
@@ -858,9 +921,10 @@ describe("Library", () => {
     renderLibrary();
 
     await waitFor(() => {
-      expect(screen.getByLabelText("View notifications")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
 
+    await openOverflowMenu(user);
     await user.selectOptions(screen.getByLabelText("View notifications"), "");
 
     await waitFor(() => {
@@ -875,24 +939,30 @@ describe("Library", () => {
     mockFetch([makeVideo()]);
     renderLibrary();
     await waitFor(() => {
-      expect(screen.getByText("Thumbnail")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    expect(screen.getByText("Thumbnail")).toBeInTheDocument();
   });
 
   it("shows Reset thumbnail button when video has a thumbnail", async () => {
     mockFetch([makeVideo({ thumbnailUrl: "https://storage.sendrec.eu/thumb.jpg" })]);
     renderLibrary();
     await waitFor(() => {
-      expect(screen.getByText("Reset thumbnail")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    expect(screen.getByText("Reset thumbnail")).toBeInTheDocument();
   });
 
   it("does not show Reset thumbnail when no thumbnail exists", async () => {
     mockFetch([makeVideo({ thumbnailUrl: undefined })]);
     renderLibrary();
     await waitFor(() => {
-      expect(screen.getByText("Thumbnail")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
+    await openOverflowMenu();
+    expect(screen.getByText("Thumbnail")).toBeInTheDocument();
     expect(screen.queryByText("Reset thumbnail")).not.toBeInTheDocument();
   });
 
@@ -902,8 +972,10 @@ describe("Library", () => {
       renderLibrary();
 
       await waitFor(() => {
-        expect(screen.getByText("Branding")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
       });
+      await openOverflowMenu();
+      expect(screen.getByText("Branding")).toBeInTheDocument();
     });
 
     it("hides branding action when disabled", async () => {
@@ -913,6 +985,7 @@ describe("Library", () => {
       await waitFor(() => {
         expect(screen.getByText("View")).toBeInTheDocument();
       });
+      await openOverflowMenu();
       expect(screen.queryByText("Branding")).not.toBeInTheDocument();
     });
   });
@@ -923,8 +996,10 @@ describe("Library", () => {
       renderLibrary();
 
       await waitFor(() => {
-        expect(screen.getByText("Downloads on")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
       });
+      await openOverflowMenu();
+      expect(screen.getByText("Downloads on")).toBeInTheDocument();
     });
 
     it("shows Downloads off when disabled", async () => {
@@ -932,8 +1007,10 @@ describe("Library", () => {
       renderLibrary();
 
       await waitFor(() => {
-        expect(screen.getByText("Downloads off")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
       });
+      await openOverflowMenu();
+      expect(screen.getByText("Downloads off")).toBeInTheDocument();
     });
 
     it("calls API to toggle download off", async () => {
@@ -942,9 +1019,10 @@ describe("Library", () => {
       renderLibrary();
 
       await waitFor(() => {
-        expect(screen.getByText("Downloads on")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
       });
 
+      await openOverflowMenu();
       await userEvent.click(screen.getByText("Downloads on"));
 
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/download-enabled", {
@@ -972,6 +1050,7 @@ describe("Library", () => {
         expect(screen.getByText(/Never expires/)).toBeInTheDocument();
       });
 
+      await openOverflowMenu();
       expect(screen.queryByText("Extend")).not.toBeInTheDocument();
     });
 
@@ -980,8 +1059,10 @@ describe("Library", () => {
       renderLibrary();
 
       await waitFor(() => {
-        expect(screen.getByText("Set expiry")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
       });
+      await openOverflowMenu();
+      expect(screen.getByText("Set expiry")).toBeInTheDocument();
     });
 
     it("shows Remove expiry button when shareExpiresAt is set", async () => {
@@ -989,8 +1070,10 @@ describe("Library", () => {
       renderLibrary();
 
       await waitFor(() => {
-        expect(screen.getByText("Remove expiry")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
       });
+      await openOverflowMenu();
+      expect(screen.getByText("Remove expiry")).toBeInTheDocument();
     });
 
     it("calls API to remove expiry", async () => {
@@ -1000,9 +1083,10 @@ describe("Library", () => {
       renderLibrary();
 
       await waitFor(() => {
-        expect(screen.getByText("Remove expiry")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
       });
 
+      await openOverflowMenu();
       await userEvent.click(screen.getByText("Remove expiry"));
 
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/link-expiry", {
@@ -1018,9 +1102,10 @@ describe("Library", () => {
       renderLibrary();
 
       await waitFor(() => {
-        expect(screen.getByText("Set expiry")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
       });
 
+      await openOverflowMenu();
       await userEvent.click(screen.getByText("Set expiry"));
 
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/link-expiry", {
