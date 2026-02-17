@@ -99,7 +99,7 @@ func TestGetBrandingSettings_NoBranding(t *testing.T) {
 
 	handler := newBrandingHandler(t, mock, &mockStorage{})
 
-	mock.ExpectQuery(`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text`).
+	mock.ExpectQuery(`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css`).
 		WithArgs(testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -140,11 +140,11 @@ func TestGetBrandingSettings_WithBranding(t *testing.T) {
 	colorBg := "#112233"
 	colorAccent := "#00ff00"
 
-	mock.ExpectQuery(`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text`).
+	mock.ExpectQuery(`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css`).
 		WithArgs(testUserID).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"company_name", "logo_key", "color_background", "color_surface", "color_text", "color_accent", "footer_text"}).
-				AddRow(&companyName, (*string)(nil), &colorBg, (*string)(nil), (*string)(nil), &colorAccent, (*string)(nil)),
+			pgxmock.NewRows([]string{"company_name", "logo_key", "color_background", "color_surface", "color_text", "color_accent", "footer_text", "custom_css"}).
+				AddRow(&companyName, (*string)(nil), &colorBg, (*string)(nil), (*string)(nil), &colorAccent, (*string)(nil), (*string)(nil)),
 		)
 
 	r := chi.NewRouter()
@@ -192,7 +192,7 @@ func TestPutBrandingSettings_Success(t *testing.T) {
 	colorBg := "#112233"
 
 	mock.ExpectExec(`INSERT INTO user_branding`).
-		WithArgs(testUserID, &companyName, (*string)(nil), &colorBg, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil)).
+		WithArgs(testUserID, &companyName, (*string)(nil), &colorBg, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil)).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	body, _ := json.Marshal(setBrandingRequest{
@@ -812,6 +812,194 @@ func TestResolveBranding_CustomLogo(t *testing.T) {
 }
 
 // --- Hex color validation ---
+
+// --- Custom CSS in branding handlers ---
+
+func TestPutBrandingSettings_WithCustomCSS(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := newBrandingHandler(t, mock, &mockStorage{})
+
+	css := "body { font-family: 'Inter', sans-serif; }"
+
+	mock.ExpectExec(`INSERT INTO user_branding`).
+		WithArgs(testUserID, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), &css).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body, _ := json.Marshal(setBrandingRequest{
+		CustomCSS: &css,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/settings/branding", handler.PutBrandingSettings)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/settings/branding", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestPutBrandingSettings_InvalidCustomCSS(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := newBrandingHandler(t, mock, &mockStorage{})
+
+	css := "body { color: red; } </style><script>alert('xss')</script>"
+	body, _ := json.Marshal(setBrandingRequest{
+		CustomCSS: &css,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/settings/branding", handler.PutBrandingSettings)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/settings/branding", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "custom CSS must not contain closing style tags" {
+		t.Errorf("unexpected error: %s", errMsg)
+	}
+}
+
+func TestGetBrandingSettings_ReturnsCustomCSS(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := newBrandingHandler(t, mock, &mockStorage{})
+
+	css := "body { font-family: 'Inter'; }"
+
+	mock.ExpectQuery(`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css`).
+		WithArgs(testUserID).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"company_name", "logo_key", "color_background", "color_surface", "color_text", "color_accent", "footer_text", "custom_css"}).
+				AddRow((*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), &css),
+		)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/settings/branding", handler.GetBrandingSettings)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/settings/branding", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp brandingSettingsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.CustomCSS == nil || *resp.CustomCSS != css {
+		t.Errorf("expected customCss %q, got %v", css, resp.CustomCSS)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestResolveBranding_CustomCSS(t *testing.T) {
+	storage := &mockStorage{}
+	css := "body { font-family: 'Inter'; }"
+
+	cfg := resolveBranding(
+		context.TODO(),
+		storage,
+		brandingSettingsResponse{
+			CustomCSS: &css,
+		},
+		brandingSettingsResponse{},
+	)
+
+	if cfg.CustomCSS != css {
+		t.Errorf("expected custom CSS %q, got %q", css, cfg.CustomCSS)
+	}
+}
+
+// --- Custom CSS sanitization ---
+
+func TestSanitizeCustomCSS_Valid(t *testing.T) {
+	css := "body { font-family: 'Inter', sans-serif; } .btn { border-radius: 4px; }"
+	sanitized, errMsg := sanitizeCustomCSS(css)
+	if errMsg != "" {
+		t.Fatalf("expected no error, got %q", errMsg)
+	}
+	if sanitized != css {
+		t.Errorf("expected CSS to pass through unchanged, got %q", sanitized)
+	}
+}
+
+func TestSanitizeCustomCSS_Empty(t *testing.T) {
+	sanitized, errMsg := sanitizeCustomCSS("")
+	if errMsg != "" {
+		t.Fatalf("expected no error for empty CSS, got %q", errMsg)
+	}
+	if sanitized != "" {
+		t.Errorf("expected empty string, got %q", sanitized)
+	}
+}
+
+func TestSanitizeCustomCSS_TooLong(t *testing.T) {
+	longCSS := make([]byte, 10*1024+1)
+	for i := range longCSS {
+		longCSS[i] = 'a'
+	}
+	_, errMsg := sanitizeCustomCSS(string(longCSS))
+	if errMsg == "" {
+		t.Fatal("expected error for CSS exceeding 10KB")
+	}
+}
+
+func TestSanitizeCustomCSS_ClosingStyleTag(t *testing.T) {
+	cases := []string{
+		"body { color: red; } </style><script>alert('xss')</script>",
+		"body { color: red; } </STYLE>",
+		"body { color: red; } </Style>",
+	}
+	for _, css := range cases {
+		_, errMsg := sanitizeCustomCSS(css)
+		if errMsg == "" {
+			t.Errorf("expected error for CSS containing closing style tag: %q", css)
+		}
+	}
+}
+
+func TestSanitizeCustomCSS_ImportURL(t *testing.T) {
+	cases := []string{
+		"@import url('https://evil.com/steal.css');",
+		"@IMPORT URL('https://evil.com/steal.css');",
+		"@Import Url('https://evil.com');",
+	}
+	for _, css := range cases {
+		_, errMsg := sanitizeCustomCSS(css)
+		if errMsg == "" {
+			t.Errorf("expected error for CSS containing @import url: %q", css)
+		}
+	}
+}
 
 func TestIsValidHexColor(t *testing.T) {
 	valid := []string{"#000000", "#ffffff", "#1a2B3c", "#AABBCC"}

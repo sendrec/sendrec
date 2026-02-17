@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Settings } from "./Settings";
@@ -300,7 +300,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: true })
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null });
+      .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
     renderSettings();
 
     await waitFor(() => {
@@ -328,7 +328,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: true })
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null });
+      .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
     renderSettings();
 
     await waitFor(() => {
@@ -343,7 +343,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: true })
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null })
+      .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -366,7 +366,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ viewNotification: "off" })
       .mockResolvedValueOnce({ brandingEnabled: true })
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null });
+      .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
     renderSettings();
 
     await waitFor(() => {
@@ -455,6 +455,51 @@ describe("Settings", () => {
     });
 
     expect(mockApiFetch).toHaveBeenCalledWith("/api/settings/api-keys/key-1", { method: "DELETE" });
+  });
+
+  it("shows custom CSS textarea when branding enabled", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Custom CSS")).toBeInTheDocument();
+    });
+  });
+
+  it("includes custom CSS in save payload", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ viewNotification: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: true })
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
+      .mockResolvedValueOnce(undefined); // PUT response
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Custom CSS")).toBeInTheDocument();
+    });
+
+    const textarea = screen.getByPlaceholderText(/Override watch page styles/);
+    fireEvent.change(textarea, { target: { value: "body { color: red; }" } });
+    await user.click(screen.getByRole("button", { name: "Save branding" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding saved")).toBeInTheDocument();
+    });
+
+    const saveCall = mockApiFetch.mock.calls.find(
+      (call: unknown[]) => call[0] === "/api/settings/branding" && (call[1] as { method: string })?.method === "PUT"
+    );
+    expect(saveCall).toBeDefined();
+    const payload = JSON.parse((saveCall![1] as { body: string }).body);
+    expect(payload.customCss).toBe("body { color: red; }");
   });
 
   it("shows error when API key creation fails", async () => {

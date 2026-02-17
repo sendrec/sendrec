@@ -21,6 +21,7 @@ interface BrandingSettings {
   colorText: string | null;
   colorAccent: string | null;
   footerText: string | null;
+  customCss: string | null;
 }
 
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
@@ -49,7 +50,7 @@ export function Settings() {
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: null, logoKey: null,
     colorBackground: null, colorSurface: null, colorText: null, colorAccent: null,
-    footerText: null,
+    footerText: null, customCss: null,
   });
   const [brandingMessage, setBrandingMessage] = useState("");
   const [brandingError, setBrandingError] = useState("");
@@ -212,6 +213,7 @@ export function Settings() {
           colorText: branding.colorText || null,
           colorAccent: branding.colorAccent || null,
           footerText: branding.footerText || null,
+          customCss: branding.customCss || null,
         }),
       });
       setBrandingMessage("Branding saved");
@@ -226,7 +228,7 @@ export function Settings() {
     setBranding({
       companyName: null, logoKey: null,
       colorBackground: null, colorSurface: null, colorText: null, colorAccent: null,
-      footerText: null,
+      footerText: null, customCss: null,
     });
   }
 
@@ -733,6 +735,21 @@ export function Settings() {
               <span style={{ color: branding.colorText ?? "#ffffff", fontSize: 14 }}>Sample video title</span>
             </div>
           </div>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Custom CSS</span>
+            <textarea
+              value={branding.customCss ?? ""}
+              onChange={(e) => setBranding({ ...branding, customCss: e.target.value || null })}
+              placeholder={"/* Override watch page styles */\nbody { font-family: 'Inter', sans-serif; }\n.btn { border-radius: 4px; }"}
+              maxLength={10240}
+              rows={6}
+              style={{ ...inputStyle, resize: "vertical" as const, fontFamily: "monospace" }}
+            />
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
+              Injected into the watch page. Max 10KB.
+            </span>
+          </label>
 
           {brandingError && (
             <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{brandingError}</p>
