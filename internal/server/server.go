@@ -218,6 +218,7 @@ func (s *Server) routes() {
 		s.router.With(commentLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/comments", s.videoHandler.PostWatchComment)
 		s.router.Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
+		s.router.Get("/embed/{shareToken}", s.videoHandler.EmbedPage)
 	}
 
 	if s.webFS != nil {

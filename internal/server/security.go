@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/sendrec/sendrec/internal/httputil"
 )
@@ -36,9 +37,14 @@ func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
 			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 			w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(), screen-wake-lock=(), display-capture=(self)")
 
+			cspFrameAncestors := frameAncestors
+			if strings.HasPrefix(r.URL.Path, "/embed/") {
+				cspFrameAncestors = "*"
+			}
+
 			csp := fmt.Sprintf(
 				"default-src 'self'; img-src 'self' data:%s; media-src 'self' data:%s; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'%s; frame-ancestors %s;",
-				storageSuffix, storageSuffix, nonce, nonce, storageSuffix, frameAncestors,
+				storageSuffix, storageSuffix, nonce, nonce, storageSuffix, cspFrameAncestors,
 			)
 			w.Header().Set("Content-Security-Policy", csp)
 

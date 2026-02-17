@@ -480,8 +480,14 @@ components:
 
     OEmbedResponse:
       type: object
-      required: [title, duration, authorName, watchUrl, createdAt]
+      required: [type, version, title, duration, authorName, watchUrl, html, width, height, createdAt]
       properties:
+        type:
+          type: string
+          enum: [video]
+        version:
+          type: string
+          enum: ["1.0"]
         title:
           type: string
         duration:
@@ -496,6 +502,15 @@ components:
         watchUrl:
           type: string
           format: uri
+        html:
+          type: string
+          description: iframe embed snippet
+        width:
+          type: integer
+          description: Embed width in pixels
+        height:
+          type: integer
+          description: Embed height in pixels
         createdAt:
           type: string
           format: date-time
@@ -1923,6 +1938,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /embed/{shareToken}:
+    get:
+      tags: [Watch]
+      summary: Embeddable video player
+      description: |
+        Renders a minimal video player page suitable for embedding via iframe.
+        Includes video with native controls, thumbnail poster, and a footer linking to the full watch page.
+        Uses permissive CSP (frame-ancestors *) so it works in any site.
+        Returns 404 if video not found, 410 if share link expired, or a password form if protected.
+      operationId: embedPage
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML page with embedded video player
+          content:
+            text/html:
+              schema:
+                type: string
+        "404":
+          description: Video not found
+          content:
+            text/html:
+              schema:
+                type: string
+        "410":
+          description: Share link expired
+          content:
+            text/html:
+              schema:
+                type: string
 
   /api/videos/{shareToken}/oembed:
     get:

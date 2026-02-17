@@ -80,7 +80,8 @@ export function Library() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [extendingId, setExtendingId] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -165,6 +166,12 @@ export function Library() {
     }, 300);
   }
 
+  function showToast(message: string) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(message);
+    toastTimer.current = setTimeout(() => setToast(null), 2000);
+  }
+
   async function deleteVideo(id: string) {
     if (!window.confirm("Delete this recording? This cannot be undone.")) {
       return;
@@ -178,13 +185,10 @@ export function Library() {
     }
   }
 
-  async function copyLink(shareUrl: string, videoId: string) {
+  async function copyLink(shareUrl: string) {
     try {
       await navigator.clipboard.writeText(shareUrl);
-      setCopiedId(videoId);
-      setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      // Fallback for browsers/contexts where clipboard API is unavailable
       const textArea = document.createElement("textarea");
       textArea.value = shareUrl;
       textArea.style.position = "fixed";
@@ -193,9 +197,8 @@ export function Library() {
       textArea.select();
       document.execCommand("copy");
       document.body.removeChild(textArea);
-      setCopiedId(videoId);
-      setTimeout(() => setCopiedId(null), 2000);
     }
+    showToast("Link copied");
   }
 
   async function downloadVideo(id: string) {
@@ -217,6 +220,7 @@ export function Library() {
       body: JSON.stringify({ downloadEnabled: newValue }),
     });
     setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, downloadEnabled: newValue } : v)));
+    showToast(newValue ? "Downloads enabled" : "Downloads disabled");
   }
 
   async function extendVideo(id: string) {
@@ -225,6 +229,7 @@ export function Library() {
       await apiFetch(`/api/videos/${id}/extend`, { method: "POST" });
       const result = await apiFetch<Video[]>("/api/videos");
       setVideos(result ?? []);
+      showToast("Link extended");
     } finally {
       setExtendingId(null);
     }
@@ -238,6 +243,7 @@ export function Library() {
     });
     const result = await apiFetch<Video[]>("/api/videos");
     setVideos(result ?? []);
+    showToast(neverExpires ? "Link set to never expire" : "Link set to expire");
   }
 
   async function addPassword(id: string) {
@@ -253,6 +259,7 @@ export function Library() {
     ]);
     setVideos(videosResult ?? []);
     setLimits(limitsResult ?? null);
+    showToast("Password added");
   }
 
   async function removePassword(id: string) {
@@ -267,6 +274,7 @@ export function Library() {
     ]);
     setVideos(videosResult ?? []);
     setLimits(limitsResult ?? null);
+    showToast("Password removed");
   }
 
   async function saveTitle(id: string) {
@@ -286,6 +294,7 @@ export function Library() {
   async function retranscribeVideo(id: string) {
     await apiFetch(`/api/videos/${id}/retranscribe`, { method: "POST" });
     setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, transcriptStatus: "pending" } : v)));
+    showToast("Transcription queued");
   }
 
   async function cycleCommentMode(video: Video) {
@@ -296,6 +305,7 @@ export function Library() {
       body: JSON.stringify({ commentMode: nextMode }),
     });
     setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, commentMode: nextMode } : v)));
+    showToast(commentModeLabels[nextMode] ?? "Comments updated");
   }
 
   async function changeNotification(video: Video, value: string) {
@@ -306,6 +316,7 @@ export function Library() {
         body: JSON.stringify({ viewNotification }),
       });
       setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, viewNotification } : v)));
+      showToast("Notifications updated");
     } catch {
       // no-op: select stays at previous value since state is only updated on success
     }
@@ -366,6 +377,7 @@ export function Library() {
       });
       if (!uploadResp.ok) return;
       await fetchVideosAndLimits(searchQuery);
+      showToast("Thumbnail updated");
     } finally {
       setUploadingThumbnailId(null);
     }
@@ -376,6 +388,7 @@ export function Library() {
     try {
       await apiFetch(`/api/videos/${videoId}/thumbnail`, { method: "DELETE" });
       await fetchVideosAndLimits(searchQuery);
+      showToast("Thumbnail reset");
     } finally {
       setUploadingThumbnailId(null);
     }
@@ -602,11 +615,10 @@ export function Library() {
                   <Link to={`/videos/${video.id}/analytics`} className="action-link">Analytics</Link>
                   <span className="action-sep">&middot;</span>
                   <button
-                    onClick={() => copyLink(video.shareUrl, video.id)}
+                    onClick={() => copyLink(video.shareUrl)}
                     className="action-link"
-                    style={{ color: copiedId === video.id ? "var(--color-accent)" : undefined }}
                   >
-                    {copiedId === video.id ? "Copied!" : "Copy link"}
+                    Copy link
                   </button>
                   <span className="action-sep">&middot;</span>
                   <button
@@ -652,6 +664,18 @@ export function Library() {
                           style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: video.downloadEnabled ? "var(--color-accent)" : undefined }}
                         >
                           {video.downloadEnabled ? "Downloads on" : "Downloads off"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const snippet = `<iframe src="${window.location.origin}/embed/${video.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
+                            navigator.clipboard.writeText(snippet);
+                            showToast("Embed code copied");
+                            setOpenMenuId(null);
+                          }}
+                          className="action-link"
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
+                        >
+                          Embed
                         </button>
                         <button
                           onClick={() => { toggleLinkExpiry(video); setOpenMenuId(null); }}
@@ -917,6 +941,31 @@ export function Library() {
           />
         );
       })()}
+
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "var(--color-surface)",
+            color: "var(--color-text)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: "10px 20px",
+            fontSize: 14,
+            fontWeight: 500,
+            zIndex: 200,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+            pointerEvents: "none",
+          }}
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
