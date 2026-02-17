@@ -741,14 +741,85 @@ export function Settings() {
             <textarea
               value={branding.customCss ?? ""}
               onChange={(e) => setBranding({ ...branding, customCss: e.target.value || null })}
-              placeholder={"/* Override watch page styles */\nbody { font-family: 'Inter', sans-serif; }\n.btn { border-radius: 4px; }"}
+              placeholder={"/* Override watch page styles */\nbody { font-family: 'Inter', sans-serif; }\n.download-btn { border-radius: 20px; }\n.comment-submit { border-radius: 20px; }"}
               maxLength={10240}
               rows={6}
               style={{ ...inputStyle, resize: "vertical" as const, fontFamily: "monospace" }}
             />
             <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
-              Injected into the watch page. Max 10KB.
+              Injected into the watch page &lt;style&gt; tag. Max 10KB. No @import url() or closing style tags.
             </span>
+            <details style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-secondary)" }}>
+              <summary style={{ cursor: "pointer" }}>Available CSS selectors</summary>
+              <pre style={{
+                marginTop: 6,
+                padding: "8px 10px",
+                background: "var(--color-bg-secondary)",
+                borderRadius: 6,
+                fontSize: 11,
+                lineHeight: 1.6,
+                overflowX: "auto",
+                whiteSpace: "pre",
+              }}>{`/* CSS Variables (override colors set in branding) */
+:root { --brand-bg; --brand-surface; --brand-text; --brand-accent }
+
+/* Layout */
+body              /* Page background, font-family, text color */
+.container        /* Max-width wrapper (960px) */
+video             /* Video player element */
+h1                /* Video title */
+.meta             /* "Creator · Date" line below title */
+
+/* Header & Footer */
+.logo             /* Company logo + name link */
+.logo img         /* Logo image (20x20) */
+.branding         /* Footer: "Shared via SendRec" */
+.branding a       /* Footer link */
+
+/* Actions Bar */
+.actions          /* Container for download + speed buttons */
+.download-btn     /* Download button */
+.speed-controls   /* Speed button group */
+.speed-btn        /* Individual speed button (0.5x, 1x, ...) */
+.speed-btn.active /* Currently selected speed */
+
+/* Comments */
+.comments-section    /* Full comments area */
+.comments-header     /* "Comments" heading */
+.comment             /* Single comment card */
+.comment-meta        /* Author + badges row */
+.comment-author      /* Commenter name */
+.comment-body        /* Comment text */
+.comment-owner-badge /* "Owner" badge */
+.comment-timestamp   /* Timestamp badge on comment */
+.comment-form        /* New comment form */
+.comment-form input  /* Name + email fields */
+.comment-form textarea /* Comment text area */
+.comment-submit      /* "Post comment" button */
+
+/* Comment Markers Bar */
+.markers-bar      /* Timeline bar below video */
+.marker-dot       /* Individual comment marker */
+
+/* Emoji Picker */
+.emoji-trigger    /* Emoji button */
+.emoji-grid       /* Emoji dropdown panel */
+.emoji-btn        /* Individual emoji button */
+
+/* Transcript */
+.transcript-section   /* Full transcript area */
+.transcript-header    /* "Transcript" heading */
+.transcript-segment   /* Single transcript line */
+.transcript-segment.active /* Currently playing segment */
+.transcript-timestamp /* Timestamp in transcript */
+.transcript-text      /* Transcript text */
+
+/* Utilities */
+.hidden           /* display: none */
+
+/* Mobile (max-width: 640px) */
+@media (max-width: 640px) { ... }`}</pre>
+            </details>
           </label>
 
           {brandingError && (
