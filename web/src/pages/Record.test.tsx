@@ -37,6 +37,11 @@ function renderRecord() {
 describe("Record", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getDisplayMedia: vi.fn(), getUserMedia: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
   });
 
   afterEach(() => {
@@ -862,6 +867,67 @@ describe("Record", () => {
     });
     // No "remaining" text since limits is null
     expect(screen.queryByText(/videos remaining/i)).not.toBeInTheDocument();
+  });
+
+  it("shows unsupported message when getDisplayMedia is not available", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByText(/screen recording is not available/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
+  });
+
+  it("shows upload link when screen recording is not available", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      const uploadLink = screen.getByText(/upload a video/i);
+      expect(uploadLink).toBeInTheDocument();
+      expect(uploadLink.closest("a")).toHaveAttribute("href", "/upload");
+    });
+  });
+
+  it("shows unsupported message when mediaDevices is undefined", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByText(/screen recording is not available/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
   });
 
   it("falls back to execCommand copy when clipboard API fails", async () => {

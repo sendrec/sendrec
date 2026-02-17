@@ -162,10 +162,48 @@ export function Record() {
     );
   }
 
+  const screenRecordingSupported =
+    typeof navigator.mediaDevices?.getDisplayMedia === "function";
+
   const quotaReached =
     limits !== null &&
     limits.maxVideosPerMonth > 0 &&
     limits.videosUsedThisMonth >= limits.maxVideosPerMonth;
+
+  if (!screenRecordingSupported) {
+    return (
+      <div className="page-container page-container--centered">
+        <h1
+          style={{
+            color: "var(--color-text)",
+            fontSize: 24,
+            marginBottom: 16,
+            textAlign: "center",
+          }}
+        >
+          Screen recording is not available
+        </h1>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginBottom: 24, maxWidth: 400, margin: "0 auto 24px" }}>
+          Screen recording is not supported on this device. Please use a desktop browser to record your screen, or{" "}
+          <Link to="/upload" style={{ color: "var(--color-accent)" }}>upload a video</Link> instead.
+        </p>
+        <Link
+          to="/upload"
+          style={{
+            background: "var(--color-accent)",
+            color: "var(--color-text)",
+            borderRadius: 8,
+            padding: "10px 24px",
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: "none",
+          }}
+        >
+          Go to Upload
+        </Link>
+      </div>
+    );
+  }
 
   if (quotaReached) {
     return (
