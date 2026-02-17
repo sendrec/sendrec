@@ -871,6 +871,31 @@ describe("Library", () => {
     });
   });
 
+  it("shows Thumbnail action button for ready videos", async () => {
+    mockFetch([makeVideo()]);
+    renderLibrary();
+    await waitFor(() => {
+      expect(screen.getByText("Thumbnail")).toBeInTheDocument();
+    });
+  });
+
+  it("shows Reset thumbnail button when video has a thumbnail", async () => {
+    mockFetch([makeVideo({ thumbnailUrl: "https://storage.sendrec.eu/thumb.jpg" })]);
+    renderLibrary();
+    await waitFor(() => {
+      expect(screen.getByText("Reset thumbnail")).toBeInTheDocument();
+    });
+  });
+
+  it("does not show Reset thumbnail when no thumbnail exists", async () => {
+    mockFetch([makeVideo({ thumbnailUrl: undefined })]);
+    renderLibrary();
+    await waitFor(() => {
+      expect(screen.getByText("Thumbnail")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Reset thumbnail")).not.toBeInTheDocument();
+  });
+
   describe("branding", () => {
     it("shows branding action when enabled", async () => {
       mockFetch([makeVideo()], { ...unlimitedLimits, brandingEnabled: true });
