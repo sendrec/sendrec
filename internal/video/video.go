@@ -127,7 +127,7 @@ type listItem struct {
 	ShareToken      string `json:"shareToken"`
 	ShareURL        string `json:"shareUrl"`
 	CreatedAt       string `json:"createdAt"`
-	ShareExpiresAt  string `json:"shareExpiresAt"`
+	ShareExpiresAt  *string `json:"shareExpiresAt"`
 	ViewCount       int64  `json:"viewCount"`
 	UniqueViewCount int64  `json:"uniqueViewCount"`
 	ThumbnailURL    string `json:"thumbnailUrl,omitempty"`
@@ -572,7 +572,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item listItem
 		var createdAt time.Time
-		var shareExpiresAt time.Time
+		var shareExpiresAt *time.Time
 		var thumbnailKey *string
 		var sharePassword *string
 		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled); err != nil {
@@ -580,7 +580,10 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		item.CreatedAt = createdAt.Format(time.RFC3339)
-		item.ShareExpiresAt = shareExpiresAt.Format(time.RFC3339)
+		if shareExpiresAt != nil {
+			formatted := shareExpiresAt.Format(time.RFC3339)
+			item.ShareExpiresAt = &formatted
+		}
 		item.ShareURL = h.baseURL + "/watch/" + item.ShareToken
 		item.HasPassword = sharePassword != nil
 		if thumbnailKey != nil {
