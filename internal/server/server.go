@@ -205,6 +205,8 @@ func (s *Server) routes() {
 				r.Put("/{id}/link-expiry", s.videoHandler.SetLinkExpiry)
 				r.Get("/{id}/branding", s.videoHandler.GetVideoBranding)
 				r.Put("/{id}/branding", s.videoHandler.SetVideoBranding)
+				r.Post("/{id}/thumbnail", s.videoHandler.UploadThumbnail)
+				r.Delete("/{id}/thumbnail", s.videoHandler.ResetThumbnail)
 			})
 		})
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
