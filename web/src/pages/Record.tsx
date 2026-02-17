@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { CameraRecorder } from "../components/CameraRecorder";
 import { Recorder } from "../components/Recorder";
 
 interface CreateVideoResponse {
@@ -46,7 +47,8 @@ export function Record() {
       const now = new Date();
       const title = `Recording ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
 
-      const createBody: Record<string, unknown> = { title, duration, fileSize: blob.size };
+      const contentType = blob.type || "video/webm";
+      const createBody: Record<string, unknown> = { title, duration, fileSize: blob.size, contentType };
       if (webcamBlob) {
         createBody.webcamFileSize = webcamBlob.size;
       }
@@ -65,7 +67,7 @@ export function Record() {
       const uploadResp = await fetch(result.uploadUrl, {
         method: "PUT",
         body: blob,
-        headers: { "Content-Type": "video/webm" },
+        headers: { "Content-Type": contentType },
       });
 
       if (!uploadResp.ok) {
@@ -162,10 +164,50 @@ export function Record() {
     );
   }
 
+  const screenRecordingSupported =
+    typeof navigator.mediaDevices?.getDisplayMedia === "function";
+  const cameraSupported =
+    typeof navigator.mediaDevices?.getUserMedia === "function";
+
   const quotaReached =
     limits !== null &&
     limits.maxVideosPerMonth > 0 &&
     limits.videosUsedThisMonth >= limits.maxVideosPerMonth;
+
+  if (!screenRecordingSupported && !cameraSupported) {
+    return (
+      <div className="page-container page-container--centered">
+        <h1
+          style={{
+            color: "var(--color-text)",
+            fontSize: 24,
+            marginBottom: 16,
+            textAlign: "center",
+          }}
+        >
+          Recording is not available
+        </h1>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginBottom: 24, maxWidth: 400, margin: "0 auto 24px" }}>
+          Recording is not supported on this device. Please use a modern browser, or{" "}
+          <Link to="/upload" style={{ color: "var(--color-accent)" }}>upload a video</Link> instead.
+        </p>
+        <Link
+          to="/upload"
+          style={{
+            background: "var(--color-accent)",
+            color: "var(--color-text)",
+            borderRadius: 8,
+            padding: "10px 24px",
+            fontSize: 14,
+            fontWeight: 600,
+            textDecoration: "none",
+          }}
+        >
+          Go to Upload
+        </Link>
+      </div>
+    );
+  }
 
   if (quotaReached) {
     return (
@@ -318,10 +360,17 @@ export function Record() {
           {remaining} videos remaining this month
         </p>
       )}
-      <Recorder
-        onRecordingComplete={handleRecordingComplete}
-        maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
-      />
+      {screenRecordingSupported ? (
+        <Recorder
+          onRecordingComplete={handleRecordingComplete}
+          maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
+        />
+      ) : (
+        <CameraRecorder
+          onRecordingComplete={handleRecordingComplete}
+          maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
+        />
+      )}
     </div>
   );
 }

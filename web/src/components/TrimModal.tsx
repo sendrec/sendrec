@@ -205,14 +205,15 @@ export function TrimModal({ videoId, duration, onClose, onTrimStarted }: TrimMod
             onTouchStart={handlePointerDown("start")}
             style={{
               position: "absolute",
-              top: 4,
+              top: -4,
               left: `${startPct}%`,
-              width: 16,
-              height: 24,
-              marginLeft: -8,
+              width: 20,
+              height: 40,
+              marginLeft: -10,
               background: "var(--color-text)",
               borderRadius: 4,
               cursor: "ew-resize",
+              touchAction: "none",
             }}
           />
           <div
@@ -221,14 +222,15 @@ export function TrimModal({ videoId, duration, onClose, onTrimStarted }: TrimMod
             onTouchStart={handlePointerDown("end")}
             style={{
               position: "absolute",
-              top: 4,
+              top: -4,
               left: `${endPct}%`,
-              width: 16,
-              height: 24,
-              marginLeft: -8,
+              width: 20,
+              height: 40,
+              marginLeft: -10,
               background: "var(--color-text)",
               borderRadius: 4,
               cursor: "ew-resize",
+              touchAction: "none",
             }}
           />
         </div>

@@ -165,7 +165,7 @@ export function Analytics() {
         &larr; Library
       </Link>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div className="analytics-header">
         <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
           Analytics
         </h1>
@@ -191,7 +191,7 @@ export function Analytics() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div className="analytics-stats">
         <div
           style={{
             background: "var(--color-surface)",

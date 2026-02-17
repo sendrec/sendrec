@@ -56,15 +56,15 @@ describe("Layout", () => {
   it("highlights active link for Record on /", () => {
     renderLayout("/");
     const recordLink = screen.getByRole("link", { name: "Record" });
-    expect(recordLink).toHaveStyle({ fontWeight: 700 });
+    expect(recordLink).toHaveClass("nav-link--active");
   });
 
   it("highlights active link for Library on /library", () => {
     renderLayout("/library");
     const libraryLink = screen.getByRole("link", { name: "Library" });
-    expect(libraryLink).toHaveStyle({ fontWeight: 700 });
+    expect(libraryLink).toHaveClass("nav-link--active");
     const recordLink = screen.getByRole("link", { name: "Record" });
-    expect(recordLink).toHaveStyle({ fontWeight: 400 });
+    expect(recordLink).not.toHaveClass("nav-link--active");
   });
 
   it("signs out on button click", async () => {
@@ -79,5 +79,45 @@ describe("Layout", () => {
     });
     expect(mockSetAccessToken).toHaveBeenCalledWith(null);
     expect(mockNavigate).toHaveBeenCalledWith("/login");
+  });
+
+  it("renders hamburger menu button", () => {
+    renderLayout();
+    expect(screen.getByRole("button", { name: "Toggle menu" })).toBeInTheDocument();
+  });
+
+  it("toggles mobile menu on hamburger click", async () => {
+    const user = userEvent.setup();
+    renderLayout();
+
+    const hamburger = screen.getByRole("button", { name: "Toggle menu" });
+    const navLinks = screen.getByRole("link", { name: "Record" }).closest(".nav-links");
+    expect(navLinks).not.toHaveClass("nav-links--open");
+
+    await user.click(hamburger);
+    expect(navLinks).toHaveClass("nav-links--open");
+
+    await user.click(hamburger);
+    expect(navLinks).not.toHaveClass("nav-links--open");
+  });
+
+  it("closes mobile menu when a nav link is clicked", async () => {
+    const user = userEvent.setup();
+    renderLayout();
+
+    const hamburger = screen.getByRole("button", { name: "Toggle menu" });
+    await user.click(hamburger);
+
+    const navLinks = screen.getByRole("link", { name: "Library" }).closest(".nav-links");
+    expect(navLinks).toHaveClass("nav-links--open");
+
+    await user.click(screen.getByRole("link", { name: "Library" }));
+    expect(navLinks).not.toHaveClass("nav-links--open");
+  });
+
+  it("renders nav with nav-bar class", () => {
+    renderLayout();
+    const nav = screen.getByRole("navigation");
+    expect(nav).toHaveClass("nav-bar");
   });
 });

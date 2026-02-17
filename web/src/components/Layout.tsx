@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { setAccessToken } from "../api/client";
 
@@ -9,6 +9,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   function isActive(path: string): boolean {
     return location.pathname === path;
@@ -20,86 +21,65 @@ export function Layout({ children }: LayoutProps) {
     navigate("/login");
   }
 
-  const activeLinkStyle = {
-    color: "var(--color-text)",
-    fontWeight: 700 as const,
-    fontSize: 14,
-    textDecoration: "none" as const,
-  };
-
-  const inactiveLinkStyle = {
-    color: "var(--color-text-secondary)",
-    fontWeight: 400 as const,
-    fontSize: 14,
-    textDecoration: "none" as const,
-  };
+  function handleNavClick() {
+    setMenuOpen(false);
+  }
 
   return (
     <>
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 24,
-          padding: "0 24px",
-          height: 56,
-          borderBottom: "1px solid var(--color-border)",
-        }}
-      >
-        <Link
-          to="/"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            fontWeight: 700,
-            fontSize: "1.125rem",
-            color: "var(--color-text)",
-            marginRight: 16,
-            textDecoration: "none",
-          }}
-        >
-          <img src="/images/logo.png" alt="SendRec" width="48" height="48" style={{ width: 48, height: 48, marginRight: 6 }} />
+      <nav className="nav-bar">
+        <Link to="/" className="nav-logo" onClick={handleNavClick}>
+          <img src="/images/logo.png" alt="SendRec" width="48" height="48" />
           SendRec
         </Link>
 
-        <Link to="/" style={isActive("/") ? activeLinkStyle : inactiveLinkStyle}>
-          Record
-        </Link>
-
-        <Link
-          to="/upload"
-          style={isActive("/upload") ? activeLinkStyle : inactiveLinkStyle}
-        >
-          Upload
-        </Link>
-
-        <Link
-          to="/library"
-          style={isActive("/library") ? activeLinkStyle : inactiveLinkStyle}
-        >
-          Library
-        </Link>
-
-        <Link
-          to="/settings"
-          style={isActive("/settings") ? activeLinkStyle : inactiveLinkStyle}
-        >
-          Settings
-        </Link>
-
         <button
-          onClick={signOut}
-          style={{
-            marginLeft: "auto",
-            background: "transparent",
-            color: "var(--color-text-secondary)",
-            fontSize: 14,
-            padding: "6px 12px",
-            borderRadius: 4,
-          }}
+          className="nav-hamburger"
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="Toggle menu"
         >
-          Sign out
+          <span />
+          <span />
+          <span />
         </button>
+
+        <div className={`nav-links${menuOpen ? " nav-links--open" : ""}`}>
+          <Link
+            to="/"
+            className={`nav-link${isActive("/") ? " nav-link--active" : ""}`}
+            onClick={handleNavClick}
+          >
+            Record
+          </Link>
+
+          <Link
+            to="/upload"
+            className={`nav-link${isActive("/upload") ? " nav-link--active" : ""}`}
+            onClick={handleNavClick}
+          >
+            Upload
+          </Link>
+
+          <Link
+            to="/library"
+            className={`nav-link${isActive("/library") ? " nav-link--active" : ""}`}
+            onClick={handleNavClick}
+          >
+            Library
+          </Link>
+
+          <Link
+            to="/settings"
+            className={`nav-link${isActive("/settings") ? " nav-link--active" : ""}`}
+            onClick={handleNavClick}
+          >
+            Settings
+          </Link>
+
+          <button className="nav-signout" onClick={signOut}>
+            Sign out
+          </button>
+        </div>
       </nav>
 
       <main>{children}</main>

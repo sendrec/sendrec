@@ -26,6 +26,20 @@ vi.mock("../components/Recorder", () => ({
   },
 }));
 
+// Store the CameraRecorder onRecordingComplete callback
+let capturedCameraOnRecordingComplete: ((blob: Blob, duration: number) => void) | null = null;
+
+vi.mock("../components/CameraRecorder", () => ({
+  CameraRecorder: ({ maxDurationSeconds, onRecordingComplete }: { maxDurationSeconds?: number; onRecordingComplete: (blob: Blob, duration: number) => void }) => {
+    capturedCameraOnRecordingComplete = onRecordingComplete;
+    return (
+      <div data-testid="camera-recorder" data-max-duration={maxDurationSeconds ?? ""}>
+        Mock Camera Recorder
+      </div>
+    );
+  },
+}));
+
 function renderRecord() {
   return render(
     <MemoryRouter>
@@ -37,6 +51,11 @@ function renderRecord() {
 describe("Record", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getDisplayMedia: vi.fn(), getUserMedia: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
   });
 
   afterEach(() => {
@@ -141,7 +160,9 @@ describe("Record", () => {
     const webcamBlob = new Blob(["webcam"], { type: "video/webm" });
 
     // Trigger recording complete with webcam blob
-    capturedOnRecordingComplete!(screenBlob, 60, webcamBlob);
+    await act(async () => {
+      capturedOnRecordingComplete!(screenBlob, 60, webcamBlob);
+    });
 
     await waitFor(() => {
       // Verify create request includes webcamFileSize
@@ -862,6 +883,161 @@ describe("Record", () => {
     });
     // No "remaining" text since limits is null
     expect(screen.queryByText(/videos remaining/i)).not.toBeInTheDocument();
+  });
+
+  it("shows CameraRecorder when getDisplayMedia is unavailable but getUserMedia is available", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("camera-recorder")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
+  });
+
+  it("passes maxDurationSeconds to CameraRecorder", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 25,
+      maxVideoDurationSeconds: 300,
+      videosUsedThisMonth: 10,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("camera-recorder")).toHaveAttribute("data-max-duration", "300");
+    });
+  });
+
+  it("shows remaining videos count with CameraRecorder", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 25,
+      maxVideoDurationSeconds: 300,
+      videosUsedThisMonth: 20,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByText(/5 videos remaining/i)).toBeInTheDocument();
+    });
+  });
+
+  it("shows unsupported message when both APIs are unavailable", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: {},
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByText(/recording is not available/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("camera-recorder")).not.toBeInTheDocument();
+  });
+
+  it("shows unsupported message when mediaDevices is undefined", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByText(/recording is not available/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("camera-recorder")).not.toBeInTheDocument();
+  });
+
+  it("uploads camera recording with correct content type from blob", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("camera-recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-cam",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "cam-token",
+    });
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["camera-data"], { type: "video/mp4" });
+    await act(async () => {
+      capturedCameraOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "https://s3.example.com/upload",
+        expect.objectContaining({
+          method: "PUT",
+          body: blob,
+          headers: { "Content-Type": "video/mp4" },
+        }),
+      );
+    });
+
+    // Verify contentType is sent in create request
+    const createCall = mockApiFetch.mock.calls.find(
+      (call: unknown[]) => call[0] === "/api/videos" && (call[1] as { method: string })?.method === "POST"
+    );
+    expect(createCall).toBeDefined();
+    const body = JSON.parse((createCall![1] as { body: string }).body);
+    expect(body.contentType).toBe("video/mp4");
+
+    globalThis.fetch = originalFetch;
   });
 
   it("falls back to execCommand copy when clipboard API fails", async () => {

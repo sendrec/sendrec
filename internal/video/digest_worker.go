@@ -63,6 +63,9 @@ func processDigest(ctx context.Context, db database.DBTX, notifier ViewNotifier,
 			WatchURL:  baseURL + "/watch/" + shareToken,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		log.Printf("digest-worker: row iteration error: %v", err)
+	}
 
 	sent := 0
 	totalVideos := 0

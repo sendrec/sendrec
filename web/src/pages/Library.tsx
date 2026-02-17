@@ -341,7 +341,7 @@ export function Library() {
 
   return (
     <div className="page-container">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div className="library-header">
         <div>
           <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
             Library
@@ -357,16 +357,7 @@ export function Library() {
           placeholder="Search videos..."
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: "8px 12px",
-            fontSize: 14,
-            color: "var(--color-text)",
-            width: 220,
-            outline: "none",
-          }}
+          className="library-search"
         />
         <Link
           to="/"
@@ -378,6 +369,7 @@ export function Library() {
             fontSize: 14,
             fontWeight: 600,
             textDecoration: "none",
+            whiteSpace: "nowrap",
           }}
         >
           New Recording
@@ -653,7 +645,7 @@ export function Library() {
             onClick={(e) => e.stopPropagation()}
             style={{
               background: "var(--color-surface)", borderRadius: 12, padding: 24,
-              width: 400, maxHeight: "80vh", overflow: "auto",
+              width: "calc(100vw - 32px)", maxWidth: 400, maxHeight: "80vh", overflow: "auto",
               border: "1px solid var(--color-border)",
             }}
           >

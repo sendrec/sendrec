@@ -109,6 +109,7 @@ type createRequest struct {
 	Duration       int    `json:"duration"`
 	FileSize       int64  `json:"fileSize"`
 	WebcamFileSize int64  `json:"webcamFileSize,omitempty"`
+	ContentType    string `json:"contentType,omitempty"`
 }
 
 type createResponse struct {
@@ -209,13 +210,22 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	contentType := req.ContentType
+	if contentType == "" {
+		contentType = "video/webm"
+	}
+	if contentType != "video/webm" && contentType != "video/mp4" {
+		httputil.WriteError(w, http.StatusBadRequest, "only video/webm and video/mp4 recordings are supported")
+		return
+	}
+
 	shareToken, err := generateShareToken()
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate share token")
 		return
 	}
 
-	fileKey := videoFileKey(userID, shareToken, "video/webm")
+	fileKey := videoFileKey(userID, shareToken, contentType)
 
 	var webcamKey *string
 	if req.WebcamFileSize > 0 {
@@ -225,16 +235,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var videoID string
 	err = h.db.QueryRow(r.Context(),
-		`INSERT INTO videos (user_id, title, duration, file_size, file_key, share_token, webcam_key)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-		userID, title, req.Duration, req.FileSize, fileKey, shareToken, webcamKey,
+		`INSERT INTO videos (user_id, title, duration, file_size, file_key, share_token, webcam_key, content_type)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		userID, title, req.Duration, req.FileSize, fileKey, shareToken, webcamKey, contentType,
 	).Scan(&videoID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create video")
 		return
 	}
 
-	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), fileKey, "video/webm", req.FileSize, 30*time.Minute)
+	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), fileKey, contentType, req.FileSize, 30*time.Minute)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate upload URL")
 		return
@@ -453,20 +463,26 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if webcamKey != nil {
-			go CompositeWithWebcam(
-				context.Background(),
-				h.db, h.storage,
-				videoID, fileKey, *webcamKey,
-				thumbnailFileKey(userID, shareToken),
-				expectedContentType,
-			)
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+				defer cancel()
+				CompositeWithWebcam(ctx, h.db, h.storage, videoID, fileKey, *webcamKey, thumbnailFileKey(userID, shareToken), expectedContentType)
+			}()
 		} else {
-			go GenerateThumbnail(context.Background(), h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken))
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+				defer cancel()
+				GenerateThumbnail(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken))
+			}()
 			if err := EnqueueTranscription(r.Context(), h.db, videoID); err != nil {
 				log.Printf("failed to enqueue transcription for %s: %v", videoID, err)
 			}
 			if duration == 0 {
-				go probeDuration(context.Background(), h.db, h.storage, videoID, fileKey)
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+					defer cancel()
+					probeDuration(ctx, h.db, h.storage, videoID, fileKey)
+				}()
 			}
 		}
 	}
@@ -532,7 +548,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	paramIdx++
 
 	if query != "" {
-		args = append(args, "%"+query+"%")
+		escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
+		args = append(args, "%"+escaped+"%")
 		baseQuery += fmt.Sprintf(` AND (v.title ILIKE $%d OR EXISTS (
 			SELECT 1 FROM jsonb_array_elements(v.transcript_json) seg
 			WHERE seg->>'text' ILIKE $%d
@@ -617,7 +634,8 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
 		if err := deleteWithRetry(ctx, h.storage, fileKey, 3); err != nil {
 			log.Printf("all delete retries failed for %s: %v", fileKey, err)
 			return
@@ -719,15 +737,17 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	viewerUserID := h.viewerUserIDFromRequest(r)
 
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		ip := clientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
-		if _, err := h.db.Exec(context.Background(),
+		if _, err := h.db.Exec(ctx,
 			`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
 			videoID, hash,
 		); err != nil {
 			log.Printf("failed to record view for %s: %v", videoID, err)
 		}
-		h.resolveAndNotify(videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
+		h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 	}()
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)
@@ -972,14 +992,11 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go TrimVideoAsync(
-		context.Background(),
-		h.db, h.storage,
-		videoID, fileKey,
-		thumbnailFileKey(userID, shareToken),
-		contentType,
-		req.StartSeconds, req.EndSeconds,
-	)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		TrimVideoAsync(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken), contentType, req.StartSeconds, req.EndSeconds)
+	}()
 
 	w.WriteHeader(http.StatusAccepted)
 }

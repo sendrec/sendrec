@@ -124,7 +124,7 @@ func (h *Handler) viewerUserIDFromRequest(r *http.Request) string {
 	return claims.UserID
 }
 
-func (h *Handler) resolveAndNotify(videoID, ownerID, ownerEmail, ownerName, videoTitle, shareToken, viewerUserID string, videoViewNotification *string) {
+func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerEmail, ownerName, videoTitle, shareToken, viewerUserID string, videoViewNotification *string) {
 	if h.viewNotifier == nil {
 		return
 	}
@@ -138,7 +138,7 @@ func (h *Handler) resolveAndNotify(videoID, ownerID, ownerEmail, ownerName, vide
 		mode = *videoViewNotification
 	} else {
 		var accountMode string
-		err := h.db.QueryRow(context.Background(),
+		err := h.db.QueryRow(ctx,
 			`SELECT view_notification FROM notification_preferences WHERE user_id = $1`,
 			ownerID,
 		).Scan(&accountMode)
@@ -155,7 +155,7 @@ func (h *Handler) resolveAndNotify(videoID, ownerID, ownerEmail, ownerName, vide
 		// Note: small race window — two simultaneous viewers could both see viewCount==1.
 		// Acceptable at current scale; use advisory lock or sent-flag column if needed later.
 		var viewCount int64
-		err := h.db.QueryRow(context.Background(),
+		err := h.db.QueryRow(ctx,
 			`SELECT COUNT(*) FROM video_views WHERE video_id = $1`,
 			videoID,
 		).Scan(&viewCount)
@@ -169,7 +169,7 @@ func (h *Handler) resolveAndNotify(videoID, ownerID, ownerEmail, ownerName, vide
 	}
 
 	watchURL := h.baseURL + "/watch/" + shareToken
-	if err := h.viewNotifier.SendViewNotification(context.Background(), ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
+	if err := h.viewNotifier.SendViewNotification(ctx, ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
 		log.Printf("failed to send view notification for %s: %v", videoID, err)
 	}
 }

@@ -248,6 +248,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             border-radius: 4px;
             margin-top: 0.75rem;
             cursor: pointer;
+            display: none;
         }
         .marker-dot {
             position: absolute;
@@ -507,19 +508,55 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             font-size: 0.875rem;
             font-style: italic;
         }
+        .browser-warning {
+            background: #1e293b;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 0.75rem;
+            color: #fbbf24;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        @media (max-width: 640px) {
+            .container { padding: 1rem 0.75rem; }
+            h1 { font-size: 1.25rem; }
+            .actions { flex-wrap: wrap; }
+            .form-row { flex-direction: column; }
+            .speed-btn { min-height: 44px; min-width: 44px; padding: 0.5rem; }
+            .download-btn { min-height: 44px; }
+            .comment-submit { min-height: 44px; }
+            .emoji-trigger { min-height: 44px; min-width: 44px; }
+            .emoji-grid { width: min(260px, calc(100vw - 2rem)); right: auto; left: 0; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <a href="{{.BaseURL}}" class="logo">{{if .Branding.LogoURL}}<img src="{{.Branding.LogoURL}}" alt="{{.Branding.CompanyName}}" width="20" height="20">{{end}}{{.Branding.CompanyName}}</a>
-        <video id="player" controls crossorigin="anonymous"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
+        <video id="player" controls playsinline webkit-playsinline crossorigin="anonymous"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
             <source src="{{.VideoURL}}" type="{{.ContentType}}">
             {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
             Your browser does not support video playback.
         </video>
+        <div id="safari-webm-warning" class="hidden" role="alert">
+            <p>This video was recorded in WebM format, which is not supported by Safari. Please open this link in Chrome or Firefox to watch.</p>
+        </div>
         <script nonce="{{.Nonce}}">
             var v = document.getElementById('player');
-            v.play().catch(function() { v.muted = true; v.play(); });
+            v.muted = true;
+            v.play().then(function() {
+                v.muted = false;
+                v.play().catch(function() { v.muted = true; });
+            }).catch(function() {});
+            (function() {
+                var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+                var src = document.querySelector('#player source');
+                if (isSafari && src && src.getAttribute('type') === 'video/webm') {
+                    document.getElementById('safari-webm-warning').className = 'browser-warning';
+                    document.getElementById('player').style.display = 'none';
+                }
+            })();
         </script>
         {{if ne .CommentMode "disabled"}}
         <div class="markers-bar" id="markers-bar"></div>
@@ -652,7 +689,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     if (!bySecond[sec]) bySecond[sec] = [];
                     bySecond[sec].push(c);
                 });
-                Object.keys(bySecond).forEach(function(sec) {
+                var keys = Object.keys(bySecond);
+                markersBar.style.display = keys.length > 0 ? 'block' : 'none';
+                keys.forEach(function(sec) {
                     var group = bySecond[sec];
                     var dot = document.createElement('div');
                     dot.className = 'marker-dot' + (group.length > 1 ? ' multi' : '') + (group[0].isPrivate ? ' private' : '');
@@ -1297,15 +1336,17 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	viewerUserID := h.viewerUserIDFromRequest(r)
 
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		ip := clientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
-		if _, err := h.db.Exec(context.Background(),
+		if _, err := h.db.Exec(ctx,
 			`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
 			videoID, hash,
 		); err != nil {
 			log.Printf("failed to record view for %s: %v", videoID, err)
 		}
-		h.resolveAndNotify(videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
+		h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 	}()
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)

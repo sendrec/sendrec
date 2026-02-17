@@ -218,10 +218,17 @@ func (s *Storage) DownloadToFile(ctx context.Context, key string, destPath strin
 	if err != nil {
 		return fmt.Errorf("create file %s: %w", destPath, err)
 	}
-	defer func() { _ = f.Close() }()
 
 	if _, err := io.Copy(f, out.Body); err != nil {
+		_ = f.Close()
 		return fmt.Errorf("write file %s: %w", destPath, err)
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("sync file %s: %w", destPath, err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close file %s: %w", destPath, err)
 	}
 	return nil
 }

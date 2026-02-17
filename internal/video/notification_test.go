@@ -322,7 +322,7 @@ func TestResolveAndNotify_SkipsWhenViewerIsOwner(t *testing.T) {
 	handler.SetViewNotifier(notifier)
 
 	every := "every"
-	handler.resolveAndNotify("vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", testUserID, &every)
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", testUserID, &every)
 
 	if notifier.called {
 		t.Error("expected notification to be skipped when viewer is owner")
@@ -341,7 +341,7 @@ func TestResolveAndNotify_SendsWhenViewerIsDifferent(t *testing.T) {
 	handler.SetViewNotifier(notifier)
 
 	every := "every"
-	handler.resolveAndNotify("vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "different-user-id", &every)
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "different-user-id", &every)
 
 	if !notifier.called {
 		t.Error("expected notification to be sent when viewer is different from owner")
@@ -360,7 +360,7 @@ func TestResolveAndNotify_SendsWhenViewerIsAnonymous(t *testing.T) {
 	handler.SetViewNotifier(notifier)
 
 	every := "every"
-	handler.resolveAndNotify("vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", &every)
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", &every)
 
 	if !notifier.called {
 		t.Error("expected notification to be sent when viewer is anonymous")

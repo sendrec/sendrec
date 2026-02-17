@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Library } from "./Library";
@@ -484,7 +484,9 @@ describe("Library", () => {
     // First poll: still processing
     mockApiFetch.mockResolvedValueOnce([makeVideo({ status: "processing" })]);
     mockApiFetch.mockResolvedValueOnce(unlimitedLimits);
-    await vi.advanceTimersByTimeAsync(5000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
 
     await waitFor(() => {
       expect(screen.getByText("processing...")).toBeInTheDocument();
@@ -493,7 +495,9 @@ describe("Library", () => {
     // Second poll: ready
     mockApiFetch.mockResolvedValueOnce([makeVideo({ status: "ready" })]);
     mockApiFetch.mockResolvedValueOnce(unlimitedLimits);
-    await vi.advanceTimersByTimeAsync(5000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
 
     await waitFor(() => {
       expect(screen.queryByText("processing...")).not.toBeInTheDocument();
