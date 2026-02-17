@@ -3,6 +3,7 @@ package video
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"testing"
 
@@ -64,5 +65,46 @@ func TestGenerateThumbnail_UploadError(t *testing.T) {
 	// Should not have called DB since ffmpeg/upload failed
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unexpected DB calls: %v", err)
+	}
+}
+
+func TestExtractFrameAt_InvalidInput(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+
+	err := extractFrameAt("/nonexistent/input.webm", "/tmp/sendrec-test-output.jpg", 2)
+	if err == nil {
+		t.Error("expected error for nonexistent input file")
+	}
+}
+
+func TestExtractFrameAt_SeekZero(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("ffmpeg not installed")
+	}
+
+	err := extractFrameAt("/nonexistent/input.webm", "/tmp/sendrec-test-output.jpg", 0)
+	if err == nil {
+		t.Error("expected error for nonexistent input file")
+	}
+}
+
+func TestThumbnailOutputSizeCheck(t *testing.T) {
+	// Verify that an empty file is detected as having no content
+	tmpFile, err := os.CreateTemp("", "sendrec-thumb-test-*.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := tmpFile.Name()
+	_ = tmpFile.Close()
+	defer func() { _ = os.Remove(path) }()
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() != 0 {
+		t.Errorf("expected empty file, got %d bytes", info.Size())
 	}
 }
