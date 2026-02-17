@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type Storage struct {
@@ -164,26 +163,6 @@ func (s *Storage) HeadObject(ctx context.Context, key string) (int64, string, er
 		ct = *out.ContentType
 	}
 	return size, ct, nil
-}
-
-func (s *Storage) SetCORS(ctx context.Context, allowedOrigins []string) error {
-	_, err := s.client.PutBucketCors(ctx, &s3.PutBucketCorsInput{
-		Bucket: aws.String(s.bucket),
-		CORSConfiguration: &types.CORSConfiguration{
-			CORSRules: []types.CORSRule{
-				{
-					AllowedOrigins: allowedOrigins,
-					AllowedMethods: []string{"GET", "PUT"},
-					AllowedHeaders: []string{"*"},
-					MaxAgeSeconds:  aws.Int32(3600),
-				},
-			},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("set bucket CORS: %w", err)
-	}
-	return nil
 }
 
 func (s *Storage) EnsureBucket(ctx context.Context) error {

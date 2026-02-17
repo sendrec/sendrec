@@ -270,55 +270,6 @@ func TestDeleteObjectError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SetCORS
-// ---------------------------------------------------------------------------
-
-func TestSetCORSSuccess(t *testing.T) {
-	var mu sync.Mutex
-	var calledMethod string
-	var hadCorsQuery bool
-
-	ts, store := newFakeS3Server(t, func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		calledMethod = r.Method
-		hadCorsQuery = r.URL.Query().Has("cors")
-		mu.Unlock()
-		w.WriteHeader(http.StatusOK)
-	})
-	defer ts.Close()
-
-	err := store.SetCORS(context.Background(), []string{"https://sendrec.eu"})
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-	if calledMethod != http.MethodPut {
-		t.Fatalf("expected PUT method, got: %s", calledMethod)
-	}
-	if !hadCorsQuery {
-		t.Fatal("expected request to have ?cors query parameter")
-	}
-}
-
-func TestSetCORSError(t *testing.T) {
-	ts, store := newFakeS3Server(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = fmt.Fprint(w, s3ErrorResponse("InternalError", "Internal Server Error"))
-	})
-	defer ts.Close()
-
-	err := store.SetCORS(context.Background(), []string{"https://sendrec.eu"})
-	if err == nil {
-		t.Fatal("expected an error, got nil")
-	}
-	if !strings.Contains(err.Error(), "set bucket CORS") {
-		t.Fatalf("expected error to contain 'set bucket CORS', got: %v", err)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // EnsureBucket
 // ---------------------------------------------------------------------------
 

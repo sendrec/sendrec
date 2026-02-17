@@ -68,15 +68,6 @@ func main() {
 
 	baseURL := getEnv("BASE_URL", "http://localhost:8080")
 
-	corsOrigins := []string{baseURL}
-	// Allow Vite dev server uploads during local development.
-	if baseURL == "http://localhost:8080" {
-		corsOrigins = append(corsOrigins, "http://localhost:5173")
-	}
-
-	if err := store.SetCORS(ctx, corsOrigins); err != nil {
-		log.Printf("warning: failed to set storage CORS: %v", err)
-	}
 	log.Println("storage bucket ready")
 
 	var webFS fs.FS
