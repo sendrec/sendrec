@@ -3779,6 +3779,100 @@ func TestWatchDownload_Disabled(t *testing.T) {
 	}
 }
 
+// --- SetLinkExpiry Tests ---
+
+func TestSetLinkExpiry_NeverExpires(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-123"
+
+	mock.ExpectExec(`UPDATE videos SET share_expires_at = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := []byte(`{"neverExpires":true}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/link-expiry", handler.SetLinkExpiry)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/link-expiry", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestSetLinkExpiry_SevenDays(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-456"
+
+	mock.ExpectExec(`UPDATE videos SET share_expires_at = now\(\) \+ INTERVAL '7 days', updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := []byte(`{"neverExpires":false}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/link-expiry", handler.SetLinkExpiry)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/link-expiry", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestSetLinkExpiry_NotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectExec(`UPDATE videos SET share_expires_at = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+		WithArgs("video-999", testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	body := []byte(`{"neverExpires":true}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/link-expiry", handler.SetLinkExpiry)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/video-999/link-expiry", body))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
 // --- SetPassword Tests ---
 
 func TestSetPassword_SetNewPassword(t *testing.T) {

@@ -893,6 +893,41 @@ func (h *Handler) SetDownloadEnabled(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+
+type setLinkExpiryRequest struct {
+	NeverExpires bool `json:"neverExpires"`
+}
+
+func (h *Handler) SetLinkExpiry(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setLinkExpiryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	var query string
+	if req.NeverExpires {
+		query = `UPDATE videos SET share_expires_at = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+	} else {
+		query = `UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+	}
+
+	tag, err := h.db.Exec(r.Context(), query, videoID, userID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not update link expiry")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func viewerHash(ip, userAgent string) string {
 	h := sha256.Sum256([]byte(ip + "|" + userAgent))
 	return fmt.Sprintf("%x", h[:8])
