@@ -14,10 +14,10 @@ func thumbnailFileKey(userID, shareToken string) string {
 	return fmt.Sprintf("recordings/%s/%s.jpg", userID, shareToken)
 }
 
-func extractFrame(inputPath, outputPath string) error {
+func extractFrameAt(inputPath, outputPath string, seekSeconds int) error {
 	cmd := exec.Command("ffmpeg",
 		"-i", inputPath,
-		"-ss", "2",
+		"-ss", fmt.Sprintf("%d", seekSeconds),
 		"-frames:v", "1",
 		"-vf", "scale=640:-1",
 		"-q:v", "5",
@@ -29,6 +29,10 @@ func extractFrame(inputPath, outputPath string) error {
 		return fmt.Errorf("ffmpeg: %w: %s", err, string(output))
 	}
 	return nil
+}
+
+func extractFrame(inputPath, outputPath string) error {
+	return extractFrameAt(inputPath, outputPath, 2)
 }
 
 func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, thumbnailKey string) {
@@ -57,6 +61,21 @@ func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStor
 
 	if err := extractFrame(tmpVideoPath, tmpThumbPath); err != nil {
 		log.Printf("thumbnail: ffmpeg failed for video %s: %v", videoID, err)
+		return
+	}
+
+	// If -ss 2 produced a 0-byte file (video shorter than 2s), retry at the start
+	if info, err := os.Stat(tmpThumbPath); err == nil && info.Size() == 0 {
+		log.Printf("thumbnail: video %s too short for seek=2, retrying at seek=0", videoID)
+		if err := extractFrameAt(tmpVideoPath, tmpThumbPath, 0); err != nil {
+			log.Printf("thumbnail: ffmpeg retry failed for video %s: %v", videoID, err)
+			return
+		}
+	}
+
+	// Skip upload if thumbnail is still empty
+	if info, err := os.Stat(tmpThumbPath); err != nil || info.Size() == 0 {
+		log.Printf("thumbnail: no frame extracted for video %s, skipping", videoID)
 		return
 	}
 
