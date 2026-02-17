@@ -654,6 +654,19 @@ export function Library() {
                           {video.downloadEnabled ? "Downloads on" : "Downloads off"}
                         </button>
                         <button
+                          onClick={() => {
+                            const snippet = `<iframe src="${window.location.origin}/embed/${video.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
+                            navigator.clipboard.writeText(snippet);
+                            setCopiedId(video.id);
+                            setTimeout(() => setCopiedId(null), 2000);
+                            setOpenMenuId(null);
+                          }}
+                          className="action-link"
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
+                        >
+                          Embed
+                        </button>
+                        <button
                           onClick={() => { toggleLinkExpiry(video); setOpenMenuId(null); }}
                           className="action-link"
                           style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}

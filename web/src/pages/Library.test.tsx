@@ -837,6 +837,34 @@ describe("Library", () => {
     });
   });
 
+  it("copies embed code when clicking Embed button", async () => {
+    const user = userEvent.setup();
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: writeTextMock },
+      writable: true,
+      configurable: true,
+    });
+
+    mockFetch([makeVideo()]);
+    renderLibrary();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    });
+    await openOverflowMenu(user);
+
+    const embedButton = screen.getByRole("button", { name: "Embed" });
+    await user.click(embedButton);
+
+    expect(writeTextMock).toHaveBeenCalledWith(
+      expect.stringContaining("<iframe")
+    );
+    expect(writeTextMock).toHaveBeenCalledWith(
+      expect.stringContaining("/embed/")
+    );
+  });
+
   it("shows analytics link for ready videos", async () => {
     mockFetch([makeVideo()]);
     renderLibrary();
