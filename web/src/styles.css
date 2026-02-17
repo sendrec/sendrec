@@ -36,6 +36,10 @@ button {
   font: inherit;
 }
 
+a, button, input, select, textarea, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
@@ -52,7 +56,7 @@ input:focus-visible {
   display: flex;
   align-items: center;
   gap: 24px;
-  padding: 0 24px;
+  padding: 0 max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left));
   height: 56px;
   border-bottom: 1px solid var(--color-border);
   position: relative;
@@ -183,7 +187,7 @@ input:focus-visible {
 .page-container {
   max-width: 800px;
   margin: 40px auto;
-  padding: 24px;
+  padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left));
 }
 
 .page-container--centered {
@@ -194,7 +198,7 @@ input:focus-visible {
 .auth-container {
   max-width: 400px;
   margin: 80px auto;
-  padding: 24px;
+  padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left));
 }
 
 .video-card {
@@ -341,5 +345,22 @@ input:focus-visible {
     display: inline-flex;
     align-items: center;
     padding: 8px 12px;
+  }
+
+  /* Prevent iOS Safari auto-zoom on input focus (requires >= 16px) */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  .nav-bar {
+    padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  }
+
+  .page-container {
+    padding: 16px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
+  }
+
+  .auth-container {
+    padding: 16px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
   }
 }
