@@ -14,9 +14,10 @@ function formatDuration(seconds: number): string {
 }
 
 function getSupportedMimeType(): string {
-  if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) {
-    return "video/webm;codecs=vp9,opus";
-  }
+  if (typeof MediaRecorder === "undefined") return "video/mp4";
+  // Prefer MP4 for universal playback compatibility (Safari can record WebM but not play it back)
+  if (MediaRecorder.isTypeSupported("video/mp4")) return "video/mp4";
+  if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) return "video/webm;codecs=vp9,opus";
   return "video/mp4";
 }
 

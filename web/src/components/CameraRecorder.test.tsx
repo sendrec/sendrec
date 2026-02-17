@@ -344,10 +344,9 @@ describe("CameraRecorder", () => {
     expect(screen.getByRole("button", { name: "Flip camera" })).toBeDisabled();
   });
 
-  it("uses mp4 mimeType when webm is not supported", async () => {
-    MockMediaRecorder.isTypeSupported = vi.fn().mockImplementation((type: string) => {
-      return !type.includes("webm");
-    });
+  it("prefers mp4 mimeType for maximum compatibility", async () => {
+    // isTypeSupported returns true for everything (default mock)
+    MockMediaRecorder.isTypeSupported = vi.fn().mockReturnValue(true);
 
     const onComplete = vi.fn();
     const user = userEvent.setup();
@@ -366,5 +365,29 @@ describe("CameraRecorder", () => {
 
     const blob = onComplete.mock.calls[0][0] as Blob;
     expect(blob.type).toBe("video/mp4");
+  });
+
+  it("falls back to webm when mp4 is not supported", async () => {
+    MockMediaRecorder.isTypeSupported = vi.fn().mockImplementation((type: string) => {
+      return type.includes("webm");
+    });
+
+    const onComplete = vi.fn();
+    const user = userEvent.setup();
+    render(<CameraRecorder onRecordingComplete={onComplete} />);
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+    await vi.waitFor(() => {
+      expect(onComplete).toHaveBeenCalledTimes(1);
+    });
+
+    const blob = onComplete.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe("video/webm");
   });
 });
