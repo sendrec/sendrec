@@ -94,6 +94,7 @@ export function Library() {
   });
   const [savingBranding, setSavingBranding] = useState(false);
   const [brandingMessage, setBrandingMessage] = useState("");
+  const [uploadingThumbnailId, setUploadingThumbnailId] = useState<string | null>(null);
 
   const fetchVideosAndLimits = useCallback(async (query = "") => {
     const searchParam = query ? `?q=${encodeURIComponent(query)}` : "";
@@ -324,6 +325,39 @@ export function Library() {
       setBrandingMessage(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSavingBranding(false);
+    }
+  }
+
+  async function uploadThumbnail(videoId: string, file: File) {
+    if (file.size > 2 * 1024 * 1024) return;
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) return;
+    setUploadingThumbnailId(videoId);
+    try {
+      const result = await apiFetch<{ uploadUrl: string }>(`/api/videos/${videoId}/thumbnail`, {
+        method: "POST",
+        body: JSON.stringify({ contentType: file.type, contentLength: file.size }),
+      });
+      if (!result) return;
+      const uploadResp = await fetch(result.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!uploadResp.ok) return;
+      await fetchVideosAndLimits(searchQuery);
+    } finally {
+      setUploadingThumbnailId(null);
+    }
+  }
+
+  async function resetThumbnail(videoId: string) {
+    setUploadingThumbnailId(videoId);
+    try {
+      await apiFetch(`/api/videos/${videoId}/thumbnail`, { method: "DELETE" });
+      await fetchVideosAndLimits(searchQuery);
+    } finally {
+      setUploadingThumbnailId(null);
     }
   }
 
@@ -656,6 +690,46 @@ export function Library() {
                         className="action-link"
                       >
                         Branding
+                      </button>
+                    </>
+                  )}
+                  <span className="action-sep">&middot;</span>
+                  <label style={{ display: "inline" }}>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="action-link"
+                      style={{ cursor: uploadingThumbnailId === video.id ? "default" : "pointer" }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          const input = (e.currentTarget.parentElement as HTMLLabelElement).querySelector("input");
+                          if (input) input.click();
+                        }
+                      }}
+                    >
+                      {uploadingThumbnailId === video.id ? "Uploading..." : "Thumbnail"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      style={{ display: "none" }}
+                      disabled={uploadingThumbnailId === video.id}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadThumbnail(video.id, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {video.thumbnailUrl && (
+                    <>
+                      <span className="action-sep">&middot;</span>
+                      <button
+                        onClick={() => resetThumbnail(video.id)}
+                        disabled={uploadingThumbnailId === video.id}
+                        className="action-link"
+                      >
+                        Reset thumbnail
                       </button>
                     </>
                   )}
