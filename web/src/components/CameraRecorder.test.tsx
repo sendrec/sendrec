@@ -309,7 +309,9 @@ describe("CameraRecorder", () => {
       new Error("Permission denied"),
     );
 
-    render(<CameraRecorder onRecordingComplete={vi.fn()} />);
+    await act(async () => {
+      render(<CameraRecorder onRecordingComplete={vi.fn()} />);
+    });
 
     await vi.waitFor(() => {
       expect(screen.getByText(/could not access your camera/i)).toBeInTheDocument();

@@ -160,7 +160,9 @@ describe("Record", () => {
     const webcamBlob = new Blob(["webcam"], { type: "video/webm" });
 
     // Trigger recording complete with webcam blob
-    capturedOnRecordingComplete!(screenBlob, 60, webcamBlob);
+    await act(async () => {
+      capturedOnRecordingComplete!(screenBlob, 60, webcamBlob);
+    });
 
     await waitFor(() => {
       // Verify create request includes webcamFileSize

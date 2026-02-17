@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { AuthForm } from "./AuthForm";
@@ -103,7 +103,10 @@ describe("AuthForm", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(screen.getByRole("button", { name: "Loading..." })).toBeDisabled();
-    resolveSubmit!();
+
+    await act(async () => {
+      resolveSubmit!();
+    });
   });
 
   it("renders footer content", () => {

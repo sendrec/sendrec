@@ -48,6 +48,9 @@ func PurgeOrphanedFiles(ctx context.Context, db database.DBTX, storage ObjectSto
 			log.Printf("cleanup: failed to mark purged for %s: %v", fileKey, err)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		log.Printf("cleanup: row iteration error: %v", err)
+	}
 }
 
 func StartCleanupLoop(ctx context.Context, db database.DBTX, storage ObjectStorage, interval time.Duration) {

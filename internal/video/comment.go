@@ -204,8 +204,10 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 
 	if !req.IsPrivate && callerUserID != ownerID && h.commentNotifier != nil {
 		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
 			var ownerEmail, ownerName, videoTitle string
-			err := h.db.QueryRow(context.Background(),
+			err := h.db.QueryRow(ctx,
 				`SELECT u.email, u.name, v.title FROM users u JOIN videos v ON v.user_id = u.id WHERE v.id = $1`,
 				videoID,
 			).Scan(&ownerEmail, &ownerName, &videoTitle)
@@ -218,7 +220,7 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 			if authorName == "" {
 				authorName = "Anonymous"
 			}
-			if err := h.commentNotifier.SendCommentNotification(context.Background(), ownerEmail, ownerName, videoTitle, authorName, req.Body, watchURL); err != nil {
+			if err := h.commentNotifier.SendCommentNotification(ctx, ownerEmail, ownerName, videoTitle, authorName, req.Body, watchURL); err != nil {
 				log.Printf("failed to send comment notification: %v", err)
 			}
 		}()

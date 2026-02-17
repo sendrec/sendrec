@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Upload } from "./Upload";
@@ -179,10 +179,12 @@ describe("Upload", () => {
     expect(screen.getByText("Uploading...")).toBeInTheDocument();
     expect(screen.getByText("demo.mp4")).toBeInTheDocument();
 
-    resolveUpload!({
-      id: "video-1",
-      uploadUrl: "https://s3.example.com/upload",
-      shareToken: "abc123defghi",
+    await act(async () => {
+      resolveUpload!({
+        id: "video-1",
+        uploadUrl: "https://s3.example.com/upload",
+        shareToken: "abc123defghi",
+      });
     });
   });
 });
