@@ -529,6 +529,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             .emoji-trigger { min-height: 44px; min-width: 44px; }
             .emoji-grid { width: min(260px, calc(100vw - 2rem)); right: auto; left: 0; }
         }
+        {{if .CustomCSS}}{{.CustomCSS}}{{end}}
     </style>
 </head>
 <body>
@@ -1147,6 +1148,7 @@ type watchPageData struct {
 	Branding         brandingConfig
 	AnalyticsScript  template.HTML
 	DownloadEnabled  bool
+	CustomCSS        template.CSS
 }
 
 type expiredPageData struct {
@@ -1268,7 +1270,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var ownerEmail string
 	var viewNotification *string
 	var contentType string
-	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText *string
+	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
 	var downloadEnabled bool
 
@@ -1276,7 +1278,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
 		        v.transcript_key, v.transcript_json, v.transcript_status,
 		        v.user_id, u.email, v.view_notification, v.content_type,
-		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text,
+		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
 		        v.download_enabled
 		 FROM videos v
@@ -1287,7 +1289,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &commentMode,
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
 		&ownerID, &ownerEmail, &viewNotification, &contentType,
-		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText,
+		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
 		&downloadEnabled)
 	if err != nil {
@@ -1307,6 +1309,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 			CompanyName: ubCompanyName, LogoKey: ubLogoKey,
 			ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
 			ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
+			CustomCSS: ubCustomCSS,
 		},
 		brandingSettingsResponse{
 			CompanyName: vbCompanyName, LogoKey: vbLogoKey,
@@ -1398,6 +1401,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Branding:         branding,
 		AnalyticsScript:  injectScriptNonce(h.analyticsScript, nonce),
 		DownloadEnabled:  downloadEnabled,
+		CustomCSS:        template.CSS(branding.CustomCSS),
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

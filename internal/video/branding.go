@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -28,6 +29,7 @@ const (
 	maxCompanyNameLength = 200
 	maxFooterTextLength  = 500
 	maxLogoUploadBytes   = 512 * 1024
+	maxCustomCSSLength   = 10 * 1024
 )
 
 type brandingConfig struct {
@@ -39,6 +41,7 @@ type brandingConfig struct {
 	ColorAccent     string `json:"colorAccent"`
 	FooterText      string `json:"footerText"`
 	HasCustomLogo   bool   `json:"hasCustomLogo"`
+	CustomCSS       string `json:"customCss"`
 }
 
 type brandingSettingsResponse struct {
@@ -49,6 +52,7 @@ type brandingSettingsResponse struct {
 	ColorText       *string `json:"colorText"`
 	ColorAccent     *string `json:"colorAccent"`
 	FooterText      *string `json:"footerText"`
+	CustomCSS       *string `json:"customCss"`
 }
 
 type setBrandingRequest struct {
@@ -59,6 +63,7 @@ type setBrandingRequest struct {
 	ColorText       *string `json:"colorText"`
 	ColorAccent     *string `json:"colorAccent"`
 	FooterText      *string `json:"footerText"`
+	CustomCSS       *string `json:"customCss"`
 }
 
 type setVideoBrandingRequest struct {
@@ -73,6 +78,20 @@ type setVideoBrandingRequest struct {
 type logoUploadResponse struct {
 	UploadURL string `json:"uploadUrl"`
 	LogoKey   string `json:"logoKey"`
+}
+
+func sanitizeCustomCSS(css string) (string, string) {
+	if len(css) > maxCustomCSSLength {
+		return "", "custom CSS must be 10KB or smaller"
+	}
+	lower := strings.ToLower(css)
+	if strings.Contains(lower, "</style") {
+		return "", "custom CSS must not contain closing style tags"
+	}
+	if strings.Contains(lower, "@import url(") {
+		return "", "custom CSS must not contain @import url()"
+	}
+	return css, ""
 }
 
 func isValidHexColor(s string) bool {
@@ -109,6 +128,10 @@ func resolveBranding(ctx context.Context, storage ObjectStorage, userBranding br
 
 	applyOverrides(&cfg, userBranding)
 	applyOverrides(&cfg, videoBranding)
+
+	if userBranding.CustomCSS != nil && *userBranding.CustomCSS != "" {
+		cfg.CustomCSS = *userBranding.CustomCSS
+	}
 
 	logoKey := resolveLogoKey(userBranding.LogoKey, videoBranding.LogoKey)
 	if logoKey == "none" {
@@ -172,10 +195,10 @@ func (h *Handler) GetBrandingSettings(w http.ResponseWriter, r *http.Request) {
 
 	var resp brandingSettingsResponse
 	err := h.db.QueryRow(r.Context(),
-		`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text
+		`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css
 		 FROM user_branding WHERE user_id = $1`,
 		userID,
-	).Scan(&resp.CompanyName, &resp.LogoKey, &resp.ColorBackground, &resp.ColorSurface, &resp.ColorText, &resp.ColorAccent, &resp.FooterText)
+	).Scan(&resp.CompanyName, &resp.LogoKey, &resp.ColorBackground, &resp.ColorSurface, &resp.ColorText, &resp.ColorAccent, &resp.FooterText, &resp.CustomCSS)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.WriteJSON(w, http.StatusOK, brandingSettingsResponse{})
@@ -212,14 +235,20 @@ func (h *Handler) PutBrandingSettings(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, errMsg)
 		return
 	}
+	if req.CustomCSS != nil {
+		if _, errMsg := sanitizeCustomCSS(*req.CustomCSS); errMsg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, errMsg)
+			return
+		}
+	}
 
 	if _, err := h.db.Exec(r.Context(),
-		`INSERT INTO user_branding (user_id, company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`INSERT INTO user_branding (user_id, company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 ON CONFLICT (user_id) DO UPDATE SET
 		   company_name = $2, logo_key = $3, color_background = $4, color_surface = $5,
-		   color_text = $6, color_accent = $7, footer_text = $8, updated_at = now()`,
-		userID, req.CompanyName, req.LogoKey, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText,
+		   color_text = $6, color_accent = $7, footer_text = $8, custom_css = $9, updated_at = now()`,
+		userID, req.CompanyName, req.LogoKey, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText, req.CustomCSS,
 	); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to save branding settings")
 		return

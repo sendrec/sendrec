@@ -686,14 +686,14 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var ownerEmail string
 	var viewNotification *string
 	var contentType string
-	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText *string
+	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password,
 		        v.transcript_key, v.transcript_json, v.transcript_status,
 		        v.user_id, u.email, v.view_notification, v.content_type,
-		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text,
+		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
@@ -703,7 +703,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword,
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
 		&ownerID, &ownerEmail, &viewNotification, &contentType,
-		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText,
+		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -727,6 +727,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 			CompanyName: ubCompanyName, LogoKey: ubLogoKey,
 			ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
 			ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
+			CustomCSS: ubCustomCSS,
 		},
 		brandingSettingsResponse{
 			CompanyName: vbCompanyName, LogoKey: vbLogoKey,

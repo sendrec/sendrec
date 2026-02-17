@@ -20,7 +20,7 @@ var watchPageColumns = []string{
 	"thumbnail_key", "share_password", "comment_mode",
 	"transcript_key", "transcript_json", "transcript_status",
 	"user_id", "email", "view_notification", "content_type",
-	"ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text",
+	"ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css",
 	"vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text",
 	"download_enabled",
 }
@@ -91,7 +91,7 @@ func TestWatchPage_Expired_Returns410(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -130,7 +130,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -181,7 +181,7 @@ func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -237,7 +237,7 @@ func TestWatchPage_WithThumbnail_RendersPosterAndOGImage(t *testing.T) {
 			&thumbKey, (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -280,7 +280,7 @@ func TestWatchPage_WithoutThumbnail_NoPosterOrOGImage(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -323,7 +323,7 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 			(*string)(nil), (*string)(nil), "anonymous",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -374,7 +374,7 @@ func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -420,7 +420,7 @@ func TestWatchPage_NameRequired_RendersNameField(t *testing.T) {
 			(*string)(nil), (*string)(nil), "name_required",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -463,7 +463,7 @@ func TestWatchPage_NameEmailRequired_RendersBothFields(t *testing.T) {
 			(*string)(nil), (*string)(nil), "name_email_required",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -513,7 +513,7 @@ func TestWatchPage_TranscriptReady_RendersSegments(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			&transcriptKey, &segStr, "ready",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -569,7 +569,7 @@ func TestWatchPage_TranscriptPending_ShowsQueueMessage(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "pending",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -609,7 +609,7 @@ func TestWatchPage_TranscriptProcessing_ShowsProgressMessage(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "processing",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -649,7 +649,7 @@ func TestWatchPage_TranscriptFailed_ShowsFailedMessage(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "failed",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -689,7 +689,7 @@ func TestWatchPage_StorageError_Returns500(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -725,7 +725,7 @@ func TestWatchPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 			(*string)(nil), &passwordHash, "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -772,7 +772,7 @@ func TestWatchPage_PasswordProtected_ValidCookie_ShowsPlayer(t *testing.T) {
 			(*string)(nil), &passwordHash, "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -822,7 +822,7 @@ func TestWatchPage_OGMetaTags(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -870,7 +870,7 @@ func TestWatchPage_CrossOriginAttribute(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -910,7 +910,7 @@ func TestWatchPage_PlaysInlineAttribute(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -950,7 +950,7 @@ func TestWatchPage_CSPNonce(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -995,7 +995,7 @@ func TestWatchPage_TitleInHTMLTitle(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -1035,7 +1035,7 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -1079,7 +1079,7 @@ func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -1146,7 +1146,7 @@ func TestWatchPage_RecordsView(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -1246,7 +1246,7 @@ func TestWatchPage_AnalyticsScriptRendered(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -1296,7 +1296,7 @@ func TestWatchPage_NoAnalyticsWhenEmpty(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -1342,7 +1342,7 @@ func TestWatchPage_ResponsiveCSS(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -1385,7 +1385,7 @@ func TestWatchPage_SafariWebMWarningElement(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -1428,7 +1428,7 @@ func TestWatchPage_DownloadEnabled_ShowsButton(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 		))
@@ -1471,7 +1471,7 @@ func TestWatchPage_DownloadDisabled_HidesButton(t *testing.T) {
 			(*string)(nil), (*string)(nil), "disabled",
 			(*string)(nil), (*string)(nil), "none",
 			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 		))
@@ -1495,6 +1495,92 @@ func TestWatchPage_DownloadDisabled_HidesButton(t *testing.T) {
 	if strings.Contains(body, `og:video`) {
 		t.Error("expected no og:video meta tag when download is disabled")
 	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestWatchPage_CustomCSS_Injected(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler.brandingEnabled = true
+
+	shareToken := "custom-css-token"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	customCSS := "body { font-family: 'Inter', sans-serif; }"
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "CSS Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), &customCSS,
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
+		))
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, customCSS) {
+		t.Error("expected custom CSS to be injected in the page")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestWatchPage_NoCustomCSS(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	shareToken := "no-css-token"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "No CSS Test", "recordings/u1/abc.webm", "Alice", createdAt, expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true,
+		))
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if strings.Contains(body, "font-family: 'Inter'") {
+		t.Error("expected no custom CSS when NULL")
+	}
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
