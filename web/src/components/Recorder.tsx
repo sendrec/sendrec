@@ -377,7 +377,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
               Maximum recording length: {formatDuration(maxDurationSeconds)}
             </p>
           )}
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
             <button
               onClick={toggleWebcam}
               aria-label={webcamEnabled ? "Disable camera" : "Enable camera"}

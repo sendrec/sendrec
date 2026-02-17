@@ -414,7 +414,7 @@ export function Settings() {
           Generate API keys for integrations like Nextcloud. Keys are shown only once when created.
         </p>
 
-        <form onSubmit={handleCreateAPIKey} style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+        <form onSubmit={handleCreateAPIKey} className="api-key-form">
           <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
             <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Label</span>
             <input
@@ -741,7 +741,7 @@ export function Settings() {
             <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{brandingMessage}</p>
           )}
 
-          <div style={{ display: "flex", gap: 12 }}>
+          <div className="settings-button-row">
             <button
               type="submit"
               disabled={savingBranding}
