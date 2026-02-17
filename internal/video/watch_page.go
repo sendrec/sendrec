@@ -248,6 +248,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             border-radius: 4px;
             margin-top: 0.75rem;
             cursor: pointer;
+            display: none;
         }
         .marker-dot {
             position: absolute;
@@ -688,7 +689,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     if (!bySecond[sec]) bySecond[sec] = [];
                     bySecond[sec].push(c);
                 });
-                Object.keys(bySecond).forEach(function(sec) {
+                var keys = Object.keys(bySecond);
+                markersBar.style.display = keys.length > 0 ? 'block' : 'none';
+                keys.forEach(function(sec) {
                     var group = bySecond[sec];
                     var dot = document.createElement('div');
                     dot.className = 'marker-dot' + (group.length > 1 ? ' multi' : '') + (group[0].isPrivate ? ' private' : '');
