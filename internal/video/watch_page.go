@@ -925,26 +925,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     var btn = e.target.closest('.reaction-btn');
                     if (!btn || btn.disabled) return;
                     var emoji = btn.getAttribute('data-emoji');
-                    var authorName = nameEl ? nameEl.value.trim() : '';
-                    var authorEmail = emailEl ? emailEl.value.trim() : '';
-                    if ((commentMode === 'name_required' || commentMode === 'name_email_required') && !authorName) {
-                        if (nameEl) {
-                            nameEl.focus();
-                            nameEl.style.borderColor = '#ef4444';
-                            setTimeout(function() { nameEl.style.borderColor = ''; }, 2000);
-                            nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                        return;
-                    }
-                    if (commentMode === 'name_email_required' && !authorEmail) {
-                        if (emailEl) {
-                            emailEl.focus();
-                            emailEl.style.borderColor = '#ef4444';
-                            setTimeout(function() { emailEl.style.borderColor = ''; }, 2000);
-                            emailEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                        return;
-                    }
                     var timestamp = clampReactionTimestamp(player.currentTime);
                     btn.disabled = true;
                     var rect = btn.getBoundingClientRect();
@@ -960,7 +940,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     fetch('/api/watch/' + shareToken + '/comments', {
                         method: 'POST',
                         headers: headers,
-                        body: JSON.stringify({authorName: authorName, authorEmail: authorEmail, body: emoji, isPrivate: false, videoTimestamp: timestamp})
+                        body: JSON.stringify({authorName: '', authorEmail: '', body: emoji, isPrivate: false, videoTimestamp: timestamp})
                     }).then(function(r) {
                         if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
                         return r.json();

@@ -330,6 +330,80 @@ func TestPostWatchComment_NameEmailRequired_MissingEmail_Returns400(t *testing.T
 	}
 }
 
+func TestPostWatchComment_NameRequired_ReactionAllowsAnonymous(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	videoID := "video-123"
+	expiresAt := time.Now().Add(24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow(videoID, "owner-1", "name_required", expiresAt, (*string)(nil)))
+
+	mock.ExpectQuery(`INSERT INTO video_comments`).
+		WithArgs(videoID, (*string)(nil), "", "", "👍", false, (*float64)(nil)).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).AddRow("comment-1", time.Now()))
+
+	body, _ := json.Marshal(postCommentRequest{Body: "👍"})
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/comments", handler.PostWatchComment)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/"+shareToken+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+}
+
+func TestPostWatchComment_NameEmailRequired_ReactionAllowsAnonymous(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	videoID := "video-123"
+	expiresAt := time.Now().Add(24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow(videoID, "owner-1", "name_email_required", expiresAt, (*string)(nil)))
+
+	mock.ExpectQuery(`INSERT INTO video_comments`).
+		WithArgs(videoID, (*string)(nil), "", "", "🎉", false, (*float64)(nil)).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).AddRow("comment-1", time.Now()))
+
+	body, _ := json.Marshal(postCommentRequest{Body: "🎉"})
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/comments", handler.PostWatchComment)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/"+shareToken+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+}
+
 func TestPostWatchComment_EmptyBody_Returns400(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {

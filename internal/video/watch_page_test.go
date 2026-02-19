@@ -352,6 +352,9 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 	if strings.Contains(body, "if (!markersBar || !videoDuration) return;") {
 		t.Error("expected markers rendering to handle videos with unknown duration instead of hard-stopping")
 	}
+	if !strings.Contains(body, "body: JSON.stringify({authorName: '', authorEmail: '', body: emoji, isPrivate: false, videoTimestamp: timestamp})") {
+		t.Error("expected reaction payload to use anonymous author name/email")
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
