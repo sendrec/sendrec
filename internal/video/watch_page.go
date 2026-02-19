@@ -290,6 +290,61 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .marker-dot:hover .marker-tooltip {
             display: block;
         }
+        .reaction-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            position: relative;
+        }
+        .reaction-btn {
+            background: var(--brand-surface);
+            border: 1px solid transparent;
+            border-radius: 20px;
+            padding: 0.25rem 0.5rem;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s;
+            line-height: 1;
+        }
+        .reaction-btn:hover {
+            transform: scale(1.2);
+            border-color: var(--brand-accent);
+        }
+        .reaction-btn:active {
+            transform: scale(0.95);
+        }
+        .reaction-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .reaction-float {
+            position: fixed;
+            font-size: 1.5rem;
+            pointer-events: none;
+            z-index: 100;
+            animation: float-up 1s ease-out forwards;
+        }
+        @keyframes float-up {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-80px) scale(1.4); }
+        }
+        .comment.emoji-reaction {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .comment.emoji-reaction .comment-body {
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+        .comment.emoji-reaction .comment-meta {
+            margin-bottom: 0;
+            font-size: 0.75rem;
+        }
         .comment-highlight {
             animation: glow 1.5s ease-out;
         }
@@ -561,6 +616,14 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </script>
         {{if ne .CommentMode "disabled"}}
         <div class="markers-bar" id="markers-bar"></div>
+        <div class="reaction-bar" id="reaction-bar">
+            <button class="reaction-btn" data-emoji="&#x1F44D;" title="React with &#x1F44D;">&#x1F44D;</button>
+            <button class="reaction-btn" data-emoji="&#x1F44E;" title="React with &#x1F44E;">&#x1F44E;</button>
+            <button class="reaction-btn" data-emoji="&#x2764;&#xFE0F;" title="React with &#x2764;&#xFE0F;">&#x2764;&#xFE0F;</button>
+            <button class="reaction-btn" data-emoji="&#x1F602;" title="React with &#x1F602;">&#x1F602;</button>
+            <button class="reaction-btn" data-emoji="&#x1F62E;" title="React with &#x1F62E;">&#x1F62E;</button>
+            <button class="reaction-btn" data-emoji="&#x1F389;" title="React with &#x1F389;">&#x1F389;</button>
+        </div>
         {{end}}
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
@@ -724,8 +787,26 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 if (lastComments) renderMarkers(lastComments);
             });
 
+            var reactionEmojis = ['\uD83D\uDC4D','\uD83D\uDC4E','\u2764\uFE0F','\uD83D\uDE02','\uD83D\uDE2E','\uD83C\uDF89'];
+            function isReactionEmoji(text) {
+                return reactionEmojis.indexOf(text.trim()) !== -1;
+            }
+
             function renderComment(c) {
                 var authorName = c.authorName || 'Anonymous';
+                if (isReactionEmoji(c.body)) {
+                    var tsBadge = '';
+                    if (c.videoTimestamp != null) {
+                        tsBadge = ' <span class="comment-timestamp" data-ts="' + c.videoTimestamp + '">' + formatTimestamp(c.videoTimestamp) + '</span>';
+                    }
+                    return '<div class="comment emoji-reaction" id="comment-' + c.id + '">' +
+                        '<span class="comment-body">' + escapeHtml(c.body) + '</span>' +
+                        '<span class="comment-meta">' +
+                            escapeHtml(authorName) + tsBadge +
+                            ' \u00b7 ' + timeAgo(c.createdAt) +
+                        '</span>' +
+                    '</div>';
+                }
                 var badges = '';
                 if (c.videoTimestamp != null) {
                     badges += ' <span class="comment-timestamp" data-ts="' + c.videoTimestamp + '">' + formatTimestamp(c.videoTimestamp) + '</span>';
@@ -770,6 +851,69 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             }
 
             loadComments();
+
+            var reactionBar = document.getElementById('reaction-bar');
+            if (reactionBar) {
+                reactionBar.addEventListener('click', function(e) {
+                    var btn = e.target.closest('.reaction-btn');
+                    if (!btn || btn.disabled) return;
+                    var emoji = btn.getAttribute('data-emoji');
+                    if (!player.duration || player.duration === Infinity) return;
+                    var authorName = nameEl ? nameEl.value.trim() : '';
+                    var authorEmail = emailEl ? emailEl.value.trim() : '';
+                    if ((commentMode === 'name_required' || commentMode === 'name_email_required') && !authorName) {
+                        if (nameEl) {
+                            nameEl.focus();
+                            nameEl.style.borderColor = '#ef4444';
+                            setTimeout(function() { nameEl.style.borderColor = ''; }, 2000);
+                            nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        return;
+                    }
+                    if (commentMode === 'name_email_required' && !authorEmail) {
+                        if (emailEl) {
+                            emailEl.focus();
+                            emailEl.style.borderColor = '#ef4444';
+                            setTimeout(function() { emailEl.style.borderColor = ''; }, 2000);
+                            emailEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        return;
+                    }
+                    var timestamp = Math.floor(player.currentTime);
+                    btn.disabled = true;
+                    var rect = btn.getBoundingClientRect();
+                    var floater = document.createElement('span');
+                    floater.className = 'reaction-float';
+                    floater.textContent = emoji;
+                    floater.style.left = rect.left + rect.width / 2 - 12 + 'px';
+                    floater.style.top = rect.top + 'px';
+                    document.body.appendChild(floater);
+                    floater.addEventListener('animationend', function() { floater.remove(); });
+                    var headers = {'Content-Type': 'application/json'};
+                    if (token) headers['Authorization'] = 'Bearer ' + token;
+                    fetch('/api/watch/' + shareToken + '/comments', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({authorName: authorName, authorEmail: authorEmail, body: emoji, isPrivate: false, videoTimestamp: timestamp})
+                    }).then(function(r) {
+                        if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
+                        return r.json();
+                    }).then(function(comment) {
+                        var noComments = listEl.querySelector('.no-comments');
+                        if (noComments) noComments.remove();
+                        listEl.insertAdjacentHTML('beforeend', renderComment(comment));
+                        var count = listEl.querySelectorAll('.comment').length;
+                        headerEl.textContent = 'Comments (' + count + ')';
+                        if (lastComments) {
+                            lastComments.push(comment);
+                            renderMarkers(lastComments);
+                        }
+                        btn.disabled = false;
+                    }).catch(function() {
+                        btn.disabled = false;
+                    });
+                });
+            }
 
             function parseTimestamp(str) {
                 var parts = str.trim().split(':');
