@@ -1308,6 +1308,27 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             }
         })();
         {{end}}
+        (function() {
+            var player = document.getElementById('player');
+            if (!player) return;
+            var milestones = [25, 50, 75, 100];
+            var reached = {};
+            player.addEventListener('timeupdate', function() {
+                if (!player.duration) return;
+                var pct = (player.currentTime / player.duration) * 100;
+                for (var i = 0; i < milestones.length; i++) {
+                    var m = milestones[i];
+                    if (pct >= m && !reached[m]) {
+                        reached[m] = true;
+                        fetch('/api/watch/{{.ShareToken}}/milestone', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ milestone: m })
+                        }).catch(function() {});
+                    }
+                }
+            });
+        })();
         {{if or (eq .TranscriptStatus "processing") (eq .TranscriptStatus "pending")}}
         (function() {
             var pollInterval = setInterval(function() {
