@@ -297,15 +297,16 @@ export function Library() {
     showToast("Transcription queued");
   }
 
-  async function cycleCommentMode(video: Video) {
-    const currentIndex = commentModeOrder.indexOf(video.commentMode);
-    const nextMode = commentModeOrder[(currentIndex + 1) % commentModeOrder.length];
-    await apiFetch(`/api/videos/${video.id}/comment-mode`, {
-      method: "PUT",
-      body: JSON.stringify({ commentMode: nextMode }),
-    });
-    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, commentMode: nextMode } : v)));
-    showToast(commentModeLabels[nextMode] ?? "Comments updated");
+  async function changeCommentMode(video: Video, mode: string) {
+    try {
+      await apiFetch(`/api/videos/${video.id}/comment-mode`, {
+        method: "PUT",
+        body: JSON.stringify({ commentMode: mode }),
+      });
+      setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, commentMode: mode } : v)));
+    } catch {
+      // no-op: select stays at previous value since state is only updated on success
+    }
   }
 
   async function changeNotification(video: Video, value: string) {
@@ -701,14 +702,32 @@ export function Library() {
                         >
                           {video.hasPassword ? "Remove password" : "Add password"}
                         </button>
-                        <button
-                          onClick={() => { cycleCommentMode(video); setOpenMenuId(null); }}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: video.commentMode !== "disabled" ? "var(--color-accent)" : undefined }}
-                        >
-                          {commentModeLabels[video.commentMode] ?? "Comments off"}
-                          {video.commentCount > 0 && ` (${video.commentCount})`}
-                        </button>
+                        <div style={{ padding: "6px 12px" }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                            <span className="action-link" style={{ cursor: "default" }}>
+                              Comments{video.commentCount > 0 && ` (${video.commentCount})`}
+                            </span>
+                            <select
+                              aria-label="Comment mode"
+                              value={video.commentMode}
+                              onChange={(e) => changeCommentMode(video, e.target.value)}
+                              style={{
+                                background: "var(--color-surface)",
+                                border: "1px solid var(--color-border)",
+                                borderRadius: 4,
+                                color: video.commentMode !== "disabled" ? "var(--color-accent)" : "var(--color-text-secondary)",
+                                fontSize: 12,
+                                padding: "2px 4px",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <option value="disabled">Off</option>
+                              <option value="anonymous">Anonymous</option>
+                              <option value="name_required">Name required</option>
+                              <option value="name_email_required">Name + email</option>
+                            </select>
+                          </label>
+                        </div>
 
                         <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
                         <div style={{ padding: "4px 12px", fontSize: 11, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>

@@ -556,7 +556,7 @@ describe("Library", () => {
     vi.useRealTimers();
   });
 
-  it("shows comment mode button with label", async () => {
+  it("shows comment mode dropdown with current value", async () => {
     mockFetch([makeVideo({ commentMode: "anonymous", commentCount: 5 })]);
     renderLibrary();
 
@@ -564,10 +564,12 @@ describe("Library", () => {
       expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
     await openOverflowMenu();
-    expect(screen.getByRole("button", { name: /Comments: anonymous \(5\)/ })).toBeInTheDocument();
+    const select = screen.getByLabelText("Comment mode") as HTMLSelectElement;
+    expect(select.value).toBe("anonymous");
+    expect(screen.getByText(/\(5\)/)).toBeInTheDocument();
   });
 
-  it("shows 'Comments off' when comments are disabled", async () => {
+  it("shows comment mode dropdown with disabled value", async () => {
     mockFetch([makeVideo({ commentMode: "disabled", commentCount: 0 })]);
     renderLibrary();
 
@@ -575,10 +577,11 @@ describe("Library", () => {
       expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
     await openOverflowMenu();
-    expect(screen.getByRole("button", { name: "Comments off" })).toBeInTheDocument();
+    const select = screen.getByLabelText("Comment mode") as HTMLSelectElement;
+    expect(select.value).toBe("disabled");
   });
 
-  it("cycles comment mode on click", async () => {
+  it("changes comment mode on select", async () => {
     const user = userEvent.setup();
     mockFetch([makeVideo({ commentMode: "disabled" })]);
     mockApiFetch.mockResolvedValueOnce(undefined); // PUT comment-mode response
@@ -589,18 +592,18 @@ describe("Library", () => {
     });
 
     await openOverflowMenu(user);
-    await user.click(screen.getByRole("button", { name: "Comments off" }));
+    await user.selectOptions(screen.getByLabelText("Comment mode"), "name_required");
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/comment-mode", {
         method: "PUT",
-        body: JSON.stringify({ commentMode: "anonymous" }),
+        body: JSON.stringify({ commentMode: "name_required" }),
       });
     });
 
-    // Menu closed after action, reopen to check updated label
-    await openOverflowMenu(user);
-    expect(screen.getByRole("button", { name: /Comments: anonymous/ })).toBeInTheDocument();
+    // Menu stays open, select shows updated value
+    const select = screen.getByLabelText("Comment mode") as HTMLSelectElement;
+    expect(select.value).toBe("name_required");
   });
 
   it("links thumbnail to watch page", async () => {
