@@ -30,6 +30,8 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     transcriptStatus: "none",
     viewNotification: null,
     downloadEnabled: true,
+    ctaText: null,
+    ctaUrl: null,
     ...overrides,
   };
 }
@@ -1229,6 +1231,55 @@ describe("Library", () => {
         expect(select.value).toBe("every");
       });
       expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
+    });
+  });
+
+  describe("CTA management", () => {
+    it("shows Call to action button in overflow menu", async () => {
+      mockFetch([makeVideo()]);
+      renderLibrary();
+      await waitFor(() => expect(screen.getByText("My Recording")).toBeInTheDocument());
+      await userEvent.click(screen.getByLabelText("More actions"));
+      expect(screen.getByText("Call to action")).toBeInTheDocument();
+    });
+
+    it("shows Edit CTA when CTA is set", async () => {
+      mockFetch([makeVideo({ ctaText: "Book a demo", ctaUrl: "https://example.com" })]);
+      renderLibrary();
+      await waitFor(() => expect(screen.getByText("My Recording")).toBeInTheDocument());
+      await userEvent.click(screen.getByLabelText("More actions"));
+      expect(screen.getByText("Edit CTA")).toBeInTheDocument();
+    });
+
+    it("opens CTA form with existing values when editing", async () => {
+      mockFetch([makeVideo({ ctaText: "Book a demo", ctaUrl: "https://example.com" })]);
+      renderLibrary();
+      await waitFor(() => expect(screen.getByText("My Recording")).toBeInTheDocument());
+      await userEvent.click(screen.getByLabelText("More actions"));
+      await userEvent.click(screen.getByText("Edit CTA"));
+      expect(screen.getByPlaceholderText(/Button text/)).toHaveValue("Book a demo");
+      expect(screen.getByPlaceholderText(/URL/)).toHaveValue("https://example.com");
+    });
+
+    it("saves CTA with PUT request", async () => {
+      mockFetch([makeVideo()]);
+      renderLibrary();
+      await waitFor(() => expect(screen.getByText("My Recording")).toBeInTheDocument());
+      await userEvent.click(screen.getByLabelText("More actions"));
+      await userEvent.click(screen.getByText("Call to action"));
+
+      await userEvent.type(screen.getByPlaceholderText(/Button text/), "Book a demo");
+      await userEvent.type(screen.getByPlaceholderText(/URL/), "https://example.com/demo");
+
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      await userEvent.click(screen.getByText("Save"));
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/cta", {
+          method: "PUT",
+          body: JSON.stringify({ text: "Book a demo", url: "https://example.com/demo" }),
+        });
+      });
     });
   });
 });

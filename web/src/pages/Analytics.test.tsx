@@ -19,6 +19,8 @@ function makeAnalyticsData(overrides: Record<string, unknown> = {}) {
       averageDailyViews: 4.7,
       peakDay: "2026-02-10",
       peakDayViews: 23,
+      totalCtaClicks: 5,
+      ctaClickRate: 0.25,
       ...(overrides.summary as Record<string, unknown> ?? {}),
     },
     daily: overrides.daily ?? [
@@ -126,5 +128,18 @@ describe("Analytics", () => {
 
     const libraryLink = screen.getByRole("link", { name: /Library/ });
     expect(libraryLink).toHaveAttribute("href", "/library");
+  });
+
+  it("displays CTA clicks card", async () => {
+    mockApiFetch.mockResolvedValueOnce(makeAnalyticsData({
+      summary: { totalCtaClicks: 5, ctaClickRate: 0.25 },
+    }));
+    renderAnalytics();
+
+    await waitFor(() => {
+      expect(screen.getByText("CTA Clicks")).toBeInTheDocument();
+    });
+    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("25.0% click rate")).toBeInTheDocument();
   });
 });

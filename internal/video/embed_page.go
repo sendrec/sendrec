@@ -19,6 +19,8 @@ type embedPageData struct {
 	Nonce        string
 	BaseURL      string
 	ContentType  string
+	CtaText      string
+	CtaUrl       string
 }
 
 type embedPasswordPageData struct {
@@ -32,6 +34,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAeGVYSWZNTQAqAAAACAAEARoABQAAAAEAAAA+ARsABQAAAAEAAABGASgAAwAAAAEAAgAAh2kABAAAAAEAAABOAAAAAAAAAEgAAAABAAAASAAAAAEAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACfCVbEAAAACXBIWXMAAAsTAAALEwEAmpwYAAAEa0lEQVRYCe1VW2icRRQ+Z+af/xK1kdQlvlhatWC7tamKoIilVrFSjdhoIqZtQBERn7RKXwQJvigUqy8iIQ9KU4Msrq0+eHlJUChiIWLTpFHrgxAkIiE2t+a/zMzxzCYb/t3ECyj4spNsZnbmzPm+850zJwCN0VCgocD/rAD+V/i3fFoqxHHc6ilPo68nR/f1LP4T3/+aQLF88nbjyaNkabew1AKIBqSYJKKSDOUb4w90zfwVkb8lsP2TwSKCuMuQ3miF6P+xvXu66nBb+cRhUOodkN4VNssA7cqJFICBAkrTc5jajonHDl6s3qmf/5TAztKJLZmvXrOCHhZSRSIIwC7MHZt45NBR52Rn+eQdqSeHgCACY4AjB4684p/sMhPh+0BJ8m1zCPd8s//QXD24+758o+6k+NFAWxqqIQjU42ApsmkKZn7BmT+7/cP3is48ldALSkbE4OSA3ceaKbL6EipZ8WiTFDCKbp2N4bnKxjp/1hDYderdqw2I91nWzXYpYaccnJCAygPZvOEqQnFgx8eDrUS4G1LNgXOCUGhp9ItKYdHzqA20KaNSFTjKKjade4Z7vXXwYc1mTN5TGAXFCjirip4HmGVjwsCItXZOePgBoS4KGUTgnDMQ6fTr8Y7Dx1cAfucgXoo17kOJV7Iqbvv6+ZkbCjxPrdisTjUEOkslOYZpFxkLSMTOfUCTDXKJPZN/VjeVB/bKQHD62UYwS8KJVY+8iEnMA1EKwglMTkUv9mlZkrwhr2tS8IMXb7QEN6JmAk52qxcFyVfy4O6+QNziao5/XX7cPOmW1SGF9zSnrAWI/VR+aAaWwnWfY40CRkOIEgJXxS63/LZnm8Xib1XH1dkibHJr6/LP4bHl9zvKAw9SGB7kgi0Ywr3uZTiC7jlCbL4af7TLVfGaUaOAyOQ8a7/AQbFyjoQozKb+zflbe4aHPY5ql0uTG6S5Dsj+zGQewih8Ajz/PkZmXiw9p4CyLGYt38r7yK8rKq5ucEq3nR74HP3wfuInxE0GUOtzYLInizYavQBzzaSil8nzjjjgivxkLjUtia1JqAtGqrPcAbnwHDizkDLFLDky3tHz9ipG3aJGAaelsNjvCrCSYa5yfo5tVnhnRlU6YlX4HTA4OHCHEfggLHwx0t09PdbRM4HW9EluPq4qBHFsxsSC9Gd1mDVfawnwUeH8T6etTk9hU1DhQDpjJIgkE0Epr3PgyPJLfp6QJNOCst6qRyHEMZskU64pkUuhUhsI1KvV8/Xm2hSsWBRLpRbrJwOciv3cVMDyx4W80nQYXPFe9gvZrIflHco75n9Oz0MYvkkpNzH2zqQMarr3fEf3l3m76nqNAu5gvKtrRqTBAUySF7gYL7Ajjd5ye2VlfzU67Rdpdnc9uLsrF22/TZZGXed0BMCTksC+fltfX5M7rx/rKpA3urN0PJoPrt3K+WwliZelsRdHO3rWPM38He6Em43ftEnHS8BpI5FpGYTXnB1pb7+ct2usGwo0FGgo4BT4A0kx06ZKzSjiAAAAAElFTkSuQmCC">
     <title>{{.Title}}</title>
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -41,6 +44,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             flex-direction: column;
             width: 100%;
             height: 100%;
+            position: relative;
         }
         .video-wrapper {
             flex: 1;
@@ -78,6 +82,10 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             font-size: 12px;
         }
         .footer a:hover { color: #e2e8f0; }
+        .cta-overlay { display: none; position: absolute; bottom: 48px; left: 0; right: 0; padding: 12px; text-align: center; background: rgba(15, 23, 42, 0.9); }
+        .cta-overlay.visible { display: block; }
+        .cta-overlay a { display: inline-block; padding: 8px 24px; background: #22c55e; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
+        .cta-overlay a:hover { opacity: 0.9; color: #fff; }
     </style>
 </head>
 <body>
@@ -85,6 +93,11 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         <div class="video-wrapper">
             <video controls playsinline webkit-playsinline crossorigin="anonymous" controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}></video>
         </div>
+        {{if and .CtaText .CtaUrl}}
+        <div class="cta-overlay" id="cta-overlay">
+            <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" id="cta-btn">{{.CtaText}}</a>
+        </div>
+        {{end}}
         <div class="footer">
             <span class="footer-title">{{.Title}}</span>
             <a href="{{.BaseURL}}/watch/{{.ShareToken}}" target="_blank" rel="noopener">Watch on SendRec</a>
@@ -98,6 +111,26 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
                 v.play().catch(function() {});
             }
         })();
+        {{if and .CtaText .CtaUrl}}
+        (function() {
+            var v = document.querySelector('video');
+            var overlay = document.getElementById('cta-overlay');
+            var btn = document.getElementById('cta-btn');
+            if (v && overlay) {
+                v.addEventListener('ended', function() {
+                    overlay.classList.add('visible');
+                });
+                v.addEventListener('play', function() {
+                    overlay.classList.remove('visible');
+                });
+            }
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    fetch('/api/watch/{{.ShareToken}}/cta-click', { method: 'POST' }).catch(function() {});
+                });
+            }
+        })();
+        {{end}}
     </script>
 </body>
 </html>`))
@@ -197,18 +230,21 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	var ownerID string
 	var ownerEmail string
 	var viewNotification *string
+	var ctaText, ctaUrl *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at,
 		        v.thumbnail_key, v.share_password, v.content_type,
-		        v.user_id, u.email, v.view_notification
+		        v.user_id, u.email, v.view_notification,
+		        v.cta_text, v.cta_url
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt,
 		&thumbnailKey, &sharePassword, &contentType,
-		&ownerID, &ownerEmail, &viewNotification)
+		&ownerID, &ownerEmail, &viewNotification,
+		&ctaText, &ctaUrl)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -282,6 +318,8 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		Nonce:        nonce,
 		BaseURL:      h.baseURL,
 		ContentType:  contentType,
+		CtaText:      derefString(ctaText),
+		CtaUrl:       derefString(ctaUrl),
 	}); err != nil {
 		log.Printf("failed to render embed page: %v", err)
 	}

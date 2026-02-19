@@ -73,9 +73,9 @@ func decodeMessageResponse(t *testing.T, rec *httptest.ResponseRecorder) message
 	return resp
 }
 
-func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
+func findCookieWithPath(cookies []*http.Cookie, name, path string) *http.Cookie {
 	for _, c := range cookies {
-		if c.Name == name {
+		if c.Name == name && c.Path == path {
 			return c
 		}
 	}
@@ -548,7 +548,7 @@ func TestLogin_Success(t *testing.T) {
 		t.Errorf("expected userID %q, got %q", "user-uuid-1", claims.UserID)
 	}
 
-	cookie := findCookie(rec.Result().Cookies(), "refresh_token")
+	cookie := findCookieWithPath(rec.Result().Cookies(), "refresh_token", "/")
 	if cookie == nil {
 		t.Fatal("expected refresh_token cookie to be set")
 	}
@@ -724,7 +724,7 @@ func TestRefresh_Success(t *testing.T) {
 		t.Errorf("expected userID %q, got %q", "user-uuid-1", claims.UserID)
 	}
 
-	cookie := findCookie(rec.Result().Cookies(), "refresh_token")
+	cookie := findCookieWithPath(rec.Result().Cookies(), "refresh_token", "/")
 	if cookie == nil {
 		t.Fatal("expected new refresh_token cookie to be set")
 	}
@@ -833,7 +833,7 @@ func TestLogout_ClearsRefreshTokenCookie(t *testing.T) {
 
 	handler.Logout(rec, req)
 
-	cookie := findCookie(rec.Result().Cookies(), "refresh_token")
+	cookie := findCookieWithPath(rec.Result().Cookies(), "refresh_token", "/")
 	if cookie == nil {
 		t.Fatal("expected refresh_token cookie in response")
 	}
@@ -842,6 +842,14 @@ func TestLogout_ClearsRefreshTokenCookie(t *testing.T) {
 	}
 	if cookie.Value != "" {
 		t.Errorf("expected empty cookie value, got %q", cookie.Value)
+	}
+
+	legacyCookie := findCookieWithPath(rec.Result().Cookies(), "refresh_token", "/api/auth")
+	if legacyCookie == nil {
+		t.Fatal("expected legacy refresh_token cookie to be cleared")
+	}
+	if legacyCookie.MaxAge != -1 {
+		t.Errorf("expected legacy cookie MaxAge -1, got %d", legacyCookie.MaxAge)
 	}
 
 	_ = mock
@@ -871,7 +879,7 @@ func TestLogout_CookieSecureFlagMatchesConfig(t *testing.T) {
 
 			handler.Logout(rec, req)
 
-			cookie := findCookie(rec.Result().Cookies(), "refresh_token")
+			cookie := findCookieWithPath(rec.Result().Cookies(), "refresh_token", "/")
 			if cookie == nil {
 				t.Fatal("expected refresh_token cookie in response")
 			}
@@ -1076,7 +1084,7 @@ func TestRegister_NoTokensIssued(t *testing.T) {
 		t.Error("expected non-empty message")
 	}
 
-	cookie := findCookie(rec.Result().Cookies(), "refresh_token")
+	cookie := findCookieWithPath(rec.Result().Cookies(), "refresh_token", "/")
 	if cookie != nil {
 		t.Error("expected no refresh_token cookie to be set")
 	}

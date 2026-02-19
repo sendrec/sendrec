@@ -21,6 +21,8 @@ interface Video {
   transcriptStatus: string;
   viewNotification: string | null;
   downloadEnabled: boolean;
+  ctaText: string | null;
+  ctaUrl: string | null;
 }
 
 interface LimitsResponse {
@@ -90,6 +92,9 @@ export function Library() {
   const [uploadingThumbnailId, setUploadingThumbnailId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [ctaVideoId, setCtaVideoId] = useState<string | null>(null);
+  const [ctaText, setCtaText] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
 
   const fetchVideosAndLimits = useCallback(async (query = "") => {
     const searchParam = query ? `?q=${encodeURIComponent(query)}` : "";
@@ -382,6 +387,26 @@ export function Library() {
     }
   }
 
+  async function saveCTA(video: Video) {
+    await apiFetch(`/api/videos/${video.id}/cta`, {
+      method: "PUT",
+      body: JSON.stringify({ text: ctaText, url: ctaUrl }),
+    });
+    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, ctaText: ctaText, ctaUrl: ctaUrl } : v)));
+    setCtaVideoId(null);
+    showToast("CTA saved");
+  }
+
+  async function clearCTA(video: Video) {
+    await apiFetch(`/api/videos/${video.id}/cta`, {
+      method: "PUT",
+      body: JSON.stringify({ text: null, url: null }),
+    });
+    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, ctaText: null, ctaUrl: null } : v)));
+    setCtaVideoId(null);
+    showToast("CTA removed");
+  }
+
   if (loading) {
     return (
       <div className="page-container page-container--centered">
@@ -666,6 +691,18 @@ export function Library() {
                           Embed
                         </button>
                         <button
+                          onClick={() => {
+                            setCtaVideoId(ctaVideoId === video.id ? null : video.id);
+                            setCtaText(video.ctaText ?? "");
+                            setCtaUrl(video.ctaUrl ?? "");
+                            setOpenMenuId(null);
+                          }}
+                          className="action-link"
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: video.ctaText ? "var(--color-accent)" : undefined }}
+                        >
+                          {video.ctaText ? "Edit CTA" : "Call to action"}
+                        </button>
+                        <button
                           onClick={() => toggleLinkExpiry(video)}
                           className="action-link"
                           style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
@@ -818,6 +855,71 @@ export function Library() {
                 </div>
               </div>
             )}
+
+                {ctaVideoId === video.id && (
+                  <div style={{ marginTop: 12, padding: 12, background: "var(--color-surface)", borderRadius: 8, border: "1px solid var(--color-border)" }}>
+                    <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 8px" }}>Call to action</p>
+                    <input
+                      type="text"
+                      placeholder="Button text (e.g. Book a demo)"
+                      value={ctaText}
+                      onChange={(e) => setCtaText(e.target.value)}
+                      maxLength={100}
+                      style={{
+                        width: "100%", padding: "8px 10px", marginBottom: 8,
+                        background: "var(--color-background)", border: "1px solid var(--color-border)",
+                        borderRadius: 6, color: "var(--color-text)", fontSize: 13,
+                      }}
+                    />
+                    <input
+                      type="url"
+                      placeholder="URL (e.g. https://example.com/demo)"
+                      value={ctaUrl}
+                      onChange={(e) => setCtaUrl(e.target.value)}
+                      maxLength={2000}
+                      style={{
+                        width: "100%", padding: "8px 10px", marginBottom: 8,
+                        background: "var(--color-background)", border: "1px solid var(--color-border)",
+                        borderRadius: 6, color: "var(--color-text)", fontSize: 13,
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => saveCTA(video)}
+                        disabled={!ctaText.trim() || !ctaUrl.trim()}
+                        style={{
+                          padding: "6px 16px", background: "var(--color-accent)", color: "#fff",
+                          border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
+                          cursor: "pointer", opacity: (!ctaText.trim() || !ctaUrl.trim()) ? 0.5 : 1,
+                        }}
+                      >
+                        Save
+                      </button>
+                      {video.ctaText && (
+                        <button
+                          onClick={() => clearCTA(video)}
+                          style={{
+                            padding: "6px 16px", background: "transparent", color: "var(--color-error)",
+                            border: "1px solid var(--color-error)", borderRadius: 6, fontSize: 13,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setCtaVideoId(null)}
+                        style={{
+                          padding: "6px 16px", background: "transparent", color: "var(--color-text-secondary)",
+                          border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 13,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
           </div>
         ))}
       </div>

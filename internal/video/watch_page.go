@@ -14,6 +14,13 @@ import (
 	"github.com/sendrec/sendrec/internal/httputil"
 )
 
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 var watchFuncs = template.FuncMap{
 	"formatTimestamp": func(seconds float64) string {
 		m := int(seconds) / 60
@@ -27,6 +34,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAeGVYSWZNTQAqAAAACAAEARoABQAAAAEAAAA+ARsABQAAAAEAAABGASgAAwAAAAEAAgAAh2kABAAAAAEAAABOAAAAAAAAAEgAAAABAAAASAAAAAEAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACfCVbEAAAACXBIWXMAAAsTAAALEwEAmpwYAAAEa0lEQVRYCe1VW2icRRQ+Z+af/xK1kdQlvlhatWC7tamKoIilVrFSjdhoIqZtQBERn7RKXwQJvigUqy8iIQ9KU4Msrq0+eHlJUChiIWLTpFHrgxAkIiE2t+a/zMzxzCYb/t3ECyj4spNsZnbmzPm+850zJwCN0VCgocD/rAD+V/i3fFoqxHHc6ilPo68nR/f1LP4T3/+aQLF88nbjyaNkabew1AKIBqSYJKKSDOUb4w90zfwVkb8lsP2TwSKCuMuQ3miF6P+xvXu66nBb+cRhUOodkN4VNssA7cqJFICBAkrTc5jajonHDl6s3qmf/5TAztKJLZmvXrOCHhZSRSIIwC7MHZt45NBR52Rn+eQdqSeHgCACY4AjB4684p/sMhPh+0BJ8m1zCPd8s//QXD24+758o+6k+NFAWxqqIQjU42ApsmkKZn7BmT+7/cP3is48ldALSkbE4OSA3ceaKbL6EipZ8WiTFDCKbp2N4bnKxjp/1hDYderdqw2I91nWzXYpYaccnJCAygPZvOEqQnFgx8eDrUS4G1LNgXOCUGhp9ItKYdHzqA20KaNSFTjKKjade4Z7vXXwYc1mTN5TGAXFCjirip4HmGVjwsCItXZOePgBoS4KGUTgnDMQ6fTr8Y7Dx1cAfucgXoo17kOJV7Iqbvv6+ZkbCjxPrdisTjUEOkslOYZpFxkLSMTOfUCTDXKJPZN/VjeVB/bKQHD62UYwS8KJVY+8iEnMA1EKwglMTkUv9mlZkrwhr2tS8IMXb7QEN6JmAk52qxcFyVfy4O6+QNziao5/XX7cPOmW1SGF9zSnrAWI/VR+aAaWwnWfY40CRkOIEgJXxS63/LZnm8Xib1XH1dkibHJr6/LP4bHl9zvKAw9SGB7kgi0Ywr3uZTiC7jlCbL4af7TLVfGaUaOAyOQ8a7/AQbFyjoQozKb+zflbe4aHPY5ql0uTG6S5Dsj+zGQewih8Ajz/PkZmXiw9p4CyLGYt38r7yK8rKq5ucEq3nR74HP3wfuInxE0GUOtzYLInizYavQBzzaSil8nzjjjgivxkLjUtia1JqAtGqrPcAbnwHDizkDLFLDky3tHz9ipG3aJGAaelsNjvCrCSYa5yfo5tVnhnRlU6YlX4HTA4OHCHEfggLHwx0t09PdbRM4HW9EluPq4qBHFsxsSC9Gd1mDVfawnwUeH8T6etTk9hU1DhQDpjJIgkE0Epr3PgyPJLfp6QJNOCst6qRyHEMZskU64pkUuhUhsI1KvV8/Xm2hSsWBRLpRbrJwOciv3cVMDyx4W80nQYXPFe9gvZrIflHco75n9Oz0MYvkkpNzH2zqQMarr3fEf3l3m76nqNAu5gvKtrRqTBAUySF7gYL7Ajjd5ye2VlfzU67Rdpdnc9uLsrF22/TZZGXed0BMCTksC+fltfX5M7rx/rKpA3urN0PJoPrt3K+WwliZelsRdHO3rWPM38He6Em43ftEnHS8BpI5FpGYTXnB1pb7+ct2usGwo0FGgo4BT4A0kx06ZKzSjiAAAAAElFTkSuQmCC">
     <title>{{.Title}} — {{.Branding.CompanyName}}</title>
     <meta property="og:title" content="{{.Title}}">
     <meta property="og:type" content="video.other">
@@ -571,6 +579,12 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: var(--brand-accent);
             background: rgba(0, 182, 122, 0.1);
         }
+        .cta-card { display: none; margin: 1rem 0; padding: 1.25rem; background: var(--brand-surface); border: 1px solid var(--brand-accent); border-radius: 8px; text-align: center; position: relative; }
+        .cta-card.visible { display: block; }
+        .cta-dismiss { position: absolute; top: 8px; right: 12px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.25rem; line-height: 1; padding: 4px; }
+        .cta-dismiss:hover { color: #e2e8f0; }
+        .cta-btn { display: inline-block; padding: 0.75rem 2rem; background: var(--brand-accent); color: #fff; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; text-decoration: none; }
+        .cta-btn:hover { opacity: 0.9; }
         .hidden { display: none; }
         .flex-center { display: flex; align-items: center; gap: 0.5rem; }
         .transcribe-btn { font-size: 0.7rem; padding: 0.2rem 0.6rem; }
@@ -686,6 +700,12 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 <button class="speed-btn" data-speed="2">2x</button>
             </div>
         </div>
+        {{if and .CtaText .CtaUrl}}
+        <div class="cta-card" id="cta-card">
+            <button class="cta-dismiss" onclick="document.getElementById('cta-card').classList.remove('visible')" aria-label="Dismiss">&times;</button>
+            <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" class="cta-btn" id="cta-btn">{{.CtaText}}</a>
+        </div>
+        {{end}}
         <script nonce="{{.Nonce}}">
             {{if .DownloadEnabled}}
             document.getElementById('download-btn').addEventListener('click', function() {
@@ -1271,6 +1291,23 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 });
             }
         })();
+        {{if and .CtaText .CtaUrl}}
+        (function() {
+            var player = document.getElementById('player');
+            var ctaCard = document.getElementById('cta-card');
+            var ctaBtn = document.getElementById('cta-btn');
+            if (player && ctaCard) {
+                player.addEventListener('ended', function() {
+                    ctaCard.classList.add('visible');
+                });
+            }
+            if (ctaBtn) {
+                ctaBtn.addEventListener('click', function() {
+                    fetch('/api/watch/{{.ShareToken}}/cta-click', { method: 'POST' }).catch(function() {});
+                });
+            }
+        })();
+        {{end}}
         {{if or (eq .TranscriptStatus "processing") (eq .TranscriptStatus "pending")}}
         (function() {
             var pollInterval = setInterval(function() {
@@ -1400,6 +1437,8 @@ type watchPageData struct {
 	CustomCSS          template.CSS
 	ReactionEmojis     []string
 	ReactionEmojisJSON template.JS
+	CtaText            string
+	CtaUrl             string
 }
 
 type expiredPageData struct {
@@ -1524,6 +1563,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
 	var downloadEnabled bool
+	var ctaText, ctaUrl *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
@@ -1531,7 +1571,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		        v.user_id, u.email, v.view_notification, v.content_type,
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
-		        v.download_enabled
+		        v.download_enabled, v.cta_text, v.cta_url
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
@@ -1542,7 +1582,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		&ownerID, &ownerEmail, &viewNotification, &contentType,
 		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
-		&downloadEnabled)
+		&downloadEnabled,
+		&ctaText, &ctaUrl)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1661,6 +1702,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		CustomCSS:          template.CSS(branding.CustomCSS),
 		ReactionEmojis:     quickReactionEmojis,
 		ReactionEmojisJSON: template.JS(string(reactionEmojisJSON)),
+		CtaText:            derefString(ctaText),
+		CtaUrl:             derefString(ctaUrl),
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

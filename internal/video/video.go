@@ -137,6 +137,8 @@ type listItem struct {
 	TranscriptStatus  string  `json:"transcriptStatus"`
 	ViewNotification  *string `json:"viewNotification"`
 	DownloadEnabled   bool    `json:"downloadEnabled"`
+	CtaText           *string `json:"ctaText"`
+	CtaUrl            *string `json:"ctaUrl"`
 }
 
 type updateRequest struct {
@@ -156,6 +158,8 @@ type watchResponse struct {
 	TranscriptURL    string              `json:"transcriptUrl,omitempty"`
 	Segments         []TranscriptSegment `json:"segments,omitempty"`
 	Branding         brandingConfig      `json:"branding"`
+	CtaText          *string             `json:"ctaText,omitempty"`
+	CtaUrl           *string             `json:"ctaUrl,omitempty"`
 }
 
 func generateShareToken() (string, error) {
@@ -537,7 +541,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
-		    v.transcript_status, v.view_notification, v.download_enabled
+		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url
 		 FROM videos v
 		 WHERE v.status != 'deleted'`
 
@@ -575,7 +579,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var shareExpiresAt *time.Time
 		var thumbnailKey *string
 		var sharePassword *string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -689,6 +693,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var ownerEmail string
 	var viewNotification *string
 	var contentType string
+	var ctaText, ctaUrl *string
 	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
 
@@ -697,7 +702,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		        v.transcript_key, v.transcript_json, v.transcript_status,
 		        v.user_id, u.email, v.view_notification, v.content_type,
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
-		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text
+		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
+		        v.cta_text, v.cta_url
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
@@ -707,7 +713,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
 		&ownerID, &ownerEmail, &viewNotification, &contentType,
 		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
-		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText)
+		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
+		&ctaText, &ctaUrl)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -793,6 +800,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		TranscriptURL:    transcriptURL,
 		Segments:         segments,
 		Branding:         branding,
+		CtaText:          ctaText,
+		CtaUrl:           ctaUrl,
 	})
 }
 
@@ -929,6 +938,81 @@ func (h *Handler) SetLinkExpiry(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type setCTARequest struct {
+	Text *string `json:"text"`
+	URL  *string `json:"url"`
+}
+
+func (h *Handler) SetCTA(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setCTARequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Text != nil && req.URL != nil {
+		if len(*req.Text) > 100 {
+			httputil.WriteError(w, http.StatusBadRequest, "CTA text must be 100 characters or less")
+			return
+		}
+		if len(*req.URL) > 2000 {
+			httputil.WriteError(w, http.StatusBadRequest, "CTA URL must be 2000 characters or less")
+			return
+		}
+		if !strings.HasPrefix(*req.URL, "http://") && !strings.HasPrefix(*req.URL, "https://") {
+			httputil.WriteError(w, http.StatusBadRequest, "CTA URL must start with http:// or https://")
+			return
+		}
+	}
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET cta_text = $1, cta_url = $2 WHERE id = $3 AND user_id = $4 AND status != 'deleted'`,
+		req.Text, req.URL, videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not update CTA")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
+	shareToken := chi.URLParam(r, "shareToken")
+
+	var videoID string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
+		shareToken,
+	).Scan(&videoID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		ip := clientIP(r)
+		hash := viewerHash(ip, r.UserAgent())
+		if _, err := h.db.Exec(ctx,
+			`INSERT INTO cta_clicks (video_id, viewer_hash) VALUES ($1, $2)`,
+			videoID, hash,
+		); err != nil {
+			log.Printf("failed to record CTA click for %s: %v", videoID, err)
+		}
+	}()
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -1145,6 +1229,8 @@ type analyticsSummary struct {
 	AverageDailyViews float64 `json:"averageDailyViews"`
 	PeakDay           string  `json:"peakDay"`
 	PeakDayViews      int64   `json:"peakDayViews"`
+	TotalCtaClicks    int64   `json:"totalCtaClicks"`
+	CtaClickRate      float64 `json:"ctaClickRate"`
 }
 
 type dailyViews struct {
@@ -1248,7 +1334,21 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		sortDailyViews(daily)
 	}
 
+	var totalCtaClicks int64
+	err = h.db.QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM cta_clicks WHERE video_id = $1 AND created_at >= $2`,
+		videoID, since,
+	).Scan(&totalCtaClicks)
+	if err != nil {
+		totalCtaClicks = 0
+	}
+
 	summary := computeSummary(daily, now.Format("2006-01-02"))
+	summary.TotalCtaClicks = totalCtaClicks
+	if summary.TotalViews > 0 {
+		summary.CtaClickRate = float64(totalCtaClicks) / float64(summary.TotalViews)
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, analyticsResponse{
 		Summary: summary,
 		Daily:   daily,
