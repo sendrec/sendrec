@@ -266,7 +266,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
-		Path:     "/api/auth",
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   h.secureCookies,
 		SameSite: http.SameSiteStrictMode,
@@ -658,7 +658,7 @@ func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    token,
-		Path:     "/api/auth",
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   h.secureCookies,
 		SameSite: http.SameSiteStrictMode,
