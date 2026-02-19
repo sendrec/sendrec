@@ -19,6 +19,8 @@ type embedPageData struct {
 	Nonce        string
 	BaseURL      string
 	ContentType  string
+	CtaText      string
+	CtaUrl       string
 }
 
 type embedPasswordPageData struct {
@@ -41,6 +43,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             flex-direction: column;
             width: 100%;
             height: 100%;
+            position: relative;
         }
         .video-wrapper {
             flex: 1;
@@ -78,6 +81,10 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             font-size: 12px;
         }
         .footer a:hover { color: #e2e8f0; }
+        .cta-overlay { display: none; position: absolute; bottom: 48px; left: 0; right: 0; padding: 12px; text-align: center; background: rgba(15, 23, 42, 0.9); }
+        .cta-overlay.visible { display: block; }
+        .cta-overlay a { display: inline-block; padding: 8px 24px; background: #22c55e; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
+        .cta-overlay a:hover { opacity: 0.9; color: #fff; }
     </style>
 </head>
 <body>
@@ -85,6 +92,11 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         <div class="video-wrapper">
             <video controls playsinline webkit-playsinline crossorigin="anonymous" controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}></video>
         </div>
+        {{if and .CtaText .CtaUrl}}
+        <div class="cta-overlay" id="cta-overlay">
+            <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" id="cta-btn">{{.CtaText}}</a>
+        </div>
+        {{end}}
         <div class="footer">
             <span class="footer-title">{{.Title}}</span>
             <a href="{{.BaseURL}}/watch/{{.ShareToken}}" target="_blank" rel="noopener">Watch on SendRec</a>
@@ -98,6 +110,26 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
                 v.play().catch(function() {});
             }
         })();
+        {{if and .CtaText .CtaUrl}}
+        (function() {
+            var v = document.querySelector('video');
+            var overlay = document.getElementById('cta-overlay');
+            var btn = document.getElementById('cta-btn');
+            if (v && overlay) {
+                v.addEventListener('ended', function() {
+                    overlay.classList.add('visible');
+                });
+                v.addEventListener('play', function() {
+                    overlay.classList.remove('visible');
+                });
+            }
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    fetch('/api/watch/{{.ShareToken}}/cta-click', { method: 'POST' }).catch(function() {});
+                });
+            }
+        })();
+        {{end}}
     </script>
 </body>
 </html>`))
@@ -197,18 +229,21 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	var ownerID string
 	var ownerEmail string
 	var viewNotification *string
+	var ctaText, ctaUrl *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at,
 		        v.thumbnail_key, v.share_password, v.content_type,
-		        v.user_id, u.email, v.view_notification
+		        v.user_id, u.email, v.view_notification,
+		        v.cta_text, v.cta_url
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt,
 		&thumbnailKey, &sharePassword, &contentType,
-		&ownerID, &ownerEmail, &viewNotification)
+		&ownerID, &ownerEmail, &viewNotification,
+		&ctaText, &ctaUrl)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -282,6 +317,8 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		Nonce:        nonce,
 		BaseURL:      h.baseURL,
 		ContentType:  contentType,
+		CtaText:      derefString(ctaText),
+		CtaUrl:       derefString(ctaUrl),
 	}); err != nil {
 		log.Printf("failed to render embed page: %v", err)
 	}
