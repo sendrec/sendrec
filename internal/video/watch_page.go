@@ -748,8 +748,41 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 return m + ':' + (s < 10 ? '0' : '') + s;
             }
 
+            function getFiniteDuration() {
+                if (!player.duration || player.duration === Infinity || isNaN(player.duration)) return 0;
+                return player.duration;
+            }
+
+            function getTimelineDuration(comments) {
+                var finiteDuration = getFiniteDuration();
+                if (finiteDuration > 0) return finiteDuration;
+                var maxTimestamp = 0;
+                var hasTimestamp = false;
+                comments.forEach(function(c) {
+                    if (c.videoTimestamp == null) return;
+                    hasTimestamp = true;
+                    if (c.videoTimestamp > maxTimestamp) maxTimestamp = c.videoTimestamp;
+                });
+                if (!hasTimestamp) return 0;
+                return maxTimestamp > 0 ? maxTimestamp : 1;
+            }
+
+            function clampTimestampToVideo(seconds) {
+                var safeSeconds = Math.max(0, seconds || 0);
+                var finiteDuration = getFiniteDuration();
+                if (finiteDuration > 0) return Math.min(safeSeconds, finiteDuration);
+                return safeSeconds;
+            }
+
+            function clampReactionTimestamp(seconds) {
+                var safeSeconds = Math.max(0, Math.floor(seconds || 0));
+                var finiteDuration = getFiniteDuration();
+                if (finiteDuration > 0) return Math.min(safeSeconds, Math.max(0, Math.floor(finiteDuration) - 1));
+                return safeSeconds;
+            }
+
             function renderMarkers(comments) {
-                if (!markersBar || !videoDuration) return;
+                if (!markersBar) return;
                 markersBar.innerHTML = '';
                 var bySecond = {};
                 comments.forEach(function(c) {
@@ -759,12 +792,21 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     bySecond[sec].push(c);
                 });
                 var keys = Object.keys(bySecond);
-                markersBar.style.display = keys.length > 0 ? 'block' : 'none';
+                if (keys.length === 0) {
+                    markersBar.style.display = 'none';
+                    return;
+                }
+                var timelineDuration = getTimelineDuration(comments);
+                if (!timelineDuration) {
+                    markersBar.style.display = 'none';
+                    return;
+                }
+                markersBar.style.display = 'block';
                 keys.forEach(function(sec) {
                     var group = bySecond[sec];
                     var dot = document.createElement('div');
                     dot.className = 'marker-dot' + (group.length > 1 ? ' multi' : '') + (group[0].isPrivate ? ' private' : '');
-                    var pct = Math.min(group[0].videoTimestamp / videoDuration * 100, 99);
+                    var pct = Math.min(group[0].videoTimestamp / timelineDuration * 100, 99);
                     dot.style.left = pct + '%';
                     var tooltipText;
                     if (group.length === 1) {
@@ -794,8 +836,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             }
 
             function updateDuration() {
-                if (player.duration && player.duration !== Infinity && player.duration !== videoDuration) {
-                    videoDuration = player.duration;
+                var finiteDuration = getFiniteDuration();
+                if (finiteDuration > 0 && finiteDuration !== videoDuration) {
+                    videoDuration = finiteDuration;
                     if (lastComments) renderMarkers(lastComments);
                 }
             }
@@ -882,7 +925,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     var btn = e.target.closest('.reaction-btn');
                     if (!btn || btn.disabled) return;
                     var emoji = btn.getAttribute('data-emoji');
-                    if (!player.duration || player.duration === Infinity) return;
                     var authorName = nameEl ? nameEl.value.trim() : '';
                     var authorEmail = emailEl ? emailEl.value.trim() : '';
                     if ((commentMode === 'name_required' || commentMode === 'name_email_required') && !authorName) {
@@ -903,7 +945,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                         }
                         return;
                     }
-                    var timestamp = Math.min(Math.floor(player.currentTime), Math.max(0, Math.floor(player.duration) - 1));
+                    var timestamp = clampReactionTimestamp(player.currentTime);
                     btn.disabled = true;
                     var rect = btn.getBoundingClientRect();
                     var floater = document.createElement('span');
@@ -956,7 +998,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             }
 
             function setTimestamp(seconds) {
-                capturedTimestamp = Math.min(seconds, videoDuration);
+                capturedTimestamp = clampTimestampToVideo(seconds);
                 timestampToggle.classList.add('active');
                 timestampToggleText.textContent = formatTimestamp(capturedTimestamp);
                 timestampToggleText.style.display = '';
@@ -984,7 +1026,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 
             function commitEdit() {
                 var parsed = parseTimestamp(timestampEditInput.value);
-                if (parsed !== null && videoDuration > 0) {
+                if (parsed !== null) {
                     setTimestamp(parsed);
                 } else if (capturedTimestamp !== null) {
                     timestampToggleText.style.display = '';
@@ -1003,7 +1045,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 if (e.target === timestampEditInput) return;
                 if (capturedTimestamp !== null) {
                     startEditing();
-                } else if (videoDuration > 0) {
+                } else {
                     player.pause();
                     setTimestamp(player.currentTime);
                 }

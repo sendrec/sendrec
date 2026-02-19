@@ -349,6 +349,9 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 			t.Errorf("expected %q in response when comments enabled", check)
 		}
 	}
+	if strings.Contains(body, "if (!markersBar || !videoDuration) return;") {
+		t.Error("expected markers rendering to handle videos with unknown duration instead of hard-stopping")
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
