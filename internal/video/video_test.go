@@ -5131,3 +5131,162 @@ func TestOEmbed_NoThumbnail(t *testing.T) {
 		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
 }
+
+func TestSetCTA_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectExec(`UPDATE videos SET cta_text`).
+		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), "video-001", testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := `{"text":"Book a demo","url":"https://example.com/demo"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/videos/video-001/cta", strings.NewReader(body))
+	req = req.WithContext(auth.ContextWithUserID(req.Context(), testUserID))
+
+	r := chi.NewRouter()
+	r.Put("/api/videos/{id}/cta", handler.SetCTA)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestSetCTA_Clear(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectExec(`UPDATE videos SET cta_text`).
+		WithArgs((*string)(nil), (*string)(nil), "video-001", testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := `{"text":null,"url":null}`
+	req := httptest.NewRequest(http.MethodPut, "/api/videos/video-001/cta", strings.NewReader(body))
+	req = req.WithContext(auth.ContextWithUserID(req.Context(), testUserID))
+
+	r := chi.NewRouter()
+	r.Put("/api/videos/{id}/cta", handler.SetCTA)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestSetCTA_TextTooLong(t *testing.T) {
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	longText := strings.Repeat("a", 101)
+	body := fmt.Sprintf(`{"text":"%s","url":"https://example.com"}`, longText)
+	req := httptest.NewRequest(http.MethodPut, "/api/videos/video-001/cta", strings.NewReader(body))
+	req = req.WithContext(auth.ContextWithUserID(req.Context(), testUserID))
+
+	r := chi.NewRouter()
+	r.Put("/api/videos/{id}/cta", handler.SetCTA)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestSetCTA_InvalidURL(t *testing.T) {
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	body := `{"text":"Click me","url":"ftp://bad.com"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/videos/video-001/cta", strings.NewReader(body))
+	req = req.WithContext(auth.ContextWithUserID(req.Context(), testUserID))
+
+	r := chi.NewRouter()
+	r.Put("/api/videos/{id}/cta", handler.SetCTA)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestRecordCTAClick_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
+		WithArgs("abc123defghi").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-001"))
+
+	mock.ExpectExec(`INSERT INTO cta_clicks`).
+		WithArgs("video-001", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/cta-click", handler.RecordCTAClick)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/abc123defghi/cta-click", nil)
+	req.Header.Set("User-Agent", "TestBrowser/1.0")
+	req.RemoteAddr = "192.168.1.1:12345"
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestRecordCTAClick_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
+		WithArgs("nonexistent").
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/cta-click", handler.RecordCTAClick)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/nonexistent/cta-click", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}

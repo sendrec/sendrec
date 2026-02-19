@@ -933,6 +933,81 @@ func (h *Handler) SetLinkExpiry(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type setCTARequest struct {
+	Text *string `json:"text"`
+	URL  *string `json:"url"`
+}
+
+func (h *Handler) SetCTA(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setCTARequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Text != nil && req.URL != nil {
+		if len(*req.Text) > 100 {
+			httputil.WriteError(w, http.StatusBadRequest, "CTA text must be 100 characters or less")
+			return
+		}
+		if len(*req.URL) > 2000 {
+			httputil.WriteError(w, http.StatusBadRequest, "CTA URL must be 2000 characters or less")
+			return
+		}
+		if !strings.HasPrefix(*req.URL, "http://") && !strings.HasPrefix(*req.URL, "https://") {
+			httputil.WriteError(w, http.StatusBadRequest, "CTA URL must start with http:// or https://")
+			return
+		}
+	}
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET cta_text = $1, cta_url = $2 WHERE id = $3 AND user_id = $4 AND status != 'deleted'`,
+		req.Text, req.URL, videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not update CTA")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
+	shareToken := chi.URLParam(r, "shareToken")
+
+	var videoID string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
+		shareToken,
+	).Scan(&videoID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		ip := clientIP(r)
+		hash := viewerHash(ip, r.UserAgent())
+		if _, err := h.db.Exec(ctx,
+			`INSERT INTO cta_clicks (video_id, viewer_hash) VALUES ($1, $2)`,
+			videoID, hash,
+		); err != nil {
+			log.Printf("failed to record CTA click for %s: %v", videoID, err)
+		}
+	}()
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func viewerHash(ip, userAgent string) string {
 	h := sha256.Sum256([]byte(ip + "|" + userAgent))
 	return fmt.Sprintf("%x", h[:8])
