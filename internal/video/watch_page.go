@@ -338,6 +338,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             padding: 0.375rem 0.75rem;
             margin-right: 0.5rem;
             margin-bottom: 0.5rem;
+            cursor: pointer;
         }
         .comment.emoji-reaction .comment-body {
             font-size: 1.25rem;
@@ -792,10 +793,14 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 });
             }
 
-            player.addEventListener('loadedmetadata', function() {
-                videoDuration = player.duration;
-                if (lastComments) renderMarkers(lastComments);
-            });
+            function updateDuration() {
+                if (player.duration && player.duration !== Infinity && player.duration !== videoDuration) {
+                    videoDuration = player.duration;
+                    if (lastComments) renderMarkers(lastComments);
+                }
+            }
+            player.addEventListener('loadedmetadata', updateDuration);
+            player.addEventListener('durationchange', updateDuration);
 
             var reactionEmojis = ['\uD83D\uDC4D','\uD83D\uDC4E','\u2764\uFE0F','\uD83D\uDE02','\uD83D\uDE2E','\uD83C\uDF89'];
             function isReactionEmoji(text) {
@@ -838,6 +843,15 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 if (tsEl) {
                     player.currentTime = parseFloat(tsEl.getAttribute('data-ts'));
                     player.play().catch(function() {});
+                    return;
+                }
+                var reactionEl = e.target.closest('.emoji-reaction');
+                if (reactionEl) {
+                    var ts = reactionEl.querySelector('.comment-timestamp');
+                    if (ts) {
+                        player.currentTime = parseFloat(ts.getAttribute('data-ts'));
+                        player.play().catch(function() {});
+                    }
                 }
             });
 
