@@ -1283,9 +1283,17 @@ type dailyViews struct {
 	UniqueViews int64  `json:"uniqueViews"`
 }
 
+type milestoneCounts struct {
+	Reached25  int64 `json:"reached25"`
+	Reached50  int64 `json:"reached50"`
+	Reached75  int64 `json:"reached75"`
+	Reached100 int64 `json:"reached100"`
+}
+
 type analyticsResponse struct {
-	Summary analyticsSummary `json:"summary"`
-	Daily   []dailyViews     `json:"daily"`
+	Summary    analyticsSummary `json:"summary"`
+	Daily      []dailyViews     `json:"daily"`
+	Milestones milestoneCounts  `json:"milestones"`
 }
 
 func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
@@ -1387,6 +1395,31 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		totalCtaClicks = 0
 	}
 
+	var milestones milestoneCounts
+	milestoneRows, err := h.db.Query(r.Context(),
+		`SELECT milestone, COUNT(DISTINCT viewer_hash) FROM view_milestones WHERE video_id = $1 AND created_at >= $2 GROUP BY milestone`,
+		videoID, since,
+	)
+	if err == nil {
+		defer milestoneRows.Close()
+		for milestoneRows.Next() {
+			var m int
+			var count int64
+			if err := milestoneRows.Scan(&m, &count); err == nil {
+				switch m {
+				case 25:
+					milestones.Reached25 = count
+				case 50:
+					milestones.Reached50 = count
+				case 75:
+					milestones.Reached75 = count
+				case 100:
+					milestones.Reached100 = count
+				}
+			}
+		}
+	}
+
 	summary := computeSummary(daily, now.Format("2006-01-02"))
 	summary.TotalCtaClicks = totalCtaClicks
 	if summary.TotalViews > 0 {
@@ -1394,8 +1427,9 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, analyticsResponse{
-		Summary: summary,
-		Daily:   daily,
+		Summary:    summary,
+		Daily:      daily,
+		Milestones: milestones,
 	})
 }
 
