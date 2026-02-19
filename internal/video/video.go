@@ -741,19 +741,21 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 
 	viewerUserID := h.viewerUserIDFromRequest(r)
 
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		ip := clientIP(r)
-		hash := viewerHash(ip, r.UserAgent())
-		if _, err := h.db.Exec(ctx,
-			`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
-			videoID, hash,
-		); err != nil {
-			log.Printf("failed to record view for %s: %v", videoID, err)
-		}
-		h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
-	}()
+	if r.URL.Query().Get("poll") != "transcript" {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			ip := clientIP(r)
+			hash := viewerHash(ip, r.UserAgent())
+			if _, err := h.db.Exec(ctx,
+				`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
+				videoID, hash,
+			); err != nil {
+				log.Printf("failed to record view for %s: %v", videoID, err)
+			}
+			h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
+		}()
+	}
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)
 	if err != nil {

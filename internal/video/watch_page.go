@@ -1274,7 +1274,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{if or (eq .TranscriptStatus "processing") (eq .TranscriptStatus "pending")}}
         (function() {
             var pollInterval = setInterval(function() {
-                fetch('/api/watch/{{.ShareToken}}')
+                fetch('/api/watch/{{.ShareToken}}?poll=transcript')
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
                         if (data.transcriptStatus === 'ready' || data.transcriptStatus === 'failed') {

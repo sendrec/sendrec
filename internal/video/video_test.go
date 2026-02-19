@@ -4146,6 +4146,58 @@ func TestWatch_OmitsTranscriptWhenNone(t *testing.T) {
 	}
 }
 
+func TestWatch_TranscriptPoll_SkipsViewRecording(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	downloadURL := "https://s3.example.com/download?signed=xyz"
+	storage := &mockStorage{downloadURL: downloadURL}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
+	videoID := "video-001"
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
+		WithArgs(shareToken).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "processing", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil)),
+		)
+
+	// No INSERT INTO video_views expected — poll should skip view recording
+
+	r := chi.NewRouter()
+	r.Get("/watch/{shareToken}", handler.Watch)
+
+	req := httptest.NewRequest(http.MethodGet, "/watch/"+shareToken+"?poll=transcript", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp watchResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.TranscriptStatus != "processing" {
+		t.Errorf("expected transcriptStatus %q, got %q", "processing", resp.TranscriptStatus)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
 // --- Delete Transcript Tests ---
 
 func TestDelete_CleansUpTranscriptFile(t *testing.T) {
