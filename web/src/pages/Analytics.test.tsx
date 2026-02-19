@@ -28,6 +28,13 @@ function makeAnalyticsData(overrides: Record<string, unknown> = {}) {
       { date: "2026-02-09", views: 20, uniqueViews: 14 },
       { date: "2026-02-10", views: 23, uniqueViews: 18 },
     ],
+    milestones: {
+      reached25: 0,
+      reached50: 0,
+      reached75: 0,
+      reached100: 0,
+      ...(overrides.milestones as Record<string, unknown> ?? {}),
+    },
   };
 }
 
@@ -141,5 +148,37 @@ describe("Analytics", () => {
     });
     expect(screen.getByText("5")).toBeInTheDocument();
     expect(screen.getByText("25.0% click rate")).toBeInTheDocument();
+  });
+
+  it("displays completion funnel with milestone data", async () => {
+    mockApiFetch.mockResolvedValueOnce(makeAnalyticsData({
+      summary: { totalViews: 100 },
+      milestones: { reached25: 80, reached50: 60, reached75: 40, reached100: 25 },
+    }));
+    renderAnalytics();
+
+    await waitFor(() => {
+      expect(screen.getByText("Completion Funnel")).toBeInTheDocument();
+    });
+    expect(screen.getByText("80")).toBeInTheDocument();
+    expect(screen.getByText("60")).toBeInTheDocument();
+    expect(screen.getByText("40")).toBeInTheDocument();
+    expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(screen.getByText("60%")).toBeInTheDocument();
+    expect(screen.getByText("40%")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+  });
+
+  it("hides completion funnel when no views", async () => {
+    mockApiFetch.mockResolvedValueOnce(makeAnalyticsData({
+      summary: { totalViews: 0, uniqueViews: 0, viewsToday: 0, averageDailyViews: 0, peakDay: "", peakDayViews: 0 },
+      daily: [],
+    }));
+    renderAnalytics();
+
+    await waitFor(() => {
+      expect(screen.getByText("No views in this period.")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Completion Funnel")).not.toBeInTheDocument();
   });
 });
