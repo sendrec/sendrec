@@ -290,6 +290,64 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .marker-dot:hover .marker-tooltip {
             display: block;
         }
+        .reaction-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding: 0.5rem 0;
+            position: relative;
+        }
+        .reaction-btn {
+            background: var(--brand-surface);
+            border: 1px solid #334155;
+            border-radius: 20px;
+            padding: 0.375rem 0.625rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s, background 0.15s;
+            line-height: 1;
+        }
+        .reaction-btn:hover {
+            transform: scale(1.15);
+            border-color: var(--brand-accent);
+            background: rgba(0, 182, 122, 0.1);
+        }
+        .reaction-btn:active {
+            transform: scale(0.95);
+        }
+        .reaction-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .reaction-float {
+            position: fixed;
+            font-size: 1.5rem;
+            pointer-events: none;
+            z-index: 100;
+            animation: float-up 1s ease-out forwards;
+        }
+        @keyframes float-up {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-80px) scale(1.4); }
+        }
+        .comment.emoji-reaction {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+        }
+        .comment.emoji-reaction .comment-body {
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+        .comment.emoji-reaction .comment-meta {
+            margin-bottom: 0;
+            font-size: 0.75rem;
+        }
         .comment-highlight {
             animation: glow 1.5s ease-out;
         }
@@ -561,6 +619,14 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </script>
         {{if ne .CommentMode "disabled"}}
         <div class="markers-bar" id="markers-bar"></div>
+        <div class="reaction-bar" id="reaction-bar">
+            <button class="reaction-btn" data-emoji="&#x1F44D;" title="React with &#x1F44D;">&#x1F44D;</button>
+            <button class="reaction-btn" data-emoji="&#x1F44E;" title="React with &#x1F44E;">&#x1F44E;</button>
+            <button class="reaction-btn" data-emoji="&#x2764;&#xFE0F;" title="React with &#x2764;&#xFE0F;">&#x2764;&#xFE0F;</button>
+            <button class="reaction-btn" data-emoji="&#x1F602;" title="React with &#x1F602;">&#x1F602;</button>
+            <button class="reaction-btn" data-emoji="&#x1F62E;" title="React with &#x1F62E;">&#x1F62E;</button>
+            <button class="reaction-btn" data-emoji="&#x1F389;" title="React with &#x1F389;">&#x1F389;</button>
+        </div>
         {{end}}
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
@@ -682,8 +748,41 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 return m + ':' + (s < 10 ? '0' : '') + s;
             }
 
+            function getFiniteDuration() {
+                if (!player.duration || player.duration === Infinity || isNaN(player.duration)) return 0;
+                return player.duration;
+            }
+
+            function getTimelineDuration(comments) {
+                var finiteDuration = getFiniteDuration();
+                if (finiteDuration > 0) return finiteDuration;
+                var maxTimestamp = 0;
+                var hasTimestamp = false;
+                comments.forEach(function(c) {
+                    if (c.videoTimestamp == null) return;
+                    hasTimestamp = true;
+                    if (c.videoTimestamp > maxTimestamp) maxTimestamp = c.videoTimestamp;
+                });
+                if (!hasTimestamp) return 0;
+                return maxTimestamp > 0 ? maxTimestamp : 1;
+            }
+
+            function clampTimestampToVideo(seconds) {
+                var safeSeconds = Math.max(0, seconds || 0);
+                var finiteDuration = getFiniteDuration();
+                if (finiteDuration > 0) return Math.min(safeSeconds, finiteDuration);
+                return safeSeconds;
+            }
+
+            function clampReactionTimestamp(seconds) {
+                var safeSeconds = Math.max(0, Math.floor(seconds || 0));
+                var finiteDuration = getFiniteDuration();
+                if (finiteDuration > 0) return Math.min(safeSeconds, Math.max(0, Math.floor(finiteDuration) - 1));
+                return safeSeconds;
+            }
+
             function renderMarkers(comments) {
-                if (!markersBar || !videoDuration) return;
+                if (!markersBar) return;
                 markersBar.innerHTML = '';
                 var bySecond = {};
                 comments.forEach(function(c) {
@@ -693,17 +792,34 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     bySecond[sec].push(c);
                 });
                 var keys = Object.keys(bySecond);
-                markersBar.style.display = keys.length > 0 ? 'block' : 'none';
+                if (keys.length === 0) {
+                    markersBar.style.display = 'none';
+                    return;
+                }
+                var timelineDuration = getTimelineDuration(comments);
+                if (!timelineDuration) {
+                    markersBar.style.display = 'none';
+                    return;
+                }
+                markersBar.style.display = 'block';
                 keys.forEach(function(sec) {
                     var group = bySecond[sec];
                     var dot = document.createElement('div');
                     dot.className = 'marker-dot' + (group.length > 1 ? ' multi' : '') + (group[0].isPrivate ? ' private' : '');
-                    dot.style.left = (group[0].videoTimestamp / videoDuration * 100) + '%';
-                    var author = group[0].authorName || 'Anonymous';
-                    var preview = group[0].body.substring(0, 80);
+                    var pct = Math.min(group[0].videoTimestamp / timelineDuration * 100, 99);
+                    dot.style.left = pct + '%';
+                    var tooltipText;
+                    if (group.length === 1) {
+                        var author = group[0].authorName || 'Anonymous';
+                        tooltipText = author + ' \u00b7 ' + formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + group[0].body.substring(0, 80);
+                    } else {
+                        tooltipText = formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + group.map(function(c) {
+                            return (isReactionEmoji(c.body) ? c.body : (c.authorName || 'Anonymous'));
+                        }).join(' ');
+                    }
                     var tooltip = document.createElement('div');
                     tooltip.className = 'marker-tooltip';
-                    tooltip.textContent = author + ' \u00b7 ' + formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + preview;
+                    tooltip.textContent = tooltipText;
                     dot.appendChild(tooltip);
                     dot.setAttribute('data-comment-id', group[0].id);
                     dot.addEventListener('click', function() {
@@ -719,13 +835,36 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 });
             }
 
-            player.addEventListener('loadedmetadata', function() {
-                videoDuration = player.duration;
-                if (lastComments) renderMarkers(lastComments);
-            });
+            function updateDuration() {
+                var finiteDuration = getFiniteDuration();
+                if (finiteDuration > 0 && finiteDuration !== videoDuration) {
+                    videoDuration = finiteDuration;
+                    if (lastComments) renderMarkers(lastComments);
+                }
+            }
+            player.addEventListener('loadedmetadata', updateDuration);
+            player.addEventListener('durationchange', updateDuration);
+
+            var reactionEmojis = ['\uD83D\uDC4D','\uD83D\uDC4E','\u2764\uFE0F','\uD83D\uDE02','\uD83D\uDE2E','\uD83C\uDF89'];
+            function isReactionEmoji(text) {
+                return reactionEmojis.indexOf(text.trim()) !== -1;
+            }
 
             function renderComment(c) {
                 var authorName = c.authorName || 'Anonymous';
+                if (isReactionEmoji(c.body)) {
+                    var tsBadge = '';
+                    if (c.videoTimestamp != null) {
+                        tsBadge = ' <span class="comment-timestamp" data-ts="' + c.videoTimestamp + '">' + formatTimestamp(c.videoTimestamp) + '</span>';
+                    }
+                    return '<div class="comment emoji-reaction" id="comment-' + c.id + '">' +
+                        '<span class="comment-body">' + escapeHtml(c.body) + '</span>' +
+                        '<span class="comment-meta">' +
+                            escapeHtml(authorName) + tsBadge +
+                            ' \u00b7 ' + timeAgo(c.createdAt) +
+                        '</span>' +
+                    '</div>';
+                }
                 var badges = '';
                 if (c.videoTimestamp != null) {
                     badges += ' <span class="comment-timestamp" data-ts="' + c.videoTimestamp + '">' + formatTimestamp(c.videoTimestamp) + '</span>';
@@ -747,6 +886,15 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 if (tsEl) {
                     player.currentTime = parseFloat(tsEl.getAttribute('data-ts'));
                     player.play().catch(function() {});
+                    return;
+                }
+                var reactionEl = e.target.closest('.emoji-reaction');
+                if (reactionEl) {
+                    var ts = reactionEl.querySelector('.comment-timestamp');
+                    if (ts) {
+                        player.currentTime = parseFloat(ts.getAttribute('data-ts'));
+                        player.play().catch(function() {});
+                    }
                 }
             });
 
@@ -771,6 +919,48 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 
             loadComments();
 
+            var reactionBar = document.getElementById('reaction-bar');
+            if (reactionBar) {
+                reactionBar.addEventListener('click', function(e) {
+                    var btn = e.target.closest('.reaction-btn');
+                    if (!btn || btn.disabled) return;
+                    var emoji = btn.getAttribute('data-emoji');
+                    var timestamp = clampReactionTimestamp(player.currentTime);
+                    btn.disabled = true;
+                    var rect = btn.getBoundingClientRect();
+                    var floater = document.createElement('span');
+                    floater.className = 'reaction-float';
+                    floater.textContent = emoji;
+                    floater.style.left = rect.left + rect.width / 2 - 12 + 'px';
+                    floater.style.top = rect.top + 'px';
+                    document.body.appendChild(floater);
+                    floater.addEventListener('animationend', function() { floater.remove(); });
+                    var headers = {'Content-Type': 'application/json'};
+                    if (token) headers['Authorization'] = 'Bearer ' + token;
+                    fetch('/api/watch/' + shareToken + '/comments', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({authorName: '', authorEmail: '', body: emoji, isPrivate: false, videoTimestamp: timestamp})
+                    }).then(function(r) {
+                        if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
+                        return r.json();
+                    }).then(function(comment) {
+                        var noComments = listEl.querySelector('.no-comments');
+                        if (noComments) noComments.remove();
+                        listEl.insertAdjacentHTML('beforeend', renderComment(comment));
+                        var count = listEl.querySelectorAll('.comment').length;
+                        headerEl.textContent = 'Comments (' + count + ')';
+                        if (lastComments) {
+                            lastComments.push(comment);
+                            renderMarkers(lastComments);
+                        }
+                        btn.disabled = false;
+                    }).catch(function() {
+                        btn.disabled = false;
+                    });
+                });
+            }
+
             function parseTimestamp(str) {
                 var parts = str.trim().split(':');
                 if (parts.length === 2) {
@@ -788,7 +978,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             }
 
             function setTimestamp(seconds) {
-                capturedTimestamp = Math.min(seconds, videoDuration);
+                capturedTimestamp = clampTimestampToVideo(seconds);
                 timestampToggle.classList.add('active');
                 timestampToggleText.textContent = formatTimestamp(capturedTimestamp);
                 timestampToggleText.style.display = '';
@@ -816,7 +1006,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 
             function commitEdit() {
                 var parsed = parseTimestamp(timestampEditInput.value);
-                if (parsed !== null && videoDuration > 0) {
+                if (parsed !== null) {
                     setTimestamp(parsed);
                 } else if (capturedTimestamp !== null) {
                     timestampToggleText.style.display = '';
@@ -835,7 +1025,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 if (e.target === timestampEditInput) return;
                 if (capturedTimestamp !== null) {
                     startEditing();
-                } else if (videoDuration > 0) {
+                } else {
                     player.pause();
                     setTimestamp(player.currentTime);
                 }

@@ -22,6 +22,15 @@ var validCommentModes = map[string]bool{
 	"name_email_required": true,
 }
 
+var quickReactionBodies = map[string]bool{
+	"👍":  true,
+	"👎":  true,
+	"❤️": true,
+	"😂":  true,
+	"😮":  true,
+	"🎉":  true,
+}
+
 type setCommentModeRequest struct {
 	CommentMode string `json:"commentMode"`
 }
@@ -42,6 +51,10 @@ type commentResponse struct {
 	IsOwner        bool     `json:"isOwner"`
 	CreatedAt      string   `json:"createdAt"`
 	VideoTimestamp *float64 `json:"videoTimestamp,omitempty"`
+}
+
+func isQuickReactionBody(body string) bool {
+	return quickReactionBodies[body]
 }
 
 func (h *Handler) SetCommentMode(w http.ResponseWriter, r *http.Request) {
@@ -160,21 +173,28 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	quickReaction := isQuickReactionBody(req.Body)
+
 	switch commentMode {
 	case "name_required":
-		if req.AuthorName == "" {
+		if req.AuthorName == "" && !quickReaction {
 			httputil.WriteError(w, http.StatusBadRequest, "name is required")
 			return
 		}
 	case "name_email_required":
-		if req.AuthorName == "" {
+		if req.AuthorName == "" && !quickReaction {
 			httputil.WriteError(w, http.StatusBadRequest, "name is required")
 			return
 		}
-		if req.AuthorEmail == "" {
+		if req.AuthorEmail == "" && !quickReaction {
 			httputil.WriteError(w, http.StatusBadRequest, "email is required")
 			return
 		}
+	}
+
+	if quickReaction {
+		req.AuthorName = ""
+		req.AuthorEmail = ""
 	}
 
 	callerUserID := h.optionalUserID(r)
