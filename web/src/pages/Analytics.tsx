@@ -15,6 +15,8 @@ interface AnalyticsSummary {
   averageDailyViews: number;
   peakDay: string;
   peakDayViews: number;
+  totalCtaClicks: number;
+  ctaClickRate: number;
 }
 
 interface AnalyticsData {
@@ -250,6 +252,25 @@ export function Analytics() {
           {data.summary.peakDay && (
             <p style={{ color: "var(--color-text-secondary)", fontSize: 12, margin: "4px 0 0" }}>
               {formatPeakDate(data.summary.peakDay)}
+            </p>
+          )}
+        </div>
+        <div
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: 16,
+            textAlign: "center",
+          }}
+        >
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 4px" }}>CTA Clicks</p>
+          <p style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 700, margin: 0 }}>
+            {data.summary.totalCtaClicks}
+          </p>
+          {data.summary.totalViews > 0 && (
+            <p style={{ color: "var(--color-text-secondary)", fontSize: 12, margin: "4px 0 0" }}>
+              {(data.summary.ctaClickRate * 100).toFixed(1)}% click rate
             </p>
           )}
         </div>
