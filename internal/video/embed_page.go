@@ -12,15 +12,16 @@ import (
 )
 
 type embedPageData struct {
-	Title        string
-	VideoURL     string
-	ThumbnailURL string
-	ShareToken   string
-	Nonce        string
-	BaseURL      string
-	ContentType  string
-	CtaText      string
-	CtaUrl       string
+	Title         string
+	VideoURL      string
+	ThumbnailURL  string
+	TranscriptURL string
+	ShareToken    string
+	Nonce         string
+	BaseURL       string
+	ContentType   string
+	CtaText       string
+	CtaUrl        string
 }
 
 type embedPasswordPageData struct {
@@ -91,7 +92,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
 <body>
     <div class="container">
         <div class="video-wrapper">
-            <video controls playsinline webkit-playsinline crossorigin="anonymous" controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}></video>
+            <video controls playsinline webkit-playsinline crossorigin="anonymous" controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>{{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles">{{end}}</video>
         </div>
         {{if and .CtaText .CtaUrl}}
         <div class="cta-overlay" id="cta-overlay">
@@ -252,12 +253,13 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	var ownerEmail string
 	var viewNotification *string
 	var ctaText, ctaUrl *string
+	var transcriptKey *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at,
 		        v.thumbnail_key, v.share_password, v.content_type,
 		        v.user_id, u.email, v.view_notification,
-		        v.cta_text, v.cta_url
+		        v.cta_text, v.cta_url, v.transcript_key
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
@@ -265,7 +267,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt,
 		&thumbnailKey, &sharePassword, &contentType,
 		&ownerID, &ownerEmail, &viewNotification,
-		&ctaText, &ctaUrl)
+		&ctaText, &ctaUrl, &transcriptKey)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -330,17 +332,25 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var transcriptURL string
+	if transcriptKey != nil {
+		if u, err := h.storage.GenerateDownloadURL(r.Context(), *transcriptKey, 1*time.Hour); err == nil {
+			transcriptURL = u
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := embedPageTemplate.Execute(w, embedPageData{
-		Title:        title,
-		VideoURL:     videoURL,
-		ThumbnailURL: thumbnailURL,
-		ShareToken:   shareToken,
-		Nonce:        nonce,
-		BaseURL:      h.baseURL,
-		ContentType:  contentType,
-		CtaText:      derefString(ctaText),
-		CtaUrl:       derefString(ctaUrl),
+		Title:         title,
+		VideoURL:      videoURL,
+		ThumbnailURL:  thumbnailURL,
+		TranscriptURL: transcriptURL,
+		ShareToken:    shareToken,
+		Nonce:         nonce,
+		BaseURL:       h.baseURL,
+		ContentType:   contentType,
+		CtaText:       derefString(ctaText),
+		CtaUrl:        derefString(ctaUrl),
 	}); err != nil {
 		log.Printf("failed to render embed page: %v", err)
 	}

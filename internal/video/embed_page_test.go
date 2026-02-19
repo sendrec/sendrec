@@ -17,7 +17,7 @@ var embedPageColumns = []string{
 	"id", "title", "file_key", "name", "created_at", "share_expires_at",
 	"thumbnail_key", "share_password", "content_type",
 	"user_id", "email", "view_notification",
-	"cta_text", "cta_url",
+	"cta_text", "cta_url", "transcript_key",
 }
 
 func embedPageRequest(shareToken string) *http.Request {
@@ -83,7 +83,7 @@ func TestEmbedPage_Expired_Returns410(t *testing.T) {
 			"vid-1", "Old Video", "recordings/u1/old.webm", "Alice", createdAt, &expiredAt,
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
-			(*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -119,7 +119,7 @@ func TestEmbedPage_Success_RendersVideoPlayer(t *testing.T) {
 			"vid-1", "My Demo", "recordings/u1/abc.webm", "Bob Smith", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
-			(*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -167,7 +167,7 @@ func TestEmbedPage_WithThumbnail_RendersPoster(t *testing.T) {
 			"vid-1", "Thumb Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			&thumbKey, (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
-			(*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -205,7 +205,7 @@ func TestEmbedPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 			"vid-1", "Protected Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), &passwordHash, "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
-			(*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -245,7 +245,7 @@ func TestEmbedPage_RecordsView(t *testing.T) {
 			"vid-1", "My Demo", "recordings/u1/abc.webm", "Bob Smith", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
-			(*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -285,7 +285,7 @@ func TestEmbedPage_CSPNonce(t *testing.T) {
 			"vid-1", "Nonce Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
-			(*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -322,7 +322,7 @@ func TestEmbedPage_NeverExpires(t *testing.T) {
 				"vid-1", "Never Expire Video", "recordings/u1/abc.webm", "Bob", createdAt, (*time.Time)(nil),
 				(*string)(nil), (*string)(nil), "video/webm",
 				"owner-user-id", "owner@example.com", (*string)(nil),
-				(*string)(nil), (*string)(nil),
+				(*string)(nil), (*string)(nil), (*string)(nil),
 			),
 		)
 
@@ -368,7 +368,7 @@ func TestEmbedPage_ResponsiveLayout(t *testing.T) {
 			"vid-1", "Responsive", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
-			(*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -411,7 +411,7 @@ func TestEmbedPage_RendersCtaOverlay(t *testing.T) {
 			"vid-1", "CTA Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
-			&ctaText, &ctaUrl,
+			&ctaText, &ctaUrl, (*string)(nil),
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -442,6 +442,58 @@ func TestEmbedPage_RendersCtaOverlay(t *testing.T) {
 	}
 }
 
+func TestEmbedPage_RendersSubtitleTrack(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	transcriptKey := "recordings/u1/abc.vtt"
+	shareToken := "subtitletest1"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(embedPageColumns).AddRow(
+			"vid-1", "Subtitled Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
+			(*string)(nil), (*string)(nil), "video/webm",
+			"owner-user-id", "owner@example.com", (*string)(nil),
+			(*string)(nil), (*string)(nil), &transcriptKey,
+		))
+
+	mock.ExpectExec(`INSERT INTO video_views`).
+		WithArgs("vid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "<track") {
+		t.Error("expected <track> element for subtitles")
+	}
+	if !strings.Contains(body, `kind="subtitles"`) {
+		t.Error("expected subtitles kind on track element")
+	}
+	if !strings.Contains(body, `srclang="en"`) {
+		t.Error("expected srclang attribute on track element")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
 func TestEmbedPage_MilestoneTrackingScript(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -462,7 +514,7 @@ func TestEmbedPage_MilestoneTrackingScript(t *testing.T) {
 			"vid-1", "Test Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
-			(*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
