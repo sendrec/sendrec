@@ -4456,6 +4456,10 @@ func TestAnalytics_Returns7DayStats(t *testing.T) {
 				AddRow(today, int64(10), int64(7)),
 		)
 
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4588,6 +4592,10 @@ func TestAnalytics_DefaultsTo7d(t *testing.T) {
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
 
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4636,6 +4644,10 @@ func TestAnalytics_30DayRange(t *testing.T) {
 				AddRow(today.AddDate(0, 0, -15), int64(3), int64(2)).
 				AddRow(today, int64(8), int64(5)),
 		)
+
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
@@ -4691,6 +4703,10 @@ func TestAnalytics_AllRange(t *testing.T) {
 				AddRow(today, int64(6), int64(4)),
 		)
 
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4738,6 +4754,10 @@ func TestAnalytics_EmptyViews(t *testing.T) {
 	mock.ExpectQuery("SELECT date_trunc").
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
+
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
@@ -4808,6 +4828,10 @@ func TestAnalytics_AllRangeEmptyViews(t *testing.T) {
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
 
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4869,6 +4893,10 @@ func TestAnalytics_PeakDayAndAverage(t *testing.T) {
 				AddRow(today, int64(7), int64(5)),
 		)
 
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4909,6 +4937,55 @@ func TestAnalytics_PeakDayAndAverage(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_IncludesCtaClicks(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-001"
+
+	// Ownership check
+	mock.ExpectQuery(`SELECT id FROM videos WHERE id`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	// Daily views query
+	mock.ExpectQuery(`SELECT date_trunc`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
+
+	// CTA clicks count
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(5)))
+
+	r := chi.NewRouter()
+	r.Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/videos/"+videoID+"/analytics?range=7d", nil)
+	req = req.WithContext(auth.ContextWithUserID(req.Context(), testUserID))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.Summary.TotalCtaClicks != 5 {
+		t.Errorf("expected 5 CTA clicks, got %d", resp.Summary.TotalCtaClicks)
 	}
 }
 

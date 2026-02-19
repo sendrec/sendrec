@@ -1229,6 +1229,8 @@ type analyticsSummary struct {
 	AverageDailyViews float64 `json:"averageDailyViews"`
 	PeakDay           string  `json:"peakDay"`
 	PeakDayViews      int64   `json:"peakDayViews"`
+	TotalCtaClicks    int64   `json:"totalCtaClicks"`
+	CtaClickRate      float64 `json:"ctaClickRate"`
 }
 
 type dailyViews struct {
@@ -1332,7 +1334,21 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		sortDailyViews(daily)
 	}
 
+	var totalCtaClicks int64
+	err = h.db.QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM cta_clicks WHERE video_id = $1 AND created_at >= $2`,
+		videoID, since,
+	).Scan(&totalCtaClicks)
+	if err != nil {
+		totalCtaClicks = 0
+	}
+
 	summary := computeSummary(daily, now.Format("2006-01-02"))
+	summary.TotalCtaClicks = totalCtaClicks
+	if summary.TotalViews > 0 {
+		summary.CtaClickRate = float64(totalCtaClicks) / float64(summary.TotalViews)
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, analyticsResponse{
 		Summary: summary,
 		Daily:   daily,
