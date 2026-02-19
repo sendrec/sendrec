@@ -294,21 +294,23 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             display: flex;
             gap: 0.5rem;
             margin-top: 0.75rem;
+            padding: 0.5rem 0;
             position: relative;
         }
         .reaction-btn {
             background: var(--brand-surface);
-            border: 1px solid transparent;
+            border: 1px solid #334155;
             border-radius: 20px;
-            padding: 0.25rem 0.5rem;
-            font-size: 1.25rem;
+            padding: 0.375rem 0.625rem;
+            font-size: 1.5rem;
             cursor: pointer;
-            transition: transform 0.15s, border-color 0.15s;
+            transition: transform 0.15s, border-color 0.15s, background 0.15s;
             line-height: 1;
         }
         .reaction-btn:hover {
-            transform: scale(1.2);
+            transform: scale(1.15);
             border-color: var(--brand-accent);
+            background: rgba(0, 182, 122, 0.1);
         }
         .reaction-btn:active {
             transform: scale(0.95);
