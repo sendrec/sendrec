@@ -13,14 +13,14 @@ import (
 )
 
 type Config struct {
-	BaseURL            string
-	Username           string
-	Password           string
-	TemplateID         int
-	CommentTemplateID  int
-	ViewTemplateID     int
-	ConfirmTemplateID  int
-	Allowlist          []string
+	BaseURL           string
+	Username          string
+	Password          string
+	TemplateID        int
+	CommentTemplateID int
+	ViewTemplateID    int
+	ConfirmTemplateID int
+	Allowlist         []string
 }
 
 type Client struct {
@@ -44,9 +44,10 @@ type txRequest struct {
 
 // DigestVideoSummary represents a single video in a digest email.
 type DigestVideoSummary struct {
-	Title     string `json:"title"`
-	ViewCount int    `json:"viewCount"`
-	WatchURL  string `json:"watchURL"`
+	Title        string `json:"title"`
+	ViewCount    int    `json:"viewCount"`
+	CommentCount int    `json:"commentCount"`
+	WatchURL     string `json:"watchURL"`
 }
 
 type subscriberRequest struct {
@@ -274,18 +275,21 @@ func (c *Client) SendDigestNotification(ctx context.Context, toEmail, toName str
 	c.ensureSubscriber(ctx, toEmail, toName)
 
 	totalViews := 0
+	totalComments := 0
 	for _, v := range videos {
 		totalViews += v.ViewCount
+		totalComments += v.CommentCount
 	}
 
 	body := txRequest{
 		SubscriberEmail: toEmail,
 		TemplateID:      c.config.ViewTemplateID,
 		Data: map[string]any{
-			"name":       toName,
-			"isDigest":   "true",
-			"totalViews": strconv.Itoa(totalViews),
-			"videos":     videos,
+			"name":          toName,
+			"isDigest":      "true",
+			"totalViews":    strconv.Itoa(totalViews),
+			"totalComments": strconv.Itoa(totalComments),
+			"videos":        videos,
 		},
 		ContentType: "html",
 	}
