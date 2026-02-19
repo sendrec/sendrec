@@ -287,8 +287,8 @@ func TestSendDigestNotification_Success(t *testing.T) {
 	})
 
 	videos := []DigestVideoSummary{
-		{Title: "Video One", ViewCount: 10, CommentCount: 2, WatchURL: "https://example.com/watch/abc"},
-		{Title: "Video Two", ViewCount: 3, CommentCount: 1, WatchURL: "https://example.com/watch/def"},
+		{Title: "Video One", ViewCount: 10, WatchURL: "https://example.com/watch/abc"},
+		{Title: "Video Two", ViewCount: 3, WatchURL: "https://example.com/watch/def"},
 	}
 
 	err := client.SendDigestNotification(context.Background(), "alice@example.com", "Alice", videos)
@@ -299,10 +299,9 @@ func TestSendDigestNotification_Success(t *testing.T) {
 	var parsed struct {
 		TemplateID int `json:"template_id"`
 		Data       struct {
-			IsDigest      string               `json:"isDigest"`
-			TotalViews    string               `json:"totalViews"`
-			TotalComments string               `json:"totalComments"`
-			Videos        []DigestVideoSummary `json:"videos"`
+			IsDigest   string                `json:"isDigest"`
+			TotalViews string                `json:"totalViews"`
+			Videos     []DigestVideoSummary  `json:"videos"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(receivedRaw, &parsed); err != nil {
@@ -318,9 +317,6 @@ func TestSendDigestNotification_Success(t *testing.T) {
 	if parsed.Data.TotalViews != "13" {
 		t.Errorf("expected totalViews=13, got %s", parsed.Data.TotalViews)
 	}
-	if parsed.Data.TotalComments != "3" {
-		t.Errorf("expected totalComments=3, got %s", parsed.Data.TotalComments)
-	}
 	if len(parsed.Data.Videos) != 2 {
 		t.Fatalf("expected 2 videos, got %d", len(parsed.Data.Videos))
 	}
@@ -329,9 +325,6 @@ func TestSendDigestNotification_Success(t *testing.T) {
 	}
 	if parsed.Data.Videos[0].ViewCount != 10 {
 		t.Errorf("expected first video 10 views, got %d", parsed.Data.Videos[0].ViewCount)
-	}
-	if parsed.Data.Videos[0].CommentCount != 2 {
-		t.Errorf("expected first video 2 comments, got %d", parsed.Data.Videos[0].CommentCount)
 	}
 }
 
@@ -613,3 +606,4 @@ func TestParseAllowlist(t *testing.T) {
 		}
 	}
 }
+

@@ -252,51 +252,24 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         .marker-dot {
             position: absolute;
-            width: 16px;
-            height: 16px;
-            padding: 0;
-            border: none;
-            background: transparent;
-            border-radius: 50%;
-            top: -4px;
-            transform: translateX(-50%);
-            cursor: pointer;
-        }
-        .marker-dot::before {
-            content: "";
-            position: absolute;
-            left: 5px;
-            top: 5px;
             width: 6px;
             height: 6px;
             background: var(--brand-accent);
             border-radius: 50%;
+            top: 1px;
+            transform: translateX(-50%);
             transition: transform 0.15s;
         }
-        .marker-dot:hover::before,
-        .marker-dot:focus-visible::before {
-            transform: scale(1.6);
-        }
-        .marker-dot:focus-visible {
-            outline: 2px solid var(--brand-accent);
-            outline-offset: 1px;
+        .marker-dot:hover {
+            transform: translateX(-50%) scale(1.6);
         }
         .marker-dot.private {
-            background: transparent;
-        }
-        .marker-dot.private::before {
             background: #3b82f6;
         }
         .marker-dot.multi {
-            width: 18px;
-            height: 18px;
-            top: -5px;
-        }
-        .marker-dot.multi::before {
             width: 8px;
             height: 8px;
-            left: 5px;
-            top: 5px;
+            top: 0;
         }
         .marker-tooltip {
             position: absolute;
@@ -314,8 +287,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             display: none;
             z-index: 10;
         }
-        .marker-dot:hover .marker-tooltip,
-        .marker-dot:focus-visible .marker-tooltip {
+        .marker-dot:hover .marker-tooltip {
             display: block;
         }
         .reaction-bar {
@@ -330,11 +302,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             border: 1px solid #334155;
             border-radius: 20px;
             padding: 0.375rem 0.625rem;
-            min-width: 44px;
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
             font-size: 1.5rem;
             cursor: pointer;
             transition: transform 0.15s, border-color 0.15s, background 0.15s;
@@ -352,10 +319,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             opacity: 0.4;
             cursor: not-allowed;
             transform: none;
-        }
-        .reaction-btn:focus-visible {
-            outline: 2px solid var(--brand-accent);
-            outline-offset: 1px;
         }
         .reaction-float {
             position: fixed;
@@ -376,15 +339,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             margin-right: 0.5rem;
             margin-bottom: 0.5rem;
             cursor: pointer;
-            border: 1px solid #334155;
-            background: var(--brand-surface);
-            color: inherit;
-            font: inherit;
-            text-align: left;
-        }
-        .comment.emoji-reaction:focus-visible {
-            outline: 2px solid var(--brand-accent);
-            outline-offset: 1px;
         }
         .comment.emoji-reaction .comment-body {
             font-size: 1.25rem;
@@ -393,9 +347,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .comment.emoji-reaction .comment-meta {
             margin-bottom: 0;
             font-size: 0.75rem;
-        }
-        .reaction-error {
-            margin-top: 0.5rem;
         }
         .comment-highlight {
             animation: glow 1.5s ease-out;
@@ -669,11 +620,13 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{if ne .CommentMode "disabled"}}
         <div class="markers-bar" id="markers-bar"></div>
         <div class="reaction-bar" id="reaction-bar">
-            {{range .ReactionEmojis}}
-            <button type="button" class="reaction-btn" data-emoji="{{.}}" title="React with {{.}}" aria-label="React with {{.}}">{{.}}</button>
-            {{end}}
+            <button class="reaction-btn" data-emoji="&#x1F44D;" title="React with &#x1F44D;">&#x1F44D;</button>
+            <button class="reaction-btn" data-emoji="&#x1F44E;" title="React with &#x1F44E;">&#x1F44E;</button>
+            <button class="reaction-btn" data-emoji="&#x2764;&#xFE0F;" title="React with &#x2764;&#xFE0F;">&#x2764;&#xFE0F;</button>
+            <button class="reaction-btn" data-emoji="&#x1F602;" title="React with &#x1F602;">&#x1F602;</button>
+            <button class="reaction-btn" data-emoji="&#x1F62E;" title="React with &#x1F62E;">&#x1F62E;</button>
+            <button class="reaction-btn" data-emoji="&#x1F389;" title="React with &#x1F389;">&#x1F389;</button>
         </div>
-        <p class="comment-error reaction-error" id="reaction-error" role="alert"></p>
         {{end}}
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
@@ -762,7 +715,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             var capturedTimestamp = null;
             var emojiTrigger = document.getElementById('emoji-trigger');
             var emojiGrid = document.getElementById('emoji-grid');
-            var reactionErrorEl = document.getElementById('reaction-error');
 
             function getAuthToken() {
                 try { return localStorage.getItem('token') || ''; } catch(e) { return ''; }
@@ -852,8 +804,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 markersBar.style.display = 'block';
                 keys.forEach(function(sec) {
                     var group = bySecond[sec];
-                    var dot = document.createElement('button');
-                    dot.type = 'button';
+                    var dot = document.createElement('div');
                     dot.className = 'marker-dot' + (group.length > 1 ? ' multi' : '') + (group[0].isPrivate ? ' private' : '');
                     var pct = Math.min(group[0].videoTimestamp / timelineDuration * 100, 99);
                     dot.style.left = pct + '%';
@@ -871,7 +822,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     tooltip.textContent = tooltipText;
                     dot.appendChild(tooltip);
                     dot.setAttribute('data-comment-id', group[0].id);
-                    dot.setAttribute('aria-label', 'Jump to ' + formatTimestamp(group[0].videoTimestamp) + (group.length > 1 ? ' (' + group.length + ' comments)' : ''));
                     dot.addEventListener('click', function() {
                         player.currentTime = group[0].videoTimestamp;
                         var commentEl = document.getElementById('comment-' + group[0].id);
@@ -895,7 +845,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             player.addEventListener('loadedmetadata', updateDuration);
             player.addEventListener('durationchange', updateDuration);
 
-            var reactionEmojis = {{.ReactionEmojisJSON}};
+            var reactionEmojis = ['\uD83D\uDC4D','\uD83D\uDC4E','\u2764\uFE0F','\uD83D\uDE02','\uD83D\uDE2E','\uD83C\uDF89'];
             function isReactionEmoji(text) {
                 return reactionEmojis.indexOf(text.trim()) !== -1;
             }
@@ -907,13 +857,13 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     if (c.videoTimestamp != null) {
                         tsBadge = ' <span class="comment-timestamp" data-ts="' + c.videoTimestamp + '">' + formatTimestamp(c.videoTimestamp) + '</span>';
                     }
-                    return '<button type="button" class="comment emoji-reaction" id="comment-' + c.id + '">' +
+                    return '<div class="comment emoji-reaction" id="comment-' + c.id + '">' +
                         '<span class="comment-body">' + escapeHtml(c.body) + '</span>' +
                         '<span class="comment-meta">' +
                             escapeHtml(authorName) + tsBadge +
                             ' \u00b7 ' + timeAgo(c.createdAt) +
                         '</span>' +
-                    '</button>';
+                    '</div>';
                 }
                 var badges = '';
                 if (c.videoTimestamp != null) {
@@ -976,7 +926,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     if (!btn || btn.disabled) return;
                     var emoji = btn.getAttribute('data-emoji');
                     var timestamp = clampReactionTimestamp(player.currentTime);
-                    if (reactionErrorEl) reactionErrorEl.style.display = 'none';
                     btn.disabled = true;
                     var rect = btn.getBoundingClientRect();
                     var floater = document.createElement('span');
@@ -993,11 +942,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                         headers: headers,
                         body: JSON.stringify({authorName: '', authorEmail: '', body: emoji, isPrivate: false, videoTimestamp: timestamp})
                     }).then(function(r) {
-                        if (!r.ok) {
-                            return r.json()
-                                .then(function(d) { throw new Error(d && d.error ? d.error : 'Could not post reaction'); })
-                                .catch(function() { throw new Error('Could not post reaction'); });
-                        }
+                        if (!r.ok) return r.json().then(function(d) { throw new Error(d.error); });
                         return r.json();
                     }).then(function(comment) {
                         var noComments = listEl.querySelector('.no-comments');
@@ -1010,11 +955,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                             renderMarkers(lastComments);
                         }
                         btn.disabled = false;
-                    }).catch(function(err) {
-                        if (reactionErrorEl) {
-                            reactionErrorEl.textContent = err && err.message ? err.message : 'Could not post reaction';
-                            reactionErrorEl.style.display = 'block';
-                        }
+                    }).catch(function() {
                         btn.disabled = false;
                     });
                 });
@@ -1380,26 +1321,24 @@ type notFoundPageData struct {
 }
 
 type watchPageData struct {
-	Title              string
-	VideoURL           string
-	Creator            string
-	Date               string
-	Nonce              string
-	ThumbnailURL       string
-	ShareToken         string
-	VideoID            string
-	CommentMode        string
-	TranscriptURL      string
-	TranscriptStatus   string
-	Segments           []TranscriptSegment
-	BaseURL            string
-	ContentType        string
-	Branding           brandingConfig
-	AnalyticsScript    template.HTML
-	DownloadEnabled    bool
-	CustomCSS          template.CSS
-	ReactionEmojis     []string
-	ReactionEmojisJSON template.JS
+	Title            string
+	VideoURL         string
+	Creator          string
+	Date             string
+	Nonce            string
+	ThumbnailURL     string
+	ShareToken       string
+	VideoID          string
+	CommentMode      string
+	TranscriptURL    string
+	TranscriptStatus string
+	Segments         []TranscriptSegment
+	BaseURL          string
+	ContentType      string
+	Branding         brandingConfig
+	AnalyticsScript  template.HTML
+	DownloadEnabled  bool
+	CustomCSS        template.CSS
 }
 
 type expiredPageData struct {
@@ -1633,34 +1572,26 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal([]byte(*transcriptJSON), &segments)
 	}
 
-	reactionEmojisJSON, err := json.Marshal(quickReactionEmojis)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := watchPageTemplate.Execute(w, watchPageData{
-		Title:              title,
-		VideoURL:           videoURL,
-		Creator:            creator,
-		Date:               createdAt.Format("Jan 2, 2006"),
-		Nonce:              nonce,
-		ThumbnailURL:       thumbnailURL,
-		ShareToken:         shareToken,
-		VideoID:            videoID,
-		CommentMode:        commentMode,
-		TranscriptURL:      transcriptURL,
-		TranscriptStatus:   transcriptStatus,
-		Segments:           segments,
-		BaseURL:            h.baseURL,
-		ContentType:        contentType,
-		Branding:           branding,
-		AnalyticsScript:    injectScriptNonce(h.analyticsScript, nonce),
-		DownloadEnabled:    downloadEnabled,
-		CustomCSS:          template.CSS(branding.CustomCSS),
-		ReactionEmojis:     quickReactionEmojis,
-		ReactionEmojisJSON: template.JS(string(reactionEmojisJSON)),
+		Title:            title,
+		VideoURL:         videoURL,
+		Creator:          creator,
+		Date:             createdAt.Format("Jan 2, 2006"),
+		Nonce:            nonce,
+		ThumbnailURL:     thumbnailURL,
+		ShareToken:       shareToken,
+		VideoID:          videoID,
+		CommentMode:      commentMode,
+		TranscriptURL:    transcriptURL,
+		TranscriptStatus: transcriptStatus,
+		Segments:         segments,
+		BaseURL:          h.baseURL,
+		ContentType:      contentType,
+		Branding:         branding,
+		AnalyticsScript:  injectScriptNonce(h.analyticsScript, nonce),
+		DownloadEnabled:  downloadEnabled,
+		CustomCSS:        template.CSS(branding.CustomCSS),
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

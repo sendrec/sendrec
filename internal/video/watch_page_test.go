@@ -355,24 +355,6 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 	if !strings.Contains(body, "body: JSON.stringify({authorName: '', authorEmail: '', body: emoji, isPrivate: false, videoTimestamp: timestamp})") {
 		t.Error("expected reaction payload to use anonymous author name/email")
 	}
-	if !strings.Contains(body, `id="reaction-error"`) {
-		t.Error("expected reaction error feedback element")
-	}
-	if !strings.Contains(body, `var reactionEmojis = ["👍","👎","❤️","😂","😮","🎉"];`) {
-		t.Error("expected reaction emojis to be sourced from backend-generated JSON list")
-	}
-	if !strings.Contains(body, `class="reaction-btn"`) || !strings.Contains(body, `aria-label="React with`) {
-		t.Error("expected reaction buttons to include accessibility labels")
-	}
-	if !strings.Contains(body, `dot.type = 'button';`) {
-		t.Error("expected marker dots to be keyboard-accessible buttons")
-	}
-	if !strings.Contains(body, `type="button" class="comment emoji-reaction"`) {
-		t.Error("expected emoji reactions to render as button elements for keyboard access")
-	}
-	if !strings.Contains(body, `reactionErrorEl.textContent =`) {
-		t.Error("expected reaction errors to be surfaced to users")
-	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}

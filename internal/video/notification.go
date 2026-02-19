@@ -13,53 +13,32 @@ import (
 	"github.com/sendrec/sendrec/internal/httputil"
 )
 
-const (
-	notificationModeOff              = "off"
-	notificationModeViewsOnly        = "views_only"
-	notificationModeCommentsOnly     = "comments_only"
-	notificationModeViewsAndComments = "views_and_comments"
-	notificationModeDigest           = "digest"
-)
-
-const (
-	viewNotificationOff    = "off"
-	viewNotificationEvery  = "every"
-	viewNotificationDigest = "digest"
-)
-
-var validNotificationModes = map[string]bool{
-	notificationModeOff:              true,
-	notificationModeViewsOnly:        true,
-	notificationModeCommentsOnly:     true,
-	notificationModeViewsAndComments: true,
-	notificationModeDigest:           true,
-}
-
 var validViewNotificationModes = map[string]bool{
-	viewNotificationOff:    true,
-	viewNotificationEvery:  true,
-	viewNotificationDigest: true,
+	"off":    true,
+	"every":  true,
+	"first":  true,
+	"digest": true,
 }
 
 type notificationPreferencesResponse struct {
-	NotificationMode string `json:"notificationMode"`
+	ViewNotification string `json:"viewNotification"`
 }
 
 type setNotificationPreferencesRequest struct {
-	NotificationMode string `json:"notificationMode"`
+	ViewNotification string `json:"viewNotification"`
 }
 
 func (h *Handler) GetNotificationPreferences(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
-	var notificationMode string
+	var viewNotification string
 	err := h.db.QueryRow(r.Context(),
 		`SELECT view_notification FROM notification_preferences WHERE user_id = $1`,
 		userID,
-	).Scan(&notificationMode)
+	).Scan(&viewNotification)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			notificationMode = notificationModeOff
+			viewNotification = "off"
 		} else {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to get preferences")
 			return
@@ -67,7 +46,7 @@ func (h *Handler) GetNotificationPreferences(w http.ResponseWriter, r *http.Requ
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, notificationPreferencesResponse{
-		NotificationMode: normalizeAccountNotificationMode(notificationMode),
+		ViewNotification: viewNotification,
 	})
 }
 
@@ -80,7 +59,7 @@ func (h *Handler) PutNotificationPreferences(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if !validNotificationModes[req.NotificationMode] {
+	if !validViewNotificationModes[req.ViewNotification] {
 		httputil.WriteError(w, http.StatusBadRequest, "invalid notification mode")
 		return
 	}
@@ -89,7 +68,7 @@ func (h *Handler) PutNotificationPreferences(w http.ResponseWriter, r *http.Requ
 		`INSERT INTO notification_preferences (user_id, view_notification)
 		 VALUES ($1, $2)
 		 ON CONFLICT (user_id) DO UPDATE SET view_notification = $2, updated_at = now()`,
-		userID, req.NotificationMode,
+		userID, req.ViewNotification,
 	); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to save preferences")
 		return
@@ -133,61 +112,6 @@ func (h *Handler) SetVideoNotification(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func normalizeAccountNotificationMode(mode string) string {
-	switch mode {
-	case notificationModeOff,
-		notificationModeViewsOnly,
-		notificationModeCommentsOnly,
-		notificationModeViewsAndComments,
-		notificationModeDigest:
-		return mode
-	case viewNotificationEvery, "first":
-		// Legacy view-only modes from older versions.
-		return notificationModeViewsOnly
-	default:
-		return notificationModeOff
-	}
-}
-
-func normalizeViewNotificationMode(mode string) string {
-	switch mode {
-	case viewNotificationOff, viewNotificationEvery, viewNotificationDigest:
-		return mode
-	case "first":
-		// Legacy per-video mode from older versions.
-		return viewNotificationEvery
-	default:
-		return viewNotificationOff
-	}
-}
-
-func sendsImmediateViewNotification(accountMode string) bool {
-	return accountMode == notificationModeViewsOnly || accountMode == notificationModeViewsAndComments
-}
-
-func sendsImmediateCommentNotification(accountMode string) bool {
-	return accountMode == notificationModeCommentsOnly || accountMode == notificationModeViewsAndComments
-}
-
-func (h *Handler) accountNotificationMode(ctx context.Context, ownerID string) string {
-	if h.db == nil {
-		return notificationModeOff
-	}
-	var mode string
-	err := h.db.QueryRow(ctx,
-		`SELECT view_notification FROM notification_preferences WHERE user_id = $1`,
-		ownerID,
-	).Scan(&mode)
-	if err != nil {
-		return notificationModeOff
-	}
-	return normalizeAccountNotificationMode(mode)
-}
-
-func (h *Handler) shouldSendImmediateCommentNotification(ctx context.Context, ownerID string) bool {
-	return sendsImmediateCommentNotification(h.accountNotificationMode(ctx, ownerID))
-}
-
 func (h *Handler) viewerUserIDFromRequest(r *http.Request) string {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
@@ -209,17 +133,39 @@ func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerE
 		return
 	}
 
-	mode := viewNotificationOff
+	mode := "off"
 	if videoViewNotification != nil {
-		mode = normalizeViewNotificationMode(*videoViewNotification)
+		mode = *videoViewNotification
 	} else {
-		if sendsImmediateViewNotification(h.accountNotificationMode(ctx, ownerID)) {
-			mode = viewNotificationEvery
+		var accountMode string
+		err := h.db.QueryRow(ctx,
+			`SELECT view_notification FROM notification_preferences WHERE user_id = $1`,
+			ownerID,
+		).Scan(&accountMode)
+		if err == nil {
+			mode = accountMode
 		}
 	}
 
-	if mode != viewNotificationEvery {
+	if mode == "off" || mode == "digest" {
 		return
+	}
+
+	if mode == "first" {
+		// Note: small race window — two simultaneous viewers could both see viewCount==1.
+		// Acceptable at current scale; use advisory lock or sent-flag column if needed later.
+		var viewCount int64
+		err := h.db.QueryRow(ctx,
+			`SELECT COUNT(*) FROM video_views WHERE video_id = $1`,
+			videoID,
+		).Scan(&viewCount)
+		if err != nil {
+			log.Printf("failed to count views for first notification: %v", err)
+			return
+		}
+		if viewCount != 1 {
+			return
+		}
 	}
 
 	watchURL := h.baseURL + "/watch/" + shareToken
