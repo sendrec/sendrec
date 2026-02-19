@@ -763,12 +763,20 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     var group = bySecond[sec];
                     var dot = document.createElement('div');
                     dot.className = 'marker-dot' + (group.length > 1 ? ' multi' : '') + (group[0].isPrivate ? ' private' : '');
-                    dot.style.left = (group[0].videoTimestamp / videoDuration * 100) + '%';
-                    var author = group[0].authorName || 'Anonymous';
-                    var preview = group[0].body.substring(0, 80);
+                    var pct = Math.min(group[0].videoTimestamp / videoDuration * 100, 99);
+                    dot.style.left = pct + '%';
+                    var tooltipText;
+                    if (group.length === 1) {
+                        var author = group[0].authorName || 'Anonymous';
+                        tooltipText = author + ' \u00b7 ' + formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + group[0].body.substring(0, 80);
+                    } else {
+                        tooltipText = formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + group.map(function(c) {
+                            return (isReactionEmoji(c.body) ? c.body : (c.authorName || 'Anonymous'));
+                        }).join(' ');
+                    }
                     var tooltip = document.createElement('div');
                     tooltip.className = 'marker-tooltip';
-                    tooltip.textContent = author + ' \u00b7 ' + formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + preview;
+                    tooltip.textContent = tooltipText;
                     dot.appendChild(tooltip);
                     dot.setAttribute('data-comment-id', group[0].id);
                     dot.addEventListener('click', function() {
@@ -881,7 +889,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                         }
                         return;
                     }
-                    var timestamp = Math.floor(player.currentTime);
+                    var timestamp = Math.min(Math.floor(player.currentTime), Math.max(0, Math.floor(player.duration) - 1));
                     btn.disabled = true;
                     var rect = btn.getBoundingClientRect();
                     var floater = document.createElement('span');
