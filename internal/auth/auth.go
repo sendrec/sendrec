@@ -263,6 +263,16 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 			_ = h.revokeRefreshToken(r.Context(), claims.TokenID)
 		}
 	}
+	// Clear cookie at both current and legacy paths
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/api/auth",
+		HttpOnly: true,
+		Secure:   h.secureCookies,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1,
+	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
@@ -655,6 +665,16 @@ func ContextWithUserID(ctx context.Context, userID string) context.Context {
 }
 
 func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
+	// Clear legacy cookie at old path to prevent duplicate cookies
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/api/auth",
+		HttpOnly: true,
+		Secure:   h.secureCookies,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1,
+	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    token,

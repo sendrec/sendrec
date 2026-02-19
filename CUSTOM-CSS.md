@@ -123,11 +123,14 @@ body
 
 ### Call to action
 
+The CTA card appears when the video finishes playing. Set it per video via Library > overflow menu > "Call to action".
+
 | Selector | Description | Default |
 |----------|-------------|---------|
-| `.cta-card` | CTA container (shown on video end) | `background: var(--brand-surface)`, `border: 1px solid var(--brand-accent)` |
-| `.cta-btn` | CTA action button | `background: var(--brand-accent)`, `border-radius: 6px` |
-| `.cta-dismiss` | CTA dismiss button | `color: #94a3b8` |
+| `.cta-card` | CTA container (hidden until video ends) | `background: var(--brand-surface)`, `border: 1px solid var(--brand-accent)`, `border-radius: 8px` |
+| `.cta-card.visible` | CTA container when shown | `display: block` |
+| `.cta-btn` | CTA action button | `background: var(--brand-accent)`, `color: #fff`, `border-radius: 6px`, `font-weight: 600` |
+| `.cta-dismiss` | CTA dismiss button (top-right "x") | `color: #94a3b8`, `font-size: 1.25rem` |
 
 ### Comments
 
@@ -291,6 +294,25 @@ h1 {
 }
 ```
 
+### Style the CTA card
+
+```css
+.cta-card {
+  background: linear-gradient(135deg, var(--brand-surface), #1a1a2e);
+  border: 2px solid var(--brand-accent);
+  border-radius: 16px;
+  padding: 2rem;
+}
+
+.cta-btn {
+  border-radius: 24px;
+  padding: 1rem 3rem;
+  font-size: 1.125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+```
+
 ### Hide sections
 
 ```css
@@ -305,6 +327,9 @@ h1 {
 
 /* Hide speed controls */
 .speed-controls { display: none; }
+
+/* Hide CTA card */
+.cta-card { display: none !important; }
 ```
 
 ## API
