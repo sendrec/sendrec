@@ -4460,6 +4460,10 @@ func TestAnalytics_Returns7DayStats(t *testing.T) {
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
 
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4596,6 +4600,10 @@ func TestAnalytics_DefaultsTo7d(t *testing.T) {
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
 
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4648,6 +4656,10 @@ func TestAnalytics_30DayRange(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT`).
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
@@ -4707,6 +4719,10 @@ func TestAnalytics_AllRange(t *testing.T) {
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
 
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4758,6 +4774,10 @@ func TestAnalytics_EmptyViews(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT`).
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
@@ -4832,6 +4852,10 @@ func TestAnalytics_AllRangeEmptyViews(t *testing.T) {
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
 
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4896,6 +4920,10 @@ func TestAnalytics_PeakDayAndAverage(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT`).
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
@@ -4967,6 +4995,10 @@ func TestAnalytics_IncludesCtaClicks(t *testing.T) {
 		WithArgs(videoID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(5)))
 
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
+
 	r := chi.NewRouter()
 	r.Get("/api/videos/{id}/analytics", handler.Analytics)
 
@@ -4986,6 +5018,79 @@ func TestAnalytics_IncludesCtaClicks(t *testing.T) {
 
 	if resp.Summary.TotalCtaClicks != 5 {
 		t.Errorf("expected 5 CTA clicks, got %d", resp.Summary.TotalCtaClicks)
+	}
+}
+
+func TestAnalytics_IncludesMilestones(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-001"
+
+	// Ownership check
+	mock.ExpectQuery(`SELECT id FROM videos WHERE id`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	// Daily views query
+	mock.ExpectQuery(`SELECT date_trunc`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
+
+	// CTA clicks count
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
+	// Milestones query
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"milestone", "count"}).
+				AddRow(25, int64(80)).
+				AddRow(50, int64(60)).
+				AddRow(75, int64(40)).
+				AddRow(100, int64(25)),
+		)
+
+	r := chi.NewRouter()
+	r.Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/videos/"+videoID+"/analytics?range=7d", nil)
+	req = req.WithContext(auth.ContextWithUserID(req.Context(), testUserID))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.Milestones.Reached25 != 80 {
+		t.Errorf("expected Reached25=80, got %d", resp.Milestones.Reached25)
+	}
+	if resp.Milestones.Reached50 != 60 {
+		t.Errorf("expected Reached50=60, got %d", resp.Milestones.Reached50)
+	}
+	if resp.Milestones.Reached75 != 40 {
+		t.Errorf("expected Reached75=40, got %d", resp.Milestones.Reached75)
+	}
+	if resp.Milestones.Reached100 != 25 {
+		t.Errorf("expected Reached100=25, got %d", resp.Milestones.Reached100)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
 	}
 }
 
@@ -5360,6 +5465,92 @@ func TestRecordCTAClick_VideoNotFound(t *testing.T) {
 	r.Post("/api/watch/{shareToken}/cta-click", handler.RecordCTAClick)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/watch/nonexistent/cta-click", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestRecordMilestone_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
+		WithArgs("abc123defghi").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-001"))
+
+	mock.ExpectExec(`INSERT INTO view_milestones`).
+		WithArgs("video-001", pgxmock.AnyArg(), 50).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/milestone", handler.RecordMilestone)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/abc123defghi/milestone", strings.NewReader(`{"milestone":50}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "TestBrowser/1.0")
+	req.RemoteAddr = "192.168.1.1:12345"
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestRecordMilestone_InvalidValue(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/milestone", handler.RecordMilestone)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/abc123defghi/milestone", strings.NewReader(`{"milestone":33}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRecordMilestone_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
+		WithArgs("nonexistent").
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/milestone", handler.RecordMilestone)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/nonexistent/milestone", strings.NewReader(`{"milestone":50}`))
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 

@@ -131,6 +131,27 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             }
         })();
         {{end}}
+        (function() {
+            var v = document.querySelector('video');
+            if (!v) return;
+            var milestones = [25, 50, 75, 100];
+            var reached = {};
+            v.addEventListener('timeupdate', function() {
+                if (!v.duration) return;
+                var pct = (v.currentTime / v.duration) * 100;
+                for (var i = 0; i < milestones.length; i++) {
+                    var m = milestones[i];
+                    if (pct >= m && !reached[m]) {
+                        reached[m] = true;
+                        fetch('/api/watch/{{.ShareToken}}/milestone', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ milestone: m })
+                        }).catch(function() {});
+                    }
+                }
+            });
+        })();
     </script>
 </body>
 </html>`))

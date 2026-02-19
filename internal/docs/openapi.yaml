@@ -666,9 +666,25 @@ components:
           type: integer
           format: int64
 
+    MilestoneCounts:
+      type: object
+      properties:
+        reached25:
+          type: integer
+          format: int64
+        reached50:
+          type: integer
+          format: int64
+        reached75:
+          type: integer
+          format: int64
+        reached100:
+          type: integer
+          format: int64
+
     AnalyticsResponse:
       type: object
-      required: [summary, daily]
+      required: [summary, daily, milestones]
       properties:
         summary:
           $ref: "#/components/schemas/AnalyticsSummary"
@@ -676,6 +692,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DailyViews"
+        milestones:
+          $ref: "#/components/schemas/MilestoneCounts"
 
     HealthResponse:
       type: object
@@ -1847,6 +1865,48 @@ paths:
       responses:
         "204":
           description: Click recorded
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/watch/{shareToken}/milestone:
+    post:
+      tags: [Watch]
+      summary: Record a viewer engagement milestone
+      description: |
+        Public endpoint. Records that a viewer reached a playback milestone (25%, 50%, 75%, or 100%).
+        Uses IP + User-Agent hash for viewer identification. Idempotent — duplicate milestones are ignored.
+      operationId: recordMilestone
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [milestone]
+              properties:
+                milestone:
+                  type: integer
+                  enum: [25, 50, 75, 100]
+                  description: Playback percentage milestone reached
+      responses:
+        "204":
+          description: Milestone recorded
+        "400":
+          description: Invalid milestone value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Video not found
           content:

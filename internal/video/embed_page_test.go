@@ -441,3 +441,51 @@ func TestEmbedPage_RendersCtaOverlay(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+func TestEmbedPage_MilestoneTrackingScript(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	shareToken := "milestone-test"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(embedPageColumns).AddRow(
+			"vid-1", "Test Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
+			(*string)(nil), (*string)(nil), "video/webm",
+			"owner-user-id", "owner@example.com", (*string)(nil),
+			(*string)(nil), (*string)(nil),
+		))
+
+	mock.ExpectExec(`INSERT INTO video_views`).
+		WithArgs("vid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "/milestone") {
+		t.Error("expected milestone tracking endpoint in response")
+	}
+	if !strings.Contains(body, "timeupdate") {
+		t.Error("expected timeupdate event listener in response")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}

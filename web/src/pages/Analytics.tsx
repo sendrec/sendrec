@@ -19,9 +19,17 @@ interface AnalyticsSummary {
   ctaClickRate: number;
 }
 
+interface Milestones {
+  reached25: number;
+  reached50: number;
+  reached75: number;
+  reached100: number;
+}
+
 interface AnalyticsData {
   summary: AnalyticsSummary;
   daily: DailyViews[];
+  milestones: Milestones;
 }
 
 type Range = "7d" | "30d" | "all";
@@ -275,6 +283,51 @@ export function Analytics() {
           )}
         </div>
       </div>
+
+      {data.summary.totalViews > 0 && (
+        <div
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: 16,
+            marginTop: 16,
+          }}
+        >
+          <h3 style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>
+            Completion Funnel
+          </h3>
+          {[
+            { label: "25%", value: data.milestones.reached25 },
+            { label: "50%", value: data.milestones.reached50 },
+            { label: "75%", value: data.milestones.reached75 },
+            { label: "100%", value: data.milestones.reached100 },
+          ].map((m) => (
+            <div key={m.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 13, width: 40, textAlign: "right" }}>
+                {m.label}
+              </span>
+              <div style={{ flex: 1, background: "var(--color-border)", borderRadius: 4, height: 24, overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${(m.value / data.summary.totalViews) * 100}%`,
+                    background: "var(--color-accent)",
+                    height: "100%",
+                    borderRadius: 4,
+                    minWidth: m.value > 0 ? 2 : 0,
+                  }}
+                />
+              </div>
+              <span style={{ color: "var(--color-text)", fontSize: 13, fontWeight: 600, width: 50 }}>
+                {m.value}
+              </span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 12, width: 45 }}>
+                {((m.value / data.summary.totalViews) * 100).toFixed(0)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {data.summary.totalViews === 0 ? (
         <p style={{ color: "var(--color-text-secondary)", fontSize: 14, textAlign: "center", marginTop: 32 }}>

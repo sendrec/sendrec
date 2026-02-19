@@ -1017,6 +1017,50 @@ func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type milestoneRequest struct {
+	Milestone int `json:"milestone"`
+}
+
+func (h *Handler) RecordMilestone(w http.ResponseWriter, r *http.Request) {
+	var req milestoneRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Milestone != 25 && req.Milestone != 50 && req.Milestone != 75 && req.Milestone != 100 {
+		httputil.WriteError(w, http.StatusBadRequest, "milestone must be 25, 50, 75, or 100")
+		return
+	}
+
+	shareToken := chi.URLParam(r, "shareToken")
+
+	var videoID string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
+		shareToken,
+	).Scan(&videoID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		ip := clientIP(r)
+		hash := viewerHash(ip, r.UserAgent())
+		if _, err := h.db.Exec(ctx,
+			`INSERT INTO view_milestones (video_id, viewer_hash, milestone) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+			videoID, hash, req.Milestone,
+		); err != nil {
+			log.Printf("failed to record milestone for %s: %v", videoID, err)
+		}
+	}()
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func viewerHash(ip, userAgent string) string {
 	h := sha256.Sum256([]byte(ip + "|" + userAgent))
 	return fmt.Sprintf("%x", h[:8])
@@ -1239,9 +1283,17 @@ type dailyViews struct {
 	UniqueViews int64  `json:"uniqueViews"`
 }
 
+type milestoneCounts struct {
+	Reached25  int64 `json:"reached25"`
+	Reached50  int64 `json:"reached50"`
+	Reached75  int64 `json:"reached75"`
+	Reached100 int64 `json:"reached100"`
+}
+
 type analyticsResponse struct {
-	Summary analyticsSummary `json:"summary"`
-	Daily   []dailyViews     `json:"daily"`
+	Summary    analyticsSummary `json:"summary"`
+	Daily      []dailyViews     `json:"daily"`
+	Milestones milestoneCounts  `json:"milestones"`
 }
 
 func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
@@ -1343,6 +1395,31 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		totalCtaClicks = 0
 	}
 
+	var milestones milestoneCounts
+	milestoneRows, err := h.db.Query(r.Context(),
+		`SELECT milestone, COUNT(DISTINCT viewer_hash) FROM view_milestones WHERE video_id = $1 AND created_at >= $2 GROUP BY milestone`,
+		videoID, since,
+	)
+	if err == nil {
+		defer milestoneRows.Close()
+		for milestoneRows.Next() {
+			var m int
+			var count int64
+			if err := milestoneRows.Scan(&m, &count); err == nil {
+				switch m {
+				case 25:
+					milestones.Reached25 = count
+				case 50:
+					milestones.Reached50 = count
+				case 75:
+					milestones.Reached75 = count
+				case 100:
+					milestones.Reached100 = count
+				}
+			}
+		}
+	}
+
 	summary := computeSummary(daily, now.Format("2006-01-02"))
 	summary.TotalCtaClicks = totalCtaClicks
 	if summary.TotalViews > 0 {
@@ -1350,8 +1427,9 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, analyticsResponse{
-		Summary: summary,
-		Daily:   daily,
+		Summary:    summary,
+		Daily:      daily,
+		Milestones: milestones,
 	})
 }
 

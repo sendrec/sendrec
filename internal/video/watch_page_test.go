@@ -1755,3 +1755,51 @@ func TestWatchPage_NoCtaWhenNotSet(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+func TestWatchPage_MilestoneTrackingScript(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs("test-token").
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"video-001", "Test Video", "recordings/user-001/test.webm", "Test User",
+			time.Now(), (*time.Time)(nil),
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"user-001", "test@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+		))
+
+	mock.ExpectExec(`INSERT INTO video_views`).
+		WithArgs("video-001", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	rec := serveWatchPage(handler, watchPageRequest("test-token"))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "/milestone") {
+		t.Error("expected milestone tracking endpoint in response")
+	}
+	if !strings.Contains(body, "timeupdate") {
+		t.Error("expected timeupdate event listener in response")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
