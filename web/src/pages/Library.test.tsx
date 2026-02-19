@@ -556,7 +556,7 @@ describe("Library", () => {
     vi.useRealTimers();
   });
 
-  it("shows comment mode button with label", async () => {
+  it("shows comment mode dropdown with current value", async () => {
     mockFetch([makeVideo({ commentMode: "anonymous", commentCount: 5 })]);
     renderLibrary();
 
@@ -564,10 +564,12 @@ describe("Library", () => {
       expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
     await openOverflowMenu();
-    expect(screen.getByRole("button", { name: /Comments: anonymous \(5\)/ })).toBeInTheDocument();
+    const select = screen.getByLabelText("Comment mode") as HTMLSelectElement;
+    expect(select.value).toBe("anonymous");
+    expect(screen.getByText(/\(5\)/)).toBeInTheDocument();
   });
 
-  it("shows 'Comments off' when comments are disabled", async () => {
+  it("shows comment mode dropdown with disabled value", async () => {
     mockFetch([makeVideo({ commentMode: "disabled", commentCount: 0 })]);
     renderLibrary();
 
@@ -575,10 +577,11 @@ describe("Library", () => {
       expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
     });
     await openOverflowMenu();
-    expect(screen.getByRole("button", { name: "Comments off" })).toBeInTheDocument();
+    const select = screen.getByLabelText("Comment mode") as HTMLSelectElement;
+    expect(select.value).toBe("disabled");
   });
 
-  it("cycles comment mode on click", async () => {
+  it("changes comment mode on select", async () => {
     const user = userEvent.setup();
     mockFetch([makeVideo({ commentMode: "disabled" })]);
     mockApiFetch.mockResolvedValueOnce(undefined); // PUT comment-mode response
@@ -589,18 +592,18 @@ describe("Library", () => {
     });
 
     await openOverflowMenu(user);
-    await user.click(screen.getByRole("button", { name: "Comments off" }));
+    await user.selectOptions(screen.getByLabelText("Comment mode"), "name_required");
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/comment-mode", {
         method: "PUT",
-        body: JSON.stringify({ commentMode: "anonymous" }),
+        body: JSON.stringify({ commentMode: "name_required" }),
       });
     });
 
-    // Menu closed after action, reopen to check updated label
-    await openOverflowMenu(user);
-    expect(screen.getByRole("button", { name: /Comments: anonymous/ })).toBeInTheDocument();
+    // Menu stays open, select shows updated value
+    const select = screen.getByLabelText("Comment mode") as HTMLSelectElement;
+    expect(select.value).toBe("name_required");
   });
 
   it("links thumbnail to watch page", async () => {
@@ -1142,6 +1145,90 @@ describe("Library", () => {
         method: "PUT",
         body: JSON.stringify({ neverExpires: false }),
       });
+    });
+  });
+
+  describe("toggle actions keep menu open", () => {
+    it("keeps menu open after toggling download", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo({ downloadEnabled: true })]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      await user.click(screen.getByText("Downloads on"));
+
+      // Menu stays open, label updates
+      expect(screen.getByText("Downloads off")).toBeInTheDocument();
+      expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
+    });
+
+    it("keeps menu open after toggling expiry", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo()]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      mockApiFetch.mockResolvedValueOnce([makeVideo({ shareExpiresAt: null })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      await user.click(screen.getByText("Remove expiry"));
+
+      await waitFor(() => {
+        // Menu stays open, label updates
+        expect(screen.getByText("Set expiry")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
+    });
+
+    it("keeps menu open after adding password", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(window, "prompt").mockReturnValue("secret123");
+      mockFetch([makeVideo({ hasPassword: false })]);
+      mockApiFetch.mockResolvedValueOnce(undefined); // PUT password
+      mockApiFetch.mockResolvedValueOnce([makeVideo({ hasPassword: true })]); // refetch videos
+      mockApiFetch.mockResolvedValueOnce(unlimitedLimits); // refetch limits
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      await user.click(screen.getByRole("button", { name: "Add password" }));
+
+      await waitFor(() => {
+        // Menu stays open, label updates
+        expect(screen.getByText("Remove password")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
+    });
+
+    it("keeps menu open after changing notification", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo({ viewNotification: null })]);
+      mockApiFetch.mockResolvedValueOnce(undefined); // PUT response
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      await user.selectOptions(screen.getByLabelText("View notifications"), "every");
+
+      await waitFor(() => {
+        const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
+        expect(select.value).toBe("every");
+      });
+      expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
     });
   });
 });
