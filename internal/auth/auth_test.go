@@ -73,15 +73,6 @@ func decodeMessageResponse(t *testing.T, rec *httptest.ResponseRecorder) message
 	return resp
 }
 
-func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
-	for _, c := range cookies {
-		if c.Name == name {
-			return c
-		}
-	}
-	return nil
-}
-
 func findCookieWithPath(cookies []*http.Cookie, name, path string) *http.Cookie {
 	for _, c := range cookies {
 		if c.Name == name && c.Path == path {
