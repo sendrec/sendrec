@@ -58,6 +58,9 @@ body
       .speed-controls         ← Speed button group
         .speed-btn            ← 0.5x, 1x, 1.5x, 2x
         .speed-btn.active     ← Currently selected speed
+    .cta-card                 ← CTA card (shown on video end)
+      .cta-dismiss            ← CTA dismiss button
+      .cta-btn                ← CTA action button
     .comments-section         ← Comments area
       h2.comments-header      ← "Comments" heading
       .comment                ← Individual comment card
@@ -117,6 +120,14 @@ body
 | `.speed-controls` | Speed button group | `display: flex`, `gap: 0.25rem` |
 | `.speed-btn` | Speed button (inactive) | `color: #94a3b8`, `border: 1px solid #334155` |
 | `.speed-btn.active` | Currently selected speed | `color: var(--brand-accent)` |
+
+### Call to action
+
+| Selector | Description | Default |
+|----------|-------------|---------|
+| `.cta-card` | CTA container (shown on video end) | `background: var(--brand-surface)`, `border: 1px solid var(--brand-accent)` |
+| `.cta-btn` | CTA action button | `background: var(--brand-accent)`, `border-radius: 6px` |
+| `.cta-dismiss` | CTA dismiss button | `color: #94a3b8` |
 
 ### Comments
 
