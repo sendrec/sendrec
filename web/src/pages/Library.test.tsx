@@ -1147,4 +1147,88 @@ describe("Library", () => {
       });
     });
   });
+
+  describe("toggle actions keep menu open", () => {
+    it("keeps menu open after toggling download", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo({ downloadEnabled: true })]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      await user.click(screen.getByText("Downloads on"));
+
+      // Menu stays open, label updates
+      expect(screen.getByText("Downloads off")).toBeInTheDocument();
+      expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
+    });
+
+    it("keeps menu open after toggling expiry", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo()]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      mockApiFetch.mockResolvedValueOnce([makeVideo({ shareExpiresAt: null })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      await user.click(screen.getByText("Remove expiry"));
+
+      await waitFor(() => {
+        // Menu stays open, label updates
+        expect(screen.getByText("Set expiry")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
+    });
+
+    it("keeps menu open after adding password", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(window, "prompt").mockReturnValue("secret123");
+      mockFetch([makeVideo({ hasPassword: false })]);
+      mockApiFetch.mockResolvedValueOnce(undefined); // PUT password
+      mockApiFetch.mockResolvedValueOnce([makeVideo({ hasPassword: true })]); // refetch videos
+      mockApiFetch.mockResolvedValueOnce(unlimitedLimits); // refetch limits
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      await user.click(screen.getByRole("button", { name: "Add password" }));
+
+      await waitFor(() => {
+        // Menu stays open, label updates
+        expect(screen.getByText("Remove password")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
+    });
+
+    it("keeps menu open after changing notification", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo({ viewNotification: null })]);
+      mockApiFetch.mockResolvedValueOnce(undefined); // PUT response
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      await user.selectOptions(screen.getByLabelText("View notifications"), "every");
+
+      await waitFor(() => {
+        const select = screen.getByLabelText("View notifications") as HTMLSelectElement;
+        expect(select.value).toBe("every");
+      });
+      expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
+    });
+  });
 });

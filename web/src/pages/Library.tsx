@@ -220,7 +220,6 @@ export function Library() {
       body: JSON.stringify({ downloadEnabled: newValue }),
     });
     setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, downloadEnabled: newValue } : v)));
-    showToast(newValue ? "Downloads enabled" : "Downloads disabled");
   }
 
   async function extendVideo(id: string) {
@@ -243,7 +242,6 @@ export function Library() {
     });
     const result = await apiFetch<Video[]>("/api/videos");
     setVideos(result ?? []);
-    showToast(neverExpires ? "Link set to never expire" : "Link set to expire");
   }
 
   async function addPassword(id: string) {
@@ -259,7 +257,6 @@ export function Library() {
     ]);
     setVideos(videosResult ?? []);
     setLimits(limitsResult ?? null);
-    showToast("Password added");
   }
 
   async function removePassword(id: string) {
@@ -274,7 +271,6 @@ export function Library() {
     ]);
     setVideos(videosResult ?? []);
     setLimits(limitsResult ?? null);
-    showToast("Password removed");
   }
 
   async function saveTitle(id: string) {
@@ -317,7 +313,6 @@ export function Library() {
         body: JSON.stringify({ viewNotification }),
       });
       setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, viewNotification } : v)));
-      showToast("Notifications updated");
     } catch {
       // no-op: select stays at previous value since state is only updated on success
     }
@@ -660,7 +655,7 @@ export function Library() {
                           Sharing
                         </div>
                         <button
-                          onClick={() => { toggleDownload(video); setOpenMenuId(null); }}
+                          onClick={() => toggleDownload(video)}
                           className="action-link"
                           style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: video.downloadEnabled ? "var(--color-accent)" : undefined }}
                         >
@@ -679,7 +674,7 @@ export function Library() {
                           Embed
                         </button>
                         <button
-                          onClick={() => { toggleLinkExpiry(video); setOpenMenuId(null); }}
+                          onClick={() => toggleLinkExpiry(video)}
                           className="action-link"
                           style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
                         >
@@ -696,7 +691,7 @@ export function Library() {
                           </button>
                         )}
                         <button
-                          onClick={() => { video.hasPassword ? removePassword(video.id) : addPassword(video.id); setOpenMenuId(null); }}
+                          onClick={() => { video.hasPassword ? removePassword(video.id) : addPassword(video.id); }}
                           className="action-link"
                           style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
                         >
@@ -786,7 +781,7 @@ export function Library() {
                             <select
                               aria-label="View notifications"
                               value={video.viewNotification ?? ""}
-                              onChange={(e) => { changeNotification(video, e.target.value); setOpenMenuId(null); }}
+                              onChange={(e) => changeNotification(video, e.target.value)}
                               style={{
                                 background: "var(--color-surface)",
                                 border: "1px solid var(--color-border)",
