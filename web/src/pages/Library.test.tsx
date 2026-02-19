@@ -937,12 +937,12 @@ describe("Library", () => {
     });
 
     await openOverflowMenu(user);
-    await user.selectOptions(screen.getByLabelText("View notifications"), "first");
+    await user.selectOptions(screen.getByLabelText("View notifications"), "every");
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/notifications", {
         method: "PUT",
-        body: JSON.stringify({ viewNotification: "first" }),
+        body: JSON.stringify({ viewNotification: "every" }),
       });
     });
   });

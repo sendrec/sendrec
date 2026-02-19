@@ -22,13 +22,15 @@ var validCommentModes = map[string]bool{
 	"name_email_required": true,
 }
 
-var quickReactionBodies = map[string]bool{
-	"👍":  true,
-	"👎":  true,
-	"❤️": true,
-	"😂":  true,
-	"😮":  true,
-	"🎉":  true,
+var quickReactionEmojis = []string{"👍", "👎", "❤️", "😂", "😮", "🎉"}
+var quickReactionBodies = buildQuickReactionSet()
+
+func buildQuickReactionSet() map[string]bool {
+	set := make(map[string]bool, len(quickReactionEmojis))
+	for _, emoji := range quickReactionEmojis {
+		set[emoji] = true
+	}
+	return set
 }
 
 type setCommentModeRequest struct {
@@ -222,7 +224,11 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !req.IsPrivate && callerUserID != ownerID && h.commentNotifier != nil {
+	if !req.IsPrivate &&
+		!quickReaction &&
+		callerUserID != ownerID &&
+		h.commentNotifier != nil &&
+		h.shouldSendImmediateCommentNotification(r.Context(), ownerID) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()

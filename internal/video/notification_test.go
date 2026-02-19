@@ -27,7 +27,7 @@ func TestGetNotificationPreferences_ExistingRow(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT view_notification FROM notification_preferences WHERE user_id = \$1`).
 		WithArgs(testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"view_notification"}).AddRow("every"))
+		WillReturnRows(pgxmock.NewRows([]string{"view_notification"}).AddRow("views_only"))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/settings/notifications", handler.GetNotificationPreferences)
@@ -43,8 +43,8 @@ func TestGetNotificationPreferences_ExistingRow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if resp["viewNotification"] != "every" {
-		t.Errorf("expected viewNotification=every, got %s", resp["viewNotification"])
+	if resp["notificationMode"] != "views_only" {
+		t.Errorf("expected notificationMode=views_only, got %s", resp["notificationMode"])
 	}
 }
 
@@ -75,8 +75,8 @@ func TestGetNotificationPreferences_DefaultWhenNoRow(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if resp["viewNotification"] != "off" {
-		t.Errorf("expected viewNotification=off, got %s", resp["viewNotification"])
+	if resp["notificationMode"] != "off" {
+		t.Errorf("expected notificationMode=off, got %s", resp["notificationMode"])
 	}
 }
 
@@ -95,7 +95,7 @@ func TestPutNotificationPreferences_ValidMode(t *testing.T) {
 		WithArgs(testUserID, "digest").
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
-	body, _ := json.Marshal(setNotificationPreferencesRequest{ViewNotification: "digest"})
+	body, _ := json.Marshal(setNotificationPreferencesRequest{NotificationMode: "digest"})
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Put("/api/settings/notifications", handler.PutNotificationPreferences)
@@ -121,7 +121,7 @@ func TestPutNotificationPreferences_InvalidMode(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
-	body, _ := json.Marshal(setNotificationPreferencesRequest{ViewNotification: "invalid"})
+	body, _ := json.Marshal(setNotificationPreferencesRequest{NotificationMode: "invalid"})
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Put("/api/settings/notifications", handler.PutNotificationPreferences)
@@ -146,12 +146,12 @@ func TestSetVideoNotification_SetMode(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	first := "first"
+	every := "every"
 	mock.ExpectExec(`UPDATE videos SET view_notification = \$1`).
-		WithArgs(&first, videoID, testUserID).
+		WithArgs(&every, videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
-	body := []byte(`{"viewNotification":"first"}`)
+	body := []byte(`{"viewNotification":"every"}`)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Put("/api/videos/{id}/notifications", handler.SetVideoNotification)
@@ -208,7 +208,7 @@ func TestSetVideoNotification_InvalidMode(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
-	body := []byte(`{"viewNotification":"invalid"}`)
+	body := []byte(`{"viewNotification":"first"}`)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Put("/api/videos/{id}/notifications", handler.SetVideoNotification)
@@ -364,6 +364,58 @@ func TestResolveAndNotify_SendsWhenViewerIsAnonymous(t *testing.T) {
 
 	if !notifier.called {
 		t.Error("expected notification to be sent when viewer is anonymous")
+	}
+}
+
+func TestResolveAndNotify_UsesAccountModeAndSkipsCommentsOnly(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	notifier := &mockViewNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler.SetViewNotifier(notifier)
+
+	mock.ExpectQuery(`SELECT view_notification FROM notification_preferences WHERE user_id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"view_notification"}).AddRow("comments_only"))
+
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", nil)
+
+	if notifier.called {
+		t.Error("expected no view notification when account mode is comments_only")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestResolveAndNotify_UsesAccountModeAndSendsViewsOnly(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	notifier := &mockViewNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler.SetViewNotifier(notifier)
+
+	mock.ExpectQuery(`SELECT view_notification FROM notification_preferences WHERE user_id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"view_notification"}).AddRow("views_only"))
+
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", nil)
+
+	if !notifier.called {
+		t.Error("expected view notification when account mode is views_only")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
 	}
 }
 
