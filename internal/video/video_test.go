@@ -5367,3 +5367,89 @@ func TestRecordCTAClick_VideoNotFound(t *testing.T) {
 		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
+
+func TestRecordMilestone_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
+		WithArgs("abc123defghi").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-001"))
+
+	mock.ExpectExec(`INSERT INTO view_milestones`).
+		WithArgs("video-001", pgxmock.AnyArg(), 50).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/milestone", handler.RecordMilestone)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/abc123defghi/milestone", strings.NewReader(`{"milestone":50}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "TestBrowser/1.0")
+	req.RemoteAddr = "192.168.1.1:12345"
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestRecordMilestone_InvalidValue(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/milestone", handler.RecordMilestone)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/abc123defghi/milestone", strings.NewReader(`{"milestone":33}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRecordMilestone_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
+		WithArgs("nonexistent").
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/milestone", handler.RecordMilestone)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/nonexistent/milestone", strings.NewReader(`{"milestone":50}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}

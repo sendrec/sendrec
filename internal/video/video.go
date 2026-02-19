@@ -1017,6 +1017,50 @@ func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type milestoneRequest struct {
+	Milestone int `json:"milestone"`
+}
+
+func (h *Handler) RecordMilestone(w http.ResponseWriter, r *http.Request) {
+	var req milestoneRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Milestone != 25 && req.Milestone != 50 && req.Milestone != 75 && req.Milestone != 100 {
+		httputil.WriteError(w, http.StatusBadRequest, "milestone must be 25, 50, 75, or 100")
+		return
+	}
+
+	shareToken := chi.URLParam(r, "shareToken")
+
+	var videoID string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
+		shareToken,
+	).Scan(&videoID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		ip := clientIP(r)
+		hash := viewerHash(ip, r.UserAgent())
+		if _, err := h.db.Exec(ctx,
+			`INSERT INTO view_milestones (video_id, viewer_hash, milestone) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+			videoID, hash, req.Milestone,
+		); err != nil {
+			log.Printf("failed to record milestone for %s: %v", videoID, err)
+		}
+	}()
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func viewerHash(ip, userAgent string) string {
 	h := sha256.Sum256([]byte(ip + "|" + userAgent))
 	return fmt.Sprintf("%x", h[:8])
