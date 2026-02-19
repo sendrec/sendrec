@@ -38,7 +38,7 @@ export function Settings() {
   const [passwordError, setPasswordError] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
-  const [viewNotification, setViewNotification] = useState("off");
+  const [notificationMode, setNotificationMode] = useState("off");
   const [notificationMessage, setNotificationMessage] = useState("");
   const [apiKeys, setApiKeys] = useState<APIKeyItem[]>([]);
   const [newKeyName, setNewKeyName] = useState("");
@@ -62,7 +62,7 @@ export function Settings() {
       try {
         const [result, notifPrefs, limits, keys] = await Promise.all([
           apiFetch<UserProfile>("/api/user"),
-          apiFetch<{ viewNotification: string }>("/api/settings/notifications"),
+          apiFetch<{ notificationMode: string }>("/api/settings/notifications"),
           apiFetch<{ brandingEnabled: boolean }>("/api/videos/limits"),
           apiFetch<APIKeyItem[]>("/api/settings/api-keys"),
         ]);
@@ -71,7 +71,7 @@ export function Settings() {
           setName(result.name);
         }
         if (notifPrefs) {
-          setViewNotification(notifPrefs.viewNotification);
+          setNotificationMode(notifPrefs.notificationMode);
         }
         if (keys) {
           setApiKeys(keys);
@@ -144,16 +144,16 @@ export function Settings() {
 
   async function handleNotificationChange(value: string) {
     setNotificationMessage("");
-    const previous = viewNotification;
-    setViewNotification(value);
+    const previous = notificationMode;
+    setNotificationMode(value);
     try {
       await apiFetch("/api/settings/notifications", {
         method: "PUT",
-        body: JSON.stringify({ viewNotification: value }),
+        body: JSON.stringify({ notificationMode: value }),
       });
       setNotificationMessage("Preference saved");
     } catch {
-      setViewNotification(previous);
+      setNotificationMode(previous);
       setNotificationMessage("Failed to save");
     }
   }
@@ -377,20 +377,21 @@ export function Settings() {
       >
         <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Notifications</h2>
         <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
-          When someone watches one of your videos, get notified by email.
+          Choose when to get email notifications for views and comments.
         </p>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>View notifications</span>
+          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Notifications</span>
           <select
-            value={viewNotification}
+            value={notificationMode}
             onChange={(e) => handleNotificationChange(e.target.value)}
             style={inputStyle}
           >
             <option value="off">Off</option>
-            <option value="every">Every view</option>
-            <option value="first">First view only</option>
-            <option value="digest">Daily digest</option>
+            <option value="views_only">Views only</option>
+            <option value="comments_only">Comments only</option>
+            <option value="views_and_comments">Views + comments</option>
+            <option value="digest">Daily digest (views + comments)</option>
           </select>
         </label>
 

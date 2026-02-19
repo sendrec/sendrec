@@ -787,7 +787,6 @@ export function Library() {
                               <option value="">Account default</option>
                               <option value="off">Off</option>
                               <option value="every">Every view</option>
-                              <option value="first">First view only</option>
                               <option value="digest">Daily digest</option>
                             </select>
                           </label>

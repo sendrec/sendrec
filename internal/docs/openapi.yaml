@@ -251,24 +251,24 @@ components:
         viewNotification:
           type: string
           nullable: true
-          enum: [null, "off", "every", "first", "digest"]
+          enum: [null, "off", "every", "digest"]
           description: Per-video notification override. Null means use account default.
 
     NotificationPreferencesResponse:
       type: object
-      required: [viewNotification]
+      required: [notificationMode]
       properties:
-        viewNotification:
+        notificationMode:
           type: string
-          enum: [off, every, first, digest]
+          enum: [off, views_only, comments_only, views_and_comments, digest]
 
     UpdateNotificationPreferencesRequest:
       type: object
-      required: [viewNotification]
+      required: [notificationMode]
       properties:
-        viewNotification:
+        notificationMode:
           type: string
-          enum: [off, every, first, digest]
+          enum: [off, views_only, comments_only, views_and_comments, digest]
 
     SetVideoNotificationRequest:
       type: object
@@ -277,7 +277,7 @@ components:
         viewNotification:
           type: string
           nullable: true
-          enum: [null, "off", "every", "first", "digest"]
+          enum: [null, "off", "every", "digest"]
           description: Set to null to clear the per-video override and use account default.
 
     BrandingSettingsResponse:
@@ -1012,7 +1012,7 @@ paths:
     put:
       tags: [Settings]
       summary: Update notification preferences
-      description: Sets the account-wide notification preference for view notifications.
+      description: Sets the account-wide notification preference for view and comment notifications.
       operationId: updateNotificationPreferences
       security:
         - bearerAuth: []

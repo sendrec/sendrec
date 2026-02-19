@@ -19,11 +19,11 @@ func TestProcessDigest_SendsSingleEmailPerUser(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.title, v\.share_token, v\.user_id, u\.email, u\.name`).
 		WillReturnRows(pgxmock.NewRows([]string{
-			"id", "title", "share_token", "user_id", "email", "name", "view_count",
+			"id", "title", "share_token", "user_id", "email", "name", "view_count", "comment_count",
 		}).AddRow(
-			"vid-1", "Video One", "tok-1", "user-1", "alice@example.com", "Alice", int64(10),
+			"vid-1", "Video One", "tok-1", "user-1", "alice@example.com", "Alice", int64(10), int64(2),
 		).AddRow(
-			"vid-2", "Video Two", "tok-2", "user-1", "alice@example.com", "Alice", int64(3),
+			"vid-2", "Video Two", "tok-2", "user-1", "alice@example.com", "Alice", int64(3), int64(0),
 		))
 
 	processDigest(context.Background(), mock, notifier, "https://app.sendrec.eu")
@@ -40,6 +40,9 @@ func TestProcessDigest_SendsSingleEmailPerUser(t *testing.T) {
 	}
 	if notifier.digestVideos[0].ViewCount != 10 {
 		t.Errorf("expected first video 10 views, got %d", notifier.digestVideos[0].ViewCount)
+	}
+	if notifier.digestVideos[0].CommentCount != 2 {
+		t.Errorf("expected first video 2 comments, got %d", notifier.digestVideos[0].CommentCount)
 	}
 	if notifier.digestVideos[1].Title != "Video Two" {
 		t.Errorf("expected second video title 'Video Two', got %q", notifier.digestVideos[1].Title)
@@ -72,13 +75,13 @@ func TestProcessDigest_MultipleUsers(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.title, v\.share_token, v\.user_id, u\.email, u\.name`).
 		WillReturnRows(pgxmock.NewRows([]string{
-			"id", "title", "share_token", "user_id", "email", "name", "view_count",
+			"id", "title", "share_token", "user_id", "email", "name", "view_count", "comment_count",
 		}).AddRow(
-			"vid-1", "Video One", "tok-1", "user-1", "alice@example.com", "Alice", int64(5),
+			"vid-1", "Video One", "tok-1", "user-1", "alice@example.com", "Alice", int64(5), int64(1),
 		).AddRow(
-			"vid-2", "Video Two", "tok-2", "user-2", "bob@example.com", "Bob", int64(8),
+			"vid-2", "Video Two", "tok-2", "user-2", "bob@example.com", "Bob", int64(8), int64(0),
 		).AddRow(
-			"vid-3", "Video Three", "tok-3", "user-1", "alice@example.com", "Alice", int64(2),
+			"vid-3", "Video Three", "tok-3", "user-1", "alice@example.com", "Alice", int64(2), int64(3),
 		))
 
 	processDigest(context.Background(), mock, notifier, "https://app.sendrec.eu")
@@ -88,7 +91,7 @@ func TestProcessDigest_MultipleUsers(t *testing.T) {
 	}
 }
 
-func TestProcessDigest_NoViewsNoEmail(t *testing.T) {
+func TestProcessDigest_NoActivityNoEmail(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -99,13 +102,45 @@ func TestProcessDigest_NoViewsNoEmail(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.title, v\.share_token, v\.user_id, u\.email, u\.name`).
 		WillReturnRows(pgxmock.NewRows([]string{
-			"id", "title", "share_token", "user_id", "email", "name", "view_count",
+			"id", "title", "share_token", "user_id", "email", "name", "view_count", "comment_count",
 		}))
 
 	processDigest(context.Background(), mock, notifier, "https://app.sendrec.eu")
 
 	if notifier.digestCalled {
-		t.Error("expected no digest notification when no views")
+		t.Error("expected no digest notification when there is no activity")
+	}
+}
+
+func TestProcessDigest_CommentsOnlyStillSendsDigest(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	notifier := &mockViewNotifier{}
+
+	mock.ExpectQuery(`SELECT v\.id, v\.title, v\.share_token, v\.user_id, u\.email, u\.name`).
+		WillReturnRows(pgxmock.NewRows([]string{
+			"id", "title", "share_token", "user_id", "email", "name", "view_count", "comment_count",
+		}).AddRow(
+			"vid-1", "Video One", "tok-1", "user-1", "alice@example.com", "Alice", int64(0), int64(4),
+		))
+
+	processDigest(context.Background(), mock, notifier, "https://app.sendrec.eu")
+
+	if !notifier.digestCalled {
+		t.Fatal("expected digest notification for comments-only activity")
+	}
+	if len(notifier.digestVideos) != 1 {
+		t.Fatalf("expected 1 digest row, got %d", len(notifier.digestVideos))
+	}
+	if notifier.digestVideos[0].ViewCount != 0 {
+		t.Fatalf("expected 0 views in digest row, got %d", notifier.digestVideos[0].ViewCount)
+	}
+	if notifier.digestVideos[0].CommentCount != 4 {
+		t.Fatalf("expected 4 comments in digest row, got %d", notifier.digestVideos[0].CommentCount)
 	}
 }
 
