@@ -49,14 +49,6 @@ function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString();
 }
 
-const commentModeLabels: Record<string, string> = {
-  disabled: "Comments off",
-  anonymous: "Comments: anonymous",
-  name_required: "Comments: name required",
-  name_email_required: "Comments: name + email",
-};
-
-const commentModeOrder = ["disabled", "anonymous", "name_required", "name_email_required"];
 
 function expiryLabel(shareExpiresAt: string | null): { text: string; expired: boolean } {
   if (shareExpiresAt === null) {
