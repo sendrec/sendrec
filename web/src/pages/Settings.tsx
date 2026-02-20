@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "../api/client";
+import { useTheme } from "../hooks/useTheme";
 
 interface UserProfile {
   name: string;
@@ -27,6 +28,7 @@ interface BrandingSettings {
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
 
 export function Settings() {
+  const { theme, setTheme } = useTheme();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [name, setName] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -419,6 +421,63 @@ export function Settings() {
           gap: 16,
         }}
       >
+        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Appearance</h2>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+          Choose how SendRec looks to you.
+        </p>
+
+        <fieldset style={{ border: "none", padding: 0, margin: 0, display: "flex", gap: 8 }}>
+          <legend style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)" }}>
+            Theme preference
+          </legend>
+          {(["dark", "light", "system"] as const).map((option) => {
+            const labels: Record<string, string> = { dark: "Dark", light: "Light", system: "System" };
+            const selected = theme === option;
+            return (
+              <label
+                key={option}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 16px",
+                  borderRadius: 8,
+                  border: `1px solid ${selected ? "var(--color-accent)" : "var(--color-border)"}`,
+                  background: selected ? "var(--color-bg)" : "transparent",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  color: selected ? "var(--color-text)" : "var(--color-text-secondary)",
+                  fontWeight: selected ? 600 : 400,
+                }}
+              >
+                <input
+                  type="radio"
+                  name="theme"
+                  value={option}
+                  checked={selected}
+                  onChange={() => setTheme(option)}
+                  style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+                  aria-label={labels[option]}
+                />
+                {labels[option]}
+              </label>
+            );
+          })}
+        </fieldset>
+      </div>
+
+      <div
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          padding: 24,
+          marginBottom: 24,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
         <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Email Notifications</h2>
         <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
           Choose when to get email notifications for views and comments.
@@ -440,7 +499,7 @@ export function Settings() {
         </label>
 
         {notificationMessage && (
-          <p style={{ color: notificationMessage === "Failed to save" ? "var(--color-error, #e74c3c)" : "var(--color-accent)", fontSize: 14, margin: 0 }}>{notificationMessage}</p>
+          <p style={{ color: notificationMessage === "Failed to save" ? "var(--color-error)" : "var(--color-accent)", fontSize: 14, margin: 0 }}>{notificationMessage}</p>
         )}
       </div>
 
@@ -659,8 +718,8 @@ export function Settings() {
                   onClick={() => handleDeleteAPIKey(key.id)}
                   style={{
                     background: "transparent",
-                    color: "var(--color-error, #e74c3c)",
-                    border: "1px solid var(--color-error, #e74c3c)",
+                    color: "var(--color-error)",
+                    border: "1px solid var(--color-error)",
                     borderRadius: 4,
                     padding: "4px 10px",
                     fontSize: 13,
@@ -719,8 +778,8 @@ export function Settings() {
                     onClick={handleLogoRemove}
                     style={{
                       background: "transparent",
-                      color: "var(--color-error, #e74c3c)",
-                      border: "1px solid var(--color-error, #e74c3c)",
+                      color: "var(--color-error)",
+                      border: "1px solid var(--color-error)",
                       borderRadius: 4,
                       padding: "4px 10px",
                       fontSize: 13,
@@ -882,7 +941,7 @@ export function Settings() {
               <pre style={{
                 marginTop: 6,
                 padding: "8px 10px",
-                background: "var(--color-bg-secondary)",
+                background: "var(--color-bg-tertiary)",
                 borderRadius: 6,
                 fontSize: 11,
                 lineHeight: 1.6,

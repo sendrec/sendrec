@@ -694,7 +694,7 @@ export function Library() {
                           padding: "8px 0",
                           minWidth: 220,
                           zIndex: 50,
-                          boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                          boxShadow: "0 4px 16px var(--color-shadow)",
                         }}
                       >
                         <div style={{ padding: "4px 12px", fontSize: 11, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -924,7 +924,7 @@ export function Library() {
                         onClick={() => saveCTA(video)}
                         disabled={!ctaText.trim() || !ctaUrl.trim()}
                         style={{
-                          padding: "6px 16px", background: "var(--color-accent)", color: "#fff",
+                          padding: "6px 16px", background: "var(--color-accent)", color: "var(--color-on-accent)",
                           border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
                           cursor: "pointer", opacity: (!ctaText.trim() || !ctaUrl.trim()) ? 0.5 : 1,
                         }}
@@ -963,7 +963,7 @@ export function Library() {
       {brandingVideoId && (
         <div
           style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex",
+            position: "fixed", inset: 0, background: "var(--color-overlay)", display: "flex",
             alignItems: "center", justifyContent: "center", zIndex: 100,
           }}
           onClick={() => setBrandingVideoId(null)}
@@ -1102,7 +1102,7 @@ export function Library() {
             fontSize: 14,
             fontWeight: 500,
             zIndex: 200,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+            boxShadow: "0 4px 16px var(--color-shadow)",
             pointerEvents: "none",
           }}
         >

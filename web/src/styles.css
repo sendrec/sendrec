@@ -7,6 +7,31 @@
   --color-accent: #00b67a;
   --color-accent-hover: #00a06b;
   --color-error: #ef4444;
+  --color-overlay: rgba(0, 0, 0, 0.6);
+  --color-shadow: rgba(0, 0, 0, 0.3);
+  --color-on-accent: #ffffff;
+  --color-chart-label: #94a3b8;
+  --color-chart-grid: rgba(148, 163, 184, 0.1);
+  --color-drag-highlight: rgba(0, 182, 122, 0.05);
+  --color-bg-tertiary: #1a2740;
+}
+
+[data-theme="light"] {
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-accent: #00915f;
+  --color-accent-hover: #007a50;
+  --color-error: #dc2626;
+  --color-overlay: rgba(0, 0, 0, 0.4);
+  --color-shadow: rgba(0, 0, 0, 0.1);
+  --color-on-accent: #ffffff;
+  --color-chart-label: #64748b;
+  --color-chart-grid: rgba(100, 116, 139, 0.1);
+  --color-drag-highlight: rgba(0, 145, 95, 0.05);
+  --color-bg-tertiary: #f1f5f9;
 }
 
 *,
