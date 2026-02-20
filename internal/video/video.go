@@ -161,6 +161,9 @@ type watchResponse struct {
 	Branding         brandingConfig      `json:"branding"`
 	CtaText          *string             `json:"ctaText,omitempty"`
 	CtaUrl           *string             `json:"ctaUrl,omitempty"`
+	Summary          string              `json:"summary,omitempty"`
+	Chapters         []Chapter           `json:"chapters,omitempty"`
+	SummaryStatus    string              `json:"summaryStatus"`
 }
 
 func generateShareToken() (string, error) {
@@ -695,6 +698,9 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var viewNotification *string
 	var contentType string
 	var ctaText, ctaUrl *string
+	var summaryText *string
+	var chaptersJSON *string
+	var summaryStatus string
 	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
 
@@ -704,7 +710,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		        v.user_id, u.email, v.view_notification, v.content_type,
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
-		        v.cta_text, v.cta_url
+		        v.cta_text, v.cta_url,
+		        v.summary, v.chapters, v.summary_status
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
@@ -715,7 +722,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		&ownerID, &ownerEmail, &viewNotification, &contentType,
 		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
-		&ctaText, &ctaUrl)
+		&ctaText, &ctaUrl,
+		&summaryText, &chaptersJSON, &summaryStatus)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -789,6 +797,15 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal([]byte(*transcriptJSON), &segments)
 	}
 
+	var summary string
+	chapters := make([]Chapter, 0)
+	if summaryText != nil {
+		summary = *summaryText
+	}
+	if chaptersJSON != nil {
+		_ = json.Unmarshal([]byte(*chaptersJSON), &chapters)
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, watchResponse{
 		Title:            title,
 		VideoURL:         videoURL,
@@ -803,6 +820,9 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		Branding:         branding,
 		CtaText:          ctaText,
 		CtaUrl:           ctaUrl,
+		Summary:          summary,
+		Chapters:         chapters,
+		SummaryStatus:    summaryStatus,
 	})
 }
 
