@@ -522,4 +522,136 @@ describe("Settings", () => {
       expect(screen.getByText("maximum number of API keys reached")).toBeInTheDocument();
     });
   });
+
+  it("renders Slack webhook URL input", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Slack Notifications")).toBeInTheDocument();
+    });
+    expect(screen.getByPlaceholderText("https://hooks.slack.com/services/...")).toBeInTheDocument();
+  });
+
+  it("saves Slack webhook URL", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(undefined); // PUT response
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("https://hooks.slack.com/services/...")).toBeInTheDocument();
+    });
+
+    await user.type(
+      screen.getByPlaceholderText("https://hooks.slack.com/services/..."),
+      "https://hooks.slack.com/services/T00/B00/xxx"
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Webhook URL saved")).toBeInTheDocument();
+    });
+
+    const saveCall = mockApiFetch.mock.calls.find(
+      (call: unknown[]) =>
+        call[0] === "/api/settings/notifications" &&
+        (call[1] as { method: string })?.method === "PUT"
+    );
+    expect(saveCall).toBeDefined();
+    const payload = JSON.parse((saveCall![1] as { body: string }).body);
+    expect(payload.slackWebhookUrl).toBe("https://hooks.slack.com/services/T00/B00/xxx");
+    expect(payload.notificationMode).toBe("off");
+  });
+
+  it("sends Slack test message", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: "https://hooks.slack.com/services/T00/B00/xxx" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(undefined); // POST test-slack response
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Send test message" })).toBeEnabled();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Send test message" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Test message sent")).toBeInTheDocument();
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/settings/notifications/test-slack", {
+      method: "POST",
+    });
+  });
+
+  it("shows error for invalid Slack webhook URL", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Invalid webhook URL"));
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("https://hooks.slack.com/services/...")).toBeInTheDocument();
+    });
+
+    await user.type(
+      screen.getByPlaceholderText("https://hooks.slack.com/services/..."),
+      "not-a-url"
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Invalid webhook URL")).toBeInTheDocument();
+    });
+  });
+
+  it("clears Slack webhook URL", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: "https://hooks.slack.com/services/T00/B00/xxx" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(undefined); // PUT response for clear
+    renderSettings();
+
+    await waitFor(() => {
+      expect(
+        screen.getByDisplayValue("https://hooks.slack.com/services/T00/B00/xxx")
+      ).toBeInTheDocument();
+    });
+
+    await user.clear(screen.getByPlaceholderText("https://hooks.slack.com/services/..."));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Webhook URL saved")).toBeInTheDocument();
+    });
+
+    const saveCall = mockApiFetch.mock.calls.find(
+      (call: unknown[]) =>
+        call[0] === "/api/settings/notifications" &&
+        (call[1] as { method: string })?.method === "PUT"
+    );
+    expect(saveCall).toBeDefined();
+    const payload = JSON.parse((saveCall![1] as { body: string }).body);
+    expect(payload.slackWebhookUrl).toBe("");
+  });
 });
