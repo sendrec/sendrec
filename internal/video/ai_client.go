@@ -91,7 +91,7 @@ func (c *AIClient) GenerateSummary(ctx context.Context, transcript string) (*Sum
 	if err != nil {
 		return nil, fmt.Errorf("send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {

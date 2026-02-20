@@ -22,7 +22,7 @@ func TestAIClient_GenerateSummary(t *testing.T) {
 
 		body, _ := io.ReadAll(r.Body)
 		var req chatRequest
-		json.Unmarshal(body, &req)
+		_ = json.Unmarshal(body, &req)
 		receivedModel = req.Model
 
 		resp := chatResponse{
@@ -31,7 +31,7 @@ func TestAIClient_GenerateSummary(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -81,7 +81,7 @@ func TestAIClient_GenerateSummary_MarkdownFence(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -113,7 +113,7 @@ func TestAIClient_GenerateSummary_InvalidJSON(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -131,7 +131,7 @@ func TestAIClient_GenerateSummary_EmptyChoices(t *testing.T) {
 			Choices: []chatChoice{},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -151,7 +151,7 @@ func TestAIClient_GenerateSummary_EmptyChoices(t *testing.T) {
 func TestAIClient_GenerateSummary_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":"invalid api key"}`))
+		_, _ = w.Write([]byte(`{"error":"invalid api key"}`))
 	}))
 	defer server.Close()
 
