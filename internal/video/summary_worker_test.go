@@ -25,6 +25,60 @@ func TestFormatTranscriptForLLM(t *testing.T) {
 	}
 }
 
+func TestFormatTranscriptForLLM_Truncation(t *testing.T) {
+	// Build segments that would exceed maxTranscriptChars
+	var segments []TranscriptSegment
+	for i := 0; i < 5000; i++ {
+		segments = append(segments, TranscriptSegment{
+			Start: float64(i * 10),
+			End:   float64(i*10 + 10),
+			Text:  "This is a segment with enough text to fill up the buffer over time.",
+		})
+	}
+
+	got := formatTranscriptForLLM(segments)
+	if len(got) > maxTranscriptChars+200 { // small buffer for last line
+		t.Errorf("formatTranscriptForLLM output too long: %d chars (max %d)", len(got), maxTranscriptChars)
+	}
+	if len(got) == 0 {
+		t.Error("formatTranscriptForLLM returned empty string")
+	}
+}
+
+func TestProcessNextSummary_SkipsTrivialTranscript(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	segments := []TranscriptSegment{
+		{Start: 0, End: 5, Text: "Only one segment."},
+	}
+	transcriptJSON, _ := json.Marshal(segments)
+
+	ai := NewAIClient("http://localhost", "key", "model")
+
+	mock.ExpectExec(`UPDATE videos SET summary_status = 'pending'`).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	mock.ExpectQuery(`UPDATE videos SET summary_status = 'processing'`).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"id", "transcript_json"}).
+				AddRow("vid-1", transcriptJSON),
+		)
+
+	mock.ExpectExec(`UPDATE videos SET summary_status = 'failed'`).
+		WithArgs("vid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	processNextSummary(context.Background(), mock, ai)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
 func TestProcessNextSummary_ClaimsAndProcesses(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -111,6 +165,7 @@ func TestProcessNextSummary_AIFailure(t *testing.T) {
 
 	segments := []TranscriptSegment{
 		{Start: 0, End: 10, Text: "Hello world."},
+		{Start: 10, End: 20, Text: "More content here."},
 	}
 	transcriptJSON, _ := json.Marshal(segments)
 

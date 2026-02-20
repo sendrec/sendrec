@@ -12,13 +12,19 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 )
 
+const maxTranscriptChars = 30000
+
 func formatTranscriptForLLM(segments []TranscriptSegment) string {
 	var result string
 	for _, seg := range segments {
 		totalSeconds := int(seg.Start)
 		minutes := totalSeconds / 60
 		seconds := totalSeconds % 60
-		result += fmt.Sprintf("[%02d:%02d] %s\n", minutes, seconds, seg.Text)
+		line := fmt.Sprintf("[%02d:%02d] %s\n", minutes, seconds, seg.Text)
+		if len(result)+len(line) > maxTranscriptChars {
+			break
+		}
+		result += line
 	}
 	return result
 }
@@ -54,6 +60,12 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 	var segments []TranscriptSegment
 	if err := json.Unmarshal(transcriptJSON, &segments); err != nil {
 		log.Printf("summary-worker: failed to parse transcript for video %s: %v", videoID, err)
+		markSummaryFailed(ctx, db, videoID)
+		return
+	}
+
+	if len(segments) < 2 {
+		log.Printf("summary-worker: skipping video %s (only %d segments)", videoID, len(segments))
 		markSummaryFailed(ctx, db, videoID)
 		return
 	}
