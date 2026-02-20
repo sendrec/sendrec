@@ -223,6 +223,24 @@ API keys for machine-to-machine access (used by the Nextcloud integration for vi
 | `TRANSCRIPTION_ENABLED` | Enable automatic video transcription | `true` |
 | `WHISPER_MODEL_PATH` | Path to the whisper.cpp model file | `/models/ggml-small.bin` |
 
+### AI Summaries (optional)
+
+Generate automatic summaries and chapter markers for transcribed videos using any OpenAI-compatible API.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AI_ENABLED` | Enable AI summary generation after transcription | `false` |
+| `AI_BASE_URL` | OpenAI-compatible API base URL | — |
+| `AI_API_KEY` | API key for the AI provider | — |
+| `AI_MODEL` | Model name to use | `mistral-small-latest` |
+
+**Supported providers:** Any OpenAI-compatible API — Mistral AI, OpenAI, Ollama (local), and others.
+
+Examples:
+- **Mistral AI:** `AI_BASE_URL=https://api.mistral.ai`, `AI_API_KEY=your-key`, `AI_MODEL=mistral-small-latest`
+- **OpenAI:** `AI_BASE_URL=https://api.openai.com`, `AI_API_KEY=your-key`, `AI_MODEL=gpt-4o-mini`
+- **Ollama (local):** `AI_BASE_URL=http://ollama:11434`, `AI_API_KEY=` (empty), `AI_MODEL=llama3.2`
+
 ### Email notifications (optional)
 
 | Variable | Description |
