@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
 
+interface TranscriptSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
 interface TrimModalProps {
   videoId: string;
+  shareToken: string;
   duration: number;
   onClose: () => void;
   onTrimStarted: () => void;
@@ -14,12 +21,14 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export function TrimModal({ videoId, duration, onClose, onTrimStarted }: TrimModalProps) {
+export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarted }: TrimModalProps) {
   const [startSeconds, setStartSeconds] = useState(0);
   const [endSeconds, setEndSeconds] = useState(duration);
   const [trimming, setTrimming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [segments, setSegments] = useState<TranscriptSegment[]>([]);
+  const [setMode, setSetMode] = useState<"start" | "end">("start");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -29,6 +38,15 @@ export function TrimModal({ videoId, duration, onClose, onTrimStarted }: TrimMod
     apiFetch<{ downloadUrl: string }>(`/api/videos/${videoId}/download`)
       .then(resp => setVideoUrl(resp?.downloadUrl ?? null));
   }, [videoId]);
+
+  useEffect(() => {
+    fetch(`/api/watch/${shareToken}`)
+      .then(resp => resp.ok ? resp.json() : null)
+      .then(data => {
+        if (data?.segments) setSegments(data.segments);
+      })
+      .catch(() => { /* password-protected or unavailable */ });
+  }, [shareToken]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -248,6 +266,67 @@ export function TrimModal({ videoId, duration, onClose, onTrimStarted }: TrimMod
           <span>Duration: {formatTime(endSeconds - startSeconds)}</span>
           <span>End: {formatTime(endSeconds)}</span>
         </div>
+
+        {segments.length > 0 && (
+          <>
+            <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+              <button
+                onClick={() => setSetMode("start")}
+                style={{
+                  padding: "4px 12px", fontSize: 12, fontWeight: 600, borderRadius: 4, border: "none", cursor: "pointer",
+                  background: setMode === "start" ? "var(--color-accent)" : "var(--color-border)",
+                  color: setMode === "start" ? "#fff" : "var(--color-text-secondary)",
+                }}
+              >
+                Set Start
+              </button>
+              <button
+                onClick={() => setSetMode("end")}
+                style={{
+                  padding: "4px 12px", fontSize: 12, fontWeight: 600, borderRadius: 4, border: "none", cursor: "pointer",
+                  background: setMode === "end" ? "var(--color-accent)" : "var(--color-border)",
+                  color: setMode === "end" ? "#fff" : "var(--color-text-secondary)",
+                }}
+              >
+                Set End
+              </button>
+            </div>
+            <div
+              style={{
+                maxHeight: 200, overflowY: "auto", border: "1px solid var(--color-border)",
+                borderRadius: 8, padding: 8, marginBottom: 16,
+              }}
+            >
+              {segments.map((seg, i) => {
+                const inRange = seg.start >= startSeconds && seg.end <= endSeconds;
+                return (
+                  <div
+                    key={i}
+                    onClick={() => {
+                      if (setMode === "start") {
+                        setStartSeconds(seg.start);
+                        setSetMode("end");
+                      } else {
+                        setEndSeconds(seg.end);
+                      }
+                      if (videoRef.current) videoRef.current.currentTime = seg.start;
+                    }}
+                    style={{
+                      padding: "4px 8px", cursor: "pointer", borderRadius: 4, fontSize: 13,
+                      background: inRange ? "rgba(0,182,122,0.1)" : "transparent",
+                      opacity: inRange ? 1 : 0.4,
+                    }}
+                  >
+                    <span style={{ color: "var(--color-text-secondary)", marginRight: 8, fontFamily: "monospace", fontSize: 12 }}>
+                      [{formatTime(seg.start)}]
+                    </span>
+                    <span style={{ color: "var(--color-text)" }}>{seg.text}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         {error && (
           <p style={{ color: "var(--color-error)", fontSize: 13, margin: "0 0 12px" }}>

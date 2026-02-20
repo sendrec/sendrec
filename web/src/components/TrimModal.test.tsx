@@ -11,6 +11,7 @@ vi.mock("../api/client", () => ({
 
 const defaultProps = {
   videoId: "v1",
+  shareToken: "abc123",
   duration: 120,
   onClose: vi.fn(),
   onTrimStarted: vi.fn(),
