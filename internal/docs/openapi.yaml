@@ -684,7 +684,7 @@ components:
 
     AnalyticsResponse:
       type: object
-      required: [summary, daily, milestones]
+      required: [summary, daily, milestones, viewers]
       properties:
         summary:
           $ref: "#/components/schemas/AnalyticsSummary"
@@ -694,6 +694,26 @@ components:
             $ref: "#/components/schemas/DailyViews"
         milestones:
           $ref: "#/components/schemas/MilestoneCounts"
+        viewers:
+          type: array
+          description: Per-email viewer data (populated when email gate is enabled)
+          items:
+            $ref: "#/components/schemas/ViewerInfo"
+
+    ViewerInfo:
+      type: object
+      required: [email, firstViewedAt, viewCount, completion]
+      properties:
+        email:
+          type: string
+        firstViewedAt:
+          type: string
+          format: date-time
+        viewCount:
+          type: integer
+        completion:
+          type: integer
+          description: Highest milestone reached (0, 25, 50, 75, or 100)
 
     HealthResponse:
       type: object
@@ -1837,6 +1857,84 @@ paths:
           description: CTA updated
         "400":
           description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/email-gate:
+    put:
+      tags: [Videos]
+      summary: Enable or disable email gate
+      description: |
+        Toggle whether viewers must enter their email before watching this video.
+        Collected emails appear in the video's analytics.
+      operationId: setEmailGate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        "204":
+          description: Email gate setting updated
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/watch/{shareToken}/identify:
+    post:
+      tags: [Watch]
+      summary: Identify viewer by email
+      description: |
+        Public endpoint. Stores the viewer's email for videos with email gate enabled.
+        Sets a signed cookie so the viewer doesn't need to re-enter their email for 7 days.
+        Uses IP + User-Agent hash to link the email to anonymous view data.
+      operationId: identifyViewer
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  maxLength: 320
+      responses:
+        "200":
+          description: Viewer identified, email gate cookie set
+        "400":
+          description: Invalid email
           content:
             application/json:
               schema:
