@@ -21,6 +21,12 @@ function renderSettings() {
 describe("Settings", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
+    localStorage.clear();
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
   });
 
   afterEach(() => {
@@ -653,5 +659,69 @@ describe("Settings", () => {
     expect(saveCall).toBeDefined();
     const payload = JSON.parse((saveCall![1] as { body: string }).body);
     expect(payload.slackWebhookUrl).toBe("");
+  });
+
+  it("shows Appearance section", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Appearance")).toBeInTheDocument();
+    });
+  });
+
+  it("defaults to System theme for new users", async () => {
+    localStorage.removeItem("theme");
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: "System" })).toBeChecked();
+    });
+  });
+
+  it("selects Dark theme after clicking Dark option", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: "System" })).toBeChecked();
+    });
+
+    await user.click(screen.getByRole("radio", { name: "Dark" }));
+    expect(screen.getByRole("radio", { name: "Dark" })).toBeChecked();
+    expect(localStorage.getItem("theme")).toBe("dark");
+  });
+
+  it("switches to Light theme when clicked", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([]);
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Appearance")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("radio", { name: "Light" }));
+    expect(screen.getByRole("radio", { name: "Light" })).toBeChecked();
+    expect(localStorage.getItem("theme")).toBe("light");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
   });
 });

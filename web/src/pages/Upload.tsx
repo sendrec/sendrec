@@ -381,7 +381,7 @@ export function Upload() {
             padding: file ? "20px 24px" : "48px 24px",
             textAlign: "center",
             cursor: "pointer",
-            background: dragging ? "rgba(0, 182, 122, 0.05)" : "var(--color-surface)",
+            background: dragging ? "var(--color-drag-highlight)" : "var(--color-surface)",
             transition: "border-color 0.2s, background 0.2s",
           }}
         >

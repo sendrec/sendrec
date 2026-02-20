@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { useTheme } from "../hooks/useTheme";
 
 interface DailyViews {
   date: string;
@@ -61,6 +62,7 @@ export function Analytics() {
   const [range, setRange] = useState<Range>("7d");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<unknown>(null);
+  const { resolvedTheme } = useTheme();
 
   const fetchAnalytics = useCallback(async (selectedRange: Range) => {
     setLoading(true);
@@ -98,6 +100,11 @@ export function Analytics() {
         (chartRef.current as { destroy: () => void }).destroy();
       }
 
+      const styles = getComputedStyle(document.documentElement);
+      const accentColor = styles.getPropertyValue("--color-accent").trim();
+      const chartLabelColor = styles.getPropertyValue("--color-chart-label").trim();
+      const chartGridColor = styles.getPropertyValue("--color-chart-grid").trim();
+
       chartRef.current = new Chart(canvasRef.current, {
         type: "bar",
         data: {
@@ -106,7 +113,7 @@ export function Analytics() {
             {
               label: "Views",
               data: data!.daily.map((d) => d.views),
-              backgroundColor: "#00b67a",
+              backgroundColor: accentColor,
               borderRadius: 3,
             },
           ],
@@ -132,15 +139,15 @@ export function Analytics() {
               beginAtZero: true,
               ticks: {
                 stepSize: 1,
-                color: "#94a3b8",
+                color: chartLabelColor,
               },
               grid: {
-                color: "rgba(148, 163, 184, 0.1)",
+                color: chartGridColor,
               },
             },
             x: {
               ticks: {
-                color: "#94a3b8",
+                color: chartLabelColor,
               },
               grid: {
                 display: false,
@@ -160,7 +167,7 @@ export function Analytics() {
         chartRef.current = null;
       }
     };
-  }, [data]);
+  }, [data, resolvedTheme]);
 
   function handleRangeChange(newRange: Range) {
     setRange(newRange);
@@ -210,7 +217,7 @@ export function Analytics() {
               onClick={() => handleRangeChange(r)}
               style={{
                 background: range === r ? "var(--color-accent)" : "transparent",
-                color: range === r ? "#fff" : "var(--color-text-secondary)",
+                color: range === r ? "var(--color-on-accent)" : "var(--color-text-secondary)",
                 border: `1px solid ${range === r ? "var(--color-accent)" : "var(--color-border)"}`,
                 borderRadius: 4,
                 padding: "6px 12px",

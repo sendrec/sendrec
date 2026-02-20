@@ -14,6 +14,7 @@ import { NotFound } from "./pages/NotFound";
 import { Settings } from "./pages/Settings";
 import { Analytics } from "./pages/Analytics";
 import { Upload } from "./pages/Upload";
+import { useTheme } from "./hooks/useTheme";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(!getAccessToken());
@@ -40,6 +41,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function App() {
+  useTheme();
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
