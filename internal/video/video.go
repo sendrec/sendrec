@@ -907,6 +907,35 @@ func (h *Handler) SetDownloadEnabled(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type setEmailGateRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+func (h *Handler) SetEmailGate(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setEmailGateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET email_gate_enabled = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
+		req.Enabled, videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not update email gate setting")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
 
 type setLinkExpiryRequest struct {
 	NeverExpires bool `json:"neverExpires"`

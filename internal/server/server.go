@@ -208,6 +208,7 @@ func (s *Server) routes() {
 				r.Post("/{id}/thumbnail", s.videoHandler.UploadThumbnail)
 				r.Delete("/{id}/thumbnail", s.videoHandler.ResetThumbnail)
 				r.Put("/{id}/cta", s.videoHandler.SetCTA)
+				r.Put("/{id}/email-gate", s.videoHandler.SetEmailGate)
 			})
 		})
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)

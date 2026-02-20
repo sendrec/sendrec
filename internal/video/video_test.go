@@ -5558,3 +5558,66 @@ func TestRecordMilestone_VideoNotFound(t *testing.T) {
 		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
+
+// --- SetEmailGate Tests ---
+
+func TestSetEmailGate_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-123"
+
+	mock.ExpectExec(`UPDATE videos SET email_gate_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
+		WithArgs(true, videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := []byte(`{"enabled":true}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/email-gate", handler.SetEmailGate)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/email-gate", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestSetEmailGate_NotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectExec(`UPDATE videos SET email_gate_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
+		WithArgs(false, "video-999", testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	body := []byte(`{"enabled":false}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/email-gate", handler.SetEmailGate)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/video-999/email-gate", body))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
