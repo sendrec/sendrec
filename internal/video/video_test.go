@@ -4443,9 +4443,9 @@ func TestAnalytics_Returns7DayStats(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
-	mock.ExpectQuery("SELECT id FROM videos").
+	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	mock.ExpectQuery("SELECT date_trunc").
@@ -4516,7 +4516,7 @@ func TestAnalytics_VideoNotFound(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
-	mock.ExpectQuery("SELECT id FROM videos").
+	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
 		WithArgs(videoID, testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -4552,9 +4552,9 @@ func TestAnalytics_InvalidRange(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
-	mock.ExpectQuery("SELECT id FROM videos").
+	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
@@ -4588,9 +4588,9 @@ func TestAnalytics_DefaultsTo7d(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
-	mock.ExpectQuery("SELECT id FROM videos").
+	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	mock.ExpectQuery("SELECT date_trunc").
 		WithArgs(videoID, pgxmock.AnyArg()).
@@ -4640,9 +4640,9 @@ func TestAnalytics_30DayRange(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
-	mock.ExpectQuery("SELECT id FROM videos").
+	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	mock.ExpectQuery("SELECT date_trunc").
@@ -4701,9 +4701,9 @@ func TestAnalytics_AllRange(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
-	mock.ExpectQuery("SELECT id FROM videos").
+	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	mock.ExpectQuery("SELECT date_trunc").
@@ -4763,9 +4763,9 @@ func TestAnalytics_EmptyViews(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
-	mock.ExpectQuery("SELECT id FROM videos").
+	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	mock.ExpectQuery("SELECT date_trunc").
 		WithArgs(videoID, pgxmock.AnyArg()).
@@ -4840,9 +4840,9 @@ func TestAnalytics_AllRangeEmptyViews(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
-	mock.ExpectQuery("SELECT id FROM videos").
+	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	mock.ExpectQuery("SELECT date_trunc").
 		WithArgs(videoID, pgxmock.AnyArg()).
@@ -4898,9 +4898,9 @@ func TestAnalytics_PeakDayAndAverage(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
-	mock.ExpectQuery("SELECT id FROM videos").
+	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	peakDate := today.AddDate(0, 0, -3)
@@ -4981,9 +4981,9 @@ func TestAnalytics_IncludesCtaClicks(t *testing.T) {
 	videoID := "video-001"
 
 	// Ownership check
-	mock.ExpectQuery(`SELECT id FROM videos WHERE id`).
+	mock.ExpectQuery(`SELECT id, email_gate_enabled FROM videos`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	// Daily views query
 	mock.ExpectQuery(`SELECT date_trunc`).
@@ -5034,9 +5034,9 @@ func TestAnalytics_IncludesMilestones(t *testing.T) {
 	videoID := "video-001"
 
 	// Ownership check
-	mock.ExpectQuery(`SELECT id FROM videos WHERE id`).
+	mock.ExpectQuery(`SELECT id, email_gate_enabled FROM videos`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
 
 	// Daily views query
 	mock.ExpectQuery(`SELECT date_trunc`).
@@ -5087,6 +5087,149 @@ func TestAnalytics_IncludesMilestones(t *testing.T) {
 	}
 	if resp.Milestones.Reached100 != 25 {
 		t.Errorf("expected Reached100=25, got %d", resp.Milestones.Reached100)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_ViewerList(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-001"
+	firstViewedAt := time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)
+
+	mock.ExpectQuery(`SELECT id, email_gate_enabled FROM videos`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, true))
+
+	mock.ExpectQuery(`SELECT date_trunc`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
+
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
+
+	mock.ExpectQuery(`SELECT vv.email, vv.created_at`).
+		WithArgs(videoID).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"email", "created_at", "view_count", "completion"}).
+				AddRow("alice@example.com", firstViewedAt, int64(3), 75).
+				AddRow("bob@example.com", firstViewedAt.Add(-2*time.Hour), int64(1), 0),
+		)
+
+	r := chi.NewRouter()
+	r.Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/videos/"+videoID+"/analytics?range=7d", nil)
+	req = req.WithContext(auth.ContextWithUserID(req.Context(), testUserID))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(resp.Viewers) != 2 {
+		t.Fatalf("expected 2 viewers, got %d", len(resp.Viewers))
+	}
+
+	if resp.Viewers[0].Email != "alice@example.com" {
+		t.Errorf("expected first viewer email %q, got %q", "alice@example.com", resp.Viewers[0].Email)
+	}
+	if resp.Viewers[0].ViewCount != 3 {
+		t.Errorf("expected first viewer view count 3, got %d", resp.Viewers[0].ViewCount)
+	}
+	if resp.Viewers[0].Completion != 75 {
+		t.Errorf("expected first viewer completion 75, got %d", resp.Viewers[0].Completion)
+	}
+	if resp.Viewers[0].FirstViewedAt != firstViewedAt.Format(time.RFC3339) {
+		t.Errorf("expected first viewer firstViewedAt %q, got %q", firstViewedAt.Format(time.RFC3339), resp.Viewers[0].FirstViewedAt)
+	}
+
+	if resp.Viewers[1].Email != "bob@example.com" {
+		t.Errorf("expected second viewer email %q, got %q", "bob@example.com", resp.Viewers[1].Email)
+	}
+	if resp.Viewers[1].ViewCount != 1 {
+		t.Errorf("expected second viewer view count 1, got %d", resp.Viewers[1].ViewCount)
+	}
+	if resp.Viewers[1].Completion != 0 {
+		t.Errorf("expected second viewer completion 0, got %d", resp.Viewers[1].Completion)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAnalytics_ViewerListEmptyWhenEmailGateDisabled(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-001"
+
+	mock.ExpectQuery(`SELECT id, email_gate_enabled FROM videos`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_gate_enabled"}).AddRow(videoID, false))
+
+	mock.ExpectQuery(`SELECT date_trunc`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"day", "views", "unique_views"}))
+
+	mock.ExpectQuery(`SELECT COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(int64(0)))
+
+	mock.ExpectQuery(`SELECT milestone, COUNT`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"milestone", "count"}))
+
+	r := chi.NewRouter()
+	r.Get("/api/videos/{id}/analytics", handler.Analytics)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/videos/"+videoID+"/analytics?range=7d", nil)
+	req = req.WithContext(auth.ContextWithUserID(req.Context(), testUserID))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp analyticsResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.Viewers == nil {
+		t.Fatal("expected viewers to be an empty array, got null")
+	}
+	if len(resp.Viewers) != 0 {
+		t.Errorf("expected 0 viewers when email gate disabled, got %d", len(resp.Viewers))
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

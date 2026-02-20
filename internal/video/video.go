@@ -1319,10 +1319,18 @@ type milestoneCounts struct {
 	Reached100 int64 `json:"reached100"`
 }
 
+type viewerInfo struct {
+	Email         string `json:"email"`
+	FirstViewedAt string `json:"firstViewedAt"`
+	ViewCount     int64  `json:"viewCount"`
+	Completion    int    `json:"completion"`
+}
+
 type analyticsResponse struct {
 	Summary    analyticsSummary `json:"summary"`
 	Daily      []dailyViews     `json:"daily"`
 	Milestones milestoneCounts  `json:"milestones"`
+	Viewers    []viewerInfo     `json:"viewers"`
 }
 
 func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
@@ -1330,10 +1338,11 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 	videoID := chi.URLParam(r, "id")
 
 	var id string
+	var emailGateEnabled bool
 	err := h.db.QueryRow(r.Context(),
-		`SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		`SELECT id, email_gate_enabled FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
 		videoID, userID,
-	).Scan(&id)
+	).Scan(&id, &emailGateEnabled)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -1449,6 +1458,33 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	viewers := make([]viewerInfo, 0)
+	if emailGateEnabled {
+		viewerRows, err := h.db.Query(r.Context(),
+			`SELECT vv.email, vv.created_at,
+			        COUNT(views.id) AS view_count,
+			        COALESCE(MAX(vm.milestone), 0) AS completion
+			 FROM video_viewers vv
+			 LEFT JOIN video_views views ON views.video_id = vv.video_id AND views.viewer_hash = vv.viewer_hash
+			 LEFT JOIN view_milestones vm ON vm.video_id = vv.video_id AND vm.viewer_hash = vv.viewer_hash
+			 WHERE vv.video_id = $1
+			 GROUP BY vv.email, vv.created_at
+			 ORDER BY vv.created_at DESC`,
+			videoID,
+		)
+		if err == nil {
+			defer viewerRows.Close()
+			for viewerRows.Next() {
+				var vi viewerInfo
+				var createdAt time.Time
+				if err := viewerRows.Scan(&vi.Email, &createdAt, &vi.ViewCount, &vi.Completion); err == nil {
+					vi.FirstViewedAt = createdAt.Format(time.RFC3339)
+					viewers = append(viewers, vi)
+				}
+			}
+		}
+	}
+
 	summary := computeSummary(daily, now.Format("2006-01-02"))
 	summary.TotalCtaClicks = totalCtaClicks
 	if summary.TotalViews > 0 {
@@ -1459,6 +1495,7 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		Summary:    summary,
 		Daily:      daily,
 		Milestones: milestones,
+		Viewers:    viewers,
 	})
 }
 
