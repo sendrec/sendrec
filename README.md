@@ -28,7 +28,7 @@ Every video gets a shareable link with password protection, expiry dates, and pe
 
 ### Watch
 
-Server-rendered watch pages with a clickable transcript panel, closed captions, timestamped comments, and emoji reactions. Embed videos in docs and wikis with a lightweight iframe player.
+Server-rendered watch pages with AI-generated summaries and chapters, a clickable transcript panel, closed captions, timestamped comments, and emoji reactions. Embed videos in docs and wikis with a lightweight iframe player.
 
 ![Watch page](.github/screenshots/watch.png)
 
@@ -43,6 +43,7 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 - **Screen & camera recording** — pause/resume, webcam overlay, drawing annotations, mobile front/back camera
 - **Video upload** — drag-and-drop MP4, WebM, MOV
 - **Automatic transcription** — whisper.cpp, closed captions on watch and embed pages, full-text search
+- **Transcript editing** — trim by clicking transcript segments, filler word removal with preview, AI-generated title suggestions
 - **Sharing** — expiring or permanent links, password protection, per-video download toggle, custom thumbnails
 - **Comments & reactions** — timestamped comments, emoji reactions, configurable modes
 - **CTA buttons** — call-to-action overlay on video end with click tracking
@@ -52,7 +53,8 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 - **View notifications** — off, views only, comments only, both, or daily digest
 - **Embeddable player** — lightweight iframe with captions, CTA, and milestone tracking
 - **Custom branding** — logo, colors, footer text, custom CSS injection, per-user defaults with per-video overrides
-- **Library** — search by title and transcript, inline title editing, overflow menu with grouped actions
+- **Library** — folders and tags, search by title and transcript, inline title editing, overflow menu with grouped actions
+- **Dark/light mode** — system preference detection, manual toggle, theme-aware charts
 - **Integrations** — Nextcloud (oEmbed + API keys), per-user API keys, OpenAPI docs
 - **Self-hostable** — single Go binary, Docker Compose, PostgreSQL, S3-compatible storage
 
