@@ -30,6 +30,12 @@ type embedPasswordPageData struct {
 	Nonce      string
 }
 
+type embedEmailGatePageData struct {
+	Title      string
+	ShareToken string
+	Nonce      string
+}
+
 var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -237,6 +243,86 @@ var embedPasswordPageTemplate = template.Must(template.New("embed-password").Par
 </body>
 </html>`))
 
+var embedEmailGatePageTemplate = template.Must(template.New("embed-emailgate").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}}</title>
+    <style nonce="{{.Nonce}}">
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; background: #0f172a; }
+        body {
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container { text-align: center; padding: 2rem; max-width: 360px; width: 100%; }
+        h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+        p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.875rem; }
+        .error { color: #ef4444; font-size: 0.8rem; margin-bottom: 0.75rem; display: none; }
+        input[type="email"] {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #fff;
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+            outline: none;
+        }
+        input[type="email"]:focus { border-color: #22c55e; }
+        button {
+            width: 100%;
+            background: #22c55e;
+            color: #fff;
+            padding: 0.625rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enter your email to watch this video</h1>
+        <p>{{.Title}}</p>
+        <p class="error" id="error-msg"></p>
+        <form id="email-gate-form">
+            <input type="email" id="email-input" placeholder="you@example.com" required maxlength="320" autofocus>
+            <button type="submit" id="submit-btn">Watch Video</button>
+        </form>
+    </div>
+    <script nonce="{{.Nonce}}">
+        document.getElementById('email-gate-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var btn = document.getElementById('submit-btn');
+            var errEl = document.getElementById('error-msg');
+            var email = document.getElementById('email-input').value;
+            btn.disabled = true;
+            errEl.style.display = 'none';
+            fetch('/api/watch/{{.ShareToken}}/identify', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: email})
+            }).then(function(r) {
+                if (r.ok) { window.location.reload(); }
+                else { return r.json().then(function(d) { errEl.textContent = d.error || 'Something went wrong'; errEl.style.display = 'block'; btn.disabled = false; }); }
+            }).catch(function() {
+                errEl.textContent = 'Something went wrong'; errEl.style.display = 'block'; btn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>`))
+
 func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	shareToken := chi.URLParam(r, "shareToken")
 
@@ -254,12 +340,14 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	var viewNotification *string
 	var ctaText, ctaUrl *string
 	var transcriptKey *string
+	var emailGateEnabled bool
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at,
 		        v.thumbnail_key, v.share_password, v.content_type,
 		        v.user_id, u.email, v.view_notification,
-		        v.cta_text, v.cta_url, v.transcript_key
+		        v.cta_text, v.cta_url, v.transcript_key,
+		        v.email_gate_enabled
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
@@ -267,7 +355,8 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt,
 		&thumbnailKey, &sharePassword, &contentType,
 		&ownerID, &ownerEmail, &viewNotification,
-		&ctaText, &ctaUrl, &transcriptKey)
+		&ctaText, &ctaUrl, &transcriptKey,
+		&emailGateEnabled)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -298,6 +387,20 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 				Nonce:      nonce,
 			}); err != nil {
 				log.Printf("failed to render embed password page: %v", err)
+			}
+			return
+		}
+	}
+
+	if emailGateEnabled {
+		if _, ok := hasValidEmailGateCookie(r, h.hmacSecret, shareToken); !ok {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := embedEmailGatePageTemplate.Execute(w, embedEmailGatePageData{
+				Title:      title,
+				ShareToken: shareToken,
+				Nonce:      nonce,
+			}); err != nil {
+				log.Printf("failed to render embed email gate page: %v", err)
 			}
 			return
 		}

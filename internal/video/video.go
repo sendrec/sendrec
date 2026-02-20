@@ -139,6 +139,7 @@ type listItem struct {
 	DownloadEnabled   bool    `json:"downloadEnabled"`
 	CtaText           *string `json:"ctaText"`
 	CtaUrl            *string `json:"ctaUrl"`
+	EmailGateEnabled  bool    `json:"emailGateEnabled"`
 }
 
 type updateRequest struct {
@@ -541,7 +542,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
-		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url
+		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled
 		 FROM videos v
 		 WHERE v.status != 'deleted'`
 
@@ -579,7 +580,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var shareExpiresAt *time.Time
 		var thumbnailKey *string
 		var sharePassword *string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -907,6 +908,35 @@ func (h *Handler) SetDownloadEnabled(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type setEmailGateRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+func (h *Handler) SetEmailGate(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setEmailGateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET email_gate_enabled = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
+		req.Enabled, videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not update email gate setting")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
 
 type setLinkExpiryRequest struct {
 	NeverExpires bool `json:"neverExpires"`
@@ -1290,10 +1320,18 @@ type milestoneCounts struct {
 	Reached100 int64 `json:"reached100"`
 }
 
+type viewerInfo struct {
+	Email         string `json:"email"`
+	FirstViewedAt string `json:"firstViewedAt"`
+	ViewCount     int64  `json:"viewCount"`
+	Completion    int    `json:"completion"`
+}
+
 type analyticsResponse struct {
 	Summary    analyticsSummary `json:"summary"`
 	Daily      []dailyViews     `json:"daily"`
 	Milestones milestoneCounts  `json:"milestones"`
+	Viewers    []viewerInfo     `json:"viewers"`
 }
 
 func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
@@ -1301,10 +1339,11 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 	videoID := chi.URLParam(r, "id")
 
 	var id string
+	var emailGateEnabled bool
 	err := h.db.QueryRow(r.Context(),
-		`SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		`SELECT id, email_gate_enabled FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
 		videoID, userID,
-	).Scan(&id)
+	).Scan(&id, &emailGateEnabled)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -1420,6 +1459,33 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	viewers := make([]viewerInfo, 0)
+	if emailGateEnabled {
+		viewerRows, err := h.db.Query(r.Context(),
+			`SELECT vv.email, vv.created_at,
+			        COUNT(views.id) AS view_count,
+			        COALESCE(MAX(vm.milestone), 0) AS completion
+			 FROM video_viewers vv
+			 LEFT JOIN video_views views ON views.video_id = vv.video_id AND views.viewer_hash = vv.viewer_hash
+			 LEFT JOIN view_milestones vm ON vm.video_id = vv.video_id AND vm.viewer_hash = vv.viewer_hash
+			 WHERE vv.video_id = $1
+			 GROUP BY vv.email, vv.created_at
+			 ORDER BY vv.created_at DESC`,
+			videoID,
+		)
+		if err == nil {
+			defer viewerRows.Close()
+			for viewerRows.Next() {
+				var vi viewerInfo
+				var createdAt time.Time
+				if err := viewerRows.Scan(&vi.Email, &createdAt, &vi.ViewCount, &vi.Completion); err == nil {
+					vi.FirstViewedAt = createdAt.Format(time.RFC3339)
+					viewers = append(viewers, vi)
+				}
+			}
+		}
+	}
+
 	summary := computeSummary(daily, now.Format("2006-01-02"))
 	summary.TotalCtaClicks = totalCtaClicks
 	if summary.TotalViews > 0 {
@@ -1430,6 +1496,7 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		Summary:    summary,
 		Daily:      daily,
 		Milestones: milestones,
+		Viewers:    viewers,
 	})
 }
 
