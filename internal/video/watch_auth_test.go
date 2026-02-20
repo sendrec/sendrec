@@ -442,6 +442,83 @@ func TestWatchDownload_PasswordProtected_NoCookie(t *testing.T) {
 	}
 }
 
+func TestEmailGateCookie(t *testing.T) {
+	hmacSecret := "test-secret"
+	shareToken := "token1234567"
+
+	t.Run("cookie name", func(t *testing.T) {
+		name := emailGateCookieName(shareToken)
+		if name != "eg_token123" {
+			t.Fatalf("expected eg_token123, got %s", name)
+		}
+	})
+
+	t.Run("sign and verify", func(t *testing.T) {
+		email := "alice@example.com"
+		value := signEmailGateCookie(hmacSecret, shareToken, email)
+		got, ok := verifyEmailGateCookie(hmacSecret, shareToken, value)
+		if !ok {
+			t.Fatal("expected valid cookie")
+		}
+		if got != email {
+			t.Fatalf("expected email %s, got %s", email, got)
+		}
+	})
+
+	t.Run("invalid signature rejected", func(t *testing.T) {
+		_, ok := verifyEmailGateCookie(hmacSecret, shareToken, "bad@email.com|invalidsig")
+		if ok {
+			t.Fatal("expected invalid cookie")
+		}
+	})
+}
+
+func TestIdentifyViewer(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	mock.ExpectQuery(`SELECT v.id FROM videos`).
+		WithArgs("validtoken1").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("vid-1"))
+
+	mock.ExpectExec(`INSERT INTO video_viewers`).
+		WithArgs("vid-1", "alice@example.com", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := strings.NewReader(`{"email":"alice@example.com"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/validtoken1/identify", body)
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/identify", handler.IdentifyViewer)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	cookies := rec.Result().Cookies()
+	found := false
+	for _, c := range cookies {
+		if c.Name == "eg_validtok" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected email gate cookie to be set")
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
 func TestWatchPage_PasswordProtected_ShowsPasswordForm(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {

@@ -1,11 +1,14 @@
 package video
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -108,5 +111,105 @@ func (h *Handler) VerifyWatchPassword(w http.ResponseWriter, r *http.Request) {
 
 	sig := signWatchCookie(h.hmacSecret, shareToken, *sharePassword)
 	setWatchCookie(w, shareToken, sig, h.secureCookies)
+	w.WriteHeader(http.StatusOK)
+}
+
+// --- Email gate cookie helpers ---
+
+func emailGateCookieName(shareToken string) string {
+	prefix := shareToken
+	if len(prefix) > 8 {
+		prefix = prefix[:8]
+	}
+	return "eg_" + prefix
+}
+
+func signEmailGateCookie(hmacSecret, shareToken, email string) string {
+	mac := hmac.New(sha256.New, []byte(hmacSecret))
+	mac.Write([]byte(shareToken + "|" + email))
+	sig := hex.EncodeToString(mac.Sum(nil))
+	return email + "|" + sig
+}
+
+func verifyEmailGateCookie(hmacSecret, shareToken, cookieValue string) (string, bool) {
+	parts := strings.SplitN(cookieValue, "|", 2)
+	if len(parts) != 2 {
+		return "", false
+	}
+	email := parts[0]
+	expected := signEmailGateCookie(hmacSecret, shareToken, email)
+	if !hmac.Equal([]byte(expected), []byte(cookieValue)) {
+		return "", false
+	}
+	return email, true
+}
+
+func setEmailGateCookie(w http.ResponseWriter, shareToken, value string, secure bool) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     emailGateCookieName(shareToken),
+		Value:    value,
+		Path:     "/",
+		MaxAge:   7 * 24 * 60 * 60,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteStrictMode,
+	})
+}
+
+func hasValidEmailGateCookie(r *http.Request, hmacSecret, shareToken string) (string, bool) {
+	cookie, err := r.Cookie(emailGateCookieName(shareToken))
+	if err != nil {
+		return "", false
+	}
+	return verifyEmailGateCookie(hmacSecret, shareToken, cookie.Value)
+}
+
+type identifyViewerRequest struct {
+	Email string `json:"email"`
+}
+
+func (h *Handler) IdentifyViewer(w http.ResponseWriter, r *http.Request) {
+	shareToken := chi.URLParam(r, "shareToken")
+
+	var req identifyViewerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	req.Email = strings.TrimSpace(req.Email)
+	if req.Email == "" || len(req.Email) > 320 || !strings.Contains(req.Email, "@") {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid email")
+		return
+	}
+
+	var videoID string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT v.id FROM videos v WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
+		shareToken,
+	).Scan(&videoID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	ip := clientIP(r)
+	hash := viewerHash(ip, r.UserAgent())
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if _, err := h.db.Exec(ctx,
+			`INSERT INTO video_viewers (video_id, email, viewer_hash) VALUES ($1, $2, $3)
+			 ON CONFLICT (video_id, email) DO NOTHING`,
+			videoID, req.Email, hash,
+		); err != nil {
+			log.Printf("failed to record viewer identity for %s: %v", videoID, err)
+		}
+	}()
+
+	sig := signEmailGateCookie(h.hmacSecret, shareToken, req.Email)
+	setEmailGateCookie(w, shareToken, sig, h.secureCookies)
+
 	w.WriteHeader(http.StatusOK)
 }

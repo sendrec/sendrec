@@ -218,6 +218,7 @@ func (s *Server) routes() {
 		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/verify", s.videoHandler.VerifyWatchPassword)
 		s.router.Get("/api/watch/{shareToken}/comments", s.videoHandler.ListWatchComments)
 		s.router.With(commentLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/comments", s.videoHandler.PostWatchComment)
+		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/identify", s.videoHandler.IdentifyViewer)
 		s.router.Post("/api/watch/{shareToken}/cta-click", s.videoHandler.RecordCTAClick)
 		s.router.Post("/api/watch/{shareToken}/milestone", s.videoHandler.RecordMilestone)
 		s.router.Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
