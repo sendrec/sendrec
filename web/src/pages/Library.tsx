@@ -24,6 +24,7 @@ interface Video {
   emailGateEnabled: boolean;
   ctaText: string | null;
   ctaUrl: string | null;
+  summaryStatus: string;
 }
 
 interface LimitsResponse {
@@ -31,6 +32,7 @@ interface LimitsResponse {
   maxVideoDurationSeconds: number;
   videosUsedThisMonth: number;
   brandingEnabled: boolean;
+  aiEnabled: boolean;
 }
 
 interface VideoBranding {
@@ -227,6 +229,13 @@ export function Library() {
       body: JSON.stringify({ enabled: newValue }),
     });
     setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, emailGateEnabled: newValue } : v)));
+  }
+
+  async function summarizeVideo(video: Video) {
+    await apiFetch(`/api/videos/${video.id}/summarize`, { method: "POST" });
+    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, summaryStatus: "pending" } : v)));
+    showToast("Summary queued");
+    setOpenMenuId(null);
   }
 
   async function extendVideo(id: string) {
@@ -604,29 +613,39 @@ export function Library() {
                       </span>
                     );
                   })()}
-                  {video.status === "ready" && video.transcriptStatus === "pending" && (
-                    <span style={{ color: "var(--color-text-secondary)", marginLeft: 8 }}>
-                      &middot; Pending transcription...
-                    </span>
-                  )}
-                  {video.status === "ready" && video.transcriptStatus === "processing" && (
-                    <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
-                      &middot; Transcribing...
-                    </span>
-                  )}
-                  {video.status === "ready" && video.transcriptStatus !== "processing" && video.transcriptStatus !== "pending" && (
-                    <span style={{ marginLeft: 8 }}>
-                      &middot;{" "}
-                      <button
-                        onClick={() => retranscribeVideo(video.id)}
-                        className="action-link"
-                        style={{ color: video.transcriptStatus === "failed" ? "var(--color-error)" : undefined }}
-                      >
-                        {video.transcriptStatus === "failed" ? "Retry transcript" : video.transcriptStatus === "none" ? "Transcribe" : "Redo transcript"}
-                      </button>
-                    </span>
-                  )}
                 </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 13 }}>
+                  {video.transcriptStatus === "pending" && (
+                    <span style={{ color: "var(--color-text-secondary)" }}>Pending transcription...</span>
+                  )}
+                  {video.transcriptStatus === "processing" && (
+                    <span style={{ color: "var(--color-accent)" }}>Transcribing...</span>
+                  )}
+                  {video.transcriptStatus !== "processing" && video.transcriptStatus !== "pending" && (
+                    <button
+                      onClick={() => retranscribeVideo(video.id)}
+                      className="action-link"
+                      style={{ color: video.transcriptStatus === "failed" ? "var(--color-error)" : undefined }}
+                    >
+                      {video.transcriptStatus === "failed" ? "Retry transcript" : video.transcriptStatus === "none" ? "Transcribe" : "Redo transcript"}
+                    </button>
+                  )}
+                  {limits?.aiEnabled && video.transcriptStatus === "ready" && (
+                    <>
+                      <span className="action-sep">&middot;</span>
+                      <button
+                        onClick={() => summarizeVideo(video)}
+                        disabled={video.summaryStatus === "pending" || video.summaryStatus === "processing"}
+                        className="action-link"
+                        style={{ opacity: video.summaryStatus === "pending" || video.summaryStatus === "processing" ? 0.5 : undefined }}
+                      >
+                        {video.summaryStatus === "pending" || video.summaryStatus === "processing"
+                          ? "Summarizing..."
+                          : video.summaryStatus === "ready" ? "Re-summarize" : "Summarize"}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 

@@ -42,7 +42,7 @@ func TestProcessNextTranscription_NoJobs(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token"}))
 
 	storage := &mockStorage{}
-	processNextTranscription(context.Background(), mock, storage)
+	processNextTranscription(context.Background(), mock, storage, false)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
@@ -65,7 +65,7 @@ func TestProcessNextTranscription_ResetsStuckJobs(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token"}))
 
 	storage := &mockStorage{}
-	processNextTranscription(context.Background(), mock, storage)
+	processNextTranscription(context.Background(), mock, storage, false)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)

@@ -168,7 +168,7 @@ func parseWhisperJSON(jsonPath string) ([]TranscriptSegment, error) {
 	return segments, nil
 }
 
-func processTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, userID, shareToken string) {
+func processTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, userID, shareToken string, aiEnabled bool) {
 	if !isTranscriptionAvailable() {
 		log.Printf("transcribe: transcription not available, marking video %s as failed", videoID)
 		if _, err := db.Exec(ctx,
@@ -286,4 +286,13 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 	}
 
 	log.Printf("transcribe: completed for video %s (%d segments)", videoID, len(segments))
+
+	if aiEnabled {
+		if _, err := db.Exec(ctx,
+			`UPDATE videos SET summary_status = 'pending', updated_at = now() WHERE id = $1`,
+			videoID,
+		); err != nil {
+			log.Printf("transcribe: failed to enqueue summary for %s: %v", videoID, err)
+		}
+	}
 }

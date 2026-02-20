@@ -1,0 +1,4 @@
+ALTER TABLE videos ADD COLUMN summary TEXT;
+ALTER TABLE videos ADD COLUMN chapters JSONB;
+ALTER TABLE videos ADD COLUMN summary_status TEXT NOT NULL DEFAULT 'none';
+ALTER TABLE videos ADD COLUMN summary_started_at TIMESTAMPTZ;
