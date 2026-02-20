@@ -58,7 +58,7 @@ func setWatchCookie(w http.ResponseWriter, shareToken, cookieValue string, secur
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteNoneMode,
 		MaxAge:   int(7 * 24 * time.Hour / time.Second),
 	})
 }
@@ -152,7 +152,7 @@ func setEmailGateCookie(w http.ResponseWriter, shareToken, value string, secure 
 		MaxAge:   7 * 24 * 60 * 60,
 		HttpOnly: true,
 		Secure:   secure,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteNoneMode,
 	})
 }
 
