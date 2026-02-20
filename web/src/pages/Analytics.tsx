@@ -106,7 +106,8 @@ export function Analytics() {
             {
               label: "Views",
               data: data!.daily.map((d) => d.views),
-              backgroundColor: "var(--color-accent)",
+              backgroundColor: "#00b67a",
+              borderRadius: 3,
             },
           ],
         },
@@ -114,6 +115,9 @@ export function Analytics() {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
+            legend: {
+              display: false,
+            },
             tooltip: {
               callbacks: {
                 afterLabel: (context) => {
@@ -128,6 +132,18 @@ export function Analytics() {
               beginAtZero: true,
               ticks: {
                 stepSize: 1,
+                color: "#94a3b8",
+              },
+              grid: {
+                color: "rgba(148, 163, 184, 0.1)",
+              },
+            },
+            x: {
+              ticks: {
+                color: "#94a3b8",
+              },
+              grid: {
+                display: false,
               },
             },
           },
@@ -384,6 +400,7 @@ export function Analytics() {
             border: "1px solid var(--color-border)",
             borderRadius: 8,
             padding: 16,
+            marginTop: 16,
             height: 300,
           }}
         >
