@@ -19,7 +19,7 @@ func EnqueueTranscription(ctx context.Context, db database.DBTX, videoID string)
 	return err
 }
 
-func processNextTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage) {
+func processNextTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, aiEnabled bool) {
 	// Reset stuck jobs (processing for more than 10 minutes)
 	if _, err := db.Exec(ctx,
 		`UPDATE videos SET transcript_status = 'pending', transcript_started_at = NULL, updated_at = now()
@@ -49,10 +49,10 @@ func processNextTranscription(ctx context.Context, db database.DBTX, storage Obj
 	}
 
 	log.Printf("transcribe-worker: claimed video %s", videoID)
-	processTranscription(ctx, db, storage, videoID, fileKey, userID, shareToken)
+	processTranscription(ctx, db, storage, videoID, fileKey, userID, shareToken, aiEnabled)
 }
 
-func StartTranscriptionWorker(ctx context.Context, db database.DBTX, storage ObjectStorage, interval time.Duration) {
+func StartTranscriptionWorker(ctx context.Context, db database.DBTX, storage ObjectStorage, interval time.Duration, aiEnabled bool) {
 	go func() {
 		log.Println("transcribe-worker: started")
 		ticker := time.NewTicker(interval)
@@ -63,7 +63,7 @@ func StartTranscriptionWorker(ctx context.Context, db database.DBTX, storage Obj
 				log.Println("transcribe-worker: shutting down")
 				return
 			case <-ticker.C:
-				processNextTranscription(ctx, db, storage)
+				processNextTranscription(ctx, db, storage, aiEnabled)
 			}
 		}
 	}()
