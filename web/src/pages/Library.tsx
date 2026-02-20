@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { FillerRemovalModal } from "../components/FillerRemovalModal";
 import { TrimModal } from "../components/TrimModal";
 
 interface Video {
@@ -24,6 +25,7 @@ interface Video {
   emailGateEnabled: boolean;
   ctaText: string | null;
   ctaUrl: string | null;
+  suggestedTitle: string | null;
   summaryStatus: string;
   folderId: string | null;
   tags: VideoTag[];
@@ -108,6 +110,7 @@ export function Library() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [trimmingId, setTrimmingId] = useState<string | null>(null);
+  const [fillerRemovalId, setFillerRemovalId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [brandingVideoId, setBrandingVideoId] = useState<string | null>(null);
@@ -368,6 +371,20 @@ export function Library() {
     await apiFetch(`/api/videos/${id}/retranscribe`, { method: "POST" });
     setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, transcriptStatus: "pending" } : v)));
     showToast("Transcription queued");
+  }
+
+  async function acceptSuggestedTitle(id: string, suggestedTitle: string) {
+    await apiFetch(`/api/videos/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title: suggestedTitle }),
+    });
+    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, title: suggestedTitle, suggestedTitle: null } : v)));
+    showToast("Title updated");
+  }
+
+  async function dismissSuggestedTitle(id: string) {
+    await apiFetch(`/api/videos/${id}/dismiss-title`, { method: "PUT" });
+    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, suggestedTitle: null } : v)));
   }
 
   async function changeCommentMode(video: Video, mode: string) {
@@ -821,6 +838,35 @@ export function Library() {
                     {video.title}
                   </a>
                 )}
+                {video.suggestedTitle && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginTop: 4 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.7V17H8v-2.3A7 7 0 0 1 12 2z" />
+                    </svg>
+                    <span style={{ color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                      Suggested: {video.suggestedTitle}
+                    </span>
+                    <button
+                      onClick={() => acceptSuggestedTitle(video.id, video.suggestedTitle!)}
+                      style={{
+                        background: "var(--color-accent)", color: "#fff", border: "none",
+                        borderRadius: 4, padding: "4px 10px", fontSize: 11, fontWeight: 600,
+                        cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+                      }}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => dismissSuggestedTitle(video.id)}
+                      style={{
+                        background: "transparent", color: "var(--color-text-secondary)", border: "none",
+                        padding: "4px 4px", fontSize: 13, cursor: "pointer", lineHeight: 1, flexShrink: 0,
+                      }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                )}
                 <p
                   style={{
                     color: "var(--color-text-secondary)",
@@ -1192,6 +1238,15 @@ export function Library() {
                         >
                           Trim
                         </button>
+                        {video.transcriptStatus === "ready" && video.status === "ready" && (
+                          <button
+                            onClick={() => { setFillerRemovalId(video.id); setOpenMenuId(null); }}
+                            className="action-link"
+                            style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
+                          >
+                            Remove fillers
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1391,6 +1446,7 @@ export function Library() {
         return (
           <TrimModal
             videoId={video.id}
+            shareToken={video.shareToken}
             duration={video.duration}
             onClose={() => setTrimmingId(null)}
             onTrimStarted={() => {
@@ -1398,6 +1454,26 @@ export function Library() {
                 prev.map((v) => (v.id === trimmingId ? { ...v, status: "processing" } : v))
               );
               setTrimmingId(null);
+            }}
+          />
+        );
+      })()}
+
+      {fillerRemovalId && (() => {
+        const video = videos.find((v) => v.id === fillerRemovalId);
+        if (!video) return null;
+        return (
+          <FillerRemovalModal
+            videoId={video.id}
+            shareToken={video.shareToken}
+            duration={video.duration}
+            onClose={() => setFillerRemovalId(null)}
+            onRemovalStarted={() => {
+              setVideos((prev) =>
+                prev.map((v) => (v.id === fillerRemovalId ? { ...v, status: "processing" } : v))
+              );
+              setFillerRemovalId(null);
+              showToast("Removing filler words...");
             }}
           />
         );

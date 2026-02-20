@@ -221,6 +221,8 @@ func (s *Server) routes() {
 				r.Post("/{id}/summarize", s.videoHandler.Summarize)
 				r.Put("/{id}/folder", s.videoHandler.SetVideoFolder)
 				r.Put("/{id}/tags", s.videoHandler.SetVideoTags)
+			r.Post("/{id}/remove-segments", s.videoHandler.RemoveSegments)
+			r.Put("/{id}/dismiss-title", s.videoHandler.DismissTitle)
 			})
 		})
 

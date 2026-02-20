@@ -33,6 +33,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     emailGateEnabled: false,
     ctaText: null,
     ctaUrl: null,
+    suggestedTitle: null,
     summaryStatus: "none",
     folderId: null,
     tags: [],
@@ -1364,6 +1365,81 @@ describe("Library", () => {
           body: JSON.stringify({ text: "Book a demo", url: "https://example.com/demo" }),
         });
       });
+    });
+  });
+
+  describe("suggested title", () => {
+    it("shows suggested title banner when suggestedTitle is set", async () => {
+      mockFetch([makeVideo({ suggestedTitle: "Product Demo for Q1" })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Suggested:/)).toBeInTheDocument();
+      });
+      expect(screen.getByText(/Product Demo for Q1/)).toBeInTheDocument();
+    });
+
+    it("accept suggested title calls PATCH and updates title", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo({ suggestedTitle: "Product Demo for Q1" })]);
+      mockApiFetch.mockResolvedValueOnce(undefined); // PATCH response
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("Accept")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Accept"));
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1", {
+          method: "PATCH",
+          body: JSON.stringify({ title: "Product Demo for Q1" }),
+        });
+      });
+    });
+
+    it("dismiss suggested title calls PUT and clears suggestion", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo({ suggestedTitle: "Product Demo for Q1" })]);
+      mockApiFetch.mockResolvedValueOnce(undefined); // PUT dismiss response
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Suggested:/)).toBeInTheDocument();
+      });
+
+      // The dismiss button shows the x character
+      const dismissButton = screen.getByText("\u00d7");
+      await user.click(dismissButton);
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/dismiss-title", { method: "PUT" });
+      });
+    });
+  });
+
+  describe("filler removal", () => {
+    it("shows Remove fillers in overflow menu when transcript is ready", async () => {
+      mockFetch([makeVideo({ transcriptStatus: "ready" })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+      await openOverflowMenu();
+      expect(screen.getByText("Remove fillers")).toBeInTheDocument();
+    });
+
+    it("hides Remove fillers when transcript is not ready", async () => {
+      mockFetch([makeVideo({ transcriptStatus: "none" })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+      await openOverflowMenu();
+      expect(screen.queryByText("Remove fillers")).not.toBeInTheDocument();
     });
   });
 });
