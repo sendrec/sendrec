@@ -15,8 +15,10 @@ import (
 
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/email"
+	"github.com/sendrec/sendrec/internal/notify"
 	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/server"
+	slackpkg "github.com/sendrec/sendrec/internal/slack"
 	"github.com/sendrec/sendrec/internal/storage"
 	"github.com/sendrec/sendrec/internal/video"
 	"github.com/sendrec/sendrec/web"
@@ -91,6 +93,8 @@ func main() {
 
 	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
 
+	slackClient := slackpkg.New(db.Pool)
+
 	srv := server.New(server.Config{
 		DB:                      db.Pool,
 		Pinger:                  db,
@@ -108,8 +112,8 @@ func main() {
 		AllowedFrameAncestors:   os.Getenv("ALLOWED_FRAME_ANCESTORS"),
 		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
 		EmailSender:             emailClient,
-		CommentNotifier:         emailClient,
-		ViewNotifier:            emailClient,
+		CommentNotifier:         notify.NewMultiCommentNotifier(emailClient, slackClient),
+		ViewNotifier:            notify.NewMultiViewNotifier(emailClient, slackClient),
 	})
 
 	var aiClient *video.AIClient
