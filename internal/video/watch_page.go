@@ -23,9 +23,11 @@ func derefString(s *string) string {
 
 var watchFuncs = template.FuncMap{
 	"formatTimestamp": func(seconds float64) string {
-		m := int(seconds) / 60
-		s := int(seconds) % 60
-		return fmt.Sprintf("%d:%02d", m, s)
+		total := int(seconds)
+		if total >= 3600 {
+			return fmt.Sprintf("%d:%02d:%02d", total/3600, (total%3600)/60, total%60)
+		}
+		return fmt.Sprintf("%d:%02d", total/60, total%60)
 	},
 }
 
@@ -553,6 +555,63 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             margin-top: 2rem;
             border-top: 1px solid var(--brand-surface);
             padding-top: 1.5rem;
+        }
+        .panel-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--brand-surface);
+            margin-bottom: 16px;
+        }
+        .panel-tab {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .panel-tab:hover {
+            color: var(--brand-text);
+        }
+        .panel-tab--active {
+            color: var(--brand-accent);
+            border-bottom-color: var(--brand-accent);
+        }
+        .summary-text {
+            color: var(--brand-text);
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0 0 16px;
+        }
+        .chapter-list-title {
+            color: var(--brand-text);
+            font-size: 13px;
+            font-weight: 600;
+            margin: 0 0 8px;
+        }
+        .chapter-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .chapter-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .chapter-timestamp {
+            color: var(--brand-accent);
+            font-size: 13px;
+            font-family: monospace;
+            min-width: 48px;
+        }
+        .chapter-title {
+            color: var(--brand-text);
+            font-size: 14px;
         }
         .speed-controls {
             display: flex;
@@ -1217,6 +1276,34 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{end}}
         {{if ne .TranscriptStatus "no_audio"}}
         <div class="transcript-section">
+            {{if and (eq .TranscriptStatus "ready") (eq .SummaryStatus "ready")}}
+            <div class="panel-tabs">
+                <button class="panel-tab panel-tab--active" data-tab="summary">Summary</button>
+                <button class="panel-tab" data-tab="transcript">Transcript</button>
+            </div>
+            <div class="panel-content" id="summary-panel">
+                <p class="summary-text">{{.Summary}}</p>
+                {{if .Chapters}}
+                <div class="chapter-list">
+                    <h3 class="chapter-list-title">Chapters</h3>
+                    {{range .Chapters}}
+                    <div class="chapter-item" data-start="{{.Start}}">
+                        <span class="chapter-timestamp">{{formatTimestamp .Start}}</span>
+                        <span class="chapter-title">{{.Title}}</span>
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+            <div class="panel-content hidden" id="transcript-panel">
+                {{range .Segments}}
+                <div class="transcript-segment" data-start="{{.Start}}" data-end="{{.End}}">
+                    <span class="transcript-timestamp">{{formatTimestamp .Start}}</span>
+                    <span class="transcript-text">{{.Text}}</span>
+                </div>
+                {{end}}
+            </div>
+            {{else}}
             <h2 class="transcript-header">Transcript <button class="download-btn transcribe-btn hidden" id="transcribe-btn">Transcribe</button></h2>
             {{if eq .TranscriptStatus "pending"}}
             <p class="transcript-processing">Transcription queued...</p>
@@ -1233,6 +1320,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             </div>
             {{else if eq .TranscriptStatus "failed"}}
             <p class="transcript-processing hidden" id="transcript-failed">Transcription failed.</p>
+            {{end}}
             {{end}}
         </div>
         {{end}}
@@ -1290,6 +1378,28 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     }).catch(function() { btn.textContent = 'Error'; btn.disabled = false; });
                 });
             }
+        })();
+        (function() {
+            var tabs = document.querySelectorAll('.panel-tab');
+            if (!tabs.length) return;
+            tabs.forEach(function(tab) {
+                tab.addEventListener('click', function() {
+                    tabs.forEach(function(t) { t.classList.remove('panel-tab--active'); });
+                    tab.classList.add('panel-tab--active');
+                    var target = tab.getAttribute('data-tab');
+                    document.getElementById('summary-panel').classList.toggle('hidden', target !== 'summary');
+                    document.getElementById('transcript-panel').classList.toggle('hidden', target !== 'transcript');
+                });
+            });
+            var chapters = document.querySelectorAll('.chapter-item');
+            var player = document.getElementById('player');
+            chapters.forEach(function(ch) {
+                ch.addEventListener('click', function() {
+                    var start = parseFloat(ch.getAttribute('data-start'));
+                    player.currentTime = start;
+                    player.play().catch(function() {});
+                });
+            });
         })();
         {{if and .CtaText .CtaUrl}}
         (function() {
@@ -1460,6 +1570,9 @@ type watchPageData struct {
 	ReactionEmojisJSON template.JS
 	CtaText            string
 	CtaUrl             string
+	Summary            string
+	Chapters           []Chapter
+	SummaryStatus      string
 }
 
 type expiredPageData struct {
@@ -1673,6 +1786,9 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var downloadEnabled bool
 	var ctaText, ctaUrl *string
 	var emailGateEnabled bool
+	var summaryText *string
+	var chaptersJSON *string
+	var summaryStatus string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
@@ -1680,7 +1796,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		        v.user_id, u.email, v.view_notification, v.content_type,
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
-		        v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled
+		        v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled,
+		        v.summary, v.chapters, v.summary_status
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
@@ -1692,7 +1809,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
 		&downloadEnabled,
-		&ctaText, &ctaUrl, &emailGateEnabled)
+		&ctaText, &ctaUrl, &emailGateEnabled,
+		&summaryText, &chaptersJSON, &summaryStatus)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1797,6 +1915,15 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal([]byte(*transcriptJSON), &segments)
 	}
 
+	var summaryStr string
+	chapterList := make([]Chapter, 0)
+	if summaryText != nil {
+		summaryStr = *summaryText
+	}
+	if chaptersJSON != nil {
+		_ = json.Unmarshal([]byte(*chaptersJSON), &chapterList)
+	}
+
 	reactionEmojisJSON, err := json.Marshal(quickReactionEmojis)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -1827,6 +1954,9 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		ReactionEmojisJSON: template.JS(string(reactionEmojisJSON)),
 		CtaText:            derefString(ctaText),
 		CtaUrl:             derefString(ctaUrl),
+		Summary:            summaryStr,
+		Chapters:           chapterList,
+		SummaryStatus:      summaryStatus,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}
