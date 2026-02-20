@@ -158,6 +158,7 @@ type listItem struct {
 	CtaUrl            *string `json:"ctaUrl"`
 	EmailGateEnabled  bool          `json:"emailGateEnabled"`
 	SummaryStatus     string        `json:"summaryStatus"`
+	SuggestedTitle    *string       `json:"suggestedTitle"`
 	FolderID          *string       `json:"folderId"`
 	Tags              []listItemTag `json:"tags"`
 }
@@ -574,7 +575,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
 		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled, v.summary_status,
-		    v.folder_id,
+		    v.suggested_title, v.folder_id,
 		    COALESCE((SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY t.name)
 		      FROM video_tags vt JOIN tags t ON t.id = vt.tag_id
 		      WHERE vt.video_id = v.id), '[]'::json) AS tags_json
@@ -632,7 +633,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var thumbnailKey *string
 		var sharePassword *string
 		var tagsJSON string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.FolderID, &tagsJSON); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.SuggestedTitle, &item.FolderID, &tagsJSON); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -1625,4 +1626,22 @@ func computeSummary(daily []dailyViews, todayStr string) analyticsSummary {
 		summary.AverageDailyViews = math.Round(avg*10) / 10
 	}
 	return summary
+}
+
+func (h *Handler) DismissTitle(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET suggested_title = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to dismiss title")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
