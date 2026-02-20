@@ -35,6 +35,7 @@ function makeAnalyticsData(overrides: Record<string, unknown> = {}) {
       reached100: 0,
       ...(overrides.milestones as Record<string, unknown> ?? {}),
     },
+    viewers: overrides.viewers ?? [],
   };
 }
 
@@ -180,5 +181,35 @@ describe("Analytics", () => {
       expect(screen.getByText("No views in this period.")).toBeInTheDocument();
     });
     expect(screen.queryByText("Completion Funnel")).not.toBeInTheDocument();
+  });
+
+  it("displays viewers table when viewers data is present", async () => {
+    mockApiFetch.mockResolvedValueOnce(makeAnalyticsData({
+      viewers: [
+        { email: "alice@example.com", firstViewedAt: "2026-02-10T14:30:00Z", viewCount: 3, completion: 82 },
+        { email: "bob@example.com", firstViewedAt: "2026-02-12T09:15:00Z", viewCount: 1, completion: 41 },
+      ],
+    }));
+    renderAnalytics();
+
+    await waitFor(() => {
+      expect(screen.getByText("Viewers")).toBeInTheDocument();
+    });
+    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+    expect(screen.getByText("bob@example.com")).toBeInTheDocument();
+    expect(screen.getByText("82%")).toBeInTheDocument();
+    expect(screen.getByText("41%")).toBeInTheDocument();
+  });
+
+  it("hides viewers table when viewers array is empty", async () => {
+    mockApiFetch.mockResolvedValueOnce(makeAnalyticsData({
+      viewers: [],
+    }));
+    renderAnalytics();
+
+    await waitFor(() => {
+      expect(screen.getByText("142")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Viewers")).not.toBeInTheDocument();
   });
 });

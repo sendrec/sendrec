@@ -26,10 +26,18 @@ interface Milestones {
   reached100: number;
 }
 
+interface Viewer {
+  email: string;
+  firstViewedAt: string;
+  viewCount: number;
+  completion: number;
+}
+
 interface AnalyticsData {
   summary: AnalyticsSummary;
   daily: DailyViews[];
   milestones: Milestones;
+  viewers: Viewer[];
 }
 
 type Range = "7d" | "30d" | "all";
@@ -326,6 +334,42 @@ export function Analytics() {
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {data.viewers && data.viewers.length > 0 && (
+        <div
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: 16,
+            marginTop: 16,
+          }}
+        >
+          <h3 style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>
+            Viewers
+          </h3>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 8px 8px 0" }}>Email</th>
+                <th style={{ textAlign: "left", color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 8px 8px 0" }}>First viewed</th>
+                <th style={{ textAlign: "right", color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 0 8px 8px" }}>Views</th>
+                <th style={{ textAlign: "right", color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 0 8px 8px" }}>Completion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.viewers.map((v) => (
+                <tr key={v.email}>
+                  <td style={{ color: "var(--color-text)", fontSize: 13, padding: "4px 8px 4px 0" }}>{v.email}</td>
+                  <td style={{ color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 8px 4px 0" }}>{new Date(v.firstViewedAt).toLocaleDateString()}</td>
+                  <td style={{ textAlign: "right", color: "var(--color-text)", fontSize: 13, padding: "4px 0 4px 8px" }}>{v.viewCount}</td>
+                  <td style={{ textAlign: "right", color: "var(--color-text)", fontSize: 13, padding: "4px 0 4px 8px" }}>{v.completion}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
