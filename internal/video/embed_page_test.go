@@ -18,6 +18,7 @@ var embedPageColumns = []string{
 	"thumbnail_key", "share_password", "content_type",
 	"user_id", "email", "view_notification",
 	"cta_text", "cta_url", "transcript_key",
+	"email_gate_enabled",
 }
 
 func embedPageRequest(shareToken string) *http.Request {
@@ -84,6 +85,7 @@ func TestEmbedPage_Expired_Returns410(t *testing.T) {
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil),
+			false,
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -120,6 +122,7 @@ func TestEmbedPage_Success_RendersVideoPlayer(t *testing.T) {
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil),
+			false,
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -168,6 +171,7 @@ func TestEmbedPage_WithThumbnail_RendersPoster(t *testing.T) {
 			&thumbKey, (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil),
+			false,
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -206,6 +210,7 @@ func TestEmbedPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 			(*string)(nil), &passwordHash, "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil),
+			false,
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -246,6 +251,7 @@ func TestEmbedPage_RecordsView(t *testing.T) {
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil),
+			false,
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -286,6 +292,7 @@ func TestEmbedPage_CSPNonce(t *testing.T) {
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil),
+			false,
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -323,6 +330,7 @@ func TestEmbedPage_NeverExpires(t *testing.T) {
 				(*string)(nil), (*string)(nil), "video/webm",
 				"owner-user-id", "owner@example.com", (*string)(nil),
 				(*string)(nil), (*string)(nil), (*string)(nil),
+				false,
 			),
 		)
 
@@ -369,6 +377,7 @@ func TestEmbedPage_ResponsiveLayout(t *testing.T) {
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil),
+			false,
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -412,6 +421,7 @@ func TestEmbedPage_RendersCtaOverlay(t *testing.T) {
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			&ctaText, &ctaUrl, (*string)(nil),
+			false,
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -464,6 +474,7 @@ func TestEmbedPage_RendersSubtitleTrack(t *testing.T) {
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			(*string)(nil), (*string)(nil), &transcriptKey,
+			false,
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -515,6 +526,7 @@ func TestEmbedPage_MilestoneTrackingScript(t *testing.T) {
 			(*string)(nil), (*string)(nil), "video/webm",
 			"owner-user-id", "owner@example.com", (*string)(nil),
 			(*string)(nil), (*string)(nil), (*string)(nil),
+			false,
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -537,6 +549,50 @@ func TestEmbedPage_MilestoneTrackingScript(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestEmbedPage_EmailGate_ShowsForm(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	shareToken := "emailgate123"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(embedPageColumns).AddRow(
+			"vid-1", "Gated Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
+			(*string)(nil), (*string)(nil), "video/webm",
+			"owner-user-id", "owner@example.com", (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
+			true,
+		))
+
+	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "Enter your email") {
+		t.Error("expected email gate form in response")
+	}
+	if strings.Contains(body, "<video") {
+		t.Error("expected no video player on email gate page")
+	}
+	if !strings.Contains(body, "/identify") {
+		t.Error("expected identify endpoint in form action")
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
