@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
@@ -201,6 +202,54 @@ func (h *Handler) DeleteFolder(w http.ResponseWriter, r *http.Request) {
 	}
 	if tag.RowsAffected() == 0 {
 		httputil.WriteError(w, http.StatusNotFound, "folder not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type setVideoFolderRequest struct {
+	FolderID *string `json:"folderId"`
+}
+
+func (h *Handler) SetVideoFolder(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setVideoFolderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	var folderID *string
+	if req.FolderID != nil && *req.FolderID != "" {
+		var id string
+		err := h.db.QueryRow(r.Context(),
+			`SELECT id FROM folders WHERE id = $1 AND user_id = $2`,
+			*req.FolderID, userID,
+		).Scan(&id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httputil.WriteError(w, http.StatusNotFound, "folder not found")
+				return
+			}
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to verify folder")
+			return
+		}
+		folderID = req.FolderID
+	}
+
+	result, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET folder_id = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
+		folderID, videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video folder")
+		return
+	}
+	if result.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
 

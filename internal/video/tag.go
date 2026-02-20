@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
@@ -217,6 +218,82 @@ func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	if result.RowsAffected() == 0 {
 		httputil.WriteError(w, http.StatusNotFound, "tag not found")
 		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+const maxTagsPerVideo = 10
+
+type setVideoTagsRequest struct {
+	TagIDs []string `json:"tagIds"`
+}
+
+func (h *Handler) SetVideoTags(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var req setVideoTagsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.TagIDs == nil {
+		req.TagIDs = []string{}
+	}
+
+	if len(req.TagIDs) > maxTagsPerVideo {
+		httputil.WriteError(w, http.StatusBadRequest, "maximum 10 tags per video")
+		return
+	}
+
+	var id string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	).Scan(&id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httputil.WriteError(w, http.StatusNotFound, "video not found")
+			return
+		}
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to verify video")
+		return
+	}
+
+	if len(req.TagIDs) > 0 {
+		var count int
+		err := h.db.QueryRow(r.Context(),
+			`SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND user_id = $2`,
+			req.TagIDs, userID,
+		).Scan(&count)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to verify tags")
+			return
+		}
+		if count != len(req.TagIDs) {
+			httputil.WriteError(w, http.StatusBadRequest, "one or more tags not found")
+			return
+		}
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		`DELETE FROM video_tags WHERE video_id = $1`,
+		videoID,
+	); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video tags")
+		return
+	}
+
+	for _, tagID := range req.TagIDs {
+		if _, err := h.db.Exec(r.Context(),
+			`INSERT INTO video_tags (video_id, tag_id) VALUES ($1, $2)`,
+			videoID, tagID,
+		); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update video tags")
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)

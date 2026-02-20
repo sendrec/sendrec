@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v4"
 )
@@ -496,6 +497,159 @@ func TestDeleteFolder_NotFound(t *testing.T) {
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
 	if errMsg != "folder not found" {
 		t.Errorf("expected error %q, got %q", "folder not found", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetVideoFolder_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-1"
+	folderID := "folder-1"
+
+	mock.ExpectQuery(`SELECT id FROM folders WHERE id = \$1 AND user_id = \$2`).
+		WithArgs(folderID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(folderID))
+
+	mock.ExpectExec(`UPDATE videos SET folder_id = \$1 WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
+		WithArgs(&folderID, videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body, _ := json.Marshal(setVideoFolderRequest{FolderID: &folderID})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/folder", handler.SetVideoFolder)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/folder", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetVideoFolder_Unfile(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-1"
+
+	mock.ExpectExec(`UPDATE videos SET folder_id = \$1 WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
+		WithArgs((*string)(nil), videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := []byte(`{"folderId":null}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/folder", handler.SetVideoFolder)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/folder", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetVideoFolder_FolderNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-1"
+	folderID := "nonexistent"
+
+	mock.ExpectQuery(`SELECT id FROM folders WHERE id = \$1 AND user_id = \$2`).
+		WithArgs(folderID, testUserID).
+		WillReturnError(pgx.ErrNoRows)
+
+	body, _ := json.Marshal(setVideoFolderRequest{FolderID: &folderID})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/folder", handler.SetVideoFolder)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/folder", body))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "folder not found" {
+		t.Errorf("expected error %q, got %q", "folder not found", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetVideoFolder_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "nonexistent"
+	folderID := "folder-1"
+
+	mock.ExpectQuery(`SELECT id FROM folders WHERE id = \$1 AND user_id = \$2`).
+		WithArgs(folderID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(folderID))
+
+	mock.ExpectExec(`UPDATE videos SET folder_id = \$1 WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
+		WithArgs(&folderID, videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	body, _ := json.Marshal(setVideoFolderRequest{FolderID: &folderID})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/folder", handler.SetVideoFolder)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/folder", body))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "video not found" {
+		t.Errorf("expected error %q, got %q", "video not found", errMsg)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

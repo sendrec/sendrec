@@ -2,6 +2,7 @@ package video
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pashagolub/pgxmock/v4"
 )
@@ -514,6 +516,209 @@ func TestDeleteTag_NotFound(t *testing.T) {
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
 	if errMsg != "tag not found" {
 		t.Errorf("expected error %q, got %q", "tag not found", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetVideoTags_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-1"
+	tagIDs := []string{"tag-1", "tag-2"}
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM tags WHERE id = ANY\(\$1\) AND user_id = \$2`).
+		WithArgs(tagIDs, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
+
+	mock.ExpectExec(`DELETE FROM video_tags WHERE video_id = \$1`).
+		WithArgs(videoID).
+		WillReturnResult(pgxmock.NewResult("DELETE", 0))
+
+	mock.ExpectExec(`INSERT INTO video_tags \(video_id, tag_id\) VALUES \(\$1, \$2\)`).
+		WithArgs(videoID, "tag-1").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	mock.ExpectExec(`INSERT INTO video_tags \(video_id, tag_id\) VALUES \(\$1, \$2\)`).
+		WithArgs(videoID, "tag-2").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body, _ := json.Marshal(setVideoTagsRequest{TagIDs: tagIDs})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/tags", handler.SetVideoTags)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/tags", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetVideoTags_EmptyArray(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-1"
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	mock.ExpectExec(`DELETE FROM video_tags WHERE video_id = \$1`).
+		WithArgs(videoID).
+		WillReturnResult(pgxmock.NewResult("DELETE", 3))
+
+	body, _ := json.Marshal(setVideoTagsRequest{TagIDs: []string{}})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/tags", handler.SetVideoTags)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/tags", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetVideoTags_TagNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-1"
+	tagIDs := []string{"tag-1", "nonexistent"}
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(videoID))
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM tags WHERE id = ANY\(\$1\) AND user_id = \$2`).
+		WithArgs(tagIDs, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
+
+	body, _ := json.Marshal(setVideoTagsRequest{TagIDs: tagIDs})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/tags", handler.SetVideoTags)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/tags", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "one or more tags not found" {
+		t.Errorf("expected error %q, got %q", "one or more tags not found", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestSetVideoTags_TooManyTags(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "video-1"
+	tagIDs := make([]string, 11)
+	for i := range tagIDs {
+		tagIDs[i] = fmt.Sprintf("tag-%d", i+1)
+	}
+
+	body, _ := json.Marshal(setVideoTagsRequest{TagIDs: tagIDs})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/tags", handler.SetVideoTags)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/tags", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "maximum 10 tags per video" {
+		t.Errorf("expected error %q, got %q", "maximum 10 tags per video", errMsg)
+	}
+}
+
+func TestSetVideoTags_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	videoID := "nonexistent"
+	tagIDs := []string{"tag-1"}
+
+	mock.ExpectQuery(`SELECT id FROM videos WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
+		WillReturnError(pgx.ErrNoRows)
+
+	body, _ := json.Marshal(setVideoTagsRequest{TagIDs: tagIDs})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/videos/{id}/tags", handler.SetVideoTags)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/videos/"+videoID+"/tags", body))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "video not found" {
+		t.Errorf("expected error %q, got %q", "video not found", errMsg)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
