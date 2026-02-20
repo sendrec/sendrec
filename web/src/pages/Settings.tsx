@@ -419,7 +419,7 @@ export function Settings() {
           gap: 16,
         }}
       >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Notifications</h2>
+        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Email Notifications</h2>
         <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
           Choose when to get email notifications for views and comments.
         </p>
