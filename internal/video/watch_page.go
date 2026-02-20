@@ -1439,13 +1439,15 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 }
             });
         })();
-        {{if or (eq .TranscriptStatus "processing") (eq .TranscriptStatus "pending")}}
+        {{if or (eq .TranscriptStatus "processing") (eq .TranscriptStatus "pending") (eq .SummaryStatus "pending") (eq .SummaryStatus "processing")}}
         (function() {
             var pollInterval = setInterval(function() {
                 fetch('/api/watch/{{.ShareToken}}?poll=transcript')
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
-                        if (data.transcriptStatus === 'ready' || data.transcriptStatus === 'failed') {
+                        var tDone = data.transcriptStatus === 'ready' || data.transcriptStatus === 'failed' || data.transcriptStatus === 'none';
+                        var sDone = data.summaryStatus === 'ready' || data.summaryStatus === 'failed' || data.summaryStatus === 'none';
+                        if (tDone && sDone) {
                             clearInterval(pollInterval);
                             window.location.reload();
                         }
