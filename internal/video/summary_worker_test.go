@@ -94,6 +94,82 @@ func TestProcessNextSummary_ClaimsAndProcesses(t *testing.T) {
 
 	summaryJSON := `{"summary":"A test video.","chapters":[{"title":"Introduction","start":0},{"title":"Testing","start":10}]}`
 
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		var content string
+		if callCount == 1 {
+			content = summaryJSON
+		} else {
+			content = "Hello World Testing Patterns"
+		}
+		resp := chatResponse{
+			Choices: []chatChoice{
+				{Message: chatMessage{Role: "assistant", Content: content}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	ai := NewAIClient(server.URL, "test-key", "test-model")
+
+	// Stuck job reset
+	mock.ExpectExec(`UPDATE videos SET summary_status = 'pending'`).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	// Claim next pending job
+	mock.ExpectQuery(`UPDATE videos SET summary_status = 'processing'`).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"id", "transcript_json"}).
+				AddRow("vid-1", transcriptJSON),
+		)
+
+	// Save summary result
+	chaptersOut, _ := json.Marshal([]Chapter{
+		{Title: "Introduction", Start: 0},
+		{Title: "Testing", Start: 10},
+	})
+	mock.ExpectExec(`UPDATE videos SET summary = .+, chapters = .+, summary_status = 'ready'`).
+		WithArgs("A test video.", chaptersOut, "vid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	// Title suggestion: query current title
+	mock.ExpectQuery(`SELECT title FROM videos WHERE id = \$1`).
+		WithArgs("vid-1").
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title"}).
+				AddRow("Recording 2/20/2026 3:45:12 PM"),
+		)
+
+	// Title suggestion: save suggested title
+	mock.ExpectExec(`UPDATE videos SET suggested_title = .+, updated_at = now\(\) WHERE id = \$2`).
+		WithArgs("Hello World Testing Patterns", "vid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	processNextSummary(context.Background(), mock, ai)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestProcessNextSummary_SkipsTitleForCustomTitle(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	segments := []TranscriptSegment{
+		{Start: 0, End: 10, Text: "Hello world."},
+		{Start: 10, End: 20, Text: "Testing patterns."},
+	}
+	transcriptJSON, _ := json.Marshal(segments)
+
+	summaryJSON := `{"summary":"A test video.","chapters":[{"title":"Introduction","start":0},{"title":"Testing","start":10}]}`
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := chatResponse{
 			Choices: []chatChoice{
@@ -126,6 +202,14 @@ func TestProcessNextSummary_ClaimsAndProcesses(t *testing.T) {
 	mock.ExpectExec(`UPDATE videos SET summary = .+, chapters = .+, summary_status = 'ready'`).
 		WithArgs("A test video.", chaptersOut, "vid-1").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	// Title suggestion: query current title — returns custom title, so no GenerateTitle call
+	mock.ExpectQuery(`SELECT title FROM videos WHERE id = \$1`).
+		WithArgs("vid-1").
+		WillReturnRows(
+			pgxmock.NewRows([]string{"title"}).
+				AddRow("My Custom Title"),
+		)
 
 	processNextSummary(context.Background(), mock, ai)
 
