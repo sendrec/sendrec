@@ -1,0 +1,4 @@
+ALTER TABLE videos DROP COLUMN IF EXISTS summary_started_at;
+ALTER TABLE videos DROP COLUMN IF EXISTS summary_status;
+ALTER TABLE videos DROP COLUMN IF EXISTS chapters;
+ALTER TABLE videos DROP COLUMN IF EXISTS summary;
