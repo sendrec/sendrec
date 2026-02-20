@@ -46,6 +46,12 @@ export function Settings() {
   const [apiKeyError, setApiKeyError] = useState("");
   const [creatingKey, setCreatingKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
+  const [savedSlackUrl, setSavedSlackUrl] = useState("");
+  const [slackMessage, setSlackMessage] = useState("");
+  const [slackError, setSlackError] = useState("");
+  const [savingSlack, setSavingSlack] = useState(false);
+  const [testingSlack, setTestingSlack] = useState(false);
   const [brandingEnabled, setBrandingEnabled] = useState(false);
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: null, logoKey: null,
@@ -62,7 +68,7 @@ export function Settings() {
       try {
         const [result, notifPrefs, limits, keys] = await Promise.all([
           apiFetch<UserProfile>("/api/user"),
-          apiFetch<{ notificationMode: string }>("/api/settings/notifications"),
+          apiFetch<{ notificationMode: string; slackWebhookUrl: string | null }>("/api/settings/notifications"),
           apiFetch<{ brandingEnabled: boolean }>("/api/videos/limits"),
           apiFetch<APIKeyItem[]>("/api/settings/api-keys"),
         ]);
@@ -72,6 +78,10 @@ export function Settings() {
         }
         if (notifPrefs) {
           setNotificationMode(notifPrefs.notificationMode);
+          if (notifPrefs.slackWebhookUrl) {
+            setSlackWebhookUrl(notifPrefs.slackWebhookUrl);
+            setSavedSlackUrl(notifPrefs.slackWebhookUrl);
+          }
         }
         if (keys) {
           setApiKeys(keys);
@@ -155,6 +165,40 @@ export function Settings() {
     } catch {
       setNotificationMode(previous);
       setNotificationMessage("Failed to save");
+    }
+  }
+
+  async function handleSlackSave() {
+    setSlackError("");
+    setSlackMessage("");
+    setSavingSlack(true);
+    try {
+      await apiFetch("/api/settings/notifications", {
+        method: "PUT",
+        body: JSON.stringify({ notificationMode, slackWebhookUrl }),
+      });
+      setSavedSlackUrl(slackWebhookUrl);
+      setSlackMessage("Webhook URL saved");
+    } catch (err) {
+      setSlackError(err instanceof Error ? err.message : "Failed to save webhook URL");
+    } finally {
+      setSavingSlack(false);
+    }
+  }
+
+  async function handleSlackTest() {
+    setSlackError("");
+    setSlackMessage("");
+    setTestingSlack(true);
+    try {
+      await apiFetch("/api/settings/notifications/test-slack", {
+        method: "POST",
+      });
+      setSlackMessage("Test message sent");
+    } catch (err) {
+      setSlackError(err instanceof Error ? err.message : "Failed to send test message");
+    } finally {
+      setTestingSlack(false);
     }
   }
 
@@ -375,7 +419,7 @@ export function Settings() {
           gap: 16,
         }}
       >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Notifications</h2>
+        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Email Notifications</h2>
         <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
           Choose when to get email notifications for views and comments.
         </p>
@@ -398,6 +442,89 @@ export function Settings() {
         {notificationMessage && (
           <p style={{ color: notificationMessage === "Failed to save" ? "var(--color-error, #e74c3c)" : "var(--color-accent)", fontSize: 14, margin: 0 }}>{notificationMessage}</p>
         )}
+      </div>
+
+      <div
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          padding: 24,
+          marginBottom: 24,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Slack Notifications</h2>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+          Send video view and comment notifications to a Slack channel.
+        </p>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Webhook URL</span>
+          <input
+            type="url"
+            value={slackWebhookUrl}
+            onChange={(e) => setSlackWebhookUrl(e.target.value)}
+            placeholder="https://hooks.slack.com/services/..."
+            style={inputStyle}
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={handleSlackSave}
+            disabled={savingSlack}
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              borderRadius: 4,
+              padding: "8px 16px",
+              fontSize: 14,
+              fontWeight: 600,
+              opacity: savingSlack ? 0.7 : 1,
+            }}
+          >
+            {savingSlack ? "Saving..." : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSlackTest}
+            disabled={testingSlack || !savedSlackUrl}
+            style={{
+              background: "transparent",
+              color: "var(--color-text-secondary)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 4,
+              padding: "8px 16px",
+              fontSize: 14,
+              cursor: !savedSlackUrl ? "default" : "pointer",
+              opacity: !savedSlackUrl ? 0.5 : 1,
+            }}
+          >
+            {testingSlack ? "Sending..." : "Send test message"}
+          </button>
+        </div>
+
+        {slackError && (
+          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{slackError}</p>
+        )}
+        {slackMessage && (
+          <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{slackMessage}</p>
+        )}
+
+        <details style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+          <summary style={{ cursor: "pointer" }}>How to get a webhook URL</summary>
+          <ol style={{ marginTop: 8, paddingLeft: 20, lineHeight: 1.8 }}>
+            <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-accent)" }}>api.slack.com/apps</a></li>
+            <li>Click <strong>Create New App</strong> and choose <strong>From scratch</strong></li>
+            <li>Under <strong>Features</strong>, select <strong>Incoming Webhooks</strong></li>
+            <li>Activate webhooks and click <strong>Add New Webhook to Workspace</strong></li>
+            <li>Choose a channel and copy the webhook URL</li>
+          </ol>
+        </details>
       </div>
 
       <div

@@ -39,6 +39,7 @@ type Config struct {
 	EmailSender             auth.EmailSender
 	CommentNotifier         video.CommentNotifier
 	ViewNotifier            video.ViewNotifier
+	SlackNotifier           video.SlackNotifier
 }
 
 type Server struct {
@@ -94,6 +95,9 @@ func New(cfg Config) *Server {
 		}
 		if cfg.AiEnabled {
 			s.videoHandler.SetAIEnabled(true)
+		}
+		if cfg.SlackNotifier != nil {
+			s.videoHandler.SetSlackNotifier(cfg.SlackNotifier)
 		}
 	}
 
@@ -172,6 +176,7 @@ func (s *Server) routes() {
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/notifications", s.videoHandler.GetNotificationPreferences)
 			r.Put("/notifications", s.videoHandler.PutNotificationPreferences)
+			r.Post("/notifications/test-slack", s.videoHandler.TestSlackWebhook)
 			r.Get("/branding", s.videoHandler.GetBrandingSettings)
 			r.Put("/branding", s.videoHandler.PutBrandingSettings)
 			r.Post("/branding/logo", s.videoHandler.UploadBrandingLogo)

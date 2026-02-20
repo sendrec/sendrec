@@ -41,6 +41,13 @@ type ViewNotifier interface {
 	SendDigestNotification(ctx context.Context, toEmail, toName string, videos []email.DigestVideoSummary) error
 }
 
+// SlackNotifier sends Slack webhook notifications independently of the email notification mode.
+// The implementation gates on whether the user has a webhook URL configured.
+type SlackNotifier interface {
+	SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int) error
+	SendCommentNotification(ctx context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error
+}
+
 type Handler struct {
 	db                      database.DBTX
 	storage                 ObjectStorage
@@ -52,6 +59,7 @@ type Handler struct {
 	secureCookies           bool
 	commentNotifier         CommentNotifier
 	viewNotifier            ViewNotifier
+	slackNotifier           SlackNotifier
 	brandingEnabled         bool
 	analyticsScript         string
 	aiEnabled               bool
@@ -63,6 +71,10 @@ func (h *Handler) SetCommentNotifier(n CommentNotifier) {
 
 func (h *Handler) SetViewNotifier(n ViewNotifier) {
 	h.viewNotifier = n
+}
+
+func (h *Handler) SetSlackNotifier(n SlackNotifier) {
+	h.slackNotifier = n
 }
 
 func (h *Handler) SetBrandingEnabled(enabled bool) {

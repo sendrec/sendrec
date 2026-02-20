@@ -6,11 +6,13 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/slack"
 )
 
 const (
@@ -42,21 +44,24 @@ var validViewNotificationModes = map[string]bool{
 }
 
 type notificationPreferencesResponse struct {
-	NotificationMode string `json:"notificationMode"`
+	NotificationMode string  `json:"notificationMode"`
+	SlackWebhookUrl  *string `json:"slackWebhookUrl"`
 }
 
 type setNotificationPreferencesRequest struct {
-	NotificationMode string `json:"notificationMode"`
+	NotificationMode string  `json:"notificationMode"`
+	SlackWebhookUrl  *string `json:"slackWebhookUrl,omitempty"`
 }
 
 func (h *Handler) GetNotificationPreferences(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
 	var notificationMode string
+	var slackWebhookUrl *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT view_notification FROM notification_preferences WHERE user_id = $1`,
+		`SELECT view_notification, slack_webhook_url FROM notification_preferences WHERE user_id = $1`,
 		userID,
-	).Scan(&notificationMode)
+	).Scan(&notificationMode, &slackWebhookUrl)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			notificationMode = notificationModeOff
@@ -68,8 +73,11 @@ func (h *Handler) GetNotificationPreferences(w http.ResponseWriter, r *http.Requ
 
 	httputil.WriteJSON(w, http.StatusOK, notificationPreferencesResponse{
 		NotificationMode: normalizeAccountNotificationMode(notificationMode),
+		SlackWebhookUrl:  slackWebhookUrl,
 	})
 }
+
+const maxSlackWebhookURLLength = 500
 
 func (h *Handler) PutNotificationPreferences(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
@@ -85,13 +93,50 @@ func (h *Handler) PutNotificationPreferences(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	var slackWebhookUrl *string
+	if req.SlackWebhookUrl != nil {
+		trimmed := strings.TrimSpace(*req.SlackWebhookUrl)
+		if trimmed != "" {
+			if !strings.HasPrefix(trimmed, "https://hooks.slack.com/") {
+				httputil.WriteError(w, http.StatusBadRequest, "Slack webhook URL must start with https://hooks.slack.com/")
+				return
+			}
+			if len(trimmed) > maxSlackWebhookURLLength {
+				httputil.WriteError(w, http.StatusBadRequest, "Slack webhook URL must be 500 characters or fewer")
+				return
+			}
+			slackWebhookUrl = &trimmed
+		}
+	}
+
 	if _, err := h.db.Exec(r.Context(),
-		`INSERT INTO notification_preferences (user_id, view_notification)
-		 VALUES ($1, $2)
-		 ON CONFLICT (user_id) DO UPDATE SET view_notification = $2, updated_at = now()`,
-		userID, req.NotificationMode,
+		`INSERT INTO notification_preferences (user_id, view_notification, slack_webhook_url)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (user_id) DO UPDATE SET view_notification = $2, slack_webhook_url = $3, updated_at = now()`,
+		userID, req.NotificationMode, slackWebhookUrl,
 	); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to save preferences")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) TestSlackWebhook(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+
+	var webhookURL *string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT slack_webhook_url FROM notification_preferences WHERE user_id = $1`,
+		userID,
+	).Scan(&webhookURL)
+	if err != nil || webhookURL == nil {
+		httputil.WriteError(w, http.StatusBadRequest, "no Slack webhook URL configured")
+		return
+	}
+
+	if err := slack.SendTestMessage(r.Context(), *webhookURL); err != nil {
+		httputil.WriteError(w, http.StatusBadGateway, "failed to send test message to Slack")
 		return
 	}
 
@@ -201,11 +246,21 @@ func (h *Handler) viewerUserIDFromRequest(r *http.Request) string {
 }
 
 func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerEmail, ownerName, videoTitle, shareToken, viewerUserID string, videoViewNotification *string) {
-	if h.viewNotifier == nil {
+	if viewerUserID != "" && viewerUserID == ownerID {
 		return
 	}
 
-	if viewerUserID != "" && viewerUserID == ownerID {
+	watchURL := h.baseURL + "/watch/" + shareToken
+
+	// Slack: always send (Slack client gates on webhook URL presence in DB)
+	if h.slackNotifier != nil {
+		if err := h.slackNotifier.SendViewNotification(ctx, ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
+			log.Printf("failed to send Slack view notification for %s: %v", videoID, err)
+		}
+	}
+
+	// Email: gated on notification mode
+	if h.viewNotifier == nil {
 		return
 	}
 
@@ -222,7 +277,6 @@ func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerE
 		return
 	}
 
-	watchURL := h.baseURL + "/watch/" + shareToken
 	if err := h.viewNotifier.SendViewNotification(ctx, ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
 		log.Printf("failed to send view notification for %s: %v", videoID, err)
 	}
