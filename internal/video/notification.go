@@ -246,11 +246,21 @@ func (h *Handler) viewerUserIDFromRequest(r *http.Request) string {
 }
 
 func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerEmail, ownerName, videoTitle, shareToken, viewerUserID string, videoViewNotification *string) {
-	if h.viewNotifier == nil {
+	if viewerUserID != "" && viewerUserID == ownerID {
 		return
 	}
 
-	if viewerUserID != "" && viewerUserID == ownerID {
+	watchURL := h.baseURL + "/watch/" + shareToken
+
+	// Slack: always send (Slack client gates on webhook URL presence in DB)
+	if h.slackNotifier != nil {
+		if err := h.slackNotifier.SendViewNotification(ctx, ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
+			log.Printf("failed to send Slack view notification for %s: %v", videoID, err)
+		}
+	}
+
+	// Email: gated on notification mode
+	if h.viewNotifier == nil {
 		return
 	}
 
@@ -267,7 +277,6 @@ func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerE
 		return
 	}
 
-	watchURL := h.baseURL + "/watch/" + shareToken
 	if err := h.viewNotifier.SendViewNotification(ctx, ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
 		log.Printf("failed to send view notification for %s: %v", videoID, err)
 	}

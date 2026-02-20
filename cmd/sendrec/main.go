@@ -15,7 +15,6 @@ import (
 
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/email"
-	"github.com/sendrec/sendrec/internal/notify"
 	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/server"
 	slackpkg "github.com/sendrec/sendrec/internal/slack"
@@ -112,8 +111,9 @@ func main() {
 		AllowedFrameAncestors:   os.Getenv("ALLOWED_FRAME_ANCESTORS"),
 		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
 		EmailSender:             emailClient,
-		CommentNotifier:         notify.NewMultiCommentNotifier(emailClient, slackClient),
-		ViewNotifier:            notify.NewMultiViewNotifier(emailClient, slackClient),
+		CommentNotifier:         emailClient,
+		ViewNotifier:            emailClient,
+		SlackNotifier:           slackClient,
 	})
 
 	var aiClient *video.AIClient

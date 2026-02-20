@@ -660,6 +660,86 @@ func TestResolveAndNotify_UsesAccountModeAndSendsViewsOnly(t *testing.T) {
 	}
 }
 
+func TestResolveAndNotify_SlackFiresWhenModeIsOff(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	emailNotifier := &mockViewNotifier{}
+	slackNotifier := &mockSlackNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler.SetViewNotifier(emailNotifier)
+	handler.SetSlackNotifier(slackNotifier)
+
+	mock.ExpectQuery(`SELECT view_notification FROM notification_preferences WHERE user_id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"view_notification"}).AddRow("off"))
+
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", nil)
+
+	if emailNotifier.called {
+		t.Error("expected email notification to be skipped when mode is off")
+	}
+	if !slackNotifier.viewCalled {
+		t.Error("expected Slack notification to fire regardless of notification mode")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestResolveAndNotify_SlackSkippedWhenViewerIsOwner(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	slackNotifier := &mockSlackNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler.SetSlackNotifier(slackNotifier)
+
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", testUserID, nil)
+
+	if slackNotifier.viewCalled {
+		t.Error("expected Slack notification to be skipped when viewer is owner")
+	}
+}
+
+func TestResolveAndNotify_BothFireWhenModeIsViewsOnly(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	emailNotifier := &mockViewNotifier{}
+	slackNotifier := &mockSlackNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler.SetViewNotifier(emailNotifier)
+	handler.SetSlackNotifier(slackNotifier)
+
+	mock.ExpectQuery(`SELECT view_notification FROM notification_preferences WHERE user_id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"view_notification"}).AddRow("views_only"))
+
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", nil)
+
+	if !emailNotifier.called {
+		t.Error("expected email notification when mode is views_only")
+	}
+	if !slackNotifier.viewCalled {
+		t.Error("expected Slack notification when mode is views_only")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
 // --- mock view notifier ---
 
 type mockViewNotifier struct {
@@ -697,5 +777,20 @@ func (m *countingDigestNotifier) SendViewNotification(context.Context, string, s
 
 func (m *countingDigestNotifier) SendDigestNotification(_ context.Context, _, _ string, _ []email.DigestVideoSummary) error {
 	*m.callCount++
+	return nil
+}
+
+type mockSlackNotifier struct {
+	viewCalled    bool
+	commentCalled bool
+}
+
+func (m *mockSlackNotifier) SendViewNotification(_ context.Context, _, _, _, _ string, _ int) error {
+	m.viewCalled = true
+	return nil
+}
+
+func (m *mockSlackNotifier) SendCommentNotification(_ context.Context, _, _, _, _, _, _ string) error {
+	m.commentCalled = true
 	return nil
 }

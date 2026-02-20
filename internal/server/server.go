@@ -39,6 +39,7 @@ type Config struct {
 	EmailSender             auth.EmailSender
 	CommentNotifier         video.CommentNotifier
 	ViewNotifier            video.ViewNotifier
+	SlackNotifier           video.SlackNotifier
 }
 
 type Server struct {
@@ -94,6 +95,9 @@ func New(cfg Config) *Server {
 		}
 		if cfg.AiEnabled {
 			s.videoHandler.SetAIEnabled(true)
+		}
+		if cfg.SlackNotifier != nil {
+			s.videoHandler.SetSlackNotifier(cfg.SlackNotifier)
 		}
 	}
 

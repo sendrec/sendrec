@@ -224,11 +224,10 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !req.IsPrivate &&
-		!quickReaction &&
-		callerUserID != ownerID &&
-		h.commentNotifier != nil &&
-		h.shouldSendImmediateCommentNotification(r.Context(), ownerID) {
+	shouldEmailComment := h.commentNotifier != nil && h.shouldSendImmediateCommentNotification(r.Context(), ownerID)
+	shouldSlackComment := h.slackNotifier != nil
+
+	if !req.IsPrivate && !quickReaction && callerUserID != ownerID && (shouldEmailComment || shouldSlackComment) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
@@ -246,8 +245,15 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 			if authorName == "" {
 				authorName = "Anonymous"
 			}
-			if err := h.commentNotifier.SendCommentNotification(ctx, ownerEmail, ownerName, videoTitle, authorName, req.Body, watchURL); err != nil {
-				log.Printf("failed to send comment notification: %v", err)
+			if shouldSlackComment {
+				if err := h.slackNotifier.SendCommentNotification(ctx, ownerEmail, ownerName, videoTitle, authorName, req.Body, watchURL); err != nil {
+					log.Printf("failed to send Slack comment notification: %v", err)
+				}
+			}
+			if shouldEmailComment {
+				if err := h.commentNotifier.SendCommentNotification(ctx, ownerEmail, ownerName, videoTitle, authorName, req.Body, watchURL); err != nil {
+					log.Printf("failed to send comment notification: %v", err)
+				}
 			}
 		}()
 	}
