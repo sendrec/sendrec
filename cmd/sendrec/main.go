@@ -109,10 +109,22 @@ func main() {
 		ViewNotifier:            emailClient,
 	})
 
+	var aiClient *video.AIClient
+	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
+	if aiEnabled {
+		aiClient = video.NewAIClient(
+			os.Getenv("AI_BASE_URL"),
+			os.Getenv("AI_API_KEY"),
+			getEnv("AI_MODEL", "mistral-small-latest"),
+		)
+		log.Printf("AI summaries enabled (model: %s)", getEnv("AI_MODEL", "mistral-small-latest"))
+	}
+
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	defer cleanupCancel()
 	video.StartCleanupLoop(cleanupCtx, db.Pool, store, 10*time.Minute)
-	video.StartTranscriptionWorker(cleanupCtx, db.Pool, store, 5*time.Second)
+	video.StartTranscriptionWorker(cleanupCtx, db.Pool, store, 5*time.Second, aiEnabled)
+	video.StartSummaryWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
 	video.StartDigestWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 
 	httpServer := &http.Server{
