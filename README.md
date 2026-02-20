@@ -8,19 +8,45 @@ The async video platform built for Europe. Open source, GDPR native, EU hosted.
 
 SendRec is an open-source alternative to Loom for teams that need their data to stay in the EU. Record your screen, share videos with your team, and keep full control of your data.
 
-- **EU hosted** — all data stored on European servers, never leaves the EU
-- **GDPR native** — privacy-first by design, not bolted on after the fact
-- **Open source** — AGPLv3 licensed, self-host or use our managed platform
-- **No US cloud dependency** — no data transfers to the US, no Schrems II risk
-- **Screen recording** — pause/resume, camera overlay (PiP webcam), drawing annotations
-- **Video upload** — drag-and-drop upload for MP4, WebM, and MOV files
-- **Video management** — trimming, download, library search (title + transcript), playback speed controls
-- **Sharing** — expiring links, password protection, video comments with timestamps and emoji
-- **Analytics** — per-video view tracking with daily charts and summary stats
-- **View notifications** — instant, first-view, or daily digest email notifications when someone watches your video
-- **Custom branding** — personalize watch pages with your logo, company name, colors, and footer text (per-user defaults with per-video overrides)
-- **Email confirmation** — new accounts require email verification before access
-- **Automatic transcription** — videos are transcribed with whisper.cpp, displayed as subtitles and a clickable transcript panel
+### Record
+
+Record your screen, camera, or both — directly in the browser. Pause and resume, draw annotations live, flip between front and back cameras on mobile. Upload existing MP4, WebM, and MOV files via drag-and-drop.
+
+![Recording](.github/screenshots/recording.png)
+
+### Share
+
+Every video gets a shareable link with password protection, expiry dates, and per-video download controls. Trim videos, upload custom thumbnails, and add call-to-action buttons that appear when the video ends.
+
+![Library](.github/screenshots/library.png)
+
+### Watch
+
+Server-rendered watch pages with a clickable transcript panel, closed captions, timestamped comments, and emoji reactions. Embed videos in docs and wikis with a lightweight iframe player.
+
+![Watch page](.github/screenshots/watch.png)
+
+### Analyze
+
+Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA click-through rates. Get notified on views, comments, or as a daily digest.
+
+![Analytics](.github/screenshots/analytics.png)
+
+### Features
+
+- **Screen & camera recording** — pause/resume, webcam overlay, drawing annotations, mobile front/back camera
+- **Video upload** — drag-and-drop MP4, WebM, MOV
+- **Automatic transcription** — whisper.cpp, closed captions on watch and embed pages, full-text search
+- **Sharing** — expiring or permanent links, password protection, per-video download toggle, custom thumbnails
+- **Comments & reactions** — timestamped comments, emoji reactions, configurable modes
+- **CTA buttons** — call-to-action overlay on video end with click tracking
+- **Viewer analytics** — daily view charts, completion funnel, CTA click-through rates
+- **View notifications** — off, views only, comments only, both, or daily digest
+- **Embeddable player** — lightweight iframe with captions, CTA, and milestone tracking
+- **Custom branding** — logo, colors, footer text, custom CSS injection, per-user defaults with per-video overrides
+- **Library** — search by title and transcript, inline title editing, overflow menu with grouped actions
+- **Integrations** — Nextcloud (oEmbed + API keys), per-user API keys, OpenAPI docs
+- **Self-hostable** — single Go binary, Docker Compose, PostgreSQL, S3-compatible storage
 
 ## Quick Start
 
