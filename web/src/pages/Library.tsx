@@ -25,6 +25,8 @@ interface Video {
   ctaText: string | null;
   ctaUrl: string | null;
   summaryStatus: string;
+  folderId: string | null;
+  tags: VideoTag[];
 }
 
 interface LimitsResponse {
@@ -42,6 +44,28 @@ interface VideoBranding {
   colorText: string | null;
   colorAccent: string | null;
   footerText: string | null;
+}
+
+interface Folder {
+  id: string;
+  name: string;
+  position: number;
+  videoCount: number;
+  createdAt: string;
+}
+
+interface Tag {
+  id: string;
+  name: string;
+  color: string | null;
+  videoCount: number;
+  createdAt: string;
+}
+
+interface VideoTag {
+  id: string;
+  name: string;
+  color: string | null;
 }
 
 function formatDuration(seconds: number): string {
@@ -98,21 +122,46 @@ export function Library() {
   const [ctaVideoId, setCtaVideoId] = useState<string | null>(null);
   const [ctaText, setCtaText] = useState("");
   const [ctaUrl, setCtaUrl] = useState("");
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [creatingTag, setCreatingTag] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState("#3b82f6");
+  const [editingSidebarId, setEditingSidebarId] = useState<string | null>(null);
+  const [editingSidebarName, setEditingSidebarName] = useState("");
+  const [sidebarMenuId, setSidebarMenuId] = useState<string | null>(null);
 
-  const fetchVideosAndLimits = useCallback(async (query = "") => {
-    const searchParam = query ? `?q=${encodeURIComponent(query)}` : "";
+  const fetchVideosAndLimits = useCallback(async (query = "", filter = "all") => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (filter.startsWith("folder:")) params.set("folder_id", filter.slice(7));
+    else if (filter === "unfiled") params.set("folder_id", "unfiled");
+    else if (filter.startsWith("tag:")) params.set("tag_id", filter.slice(4));
+    const qs = params.toString();
     const [videosResult, limitsResult] = await Promise.all([
-      apiFetch<Video[]>(`/api/videos${searchParam}`),
+      apiFetch<Video[]>(`/api/videos${qs ? `?${qs}` : ""}`),
       apiFetch<LimitsResponse>("/api/videos/limits"),
     ]);
     setVideos(videosResult ?? []);
     setLimits(limitsResult ?? null);
   }, []);
 
+  const fetchFoldersAndTags = useCallback(async () => {
+    const [foldersResult, tagsResult] = await Promise.all([
+      apiFetch<Folder[]>("/api/folders"),
+      apiFetch<Tag[]>("/api/tags"),
+    ]);
+    setFolders(foldersResult ?? []);
+    setTags(tagsResult ?? []);
+  }, []);
+
   useEffect(() => {
     async function fetchData() {
       try {
-        await fetchVideosAndLimits();
+        await Promise.all([fetchVideosAndLimits(), fetchFoldersAndTags()]);
       } catch {
         setVideos([]);
       } finally {
@@ -121,7 +170,7 @@ export function Library() {
     }
 
     fetchData();
-  }, [fetchVideosAndLimits]);
+  }, [fetchVideosAndLimits, fetchFoldersAndTags]);
 
   useEffect(() => {
     const hasProcessing = videos.some(
@@ -131,14 +180,14 @@ export function Library() {
 
     const interval = setInterval(async () => {
       try {
-        await fetchVideosAndLimits(searchQuery);
+        await fetchVideosAndLimits(searchQuery, activeFilter);
       } catch {
         // ignore poll errors
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [videos, searchQuery, fetchVideosAndLimits]);
+  }, [videos, searchQuery, activeFilter, fetchVideosAndLimits]);
 
   useEffect(() => {
     if (!openMenuId) return;
@@ -158,12 +207,24 @@ export function Library() {
     };
   }, [openMenuId]);
 
+  useEffect(() => {
+    if (!sidebarMenuId) return;
+    function handleClick() { setSidebarMenuId(null); }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [sidebarMenuId]);
+
   function handleSearchChange(value: string) {
     setSearchQuery(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      fetchVideosAndLimits(value);
+      fetchVideosAndLimits(value, activeFilter);
     }, 300);
+  }
+
+  function handleFilterChange(filter: string) {
+    setActiveFilter(filter);
+    fetchVideosAndLimits(searchQuery, filter);
   }
 
   function showToast(message: string) {
@@ -426,6 +487,57 @@ export function Library() {
     showToast("CTA removed");
   }
 
+  async function createFolder() {
+    if (!newFolderName.trim()) return;
+    await apiFetch("/api/folders", { method: "POST", body: JSON.stringify({ name: newFolderName.trim() }) });
+    setNewFolderName("");
+    setCreatingFolder(false);
+    await fetchFoldersAndTags();
+  }
+
+  async function createTag() {
+    if (!newTagName.trim()) return;
+    await apiFetch("/api/tags", { method: "POST", body: JSON.stringify({ name: newTagName.trim(), color: newTagColor }) });
+    setNewTagName("");
+    setCreatingTag(false);
+    await fetchFoldersAndTags();
+  }
+
+  async function renameSidebarItem(type: "folder" | "tag", id: string) {
+    if (!editingSidebarName.trim()) return;
+    const url = type === "folder" ? `/api/folders/${id}` : `/api/tags/${id}`;
+    await apiFetch(url, { method: "PUT", body: JSON.stringify({ name: editingSidebarName.trim() }) });
+    setEditingSidebarId(null);
+    await fetchFoldersAndTags();
+  }
+
+  async function deleteSidebarItem(type: "folder" | "tag", id: string) {
+    const msg = type === "folder" ? "Delete this folder? Videos will become unfiled." : "Delete this tag? It will be removed from all videos.";
+    if (!window.confirm(msg)) return;
+    const url = type === "folder" ? `/api/folders/${id}` : `/api/tags/${id}`;
+    await apiFetch(url, { method: "DELETE" });
+    if (activeFilter === `${type}:${id}`) setActiveFilter("all");
+    await fetchFoldersAndTags();
+    await fetchVideosAndLimits(searchQuery, activeFilter === `${type}:${id}` ? "all" : activeFilter);
+  }
+
+  async function moveToFolder(videoId: string, folderId: string | null) {
+    await apiFetch(`/api/videos/${videoId}/folder`, { method: "PUT", body: JSON.stringify({ folderId }) });
+    setVideos((prev) => prev.map((v) => (v.id === videoId ? { ...v, folderId } : v)));
+    await fetchFoldersAndTags();
+    setOpenMenuId(null);
+  }
+
+  async function toggleVideoTag(videoId: string, tagId: string) {
+    const video = videos.find((v) => v.id === videoId);
+    if (!video) return;
+    const currentIds = video.tags.map((t) => t.id);
+    const newIds = currentIds.includes(tagId) ? currentIds.filter((id) => id !== tagId) : [...currentIds, tagId];
+    await apiFetch(`/api/videos/${videoId}/tags`, { method: "PUT", body: JSON.stringify({ tagIds: newIds }) });
+    await fetchVideosAndLimits(searchQuery, activeFilter);
+    await fetchFoldersAndTags();
+  }
+
   if (loading) {
     return (
       <div className="page-container page-container--centered">
@@ -463,6 +575,140 @@ export function Library() {
 
   return (
     <div className="page-container">
+      <div className="library-layout">
+        <nav className="library-sidebar">
+          <button
+            className={`sidebar-item${activeFilter === "all" ? " sidebar-item--active" : ""}`}
+            onClick={() => handleFilterChange("all")}
+          >
+            All Videos
+          </button>
+          <button
+            className={`sidebar-item${activeFilter === "unfiled" ? " sidebar-item--active" : ""}`}
+            onClick={() => handleFilterChange("unfiled")}
+          >
+            Unfiled
+          </button>
+
+          <div className="sidebar-section">
+            <div className="sidebar-section-header">
+              <span>Folders</span>
+              <button className="sidebar-add-btn" onClick={() => setCreatingFolder(true)} title="New folder">+</button>
+            </div>
+            {creatingFolder && (
+              <div style={{ padding: "4px 8px" }}>
+                <input
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") createFolder(); if (e.key === "Escape") setCreatingFolder(false); }}
+                  placeholder="Folder name"
+                  maxLength={100}
+                  style={{ width: "100%", padding: "4px 8px", fontSize: 13, background: "var(--color-background)", border: "1px solid var(--color-border)", borderRadius: 4, color: "var(--color-text)" }}
+                />
+              </div>
+            )}
+            {folders.map((folder) => (
+              <div key={folder.id} className="sidebar-item-wrapper" onMouseLeave={() => { if (sidebarMenuId === `folder-${folder.id}`) setSidebarMenuId(null); }}>
+                {editingSidebarId === `folder-${folder.id}` ? (
+                  <input
+                    autoFocus
+                    value={editingSidebarName}
+                    onChange={(e) => setEditingSidebarName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") renameSidebarItem("folder", folder.id); if (e.key === "Escape") setEditingSidebarId(null); }}
+                    onBlur={() => renameSidebarItem("folder", folder.id)}
+                    style={{ width: "100%", padding: "4px 8px", fontSize: 13, background: "var(--color-background)", border: "1px solid var(--color-border)", borderRadius: 4, color: "var(--color-text)" }}
+                  />
+                ) : (
+                  <button
+                    className={`sidebar-item${activeFilter === `folder:${folder.id}` ? " sidebar-item--active" : ""}`}
+                    onClick={() => handleFilterChange(`folder:${folder.id}`)}
+                  >
+                    <span className="sidebar-item-name">{folder.name}</span>
+                    <span className="sidebar-item-count">{folder.videoCount}</span>
+                  </button>
+                )}
+                <button
+                  className="sidebar-item-menu-btn"
+                  onClick={(e) => { e.stopPropagation(); setSidebarMenuId(sidebarMenuId === `folder-${folder.id}` ? null : `folder-${folder.id}`); }}
+                >
+                  &#x22EE;
+                </button>
+                {sidebarMenuId === `folder-${folder.id}` && (
+                  <div className="sidebar-item-menu" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => { setEditingSidebarId(`folder-${folder.id}`); setEditingSidebarName(folder.name); setSidebarMenuId(null); }}>Rename</button>
+                    <button onClick={() => { deleteSidebarItem("folder", folder.id); setSidebarMenuId(null); }}>Delete</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="sidebar-section">
+            <div className="sidebar-section-header">
+              <span>Tags</span>
+              <button className="sidebar-add-btn" onClick={() => setCreatingTag(true)} title="New tag">+</button>
+            </div>
+            {creatingTag && (
+              <div style={{ padding: "4px 8px" }}>
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input
+                    type="color"
+                    value={newTagColor}
+                    onChange={(e) => setNewTagColor(e.target.value)}
+                    style={{ width: 24, height: 24, padding: 0, border: "none", cursor: "pointer" }}
+                  />
+                  <input
+                    autoFocus
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") createTag(); if (e.key === "Escape") setCreatingTag(false); }}
+                    placeholder="Tag name"
+                    maxLength={50}
+                    style={{ flex: 1, padding: "4px 8px", fontSize: 13, background: "var(--color-background)", border: "1px solid var(--color-border)", borderRadius: 4, color: "var(--color-text)" }}
+                  />
+                </div>
+              </div>
+            )}
+            {tags.map((tag) => (
+              <div key={tag.id} className="sidebar-item-wrapper" onMouseLeave={() => { if (sidebarMenuId === `tag-${tag.id}`) setSidebarMenuId(null); }}>
+                {editingSidebarId === `tag-${tag.id}` ? (
+                  <input
+                    autoFocus
+                    value={editingSidebarName}
+                    onChange={(e) => setEditingSidebarName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") renameSidebarItem("tag", tag.id); if (e.key === "Escape") setEditingSidebarId(null); }}
+                    onBlur={() => renameSidebarItem("tag", tag.id)}
+                    style={{ width: "100%", padding: "4px 8px", fontSize: 13, background: "var(--color-background)", border: "1px solid var(--color-border)", borderRadius: 4, color: "var(--color-text)" }}
+                  />
+                ) : (
+                  <button
+                    className={`sidebar-item${activeFilter === `tag:${tag.id}` ? " sidebar-item--active" : ""}`}
+                    onClick={() => handleFilterChange(`tag:${tag.id}`)}
+                  >
+                    <span className="tag-dot" style={{ background: tag.color ?? "var(--color-text-secondary)" }} />
+                    <span className="sidebar-item-name">{tag.name}</span>
+                    <span className="sidebar-item-count">{tag.videoCount}</span>
+                  </button>
+                )}
+                <button
+                  className="sidebar-item-menu-btn"
+                  onClick={(e) => { e.stopPropagation(); setSidebarMenuId(sidebarMenuId === `tag-${tag.id}` ? null : `tag-${tag.id}`); }}
+                >
+                  &#x22EE;
+                </button>
+                {sidebarMenuId === `tag-${tag.id}` && (
+                  <div className="sidebar-item-menu" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => { setEditingSidebarId(`tag-${tag.id}`); setEditingSidebarName(tag.name); setSidebarMenuId(null); }}>Rename</button>
+                    <button onClick={() => { deleteSidebarItem("tag", tag.id); setSidebarMenuId(null); }}>Delete</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </nav>
+
+        <div className="library-main">
       <div className="library-header">
         <div>
           <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
@@ -649,6 +895,25 @@ export function Library() {
               </div>
             </div>
 
+            {video.tags.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                {video.tags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 4,
+                      padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 500,
+                      background: "var(--color-background)", border: "1px solid var(--color-border)",
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: tag.color ?? "var(--color-text-secondary)" }} />
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {video.status === "ready" && (
               <div className="video-card-actions" style={{ borderTop: "1px solid var(--color-border)", marginTop: 12, paddingTop: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -697,6 +962,57 @@ export function Library() {
                           boxShadow: "0 4px 16px var(--color-shadow)",
                         }}
                       >
+                        <div style={{ padding: "4px 12px", fontSize: 11, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                          Organization
+                        </div>
+                        <div style={{ padding: "4px 12px" }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                            <span className="action-link" style={{ cursor: "default" }}>Folder</span>
+                            <select
+                              aria-label="Move to folder"
+                              value={video.folderId ?? ""}
+                              onChange={(e) => moveToFolder(video.id, e.target.value || null)}
+                              style={{
+                                background: "var(--color-surface)", border: "1px solid var(--color-border)",
+                                borderRadius: 4, color: video.folderId ? "var(--color-accent)" : "var(--color-text-secondary)",
+                                fontSize: 12, padding: "2px 4px", cursor: "pointer",
+                              }}
+                            >
+                              <option value="">None</option>
+                              {folders.map((f) => (
+                                <option key={f.id} value={f.id}>{f.name}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                        {tags.length > 0 && (
+                          <div style={{ padding: "4px 12px" }}>
+                            <div style={{ fontSize: 13, marginBottom: 4 }} className="action-link">Tags</div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                              {tags.map((tag) => {
+                                const active = video.tags.some((vt) => vt.id === tag.id);
+                                return (
+                                  <button
+                                    key={tag.id}
+                                    onClick={() => toggleVideoTag(video.id, tag.id)}
+                                    style={{
+                                      display: "inline-flex", alignItems: "center", gap: 4,
+                                      padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 500,
+                                      background: active ? "var(--color-accent)" : "var(--color-background)",
+                                      color: active ? "var(--color-on-accent)" : "var(--color-text-secondary)",
+                                      border: active ? "1px solid var(--color-accent)" : "1px solid var(--color-border)",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: tag.color ?? "var(--color-text-secondary)" }} />
+                                    {tag.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
                         <div style={{ padding: "4px 12px", fontSize: 11, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                           Sharing
                         </div>
@@ -958,6 +1274,8 @@ export function Library() {
                 )}
           </div>
         ))}
+      </div>
+        </div>
       </div>
 
       {brandingVideoId && (

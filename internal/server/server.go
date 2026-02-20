@@ -219,8 +219,29 @@ func (s *Server) routes() {
 				r.Put("/{id}/cta", s.videoHandler.SetCTA)
 				r.Put("/{id}/email-gate", s.videoHandler.SetEmailGate)
 				r.Post("/{id}/summarize", s.videoHandler.Summarize)
+				r.Put("/{id}/folder", s.videoHandler.SetVideoFolder)
+				r.Put("/{id}/tags", s.videoHandler.SetVideoTags)
 			})
 		})
+
+		s.router.Route("/api/folders", func(r chi.Router) {
+			r.Use(s.authHandler.Middleware)
+			r.Use(maxBodySize(64 * 1024))
+			r.Get("/", s.videoHandler.ListFolders)
+			r.Post("/", s.videoHandler.CreateFolder)
+			r.Put("/{id}", s.videoHandler.UpdateFolder)
+			r.Delete("/{id}", s.videoHandler.DeleteFolder)
+		})
+
+		s.router.Route("/api/tags", func(r chi.Router) {
+			r.Use(s.authHandler.Middleware)
+			r.Use(maxBodySize(64 * 1024))
+			r.Get("/", s.videoHandler.ListTags)
+			r.Post("/", s.videoHandler.CreateTag)
+			r.Put("/{id}", s.videoHandler.UpdateTag)
+			r.Delete("/{id}", s.videoHandler.DeleteTag)
+		})
+
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
 		commentLimiter := ratelimit.NewLimiter(0.2, 3)
 		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
