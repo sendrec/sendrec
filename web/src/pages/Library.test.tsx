@@ -30,6 +30,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     transcriptStatus: "none",
     viewNotification: null,
     downloadEnabled: true,
+    emailGateEnabled: false,
     ctaText: null,
     ctaUrl: null,
     ...overrides,
@@ -1064,6 +1065,84 @@ describe("Library", () => {
         method: "PUT",
         body: JSON.stringify({ downloadEnabled: false }),
       });
+    });
+  });
+
+  describe("email gate toggle", () => {
+    it("shows Require email when email gate is off", async () => {
+      mockFetch([makeVideo({ emailGateEnabled: false })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+      await openOverflowMenu();
+      expect(screen.getByText("Require email")).toBeInTheDocument();
+    });
+
+    it("shows Email required when email gate is on", async () => {
+      mockFetch([makeVideo({ emailGateEnabled: true })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+      await openOverflowMenu();
+      expect(screen.getByText("Email required")).toBeInTheDocument();
+    });
+
+    it("calls API to enable email gate", async () => {
+      mockFetch([makeVideo({ emailGateEnabled: false })]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu();
+      await userEvent.click(screen.getByText("Require email"));
+
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/email-gate", {
+        method: "PUT",
+        body: JSON.stringify({ enabled: true }),
+      });
+    });
+
+    it("calls API to disable email gate", async () => {
+      mockFetch([makeVideo({ emailGateEnabled: true })]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu();
+      await userEvent.click(screen.getByText("Email required"));
+
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1/email-gate", {
+        method: "PUT",
+        body: JSON.stringify({ enabled: false }),
+      });
+    });
+
+    it("keeps menu open after toggling email gate", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo({ emailGateEnabled: false })]);
+      mockApiFetch.mockResolvedValueOnce(undefined);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      await user.click(screen.getByText("Require email"));
+
+      // Menu stays open, label updates
+      expect(screen.getByText("Email required")).toBeInTheDocument();
+      expect(screen.getByText("Trim")).toBeInTheDocument(); // menu still visible
     });
   });
 

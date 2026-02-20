@@ -21,6 +21,7 @@ interface Video {
   transcriptStatus: string;
   viewNotification: string | null;
   downloadEnabled: boolean;
+  emailGateEnabled: boolean;
   ctaText: string | null;
   ctaUrl: string | null;
 }
@@ -217,6 +218,15 @@ export function Library() {
       body: JSON.stringify({ downloadEnabled: newValue }),
     });
     setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, downloadEnabled: newValue } : v)));
+  }
+
+  async function toggleEmailGate(video: Video) {
+    const newValue = !video.emailGateEnabled;
+    await apiFetch(`/api/videos/${video.id}/email-gate`, {
+      method: "PUT",
+      body: JSON.stringify({ enabled: newValue }),
+    });
+    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, emailGateEnabled: newValue } : v)));
   }
 
   async function extendVideo(id: string) {
@@ -677,6 +687,13 @@ export function Library() {
                           style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: video.downloadEnabled ? "var(--color-accent)" : undefined }}
                         >
                           {video.downloadEnabled ? "Downloads on" : "Downloads off"}
+                        </button>
+                        <button
+                          onClick={() => toggleEmailGate(video)}
+                          className="action-link"
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: video.emailGateEnabled ? "var(--color-accent)" : undefined }}
+                        >
+                          {video.emailGateEnabled ? "Email required" : "Require email"}
                         </button>
                         <button
                           onClick={() => {

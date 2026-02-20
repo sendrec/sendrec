@@ -139,6 +139,7 @@ type listItem struct {
 	DownloadEnabled   bool    `json:"downloadEnabled"`
 	CtaText           *string `json:"ctaText"`
 	CtaUrl            *string `json:"ctaUrl"`
+	EmailGateEnabled  bool    `json:"emailGateEnabled"`
 }
 
 type updateRequest struct {
@@ -541,7 +542,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
-		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url
+		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled
 		 FROM videos v
 		 WHERE v.status != 'deleted'`
 
@@ -579,7 +580,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var shareExpiresAt *time.Time
 		var thumbnailKey *string
 		var sharePassword *string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
