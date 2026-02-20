@@ -24,6 +24,7 @@ interface Video {
   emailGateEnabled: boolean;
   ctaText: string | null;
   ctaUrl: string | null;
+  summaryStatus: string;
 }
 
 interface LimitsResponse {
@@ -31,6 +32,7 @@ interface LimitsResponse {
   maxVideoDurationSeconds: number;
   videosUsedThisMonth: number;
   brandingEnabled: boolean;
+  aiEnabled: boolean;
 }
 
 interface VideoBranding {
@@ -227,6 +229,13 @@ export function Library() {
       body: JSON.stringify({ enabled: newValue }),
     });
     setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, emailGateEnabled: newValue } : v)));
+  }
+
+  async function summarizeVideo(video: Video) {
+    await apiFetch(`/api/videos/${video.id}/summarize`, { method: "POST" });
+    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, summaryStatus: "pending" } : v)));
+    showToast("Summary queued");
+    setOpenMenuId(null);
   }
 
   async function extendVideo(id: string) {
@@ -819,6 +828,21 @@ export function Library() {
                             style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
                           >
                             Branding
+                          </button>
+                        )}
+                        {limits?.aiEnabled && video.transcriptStatus === "ready" && (
+                          <button
+                            onClick={() => summarizeVideo(video)}
+                            disabled={video.summaryStatus === "pending" || video.summaryStatus === "processing"}
+                            className="action-link"
+                            style={{
+                              display: "block", width: "100%", textAlign: "left", padding: "6px 12px",
+                              opacity: video.summaryStatus === "pending" || video.summaryStatus === "processing" ? 0.5 : undefined,
+                            }}
+                          >
+                            {video.summaryStatus === "pending" || video.summaryStatus === "processing"
+                              ? "Summarizing..."
+                              : video.summaryStatus === "ready" ? "Re-summarize" : "Summarize"}
                           </button>
                         )}
                         <div style={{ padding: "6px 12px" }}>

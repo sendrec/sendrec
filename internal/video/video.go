@@ -54,6 +54,7 @@ type Handler struct {
 	viewNotifier            ViewNotifier
 	brandingEnabled         bool
 	analyticsScript         string
+	aiEnabled               bool
 }
 
 func (h *Handler) SetCommentNotifier(n CommentNotifier) {
@@ -70,6 +71,10 @@ func (h *Handler) SetBrandingEnabled(enabled bool) {
 
 func (h *Handler) SetAnalyticsScript(script string) {
 	h.analyticsScript = script
+}
+
+func (h *Handler) SetAIEnabled(enabled bool) {
+	h.aiEnabled = enabled
 }
 
 func extensionForContentType(ct string) string {
@@ -140,6 +145,7 @@ type listItem struct {
 	CtaText           *string `json:"ctaText"`
 	CtaUrl            *string `json:"ctaUrl"`
 	EmailGateEnabled  bool    `json:"emailGateEnabled"`
+	SummaryStatus     string  `json:"summaryStatus"`
 }
 
 type updateRequest struct {
@@ -374,6 +380,7 @@ type limitsResponse struct {
 	MaxVideoDurationSeconds int  `json:"maxVideoDurationSeconds"`
 	VideosUsedThisMonth     int  `json:"videosUsedThisMonth"`
 	BrandingEnabled         bool `json:"brandingEnabled"`
+	AiEnabled               bool `json:"aiEnabled"`
 }
 
 func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
@@ -394,6 +401,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		MaxVideoDurationSeconds: h.maxVideoDurationSeconds,
 		VideosUsedThisMonth:     videosUsed,
 		BrandingEnabled:         h.brandingEnabled,
+		AiEnabled:               h.aiEnabled,
 	})
 }
 
@@ -545,7 +553,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
-		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled
+		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled, v.summary_status
 		 FROM videos v
 		 WHERE v.status != 'deleted'`
 
@@ -583,7 +591,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var shareExpiresAt *time.Time
 		var thumbnailKey *string
 		var sharePassword *string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -952,6 +960,32 @@ func (h *Handler) SetEmailGate(w http.ResponseWriter, r *http.Request) {
 	}
 	if tag.RowsAffected() == 0 {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) Summarize(w http.ResponseWriter, r *http.Request) {
+	if !h.aiEnabled {
+		httputil.WriteError(w, http.StatusForbidden, "AI summaries not enabled")
+		return
+	}
+
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET summary_status = 'pending', summary = NULL, chapters = NULL, updated_at = now()
+		 WHERE id = $1 AND user_id = $2 AND status != 'deleted' AND transcript_status = 'ready'`,
+		videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not enqueue summary")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found or transcript not ready")
 		return
 	}
 

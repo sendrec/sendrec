@@ -33,6 +33,7 @@ type Config struct {
 	S3PublicEndpoint        string
 	EnableDocs              bool
 	BrandingEnabled         bool
+	AiEnabled               bool
 	AllowedFrameAncestors   string
 	AnalyticsScript         string
 	EmailSender             auth.EmailSender
@@ -90,6 +91,9 @@ func New(cfg Config) *Server {
 		}
 		if cfg.AnalyticsScript != "" {
 			s.videoHandler.SetAnalyticsScript(cfg.AnalyticsScript)
+		}
+		if cfg.AiEnabled {
+			s.videoHandler.SetAIEnabled(true)
 		}
 	}
 
@@ -209,6 +213,7 @@ func (s *Server) routes() {
 				r.Delete("/{id}/thumbnail", s.videoHandler.ResetThumbnail)
 				r.Put("/{id}/cta", s.videoHandler.SetCTA)
 				r.Put("/{id}/email-gate", s.videoHandler.SetEmailGate)
+				r.Post("/{id}/summarize", s.videoHandler.Summarize)
 			})
 		})
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)

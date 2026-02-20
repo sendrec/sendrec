@@ -89,6 +89,8 @@ func main() {
 		Allowlist:         email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
 	})
 
+	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
+
 	srv := server.New(server.Config{
 		DB:                      db.Pool,
 		Pinger:                  db,
@@ -102,6 +104,7 @@ func main() {
 		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
 		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",
+		AiEnabled:               aiEnabled,
 		AllowedFrameAncestors:   os.Getenv("ALLOWED_FRAME_ANCESTORS"),
 		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
 		EmailSender:             emailClient,
@@ -110,7 +113,6 @@ func main() {
 	})
 
 	var aiClient *video.AIClient
-	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
 	if aiEnabled {
 		aiClient = video.NewAIClient(
 			os.Getenv("AI_BASE_URL"),
