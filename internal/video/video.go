@@ -636,7 +636,9 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
-		json.Unmarshal([]byte(tagsJSON), &item.Tags)
+		if err := json.Unmarshal([]byte(tagsJSON), &item.Tags); err != nil {
+			item.Tags = make([]listItemTag, 0)
+		}
 		if item.Tags == nil {
 			item.Tags = make([]listItemTag, 0)
 		}
