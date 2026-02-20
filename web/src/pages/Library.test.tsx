@@ -33,14 +33,19 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     emailGateEnabled: false,
     ctaText: null,
     ctaUrl: null,
+    summaryStatus: "none",
+    folderId: null,
+    tags: [],
     ...overrides,
   };
 }
 
-function mockFetch(videos: unknown[], limits = unlimitedLimits) {
+function mockFetch(videos: unknown[], limits = unlimitedLimits, folders: unknown[] = [], tags: unknown[] = []) {
   mockApiFetch
     .mockResolvedValueOnce(videos)
-    .mockResolvedValueOnce(limits);
+    .mockResolvedValueOnce(limits)
+    .mockResolvedValueOnce(folders)
+    .mockResolvedValueOnce(tags);
 }
 
 function renderLibrary() {
@@ -221,8 +226,8 @@ describe("Library", () => {
 
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(confirmSpy).toHaveBeenCalledWith("Delete this recording? This cannot be undone.");
-    // Should not have called delete API (only initial fetch + limits fetch)
-    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+    // Should not have called delete API (only initial fetches: videos, limits, folders, tags)
+    expect(mockApiFetch).toHaveBeenCalledTimes(4);
   });
 
   it("deletes video when confirmed", async () => {
@@ -393,8 +398,8 @@ describe("Library", () => {
     await openOverflowMenu(user);
     await user.click(screen.getByRole("button", { name: "Add password" }));
 
-    // Should not have called password API (only initial fetch + limits fetch)
-    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+    // Should not have called password API (only initial fetches: videos, limits, folders, tags)
+    expect(mockApiFetch).toHaveBeenCalledTimes(4);
   });
 
   it("shows processing status", async () => {
@@ -462,8 +467,8 @@ describe("Library", () => {
 
     expect(screen.getByText("My Recording")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Something else")).not.toBeInTheDocument();
-    // Should not have called PATCH (only initial fetch + limits fetch)
-    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+    // Should not have called PATCH (only initial fetches: videos, limits, folders, tags)
+    expect(mockApiFetch).toHaveBeenCalledTimes(4);
   });
 
   it("renders Trim button for ready videos", async () => {
