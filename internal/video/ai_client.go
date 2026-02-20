@@ -43,6 +43,7 @@ const summarySystemPrompt = `You are a video content analyzer. Given a timestamp
 - "summary": A 2-3 sentence overview of what the video covers.
 - "chapters": An array of objects with "title" (string, 3-6 words) and "start" (number, seconds from transcript timestamps) marking major topic changes. Include 2-8 chapters depending on video length. The first chapter should start at 0.
 
+Write the summary and chapter titles in the same language as the transcript.
 Return ONLY valid JSON, no markdown formatting.`
 
 type chatMessage struct {
