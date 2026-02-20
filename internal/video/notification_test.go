@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -25,9 +26,9 @@ func TestGetNotificationPreferences_ExistingRow(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectQuery(`SELECT view_notification FROM notification_preferences WHERE user_id = \$1`).
+	mock.ExpectQuery(`SELECT view_notification, slack_webhook_url FROM notification_preferences WHERE user_id = \$1`).
 		WithArgs(testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"view_notification"}).AddRow("views_only"))
+		WillReturnRows(pgxmock.NewRows([]string{"view_notification", "slack_webhook_url"}).AddRow("views_only", (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/settings/notifications", handler.GetNotificationPreferences)
@@ -39,12 +40,12 @@ func TestGetNotificationPreferences_ExistingRow(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var resp map[string]string
+	var resp map[string]interface{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if resp["notificationMode"] != "views_only" {
-		t.Errorf("expected notificationMode=views_only, got %s", resp["notificationMode"])
+		t.Errorf("expected notificationMode=views_only, got %v", resp["notificationMode"])
 	}
 }
 
@@ -57,7 +58,7 @@ func TestGetNotificationPreferences_DefaultWhenNoRow(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectQuery(`SELECT view_notification FROM notification_preferences WHERE user_id = \$1`).
+	mock.ExpectQuery(`SELECT view_notification, slack_webhook_url FROM notification_preferences WHERE user_id = \$1`).
 		WithArgs(testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -71,12 +72,15 @@ func TestGetNotificationPreferences_DefaultWhenNoRow(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	var resp map[string]string
+	var resp map[string]interface{}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if resp["notificationMode"] != "off" {
-		t.Errorf("expected notificationMode=off, got %s", resp["notificationMode"])
+		t.Errorf("expected notificationMode=off, got %v", resp["notificationMode"])
+	}
+	if resp["slackWebhookUrl"] != nil {
+		t.Errorf("expected slackWebhookUrl=nil, got %v", resp["slackWebhookUrl"])
 	}
 }
 
@@ -92,7 +96,7 @@ func TestPutNotificationPreferences_ValidMode(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`INSERT INTO notification_preferences`).
-		WithArgs(testUserID, "digest").
+		WithArgs(testUserID, "digest", (*string)(nil)).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	body, _ := json.Marshal(setNotificationPreferencesRequest{NotificationMode: "digest"})
@@ -128,6 +132,243 @@ func TestPutNotificationPreferences_InvalidMode(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/settings/notifications", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetNotificationPreferences_IncludesSlackWebhookUrl(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	slackURL := "https://hooks.slack.com/services/T/B/X"
+	mock.ExpectQuery(`SELECT view_notification, slack_webhook_url FROM notification_preferences WHERE user_id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"view_notification", "slack_webhook_url"}).AddRow("views_only", &slackURL))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/settings/notifications", handler.GetNotificationPreferences)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/settings/notifications", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp["notificationMode"] != "views_only" {
+		t.Errorf("expected notificationMode=views_only, got %v", resp["notificationMode"])
+	}
+	if resp["slackWebhookUrl"] != slackURL {
+		t.Errorf("expected slackWebhookUrl=%s, got %v", slackURL, resp["slackWebhookUrl"])
+	}
+}
+
+func TestGetNotificationPreferences_SlackWebhookUrlNull(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT view_notification, slack_webhook_url FROM notification_preferences WHERE user_id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"view_notification", "slack_webhook_url"}).AddRow("off", (*string)(nil)))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/settings/notifications", handler.GetNotificationPreferences)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/settings/notifications", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp["notificationMode"] != "off" {
+		t.Errorf("expected notificationMode=off, got %v", resp["notificationMode"])
+	}
+	if resp["slackWebhookUrl"] != nil {
+		t.Errorf("expected slackWebhookUrl=nil, got %v", resp["slackWebhookUrl"])
+	}
+}
+
+func TestPutNotificationPreferences_SavesSlackWebhookUrl(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	slackURL := "https://hooks.slack.com/services/T/B/X"
+	mock.ExpectExec(`INSERT INTO notification_preferences`).
+		WithArgs(testUserID, "views_only", &slackURL).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := []byte(`{"notificationMode":"views_only","slackWebhookUrl":"https://hooks.slack.com/services/T/B/X"}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/settings/notifications", handler.PutNotificationPreferences)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/settings/notifications", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestPutNotificationPreferences_ClearsSlackWebhookUrl(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectExec(`INSERT INTO notification_preferences`).
+		WithArgs(testUserID, "off", (*string)(nil)).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := []byte(`{"notificationMode":"off","slackWebhookUrl":""}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/settings/notifications", handler.PutNotificationPreferences)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/settings/notifications", body))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestPutNotificationPreferences_RejectsInvalidWebhookUrl(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	body := []byte(`{"notificationMode":"views_only","slackWebhookUrl":"https://evil.com/webhook"}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/settings/notifications", handler.PutNotificationPreferences)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/settings/notifications", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPutNotificationPreferences_RejectsLongWebhookUrl(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	longURL := "https://hooks.slack.com/services/" + strings.Repeat("x", 500)
+	body := []byte(`{"notificationMode":"views_only","slackWebhookUrl":"` + longURL + `"}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/settings/notifications", handler.PutNotificationPreferences)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/settings/notifications", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// --- TestSlackWebhook Tests ---
+
+func TestTestSlackWebhook_Success(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	fakeSlack := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer fakeSlack.Close()
+
+	webhookURL := fakeSlack.URL
+	mock.ExpectQuery(`SELECT slack_webhook_url FROM notification_preferences WHERE user_id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"slack_webhook_url"}).AddRow(&webhookURL))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/settings/notifications/test-slack", handler.TestSlackWebhook)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/settings/notifications/test-slack", nil))
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestTestSlackWebhook_NoUrlConfigured_Returns400(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT slack_webhook_url FROM notification_preferences WHERE user_id = \$1`).
+		WithArgs(testUserID).
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/settings/notifications/test-slack", handler.TestSlackWebhook)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/settings/notifications/test-slack", nil))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
