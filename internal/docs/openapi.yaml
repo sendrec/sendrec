@@ -1,7 +1,7 @@
 openapi: "3.0.3"
 info:
   title: SendRec API
-  version: "1.24.0"
+  version: "1.42.0"
   description: API for SendRec, an open-source EU-native async video messaging platform.
   license:
     name: MIT
@@ -261,6 +261,11 @@ components:
         notificationMode:
           type: string
           enum: [off, views_only, comments_only, views_and_comments, digest]
+        slackWebhookUrl:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Slack incoming webhook URL for notifications. Must start with https://hooks.slack.com/
 
     UpdateNotificationPreferencesRequest:
       type: object
@@ -269,6 +274,11 @@ components:
         notificationMode:
           type: string
           enum: [off, views_only, comments_only, views_and_comments, digest]
+        slackWebhookUrl:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Slack incoming webhook URL. Must start with https://hooks.slack.com/. Send empty string to clear.
 
     SetVideoNotificationRequest:
       type: object
@@ -1095,6 +1105,36 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/notifications/test-slack:
+    post:
+      tags: [Settings]
+      summary: Send test Slack notification
+      description: Sends a test message to the user's configured Slack webhook URL. The webhook URL must be saved first via PUT /api/settings/notifications.
+      operationId: testSlackWebhook
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Test message sent successfully
+        "400":
+          description: No Slack webhook URL configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Failed to send message to Slack
           content:
             application/json:
               schema:

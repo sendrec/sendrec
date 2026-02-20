@@ -46,6 +46,7 @@ Then create a `garage-init.sh` script that sets up the bucket and credentials on
 # Dockerfile.garage-init
 FROM dxflrs/garage:v2.2.0 AS garage
 FROM alpine:3.21
+RUN apk add --no-cache aws-cli
 COPY --from=garage /garage /usr/local/bin/garage
 ```
 
@@ -79,11 +80,20 @@ if [ -n "${KEY_ID}" ]; then
   garage bucket allow --read --write --owner "${S3_BUCKET}" --key "${KEY_ID}" 2>/dev/null || true
 fi
 
-BUCKET_ID=$(garage json-api GetBucketInfo "{\"globalAlias\":\"${S3_BUCKET}\"}" 2>/dev/null \
-  | grep '"id"' | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')
-if [ -n "${BUCKET_ID}" ]; then
-  garage json-api UpdateBucket "{\"id\":\"${BUCKET_ID}\",\"body\":{\"corsConfig\":{\"set\":[{\"allowedOrigins\":[\"*\"],\"allowedMethods\":[\"GET\",\"PUT\",\"HEAD\"],\"allowedHeaders\":[\"*\"],\"exposeHeaders\":[\"ETag\"],\"maxAgeSeconds\":3600}]}}}" > /dev/null 2>&1
-fi
+# Set CORS via aws-cli (Garage v2.2.0 admin API silently ignores corsConfig)
+apk add --no-cache aws-cli > /dev/null 2>&1 || true
+export AWS_ACCESS_KEY_ID="${KEY_ID}"
+export AWS_SECRET_ACCESS_KEY="${SECRET}"
+export AWS_DEFAULT_REGION="eu-central-1"
+aws --endpoint-url http://127.0.0.1:3900 s3api put-bucket-cors --bucket "${S3_BUCKET}" --cors-configuration '{
+  "CORSRules": [{
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }]
+}' 2>/dev/null || true
 ```
 
 ```yaml
@@ -240,6 +250,18 @@ Examples:
 - **Mistral AI:** `AI_BASE_URL=https://api.mistral.ai`, `AI_API_KEY=your-key`, `AI_MODEL=mistral-small-latest`
 - **OpenAI:** `AI_BASE_URL=https://api.openai.com`, `AI_API_KEY=your-key`, `AI_MODEL=gpt-4o-mini`
 - **Ollama (local):** `AI_BASE_URL=http://ollama:11434`, `AI_API_KEY=` (empty), `AI_MODEL=llama3.2`
+
+### Slack notifications (optional)
+
+Receive view and comment notifications in a Slack channel via incoming webhooks.
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) and create a new app (From scratch)
+2. Under **Incoming Webhooks**, activate and add a webhook to your channel
+3. Copy the webhook URL
+4. In SendRec **Settings > Slack Notifications**, paste the URL and click Save
+5. Click **Send test message** to verify
+
+No server-side configuration is needed — each user configures their own webhook URL in Settings.
 
 ### Email notifications (optional)
 

@@ -14,6 +14,12 @@ Record your screen, camera, or both — directly in the browser. Pause and resum
 
 ![Recording](.github/screenshots/recording.png)
 
+### Upload
+
+Drag-and-drop existing MP4, WebM, and MOV files. Set a title, upload directly to S3 via presigned URLs, and get a shareable link instantly.
+
+![Upload](.github/screenshots/upload.png)
+
 ### Share
 
 Every video gets a shareable link with password protection, expiry dates, and per-video download controls. Trim videos, upload custom thumbnails, and add call-to-action buttons that appear when the video ends.
@@ -40,7 +46,9 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 - **Sharing** — expiring or permanent links, password protection, per-video download toggle, custom thumbnails
 - **Comments & reactions** — timestamped comments, emoji reactions, configurable modes
 - **CTA buttons** — call-to-action overlay on video end with click tracking
+- **AI summaries** — AI-generated summaries and chapter markers via any OpenAI-compatible API
 - **Viewer analytics** — daily view charts, completion funnel, CTA click-through rates
+- **Slack webhook notifications** — per-user Slack incoming webhook for view and comment alerts
 - **View notifications** — off, views only, comments only, both, or daily digest
 - **Embeddable player** — lightweight iframe with captions, CTA, and milestone tracking
 - **Custom branding** — logo, colors, footer text, custom CSS injection, per-user defaults with per-video overrides
