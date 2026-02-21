@@ -93,6 +93,11 @@ export function Settings() {
   const [brandingError, setBrandingError] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [billing, setBilling] = useState<{ plan: string; subscriptionId: string | null; portalUrl: string | null } | null>(null);
+  const [billingEnabled, setBillingEnabled] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+  const [billingMessage, setBillingMessage] = useState("");
 
   useEffect(() => {
     async function fetchProfile() {
@@ -133,6 +138,17 @@ export function Settings() {
         }
       } catch {
         // stay on page, fields will be empty
+      }
+
+      try {
+        const billingData = await apiFetch<{ plan: string; subscriptionId: string | null; portalUrl: string | null }>("/api/settings/billing");
+        if (billingData) {
+          setBilling(billingData);
+          setBillingEnabled(true);
+        }
+      } catch {
+        // Billing not configured (self-hosted) — hide billing section
+        setBillingEnabled(false);
       }
     }
     fetchProfile();
@@ -421,6 +437,39 @@ export function Settings() {
     }
   }
 
+  async function handleUpgrade() {
+    setUpgrading(true);
+    setBillingMessage("");
+    try {
+      const resp = await apiFetch<{ checkoutUrl: string }>("/api/settings/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ plan: "pro" }),
+      });
+      if (resp?.checkoutUrl) {
+        window.location.href = resp.checkoutUrl;
+      }
+    } catch (err: unknown) {
+      setBillingMessage(err instanceof Error ? err.message : "Failed to start checkout");
+    } finally {
+      setUpgrading(false);
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (!confirm("Cancel your Pro subscription? You'll keep access until the end of your billing period.")) return;
+    setCanceling(true);
+    setBillingMessage("");
+    try {
+      await apiFetch("/api/settings/billing/cancel", { method: "POST" });
+      setBillingMessage("Subscription canceled. Access continues until end of billing period.");
+      setBilling((b) => b ? { ...b, plan: "free", subscriptionId: null, portalUrl: null } : b);
+    } catch (err: unknown) {
+      setBillingMessage(err instanceof Error ? err.message : "Failed to cancel");
+    } finally {
+      setCanceling(false);
+    }
+  }
+
   if (!profile) {
     return (
       <div className="page-container page-container--centered">
@@ -444,6 +493,113 @@ export function Settings() {
       <h1 style={{ color: "var(--color-text)", fontSize: 24, marginBottom: 24 }}>
         Settings
       </h1>
+
+      {billingEnabled && billing && (
+        <div style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          padding: 24,
+          marginBottom: 24,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Subscription</h2>
+            <span style={{
+              background: billing.plan === "pro" ? "var(--color-accent)" : "var(--color-border)",
+              color: billing.plan === "pro" ? "#fff" : "var(--color-text-secondary)",
+              padding: "2px 10px",
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 600,
+              textTransform: "capitalize",
+            }}>
+              {billing.plan === "pro" ? "Pro" : "Free"}
+            </span>
+          </div>
+
+          {billing.plan === "free" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+                Upgrade to Pro for unlimited videos and recording duration.
+              </p>
+              <div style={{
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: 16,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}>
+                <div>
+                  <p style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, margin: 0 }}>Pro</p>
+                  <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: "4px 0 0" }}>Unlimited videos and duration</p>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ color: "var(--color-text)", fontSize: 18, fontWeight: 600 }}>€8/mo</span>
+                  <button
+                    type="button"
+                    onClick={handleUpgrade}
+                    disabled={upgrading}
+                    style={{
+                      background: "var(--color-accent)",
+                      color: "#fff",
+                      borderRadius: 4,
+                      padding: "8px 16px",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      border: "none",
+                      cursor: upgrading ? "default" : "pointer",
+                      opacity: upgrading ? 0.7 : 1,
+                    }}
+                  >
+                    {upgrading ? "Redirecting..." : "Upgrade to Pro"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {billing.plan === "pro" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {billing.portalUrl && (
+                <a
+                  href={billing.portalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--color-accent)", fontSize: 14 }}
+                >
+                  Manage subscription
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={handleCancelSubscription}
+                disabled={canceling}
+                style={{
+                  background: "transparent",
+                  color: "var(--color-error, #ef4444)",
+                  border: "1px solid var(--color-error, #ef4444)",
+                  borderRadius: 4,
+                  padding: "8px 16px",
+                  fontSize: 14,
+                  cursor: canceling ? "default" : "pointer",
+                  opacity: canceling ? 0.7 : 1,
+                  alignSelf: "flex-start",
+                }}
+              >
+                {canceling ? "Canceling..." : "Cancel subscription"}
+              </button>
+            </div>
+          )}
+
+          {billingMessage && (
+            <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>{billingMessage}</p>
+          )}
+        </div>
+      )}
 
       <form
         onSubmit={handleNameSubmit}

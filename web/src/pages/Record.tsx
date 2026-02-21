@@ -216,20 +216,37 @@ export function Record() {
           You've reached your limit of {limits!.maxVideosPerMonth} videos this month.
           Delete unused recordings or wait until next month.
         </p>
-        <Link
-          to="/library"
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 8,
-            padding: "10px 24px",
-            fontSize: 14,
-            fontWeight: 600,
-            textDecoration: "none",
-          }}
-        >
-          Go to Library
-        </Link>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+          <Link
+            to="/library"
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Go to Library
+          </Link>
+          <Link
+            to="/settings"
+            style={{
+              background: "transparent",
+              color: "var(--color-accent)",
+              border: "1px solid var(--color-accent)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Upgrade to Pro
+          </Link>
+        </div>
       </div>
     );
   }

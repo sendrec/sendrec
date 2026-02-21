@@ -120,6 +120,12 @@ func parseErrorResponse(t *testing.T, body []byte) string {
 	return errResp.Error
 }
 
+func expectPlanQuery(mock pgxmock.PgxPoolIface, plan string) {
+	mock.ExpectQuery(`SELECT subscription_plan FROM users`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"subscription_plan"}).AddRow(plan))
+}
+
 // --- generateShareToken Tests ---
 
 func TestGenerateShareToken_Returns12CharacterString(t *testing.T) {
@@ -217,6 +223,7 @@ func TestCreate_Success(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -278,6 +285,7 @@ func TestCreate_DefaultTitleWhenEmpty(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -322,6 +330,8 @@ func TestCreate_InvalidJSONBody(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
+
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
 
@@ -348,6 +358,7 @@ func TestCreate_DatabaseError(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -397,6 +408,7 @@ func TestCreate_StorageError(t *testing.T) {
 	storage := &mockStorage{uploadErr: errors.New("s3 unavailable")}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -448,6 +460,8 @@ func TestCreate_RejectsDurationExceedingLimit(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, testJWTSecret, false) // 5 min limit
 
+	expectPlanQuery(mock, "free")
+
 	body, _ := json.Marshal(createRequest{
 		Title:    "Long Video",
 		Duration: 301,
@@ -484,6 +498,7 @@ func TestCreate_AllowsDurationWithinLimit(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -528,6 +543,7 @@ func TestCreate_AllowsAnyDurationWhenLimitIsZero(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false) // no limit
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -574,6 +590,7 @@ func TestCreate_RejectsWhenMonthlyLimitReached(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, testJWTSecret, false) // 25/month limit
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(25))
@@ -614,6 +631,7 @@ func TestCreate_AllowsWhenBelowMonthlyLimit(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(24))
@@ -662,6 +680,7 @@ func TestCreate_SkipsMonthlyCheckWhenLimitIsZero(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false) // no limit
 
+	expectPlanQuery(mock, "free")
 	// No ExpectQuery for COUNT — should not query at all
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
@@ -707,6 +726,7 @@ func TestCreate_MonthlyLimitCountQueryError(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
 		WillReturnError(errors.New("db error"))
@@ -747,6 +767,7 @@ func TestCreate_WithWebcam_ReturnsWebcamUploadURL(t *testing.T) {
 	}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -803,6 +824,7 @@ func TestCreate_WithoutWebcam_OmitsWebcamUploadURL(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=screen"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -855,6 +877,7 @@ func TestCreate_WithContentTypeMp4(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -908,6 +931,8 @@ func TestCreate_RejectsInvalidContentType(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
+
 	body, _ := json.Marshal(createRequest{
 		Title:       "Bad Type",
 		Duration:    30,
@@ -942,6 +967,7 @@ func TestUpload_Success(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -1000,6 +1026,8 @@ func TestUpload_InvalidContentType(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
+
 	body, _ := json.Marshal(uploadRequest{
 		Title:       "My Video",
 		FileSize:    5000000,
@@ -1027,6 +1055,8 @@ func TestUpload_MissingFileSize(t *testing.T) {
 	defer mock.Close()
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+
+	expectPlanQuery(mock, "free")
 
 	body, _ := json.Marshal(uploadRequest{
 		Title:       "My Video",
@@ -1056,6 +1086,8 @@ func TestUpload_ExceedsMaxSize(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 1000, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
+
 	body, _ := json.Marshal(uploadRequest{
 		Title:       "My Video",
 		FileSize:    5000,
@@ -1084,6 +1116,7 @@ func TestUpload_MonthlyLimit(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 5, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(5))
@@ -2118,6 +2151,7 @@ func TestCreate_FileKeyContainsUserIDAndShareToken(t *testing.T) {
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
@@ -3413,6 +3447,7 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(12))
@@ -3460,6 +3495,7 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
+	expectPlanQuery(mock, "free")
 	// No ExpectQuery — should not query COUNT when unlimited
 
 	r := chi.NewRouter()
@@ -3485,6 +3521,145 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	}
 	if resp.VideosUsedThisMonth != 0 {
 		t.Errorf("expected videosUsedThisMonth 0, got %d", resp.VideosUsedThisMonth)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestLimits_ProUser(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, testJWTSecret, false)
+
+	expectPlanQuery(mock, "pro")
+	// No ExpectQuery for COUNT — pro users have unlimited videos
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/videos/limits", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
+		MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
+		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.MaxVideosPerMonth != 0 {
+		t.Errorf("expected maxVideosPerMonth 0 for pro user, got %d", resp.MaxVideosPerMonth)
+	}
+	if resp.MaxVideoDurationSeconds != 0 {
+		t.Errorf("expected maxVideoDurationSeconds 0 for pro user, got %d", resp.MaxVideoDurationSeconds)
+	}
+	if resp.VideosUsedThisMonth != 0 {
+		t.Errorf("expected videosUsedThisMonth 0 for pro user, got %d", resp.VideosUsedThisMonth)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_ProUserNoLimitCheck(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, testJWTSecret, false)
+
+	expectPlanQuery(mock, "pro")
+	// No ExpectQuery for COUNT — pro users skip the monthly limit check
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"Pro User Video",
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-pro"))
+
+	body, _ := json.Marshal(createRequest{
+		Title:    "Pro User Video",
+		Duration: 600, // exceeds free tier 300s limit
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestUpload_ProUserNoLimitCheck(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 5, 0, testJWTSecret, false)
+
+	expectPlanQuery(mock, "pro")
+	// No ExpectQuery for COUNT — pro users skip the monthly limit check
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"Pro Upload",
+			int(0),
+			int64(5000000),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			"video/mp4",
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-pro-upload"))
+
+	body, _ := json.Marshal(uploadRequest{
+		Title:       "Pro Upload",
+		FileSize:    5000000,
+		ContentType: "video/mp4",
+	})
+
+	r := chi.NewRouter()
+	r.Use(newAuthMiddleware())
+	r.Post("/api/videos/upload", handler.Upload)
+
+	req := authenticatedRequest(t, "POST", "/api/videos/upload", body)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sendrec/sendrec/internal/auth"
+	"github.com/sendrec/sendrec/internal/billing"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/docs"
 	"github.com/sendrec/sendrec/internal/ratelimit"
@@ -42,16 +43,20 @@ type Config struct {
 	ViewNotifier            video.ViewNotifier
 	SlackNotifier           video.SlackNotifier
 	WebhookClient           *webhook.Client
+	CreemAPIKey             string
+	CreemWebhookSecret      string
+	CreemProProductID       string
 }
 
 type Server struct {
-	router       chi.Router
-	pinger       Pinger
-	authHandler  *auth.Handler
-	videoHandler *video.Handler
-	db           database.DBTX
-	webFS        fs.FS
-	enableDocs   bool
+	router          chi.Router
+	pinger          Pinger
+	authHandler     *auth.Handler
+	videoHandler    *video.Handler
+	db              database.DBTX
+	billingHandlers *billing.Handlers
+	webFS           fs.FS
+	enableDocs      bool
 }
 
 func New(cfg Config) *Server {
@@ -103,6 +108,11 @@ func New(cfg Config) *Server {
 		}
 		if cfg.WebhookClient != nil {
 			s.videoHandler.SetWebhookClient(cfg.WebhookClient)
+		}
+
+		if cfg.CreemAPIKey != "" {
+			creemClient := billing.New(cfg.CreemAPIKey, "")
+			s.billingHandlers = billing.NewHandlers(cfg.DB, creemClient, baseURL, cfg.CreemProProductID, cfg.CreemWebhookSecret)
 		}
 	}
 
@@ -192,6 +202,11 @@ func (s *Server) routes() {
 			r.Post("/api-keys", auth.GenerateAPIKey(s.db))
 			r.Get("/api-keys", auth.ListAPIKeys(s.db))
 			r.Delete("/api-keys/{id}", auth.DeleteAPIKey(s.db))
+			if s.billingHandlers != nil {
+				r.Get("/billing", s.billingHandlers.GetBilling)
+				r.Post("/billing/checkout", s.billingHandlers.CreateCheckout)
+				r.Post("/billing/cancel", s.billingHandlers.CancelSubscription)
+			}
 		})
 
 		videoLimiter := ratelimit.NewLimiter(2, 10)
@@ -265,6 +280,10 @@ func (s *Server) routes() {
 		s.router.Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 		s.router.Get("/embed/{shareToken}", s.videoHandler.EmbedPage)
+
+		if s.billingHandlers != nil {
+			s.router.Post("/api/webhooks/creem", s.billingHandlers.Webhook)
+		}
 	}
 
 	if s.webFS != nil {

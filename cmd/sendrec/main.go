@@ -96,6 +96,10 @@ func main() {
 	slackClient := slackpkg.New(db.Pool)
 	webhookClient := webhookpkg.New(db.Pool)
 
+	creemAPIKey := os.Getenv("CREEM_API_KEY")
+	creemWebhookSecret := os.Getenv("CREEM_WEBHOOK_SECRET")
+	creemProProductID := os.Getenv("CREEM_PRO_PRODUCT_ID")
+
 	srv := server.New(server.Config{
 		DB:                      db.Pool,
 		Pinger:                  db,
@@ -117,7 +121,14 @@ func main() {
 		ViewNotifier:            emailClient,
 		SlackNotifier:           slackClient,
 		WebhookClient:           webhookClient,
+		CreemAPIKey:             creemAPIKey,
+		CreemWebhookSecret:      creemWebhookSecret,
+		CreemProProductID:       creemProProductID,
 	})
+
+	if creemAPIKey != "" {
+		log.Println("Creem billing enabled")
+	}
 
 	var aiClient *video.AIClient
 	if aiEnabled {
