@@ -134,8 +134,8 @@ describe("Analytics", () => {
       expect(screen.getByText("142")).toBeInTheDocument();
     });
 
-    const libraryLink = screen.getByRole("link", { name: /Library/ });
-    expect(libraryLink).toHaveAttribute("href", "/library");
+    const backLink = screen.getByRole("link", { name: /Back/ });
+    expect(backLink).toHaveAttribute("href", "/videos/v1");
   });
 
   it("displays CTA clicks card", async () => {

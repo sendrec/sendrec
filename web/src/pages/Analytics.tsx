@@ -194,7 +194,7 @@ export function Analytics() {
   return (
     <div className="page-container">
       <Link
-        to="/library"
+        to={`/videos/${id}`}
         style={{
           color: "var(--color-text-secondary)",
           textDecoration: "none",
@@ -203,7 +203,7 @@ export function Analytics() {
           display: "inline-block",
         }}
       >
-        &larr; Library
+        &larr; Back
       </Link>
 
       <div className="analytics-header">
