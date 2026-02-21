@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { TrimModal } from "../components/TrimModal";
 import { FillerRemovalModal } from "../components/FillerRemovalModal";
@@ -112,12 +112,10 @@ function viewCountLabel(viewCount: number, uniqueViewCount: number): string {
 
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
-  const location = useLocation();
   const navigate = useNavigate();
-  const routerState = location.state as { video?: Video } | null;
 
-  const [video, setVideo] = useState<Video | null>(routerState?.video ?? null);
-  const [loading, setLoading] = useState(!routerState?.video);
+  const [video, setVideo] = useState<Video | null>(null);
+  const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);

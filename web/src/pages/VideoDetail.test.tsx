@@ -126,10 +126,10 @@ function setupDefaultMocks(
     .mockResolvedValueOnce(overrides.tags ?? defaultTags);
 }
 
-function renderVideoDetail(videoId = "v1", routerState?: unknown) {
+function renderVideoDetail(videoId = "v1") {
   return render(
     <MemoryRouter
-      initialEntries={[{ pathname: `/videos/${videoId}`, state: routerState }]}
+      initialEntries={[`/videos/${videoId}`]}
     >
       <Routes>
         <Route path="/videos/:id" element={<VideoDetail />} />
@@ -153,11 +153,10 @@ describe("VideoDetail", () => {
 
   // ─── Skeleton tests ───────────────────────────────────────────
 
-  it("renders video title and metadata from router state", async () => {
-    const video = makeVideo();
+  it("renders video title and metadata after fetching", async () => {
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -190,7 +189,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
@@ -204,7 +203,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ shareToken: "tok456" });
     setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
@@ -246,7 +245,7 @@ describe("VideoDetail", () => {
     });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
@@ -268,7 +267,7 @@ describe("VideoDetail", () => {
     });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
@@ -283,7 +282,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ viewCount: 10, uniqueViewCount: 7 });
     setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText(/10 views/)).toBeInTheDocument();
@@ -293,9 +292,9 @@ describe("VideoDetail", () => {
 
   it("shows never expires for null expiry", async () => {
     const video = makeVideo({ shareExpiresAt: null });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       // Appears in both header metadata and Sharing expiry row
@@ -307,9 +306,9 @@ describe("VideoDetail", () => {
     const video = makeVideo({
       shareExpiresAt: new Date(Date.now() - 86400000).toISOString(),
     });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       // Appears in both header metadata and Sharing expiry row
@@ -323,7 +322,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -338,7 +337,7 @@ describe("VideoDetail", () => {
     });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       const input = screen.getByLabelText("Share link") as HTMLInputElement;
@@ -355,7 +354,7 @@ describe("VideoDetail", () => {
     });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Copy link")).toBeInTheDocument();
@@ -374,7 +373,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Copy embed")).toBeInTheDocument();
@@ -389,7 +388,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ hasPassword: false });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("No password")).toBeInTheDocument();
@@ -399,9 +398,9 @@ describe("VideoDetail", () => {
 
   it("shows password controls - remove password when set", async () => {
     const video = makeVideo({ hasPassword: true });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Password set")).toBeInTheDocument();
@@ -414,7 +413,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks();
     mockApiFetch.mockResolvedValueOnce(undefined); // toggle response
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Enabled")).toBeInTheDocument();
@@ -438,7 +437,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks();
     mockApiFetch.mockResolvedValueOnce(undefined);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       // Find the toggle in the email gate row
@@ -463,9 +462,9 @@ describe("VideoDetail", () => {
 
   it("shows comments dropdown with correct value", async () => {
     const video = makeVideo({ commentMode: "anonymous" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       const select = screen.getByLabelText("Comment mode") as HTMLSelectElement;
@@ -478,7 +477,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks();
     mockApiFetch.mockResolvedValueOnce(undefined);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByLabelText("Comment mode")).toBeInTheDocument();
@@ -505,7 +504,7 @@ describe("VideoDetail", () => {
     });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Remove expiry")).toBeInTheDocument();
@@ -517,7 +516,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ shareExpiresAt: null });
     setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Set expiry")).toBeInTheDocument();
@@ -530,7 +529,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ ctaText: null, ctaUrl: null });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Add CTA")).toBeInTheDocument();
@@ -548,7 +547,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ ctaText: null, ctaUrl: null });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Add CTA")).toBeInTheDocument();
@@ -567,9 +566,9 @@ describe("VideoDetail", () => {
       ctaText: "Book a demo",
       ctaUrl: "https://example.com",
     });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Book a demo")).toBeInTheDocument();
@@ -583,7 +582,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -596,7 +595,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ title: "My Recording" });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -617,7 +616,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks({ video });
     mockApiFetch.mockResolvedValueOnce(undefined);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
@@ -641,7 +640,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ transcriptStatus: "none" });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Not started")).toBeInTheDocument();
@@ -653,7 +652,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ transcriptStatus: "pending" });
     setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Pending...")).toBeInTheDocument();
@@ -667,7 +666,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ transcriptStatus: "processing" });
     setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Transcribing...")).toBeInTheDocument();
@@ -678,9 +677,9 @@ describe("VideoDetail", () => {
 
   it("shows transcript status 'Ready' with Redo transcript button", async () => {
     const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Ready")).toBeInTheDocument();
@@ -690,9 +689,9 @@ describe("VideoDetail", () => {
 
   it("shows transcript status 'Failed' with Retry transcript button", async () => {
     const video = makeVideo({ transcriptStatus: "failed" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Failed")).toBeInTheDocument();
@@ -705,7 +704,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks();
     mockApiFetch.mockResolvedValueOnce(undefined);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Transcribe")).toBeInTheDocument();
@@ -728,7 +727,7 @@ describe("VideoDetail", () => {
     });
     setupDefaultMocks({ limits: { ...defaultLimits, aiEnabled: true } });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Summarize")).toBeInTheDocument();
@@ -742,7 +741,7 @@ describe("VideoDetail", () => {
     });
     setupDefaultMocks({ limits: { ...defaultLimits, aiEnabled: false } });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -757,7 +756,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ summaryStatus: "ready" });
     setupDefaultMocks({ video, limits: { ...defaultLimits, aiEnabled: true } });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Re-summarize")).toBeInTheDocument();
@@ -768,7 +767,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ summaryStatus: "pending" });
     setupDefaultMocks({ video, limits: { ...defaultLimits, aiEnabled: true } });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Summarize")).toBeInTheDocument();
@@ -779,9 +778,9 @@ describe("VideoDetail", () => {
 
   it("shows suggested title with accept and dismiss buttons", async () => {
     const video = makeVideo({ suggestedTitle: "Better Title" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Better Title")).toBeInTheDocument();
@@ -795,7 +794,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks({ video });
     mockApiFetch.mockResolvedValueOnce(undefined);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Accept")).toBeInTheDocument();
@@ -816,7 +815,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks({ video });
     mockApiFetch.mockResolvedValueOnce(undefined);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Dismiss")).toBeInTheDocument();
@@ -836,7 +835,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ suggestedTitle: null });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -851,7 +850,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Trim video")).toBeInTheDocument();
@@ -862,7 +861,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Trim video")).toBeInTheDocument();
@@ -875,9 +874,9 @@ describe("VideoDetail", () => {
 
   it("shows remove fillers button when transcript ready", async () => {
     const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Remove fillers")).toBeInTheDocument();
@@ -888,7 +887,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ transcriptStatus: "none" });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -903,7 +902,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ transcriptStatus: "ready" });
     setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Remove fillers")).toBeInTheDocument();
@@ -920,7 +919,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -933,7 +932,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Upload")).toBeInTheDocument();
@@ -946,7 +945,7 @@ describe("VideoDetail", () => {
     });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Reset thumbnail")).toBeInTheDocument();
@@ -957,7 +956,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ thumbnailUrl: undefined });
     setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -970,9 +969,9 @@ describe("VideoDetail", () => {
 
   it("shows notifications dropdown", async () => {
     const video = makeVideo({ viewNotification: "every" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       const select = screen.getByLabelText(
@@ -988,7 +987,7 @@ describe("VideoDetail", () => {
       limits: { ...defaultLimits, brandingEnabled: true },
     });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Customize")).toBeInTheDocument();
@@ -1001,7 +1000,7 @@ describe("VideoDetail", () => {
       limits: { ...defaultLimits, brandingEnabled: false },
     });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -1018,7 +1017,7 @@ describe("VideoDetail", () => {
       limits: { ...defaultLimits, brandingEnabled: true },
     });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Customize")).toBeInTheDocument();
@@ -1046,7 +1045,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
@@ -1059,7 +1058,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ folderId: null });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       const select = screen.getByLabelText("Folder") as HTMLSelectElement;
@@ -1077,7 +1076,7 @@ describe("VideoDetail", () => {
     const video = makeVideo({ folderId: "f1" });
     setupDefaultMocks({ video });
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       const select = screen.getByLabelText("Folder") as HTMLSelectElement;
@@ -1090,7 +1089,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks();
     mockApiFetch.mockResolvedValueOnce(undefined);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByLabelText("Folder")).toBeInTheDocument();
@@ -1114,7 +1113,7 @@ describe("VideoDetail", () => {
     });
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByLabelText("Tag Demo")).toBeInTheDocument();
@@ -1127,7 +1126,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks();
     mockApiFetch.mockResolvedValueOnce(undefined);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByLabelText("Tag Demo")).toBeInTheDocument();
@@ -1149,7 +1148,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Delete video")).toBeInTheDocument();
@@ -1162,7 +1161,7 @@ describe("VideoDetail", () => {
     mockApiFetch.mockResolvedValueOnce(undefined);
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Delete video")).toBeInTheDocument();
@@ -1186,7 +1185,7 @@ describe("VideoDetail", () => {
     setupDefaultMocks();
     vi.spyOn(window, "confirm").mockReturnValue(false);
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Delete video")).toBeInTheDocument();
@@ -1204,7 +1203,7 @@ describe("VideoDetail", () => {
     const video = makeVideo();
     setupDefaultMocks();
 
-    renderVideoDetail("v1", { video });
+    renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByText("Copy link")).toBeInTheDocument();
