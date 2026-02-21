@@ -724,4 +724,220 @@ describe("Settings", () => {
     expect(localStorage.getItem("theme")).toBe("light");
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
   });
+
+  describe("Webhooks", () => {
+    it("renders webhook section with URL input", async () => {
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null, webhookUrl: null, webhookSecret: null })
+        .mockResolvedValueOnce({ brandingEnabled: false })
+        .mockResolvedValueOnce([]);
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByText("Webhooks")).toBeInTheDocument();
+      });
+      expect(screen.getByPlaceholderText("https://example.com/webhook")).toBeInTheDocument();
+    });
+
+    it("saves webhook URL and shows signing secret", async () => {
+      const user = userEvent.setup();
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null, webhookUrl: null, webhookSecret: null })
+        .mockResolvedValueOnce({ brandingEnabled: false })
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce(undefined) // PUT notifications
+        .mockResolvedValueOnce({ notificationMode: "off", webhookSecret: "whsec_abc123" }) // GET after save
+        .mockResolvedValueOnce([]); // deliveries fetch triggered by savedWebhookUrl change
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText("https://example.com/webhook")).toBeInTheDocument();
+      });
+
+      await user.type(
+        screen.getByPlaceholderText("https://example.com/webhook"),
+        "https://example.com/hook"
+      );
+      await user.click(screen.getByRole("button", { name: "Save webhook" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Saved")).toBeInTheDocument();
+      });
+      expect(screen.getByText("whsec_abc123")).toBeInTheDocument();
+
+      const saveCall = mockApiFetch.mock.calls.find(
+        (call: unknown[]) =>
+          call[0] === "/api/settings/notifications" &&
+          (call[1] as { method: string })?.method === "PUT"
+      );
+      expect(saveCall).toBeDefined();
+      const payload = JSON.parse((saveCall![1] as { body: string }).body);
+      expect(payload.webhookUrl).toBe("https://example.com/hook");
+    });
+
+    it("shows deliveries table when webhook is configured", async () => {
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({
+          notificationMode: "off",
+          slackWebhookUrl: null,
+          webhookUrl: "https://example.com/hook",
+          webhookSecret: "whsec_abc123",
+        })
+        .mockResolvedValueOnce({ brandingEnabled: false })
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: "del-1",
+            event: "video.viewed",
+            payload: '{"event":"video.viewed"}',
+            statusCode: 200,
+            responseBody: "ok",
+            attempt: 1,
+            createdAt: "2026-02-21T10:00:00Z",
+          },
+          {
+            id: "del-2",
+            event: "video.comment.created",
+            payload: '{"event":"video.comment.created"}',
+            statusCode: 500,
+            responseBody: "error",
+            attempt: 1,
+            createdAt: "2026-02-21T09:00:00Z",
+          },
+        ]);
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByText("Recent deliveries")).toBeInTheDocument();
+      });
+      // Event names appear in both deliveries table and supported events list
+      expect(screen.getAllByText("video.viewed").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("video.comment.created").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("200")).toBeInTheDocument();
+      expect(screen.getByText("500")).toBeInTheDocument();
+    });
+
+    it("sends test webhook event", async () => {
+      const user = userEvent.setup();
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({
+          notificationMode: "off",
+          slackWebhookUrl: null,
+          webhookUrl: "https://example.com/hook",
+          webhookSecret: "whsec_abc123",
+        })
+        .mockResolvedValueOnce({ brandingEnabled: false })
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]) // initial deliveries fetch
+        .mockResolvedValueOnce(undefined) // POST test-webhook
+        .mockResolvedValueOnce([{ // refreshed deliveries
+          id: "del-1",
+          event: "test",
+          payload: '{"event":"test"}',
+          statusCode: 200,
+          responseBody: "ok",
+          attempt: 1,
+          createdAt: "2026-02-21T10:00:00Z",
+        }]);
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Send test event" })).toBeEnabled();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Send test event" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Test event sent")).toBeInTheDocument();
+      });
+
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/settings/notifications/test-webhook", {
+        method: "POST",
+      });
+    });
+
+    it("disables test button when no webhook URL saved", async () => {
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null, webhookUrl: null, webhookSecret: null })
+        .mockResolvedValueOnce({ brandingEnabled: false })
+        .mockResolvedValueOnce([]);
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Send test event" })).toBeDisabled();
+      });
+    });
+
+    it("shows signing secret with copy and regenerate buttons", async () => {
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({
+          notificationMode: "off",
+          slackWebhookUrl: null,
+          webhookUrl: "https://example.com/hook",
+          webhookSecret: "whsec_secret123",
+        })
+        .mockResolvedValueOnce({ brandingEnabled: false })
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]); // deliveries
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByText("whsec_secret123")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Signing secret")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Regenerate" })).toBeInTheDocument();
+    });
+
+    it("regenerates signing secret", async () => {
+      const user = userEvent.setup();
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({
+          notificationMode: "off",
+          slackWebhookUrl: null,
+          webhookUrl: "https://example.com/hook",
+          webhookSecret: "whsec_old",
+        })
+        .mockResolvedValueOnce({ brandingEnabled: false })
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]) // deliveries
+        .mockResolvedValueOnce({ webhookSecret: "whsec_new" }); // regenerate response
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByText("whsec_old")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Regenerate" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("whsec_new")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Secret regenerated")).toBeInTheDocument();
+
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/settings/notifications/regenerate-webhook-secret", {
+        method: "POST",
+      });
+    });
+
+    it("shows supported events in collapsible section", async () => {
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null, webhookUrl: null, webhookSecret: null })
+        .mockResolvedValueOnce({ brandingEnabled: false })
+        .mockResolvedValueOnce([]);
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByText("Supported events")).toBeInTheDocument();
+      });
+    });
+  });
 });
