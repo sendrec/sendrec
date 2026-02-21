@@ -14,6 +14,7 @@ import (
 	"github.com/sendrec/sendrec/internal/docs"
 	"github.com/sendrec/sendrec/internal/ratelimit"
 	"github.com/sendrec/sendrec/internal/video"
+	"github.com/sendrec/sendrec/internal/webhook"
 )
 
 type Pinger interface {
@@ -40,6 +41,7 @@ type Config struct {
 	CommentNotifier         video.CommentNotifier
 	ViewNotifier            video.ViewNotifier
 	SlackNotifier           video.SlackNotifier
+	WebhookClient           *webhook.Client
 }
 
 type Server struct {
@@ -98,6 +100,9 @@ func New(cfg Config) *Server {
 		}
 		if cfg.SlackNotifier != nil {
 			s.videoHandler.SetSlackNotifier(cfg.SlackNotifier)
+		}
+		if cfg.WebhookClient != nil {
+			s.videoHandler.SetWebhookClient(cfg.WebhookClient)
 		}
 	}
 
@@ -177,6 +182,9 @@ func (s *Server) routes() {
 			r.Get("/notifications", s.videoHandler.GetNotificationPreferences)
 			r.Put("/notifications", s.videoHandler.PutNotificationPreferences)
 			r.Post("/notifications/test-slack", s.videoHandler.TestSlackWebhook)
+			r.Post("/notifications/test-webhook", s.videoHandler.TestWebhook)
+			r.Post("/notifications/regenerate-webhook-secret", s.videoHandler.RegenerateWebhookSecret)
+			r.Get("/notifications/webhook-deliveries", s.videoHandler.ListWebhookDeliveries)
 			r.Get("/branding", s.videoHandler.GetBrandingSettings)
 			r.Put("/branding", s.videoHandler.PutBrandingSettings)
 			r.Post("/branding/logo", s.videoHandler.UploadBrandingLogo)

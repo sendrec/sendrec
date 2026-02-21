@@ -14,6 +14,16 @@ interface APIKeyItem {
   lastUsedAt: string | null;
 }
 
+interface WebhookDelivery {
+  id: string;
+  event: string;
+  payload: string;
+  statusCode: number;
+  responseBody: string;
+  attempt: number;
+  createdAt: string;
+}
+
 interface BrandingSettings {
   companyName: string | null;
   logoKey: string | null;
@@ -26,6 +36,14 @@ interface BrandingSettings {
 }
 
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
+
+function formatJson(value: string): string {
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
 
 export function Settings() {
   const { theme, setTheme } = useTheme();
@@ -54,6 +72,17 @@ export function Settings() {
   const [slackError, setSlackError] = useState("");
   const [savingSlack, setSavingSlack] = useState(false);
   const [testingSlack, setTestingSlack] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [savedWebhookUrl, setSavedWebhookUrl] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [savingWebhook, setSavingWebhook] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [webhookError, setWebhookError] = useState("");
+  const [webhookMessage, setWebhookMessage] = useState("");
+  const [webhookDeliveries, setWebhookDeliveries] = useState<WebhookDelivery[]>([]);
+  const [expandedDelivery, setExpandedDelivery] = useState<string | null>(null);
+  const [regeneratingSecret, setRegeneratingSecret] = useState(false);
+  const [copiedSecret, setCopiedSecret] = useState(false);
   const [brandingEnabled, setBrandingEnabled] = useState(false);
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: null, logoKey: null,
@@ -70,7 +99,7 @@ export function Settings() {
       try {
         const [result, notifPrefs, limits, keys] = await Promise.all([
           apiFetch<UserProfile>("/api/user"),
-          apiFetch<{ notificationMode: string; slackWebhookUrl: string | null }>("/api/settings/notifications"),
+          apiFetch<{ notificationMode: string; slackWebhookUrl: string | null; webhookUrl: string | null; webhookSecret: string | null }>("/api/settings/notifications"),
           apiFetch<{ brandingEnabled: boolean }>("/api/videos/limits"),
           apiFetch<APIKeyItem[]>("/api/settings/api-keys"),
         ]);
@@ -83,6 +112,13 @@ export function Settings() {
           if (notifPrefs.slackWebhookUrl) {
             setSlackWebhookUrl(notifPrefs.slackWebhookUrl);
             setSavedSlackUrl(notifPrefs.slackWebhookUrl);
+          }
+          if (notifPrefs.webhookUrl) {
+            setWebhookUrl(notifPrefs.webhookUrl);
+            setSavedWebhookUrl(notifPrefs.webhookUrl);
+          }
+          if (notifPrefs.webhookSecret) {
+            setWebhookSecret(notifPrefs.webhookSecret);
           }
         }
         if (keys) {
@@ -101,6 +137,13 @@ export function Settings() {
     }
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    if (!savedWebhookUrl) return;
+    apiFetch<WebhookDelivery[]>("/api/settings/notifications/webhook-deliveries")
+      .then((data) => setWebhookDeliveries(data ?? []))
+      .catch(() => {});
+  }, [savedWebhookUrl]);
 
   async function handleNameSubmit(event: FormEvent) {
     event.preventDefault();
@@ -201,6 +244,60 @@ export function Settings() {
       setSlackError(err instanceof Error ? err.message : "Failed to send test message");
     } finally {
       setTestingSlack(false);
+    }
+  }
+
+  async function handleWebhookSave() {
+    setSavingWebhook(true);
+    setWebhookError("");
+    setWebhookMessage("");
+    try {
+      await apiFetch("/api/settings/notifications", {
+        method: "PUT",
+        body: JSON.stringify({
+          notificationMode,
+          slackWebhookUrl: savedSlackUrl || undefined,
+          webhookUrl: webhookUrl || undefined,
+        }),
+      });
+      setSavedWebhookUrl(webhookUrl);
+      setWebhookMessage("Saved");
+      const prefs = await apiFetch<{ webhookSecret: string | null }>("/api/settings/notifications");
+      if (prefs?.webhookSecret) setWebhookSecret(prefs.webhookSecret);
+    } catch (err) {
+      setWebhookError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSavingWebhook(false);
+    }
+  }
+
+  async function handleWebhookTest() {
+    setTestingWebhook(true);
+    setWebhookError("");
+    setWebhookMessage("");
+    try {
+      await apiFetch("/api/settings/notifications/test-webhook", { method: "POST" });
+      setWebhookMessage("Test event sent");
+      const data = await apiFetch<WebhookDelivery[]>("/api/settings/notifications/webhook-deliveries");
+      setWebhookDeliveries(data ?? []);
+    } catch (err) {
+      setWebhookError(err instanceof Error ? err.message : "Failed to send test");
+    } finally {
+      setTestingWebhook(false);
+    }
+  }
+
+  async function handleRegenerateSecret() {
+    setRegeneratingSecret(true);
+    setWebhookError("");
+    try {
+      const resp = await apiFetch<{ webhookSecret: string }>("/api/settings/notifications/regenerate-webhook-secret", { method: "POST" });
+      if (resp?.webhookSecret) setWebhookSecret(resp.webhookSecret);
+      setWebhookMessage("Secret regenerated");
+    } catch (err) {
+      setWebhookError(err instanceof Error ? err.message : "Failed to regenerate");
+    } finally {
+      setRegeneratingSecret(false);
     }
   }
 
@@ -583,6 +680,251 @@ export function Settings() {
             <li>Activate webhooks and click <strong>Add New Webhook to Workspace</strong></li>
             <li>Choose a channel and copy the webhook URL</li>
           </ol>
+        </details>
+      </div>
+
+      <div
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          padding: 24,
+          marginBottom: 24,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Webhooks</h2>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+          Receive HTTP POST notifications for video events. Use with n8n, Zapier, or custom integrations.
+        </p>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Webhook URL</span>
+          <input
+            type="url"
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+            placeholder="https://example.com/webhook"
+            style={inputStyle}
+          />
+        </label>
+
+        {webhookSecret && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Signing secret</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <code
+                style={{
+                  color: "var(--color-text)",
+                  fontSize: 13,
+                  background: "var(--color-bg)",
+                  padding: "6px 10px",
+                  borderRadius: 4,
+                  flex: 1,
+                  wordBreak: "break-all",
+                  fontFamily: "monospace",
+                }}
+              >
+                {webhookSecret}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(webhookSecret);
+                  setCopiedSecret(true);
+                  setTimeout(() => setCopiedSecret(false), 2000);
+                }}
+                style={{
+                  background: "transparent",
+                  color: "var(--color-text-secondary)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 4,
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {copiedSecret ? "Copied" : "Copy"}
+              </button>
+              <button
+                type="button"
+                onClick={handleRegenerateSecret}
+                disabled={regeneratingSecret}
+                style={{
+                  background: "transparent",
+                  color: "var(--color-text-secondary)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 4,
+                  padding: "6px 12px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  opacity: regeneratingSecret ? 0.7 : 1,
+                }}
+              >
+                {regeneratingSecret ? "Regenerating..." : "Regenerate"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={handleWebhookSave}
+            disabled={savingWebhook}
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              borderRadius: 4,
+              padding: "8px 16px",
+              fontSize: 14,
+              fontWeight: 600,
+              opacity: savingWebhook ? 0.7 : 1,
+            }}
+          >
+            {savingWebhook ? "Saving..." : "Save webhook"}
+          </button>
+          <button
+            type="button"
+            onClick={handleWebhookTest}
+            disabled={testingWebhook || !savedWebhookUrl}
+            style={{
+              background: "transparent",
+              color: "var(--color-text-secondary)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 4,
+              padding: "8px 16px",
+              fontSize: 14,
+              cursor: !savedWebhookUrl ? "default" : "pointer",
+              opacity: !savedWebhookUrl ? 0.5 : 1,
+            }}
+          >
+            {testingWebhook ? "Sending..." : "Send test event"}
+          </button>
+        </div>
+
+        {webhookError && (
+          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{webhookError}</p>
+        )}
+        {webhookMessage && (
+          <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{webhookMessage}</p>
+        )}
+
+        {webhookDeliveries.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <h3 style={{ color: "var(--color-text)", fontSize: 15, margin: 0 }}>Recent deliveries</h3>
+            {webhookDeliveries.map((delivery) => {
+              const isSuccess = delivery.statusCode >= 200 && delivery.statusCode < 300;
+              const isExpanded = expandedDelivery === delivery.id;
+              return (
+                <div key={delivery.id}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedDelivery(isExpanded ? null : delivery.id)}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      background: "var(--color-bg)",
+                      borderRadius: 4,
+                      padding: "8px 12px",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: isSuccess ? "var(--color-accent)" : "var(--color-error)",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <code style={{ color: "var(--color-text)", fontSize: 13, fontFamily: "monospace" }}>
+                      {delivery.event}
+                    </code>
+                    <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+                      {delivery.statusCode}
+                    </span>
+                    <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginLeft: "auto" }}>
+                      {new Date(delivery.createdAt).toLocaleString()}
+                    </span>
+                  </button>
+                  {isExpanded && (
+                    <div
+                      style={{
+                        background: "var(--color-bg)",
+                        borderRadius: "0 0 4px 4px",
+                        padding: "8px 12px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      <div>
+                        <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>Payload</span>
+                        <pre
+                          style={{
+                            color: "var(--color-text)",
+                            fontSize: 12,
+                            fontFamily: "monospace",
+                            background: "var(--color-surface)",
+                            padding: 8,
+                            borderRadius: 4,
+                            overflowX: "auto",
+                            whiteSpace: "pre-wrap",
+                            margin: "4px 0 0",
+                          }}
+                        >
+                          {formatJson(delivery.payload)}
+                        </pre>
+                      </div>
+                      {delivery.responseBody && (
+                        <div>
+                          <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>Response</span>
+                          <pre
+                            style={{
+                              color: "var(--color-text)",
+                              fontSize: 12,
+                              fontFamily: "monospace",
+                              background: "var(--color-surface)",
+                              padding: 8,
+                              borderRadius: 4,
+                              overflowX: "auto",
+                              whiteSpace: "pre-wrap",
+                              margin: "4px 0 0",
+                            }}
+                          >
+                            {delivery.responseBody}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <details style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+          <summary style={{ cursor: "pointer" }}>Supported events</summary>
+          <ul style={{ marginTop: 8, paddingLeft: 20, lineHeight: 1.8 }}>
+            <li><code style={{ fontFamily: "monospace" }}>video.viewed</code> — A viewer watched a video</li>
+            <li><code style={{ fontFamily: "monospace" }}>video.comment.created</code> — A new comment was posted</li>
+            <li><code style={{ fontFamily: "monospace" }}>video.reaction.created</code> — An emoji reaction was added</li>
+            <li><code style={{ fontFamily: "monospace" }}>video.transcription.ready</code> — Transcription completed</li>
+            <li><code style={{ fontFamily: "monospace" }}>video.summary.ready</code> — AI summary completed</li>
+            <li><code style={{ fontFamily: "monospace" }}>video.cta.clicked</code> — A CTA button was clicked</li>
+            <li><code style={{ fontFamily: "monospace" }}>test</code> — Test event from Settings</li>
+          </ul>
         </details>
       </div>
 

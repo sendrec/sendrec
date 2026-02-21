@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/webhook"
 )
 
 const maxCommentBodyLength = 5000
@@ -244,6 +245,24 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 			authorName := req.AuthorName
 			if authorName == "" {
 				authorName = "Anonymous"
+			}
+			if h.webhookClient != nil {
+				wURL, wSecret, wErr := h.webhookClient.LookupConfigByUserID(ctx, ownerID)
+				if wErr == nil {
+					if err := h.webhookClient.Dispatch(ctx, ownerID, wURL, wSecret, webhook.Event{
+						Name:      "video.comment",
+						Timestamp: time.Now().UTC(),
+						Data: map[string]any{
+							"videoId":  videoID,
+							"title":    videoTitle,
+							"watchUrl": watchURL,
+							"author":   authorName,
+							"body":     req.Body,
+						},
+					}); err != nil {
+						log.Printf("webhook dispatch failed for video.comment: %v", err)
+					}
+				}
 			}
 			if shouldSlackComment {
 				if err := h.slackNotifier.SendCommentNotification(ctx, ownerEmail, ownerName, videoTitle, authorName, req.Body, watchURL); err != nil {
