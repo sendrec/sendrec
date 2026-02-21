@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
-import { FillerRemovalModal } from "../components/FillerRemovalModal";
-import { TrimModal } from "../components/TrimModal";
 
 interface Video {
   id: string;
@@ -37,15 +35,6 @@ interface LimitsResponse {
   videosUsedThisMonth: number;
   brandingEnabled: boolean;
   aiEnabled: boolean;
-}
-
-interface VideoBranding {
-  companyName: string | null;
-  colorBackground: string | null;
-  colorSurface: string | null;
-  colorText: string | null;
-  colorAccent: string | null;
-  footerText: string | null;
 }
 
 interface Folder {
@@ -102,29 +91,14 @@ export function Library() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [extendingId, setExtendingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [trimmingId, setTrimmingId] = useState<string | null>(null);
-  const [fillerRemovalId, setFillerRemovalId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [brandingVideoId, setBrandingVideoId] = useState<string | null>(null);
-  const [videoBranding, setVideoBranding] = useState<VideoBranding>({
-    companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null,
-  });
-  const [savingBranding, setSavingBranding] = useState(false);
-  const [brandingMessage, setBrandingMessage] = useState("");
-  const [uploadingThumbnailId, setUploadingThumbnailId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [ctaVideoId, setCtaVideoId] = useState<string | null>(null);
-  const [ctaText, setCtaText] = useState("");
-  const [ctaUrl, setCtaUrl] = useState("");
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>("all");
@@ -277,233 +251,6 @@ export function Library() {
     }
   }
 
-  async function toggleDownload(video: Video) {
-    const newValue = !video.downloadEnabled;
-    await apiFetch(`/api/videos/${video.id}/download-enabled`, {
-      method: "PUT",
-      body: JSON.stringify({ downloadEnabled: newValue }),
-    });
-    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, downloadEnabled: newValue } : v)));
-  }
-
-  async function toggleEmailGate(video: Video) {
-    const newValue = !video.emailGateEnabled;
-    await apiFetch(`/api/videos/${video.id}/email-gate`, {
-      method: "PUT",
-      body: JSON.stringify({ enabled: newValue }),
-    });
-    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, emailGateEnabled: newValue } : v)));
-  }
-
-  async function summarizeVideo(video: Video) {
-    await apiFetch(`/api/videos/${video.id}/summarize`, { method: "POST" });
-    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, summaryStatus: "pending" } : v)));
-    showToast("Summary queued");
-    setOpenMenuId(null);
-  }
-
-  async function extendVideo(id: string) {
-    setExtendingId(id);
-    try {
-      await apiFetch(`/api/videos/${id}/extend`, { method: "POST" });
-      const result = await apiFetch<Video[]>("/api/videos");
-      setVideos(result ?? []);
-      showToast("Link extended");
-    } finally {
-      setExtendingId(null);
-    }
-  }
-
-  async function toggleLinkExpiry(video: Video) {
-    const neverExpires = video.shareExpiresAt !== null;
-    await apiFetch(`/api/videos/${video.id}/link-expiry`, {
-      method: "PUT",
-      body: JSON.stringify({ neverExpires }),
-    });
-    const result = await apiFetch<Video[]>("/api/videos");
-    setVideos(result ?? []);
-  }
-
-  async function addPassword(id: string) {
-    const password = window.prompt("Enter a password for this video:");
-    if (!password) return;
-    await apiFetch(`/api/videos/${id}/password`, {
-      method: "PUT",
-      body: JSON.stringify({ password }),
-    });
-    const [videosResult, limitsResult] = await Promise.all([
-      apiFetch<Video[]>("/api/videos"),
-      apiFetch<LimitsResponse>("/api/videos/limits"),
-    ]);
-    setVideos(videosResult ?? []);
-    setLimits(limitsResult ?? null);
-  }
-
-  async function removePassword(id: string) {
-    if (!window.confirm("Remove the password from this video?")) return;
-    await apiFetch(`/api/videos/${id}/password`, {
-      method: "PUT",
-      body: JSON.stringify({ password: "" }),
-    });
-    const [videosResult, limitsResult] = await Promise.all([
-      apiFetch<Video[]>("/api/videos"),
-      apiFetch<LimitsResponse>("/api/videos/limits"),
-    ]);
-    setVideos(videosResult ?? []);
-    setLimits(limitsResult ?? null);
-  }
-
-  async function saveTitle(id: string) {
-    const original = videos.find((v) => v.id === id)?.title;
-    if (!editTitle.trim() || editTitle === original) {
-      setEditingId(null);
-      return;
-    }
-    await apiFetch(`/api/videos/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ title: editTitle }),
-    });
-    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, title: editTitle } : v)));
-    setEditingId(null);
-  }
-
-  async function retranscribeVideo(id: string) {
-    await apiFetch(`/api/videos/${id}/retranscribe`, { method: "POST" });
-    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, transcriptStatus: "pending" } : v)));
-    showToast("Transcription queued");
-  }
-
-  async function acceptSuggestedTitle(id: string, suggestedTitle: string) {
-    await apiFetch(`/api/videos/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ title: suggestedTitle }),
-    });
-    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, title: suggestedTitle, suggestedTitle: null } : v)));
-    showToast("Title updated");
-  }
-
-  async function dismissSuggestedTitle(id: string) {
-    await apiFetch(`/api/videos/${id}/dismiss-title`, { method: "PUT" });
-    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, suggestedTitle: null } : v)));
-  }
-
-  async function changeCommentMode(video: Video, mode: string) {
-    try {
-      await apiFetch(`/api/videos/${video.id}/comment-mode`, {
-        method: "PUT",
-        body: JSON.stringify({ commentMode: mode }),
-      });
-      setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, commentMode: mode } : v)));
-    } catch {
-      // no-op: select stays at previous value since state is only updated on success
-    }
-  }
-
-  async function changeNotification(video: Video, value: string) {
-    const viewNotification = value === "" ? null : value;
-    try {
-      await apiFetch(`/api/videos/${video.id}/notifications`, {
-        method: "PUT",
-        body: JSON.stringify({ viewNotification }),
-      });
-      setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, viewNotification } : v)));
-    } catch {
-      // no-op: select stays at previous value since state is only updated on success
-    }
-  }
-
-  async function openBranding(videoId: string) {
-    setBrandingVideoId(videoId);
-    setBrandingMessage("");
-    try {
-      const data = await apiFetch<VideoBranding>(`/api/videos/${videoId}/branding`);
-      if (data) setVideoBranding(data);
-      else setVideoBranding({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null });
-    } catch {
-      setVideoBranding({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null });
-    }
-  }
-
-  async function saveBranding() {
-    if (!brandingVideoId) return;
-    setSavingBranding(true);
-    setBrandingMessage("");
-    try {
-      await apiFetch(`/api/videos/${brandingVideoId}/branding`, {
-        method: "PUT",
-        body: JSON.stringify({
-          companyName: videoBranding.companyName || null,
-          colorBackground: videoBranding.colorBackground || null,
-          colorSurface: videoBranding.colorSurface || null,
-          colorText: videoBranding.colorText || null,
-          colorAccent: videoBranding.colorAccent || null,
-          footerText: videoBranding.footerText || null,
-        }),
-      });
-      setBrandingMessage("Saved");
-      setTimeout(() => setBrandingVideoId(null), 1000);
-    } catch (err) {
-      setBrandingMessage(err instanceof Error ? err.message : "Failed to save");
-    } finally {
-      setSavingBranding(false);
-    }
-  }
-
-  async function uploadThumbnail(videoId: string, file: File) {
-    if (file.size > 2 * 1024 * 1024) return;
-    const validTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!validTypes.includes(file.type)) return;
-    setUploadingThumbnailId(videoId);
-    try {
-      const result = await apiFetch<{ uploadUrl: string }>(`/api/videos/${videoId}/thumbnail`, {
-        method: "POST",
-        body: JSON.stringify({ contentType: file.type, contentLength: file.size }),
-      });
-      if (!result) return;
-      const uploadResp = await fetch(result.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!uploadResp.ok) return;
-      await fetchVideosAndLimits(searchQuery);
-      showToast("Thumbnail updated");
-    } finally {
-      setUploadingThumbnailId(null);
-    }
-  }
-
-  async function resetThumbnail(videoId: string) {
-    setUploadingThumbnailId(videoId);
-    try {
-      await apiFetch(`/api/videos/${videoId}/thumbnail`, { method: "DELETE" });
-      await fetchVideosAndLimits(searchQuery);
-      showToast("Thumbnail reset");
-    } finally {
-      setUploadingThumbnailId(null);
-    }
-  }
-
-  async function saveCTA(video: Video) {
-    await apiFetch(`/api/videos/${video.id}/cta`, {
-      method: "PUT",
-      body: JSON.stringify({ text: ctaText, url: ctaUrl }),
-    });
-    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, ctaText: ctaText, ctaUrl: ctaUrl } : v)));
-    setCtaVideoId(null);
-    showToast("CTA saved");
-  }
-
-  async function clearCTA(video: Video) {
-    await apiFetch(`/api/videos/${video.id}/cta`, {
-      method: "PUT",
-      body: JSON.stringify({ text: null, url: null }),
-    });
-    setVideos((prev) => prev.map((v) => (v.id === video.id ? { ...v, ctaText: null, ctaUrl: null } : v)));
-    setCtaVideoId(null);
-    showToast("CTA removed");
-  }
-
   async function createFolder() {
     if (!newFolderName.trim()) return;
     await apiFetch("/api/folders", { method: "POST", body: JSON.stringify({ name: newFolderName.trim() }) });
@@ -536,23 +283,6 @@ export function Library() {
     if (activeFilter === `${type}:${id}`) setActiveFilter("all");
     await fetchFoldersAndTags();
     await fetchVideosAndLimits(searchQuery, activeFilter === `${type}:${id}` ? "all" : activeFilter);
-  }
-
-  async function moveToFolder(videoId: string, folderId: string | null) {
-    await apiFetch(`/api/videos/${videoId}/folder`, { method: "PUT", body: JSON.stringify({ folderId }) });
-    setVideos((prev) => prev.map((v) => (v.id === videoId ? { ...v, folderId } : v)));
-    await fetchFoldersAndTags();
-    setOpenMenuId(null);
-  }
-
-  async function toggleVideoTag(videoId: string, tagId: string) {
-    const video = videos.find((v) => v.id === videoId);
-    if (!video) return;
-    const currentIds = video.tags.map((t) => t.id);
-    const newIds = currentIds.includes(tagId) ? currentIds.filter((id) => id !== tagId) : [...currentIds, tagId];
-    await apiFetch(`/api/videos/${videoId}/tags`, { method: "PUT", body: JSON.stringify({ tagIds: newIds }) });
-    await fetchVideosAndLimits(searchQuery, activeFilter);
-    await fetchFoldersAndTags();
   }
 
   if (loading) {
@@ -775,7 +505,7 @@ export function Library() {
           >
             <div className="video-card-top">
               {video.thumbnailUrl && (
-                <a href={`/watch/${video.shareToken}`} style={{ flexShrink: 0 }}>
+                <Link to={`/videos/${video.id}`} state={{ video }} style={{ flexShrink: 0 }}>
                   <img
                     src={video.thumbnailUrl}
                     alt=""
@@ -788,85 +518,26 @@ export function Library() {
                       display: "block",
                     }}
                   />
-                </a>
+                </Link>
               )}
               <div style={{ minWidth: 0, flex: 1 }}>
-                {editingId === video.id ? (
-                  <input
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") saveTitle(video.id);
-                      if (e.key === "Escape") setEditingId(null);
-                    }}
-                    onBlur={() => saveTitle(video.id)}
-                    autoFocus
-                    style={{
-                      fontWeight: 600,
-                      fontSize: 15,
-                      color: "var(--color-text)",
-                      background: "var(--color-surface)",
-                      border: "1px solid var(--color-accent)",
-                      borderRadius: 4,
-                      padding: "2px 6px",
-                      margin: 0,
-                      width: "100%",
-                      outline: "none",
-                    }}
-                  />
-                ) : (
-                  <a
-                    href={`/watch/${video.shareToken}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setEditingId(video.id);
-                      setEditTitle(video.title);
-                    }}
-                    style={{
-                      fontWeight: 600,
-                      fontSize: 15,
-                      color: "var(--color-text)",
-                      margin: 0,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      display: "block",
-                      textDecoration: "none",
-                      cursor: "text",
-                    }}
-                  >
-                    {video.title}
-                  </a>
-                )}
-                {video.suggestedTitle && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginTop: 4 }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.7V17H8v-2.3A7 7 0 0 1 12 2z" />
-                    </svg>
-                    <span style={{ color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
-                      Suggested: {video.suggestedTitle}
-                    </span>
-                    <button
-                      onClick={() => acceptSuggestedTitle(video.id, video.suggestedTitle!)}
-                      style={{
-                        background: "var(--color-accent)", color: "#fff", border: "none",
-                        borderRadius: 4, padding: "4px 10px", fontSize: 11, fontWeight: 600,
-                        cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
-                      }}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => dismissSuggestedTitle(video.id)}
-                      style={{
-                        background: "transparent", color: "var(--color-text-secondary)", border: "none",
-                        padding: "4px 4px", fontSize: 13, cursor: "pointer", lineHeight: 1, flexShrink: 0,
-                      }}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                )}
+                <Link
+                  to={`/videos/${video.id}`}
+                  state={{ video }}
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 15,
+                    color: "var(--color-text)",
+                    margin: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    display: "block",
+                    textDecoration: "none",
+                  }}
+                >
+                  {video.title}
+                </Link>
                 <p
                   style={{
                     color: "var(--color-text-secondary)",
@@ -906,38 +577,6 @@ export function Library() {
                     );
                   })()}
                 </p>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 13 }}>
-                  {video.transcriptStatus === "pending" && (
-                    <span style={{ color: "var(--color-text-secondary)" }}>Pending transcription...</span>
-                  )}
-                  {video.transcriptStatus === "processing" && (
-                    <span style={{ color: "var(--color-accent)" }}>Transcribing...</span>
-                  )}
-                  {video.transcriptStatus !== "processing" && video.transcriptStatus !== "pending" && (
-                    <button
-                      onClick={() => retranscribeVideo(video.id)}
-                      className="action-link"
-                      style={{ color: video.transcriptStatus === "failed" ? "var(--color-error)" : undefined }}
-                    >
-                      {video.transcriptStatus === "failed" ? "Retry transcript" : video.transcriptStatus === "none" ? "Transcribe" : "Redo transcript"}
-                    </button>
-                  )}
-                  {limits?.aiEnabled && video.transcriptStatus === "ready" && (
-                    <>
-                      <span className="action-sep">&middot;</span>
-                      <button
-                        onClick={() => summarizeVideo(video)}
-                        disabled={video.summaryStatus === "pending" || video.summaryStatus === "processing"}
-                        className="action-link"
-                        style={{ opacity: video.summaryStatus === "pending" || video.summaryStatus === "processing" ? 0.5 : undefined }}
-                      >
-                        {video.summaryStatus === "pending" || video.summaryStatus === "processing"
-                          ? "Summarizing..."
-                          : video.summaryStatus === "ready" ? "Re-summarize" : "Summarize"}
-                      </button>
-                    </>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -963,24 +602,11 @@ export function Library() {
             {video.status === "ready" && (
               <div className="video-card-actions" style={{ borderTop: "1px solid var(--color-border)", marginTop: 12, paddingTop: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  <a href={`/watch/${video.shareToken}`} className="action-link">View</a>
-                  <span className="action-sep">&middot;</span>
-                  <Link to={`/videos/${video.id}/analytics`} className="action-link">Analytics</Link>
-                  <span className="action-sep">&middot;</span>
                   <button
                     onClick={() => copyLink(video.shareUrl)}
                     className="action-link"
                   >
                     Copy link
-                  </button>
-                  <span className="action-sep">&middot;</span>
-                  <button
-                    onClick={() => downloadVideo(video.id)}
-                    disabled={downloadingId === video.id}
-                    className="action-link"
-                    style={{ opacity: downloadingId === video.id ? 0.5 : undefined }}
-                  >
-                    {downloadingId === video.id ? "Downloading..." : "Download"}
                   </button>
                   <span className="action-sep">&middot;</span>
                   <div style={{ position: "relative" }} ref={openMenuId === video.id ? menuRef : undefined}>
@@ -1003,481 +629,47 @@ export function Library() {
                           border: "1px solid var(--color-border)",
                           borderRadius: 8,
                           padding: "8px 0",
-                          minWidth: 220,
+                          minWidth: 180,
                           zIndex: 50,
                           boxShadow: "0 4px 16px var(--color-shadow)",
                         }}
                       >
-                        <div style={{ padding: "4px 12px", fontSize: 11, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                          Organization
-                        </div>
-                        <div style={{ padding: "4px 12px" }}>
-                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                            <span className="action-link" style={{ cursor: "default" }}>Folder</span>
-                            <select
-                              aria-label="Move to folder"
-                              value={video.folderId ?? ""}
-                              onChange={(e) => moveToFolder(video.id, e.target.value || null)}
-                              style={{
-                                background: "var(--color-surface)", border: "1px solid var(--color-border)",
-                                borderRadius: 4, color: video.folderId ? "var(--color-accent)" : "var(--color-text-secondary)",
-                                fontSize: 12, padding: "2px 4px", cursor: "pointer",
-                              }}
-                            >
-                              <option value="">None</option>
-                              {folders.map((f) => (
-                                <option key={f.id} value={f.id}>{f.name}</option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-                        {tags.length > 0 && (
-                          <div style={{ padding: "4px 12px" }}>
-                            <div style={{ fontSize: 13, marginBottom: 4 }} className="action-link">Tags</div>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                              {tags.map((tag) => {
-                                const active = video.tags.some((vt) => vt.id === tag.id);
-                                return (
-                                  <button
-                                    key={tag.id}
-                                    onClick={() => toggleVideoTag(video.id, tag.id)}
-                                    style={{
-                                      display: "inline-flex", alignItems: "center", gap: 4,
-                                      padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 500,
-                                      background: active ? "var(--color-accent)" : "var(--color-background)",
-                                      color: active ? "var(--color-on-accent)" : "var(--color-text-secondary)",
-                                      border: active ? "1px solid var(--color-accent)" : "1px solid var(--color-border)",
-                                      cursor: "pointer",
-                                    }}
-                                  >
-                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: tag.color ?? "var(--color-text-secondary)" }} />
-                                    {tag.name}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
+                        <Link
+                          to={`/videos/${video.id}/analytics`}
+                          className="action-link"
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", textDecoration: "none" }}
+                          onClick={() => setOpenMenuId(null)}
+                        >
+                          Analytics
+                        </Link>
+                        <button
+                          onClick={() => { downloadVideo(video.id); setOpenMenuId(null); }}
+                          disabled={downloadingId === video.id}
+                          className="action-link"
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", opacity: downloadingId === video.id ? 0.5 : undefined }}
+                        >
+                          {downloadingId === video.id ? "Downloading..." : "Download"}
+                        </button>
                         <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
-                        <div style={{ padding: "4px 12px", fontSize: 11, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                          Sharing
-                        </div>
                         <button
-                          onClick={() => toggleDownload(video)}
+                          onClick={() => { deleteVideo(video.id); setOpenMenuId(null); }}
+                          disabled={deletingId === video.id}
                           className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: video.downloadEnabled ? "var(--color-accent)" : undefined }}
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: "var(--color-error)", opacity: deletingId === video.id ? 0.5 : undefined }}
                         >
-                          {video.downloadEnabled ? "Downloads on" : "Downloads off"}
+                          {deletingId === video.id ? "Deleting..." : "Delete"}
                         </button>
-                        <button
-                          onClick={() => toggleEmailGate(video)}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: video.emailGateEnabled ? "var(--color-accent)" : undefined }}
-                        >
-                          {video.emailGateEnabled ? "Email required" : "Require email"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            const snippet = `<iframe src="${window.location.origin}/embed/${video.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
-                            navigator.clipboard.writeText(snippet);
-                            showToast("Embed code copied");
-                            setOpenMenuId(null);
-                          }}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
-                        >
-                          Embed
-                        </button>
-                        <button
-                          onClick={() => {
-                            setCtaVideoId(ctaVideoId === video.id ? null : video.id);
-                            setCtaText(video.ctaText ?? "");
-                            setCtaUrl(video.ctaUrl ?? "");
-                            setOpenMenuId(null);
-                          }}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: video.ctaText ? "var(--color-accent)" : undefined }}
-                        >
-                          {video.ctaText ? "Edit CTA" : "Call to action"}
-                        </button>
-                        <button
-                          onClick={() => toggleLinkExpiry(video)}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
-                        >
-                          {video.shareExpiresAt === null ? "Set expiry" : "Remove expiry"}
-                        </button>
-                        {video.shareExpiresAt !== null && (
-                          <button
-                            onClick={() => { extendVideo(video.id); setOpenMenuId(null); }}
-                            disabled={extendingId === video.id}
-                            className="action-link"
-                            style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", opacity: extendingId === video.id ? 0.5 : undefined }}
-                          >
-                            {extendingId === video.id ? "Extending..." : "Extend"}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => { video.hasPassword ? removePassword(video.id) : addPassword(video.id); }}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
-                        >
-                          {video.hasPassword ? "Remove password" : "Add password"}
-                        </button>
-                        <div style={{ padding: "6px 12px" }}>
-                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                            <span className="action-link" style={{ cursor: "default" }}>
-                              Comments{video.commentCount > 0 && ` (${video.commentCount})`}
-                            </span>
-                            <select
-                              aria-label="Comment mode"
-                              value={video.commentMode}
-                              onChange={(e) => changeCommentMode(video, e.target.value)}
-                              style={{
-                                background: "var(--color-surface)",
-                                border: "1px solid var(--color-border)",
-                                borderRadius: 4,
-                                color: video.commentMode !== "disabled" ? "var(--color-accent)" : "var(--color-text-secondary)",
-                                fontSize: 12,
-                                padding: "2px 4px",
-                                cursor: "pointer",
-                              }}
-                            >
-                              <option value="disabled">Off</option>
-                              <option value="anonymous">Anonymous</option>
-                              <option value="name_required">Name required</option>
-                              <option value="name_email_required">Name + email</option>
-                            </select>
-                          </label>
-                        </div>
-
-                        <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
-                        <div style={{ padding: "4px 12px", fontSize: 11, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                          Customization
-                        </div>
-                        <label style={{ display: "block", padding: "6px 12px" }}>
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            className="action-link"
-                            style={{ cursor: uploadingThumbnailId === video.id ? "default" : "pointer" }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                const input = (e.currentTarget.parentElement as HTMLLabelElement).querySelector("input");
-                                if (input) input.click();
-                              }
-                            }}
-                          >
-                            {uploadingThumbnailId === video.id ? "Uploading..." : "Thumbnail"}
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            style={{ display: "none" }}
-                            disabled={uploadingThumbnailId === video.id}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) uploadThumbnail(video.id, file);
-                              e.target.value = "";
-                              setOpenMenuId(null);
-                            }}
-                          />
-                        </label>
-                        {video.thumbnailUrl && (
-                          <button
-                            onClick={() => { resetThumbnail(video.id); setOpenMenuId(null); }}
-                            disabled={uploadingThumbnailId === video.id}
-                            className="action-link"
-                            style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
-                          >
-                            Reset thumbnail
-                          </button>
-                        )}
-                        {limits?.brandingEnabled && (
-                          <button
-                            onClick={() => { openBranding(video.id); setOpenMenuId(null); }}
-                            className="action-link"
-                            style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
-                          >
-                            Branding
-                          </button>
-                        )}
-                        <div style={{ padding: "6px 12px" }}>
-                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                            <span className="action-link" style={{ cursor: "default" }}>Notifications</span>
-                            <select
-                              aria-label="View notifications"
-                              value={video.viewNotification ?? ""}
-                              onChange={(e) => changeNotification(video, e.target.value)}
-                              style={{
-                                background: "var(--color-surface)",
-                                border: "1px solid var(--color-border)",
-                                borderRadius: 4,
-                                color: "var(--color-text-secondary)",
-                                fontSize: 12,
-                                padding: "2px 4px",
-                                cursor: "pointer",
-                              }}
-                            >
-                              <option value="">Account default</option>
-                              <option value="off">Off</option>
-                              <option value="every">Every view</option>
-                              <option value="digest">Daily digest</option>
-                            </select>
-                          </label>
-                        </div>
-
-                        <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
-                        <div style={{ padding: "4px 12px", fontSize: 11, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                          Editing
-                        </div>
-                        <button
-                          onClick={() => { setTrimmingId(video.id); setOpenMenuId(null); }}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
-                        >
-                          Trim
-                        </button>
-                        {video.transcriptStatus === "ready" && video.status === "ready" && (
-                          <button
-                            onClick={() => { setFillerRemovalId(video.id); setOpenMenuId(null); }}
-                            className="action-link"
-                            style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
-                          >
-                            Remove fillers
-                          </button>
-                        )}
                       </div>
                     )}
                   </div>
-                  <span style={{ flex: 1 }} />
-                  <button
-                    onClick={() => deleteVideo(video.id)}
-                    disabled={deletingId === video.id}
-                    className="action-link"
-                    style={{ color: "var(--color-error)", opacity: deletingId === video.id ? 0.5 : undefined }}
-                  >
-                    {deletingId === video.id ? "Deleting..." : "Delete"}
-                  </button>
                 </div>
               </div>
             )}
-
-                {ctaVideoId === video.id && (
-                  <div style={{ marginTop: 12, padding: 12, background: "var(--color-surface)", borderRadius: 8, border: "1px solid var(--color-border)" }}>
-                    <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 8px" }}>Call to action</p>
-                    <input
-                      type="text"
-                      placeholder="Button text (e.g. Book a demo)"
-                      value={ctaText}
-                      onChange={(e) => setCtaText(e.target.value)}
-                      maxLength={100}
-                      style={{
-                        width: "100%", padding: "8px 10px", marginBottom: 8,
-                        background: "var(--color-background)", border: "1px solid var(--color-border)",
-                        borderRadius: 6, color: "var(--color-text)", fontSize: 13,
-                      }}
-                    />
-                    <input
-                      type="url"
-                      placeholder="URL (e.g. https://example.com/demo)"
-                      value={ctaUrl}
-                      onChange={(e) => setCtaUrl(e.target.value)}
-                      maxLength={2000}
-                      style={{
-                        width: "100%", padding: "8px 10px", marginBottom: 8,
-                        background: "var(--color-background)", border: "1px solid var(--color-border)",
-                        borderRadius: 6, color: "var(--color-text)", fontSize: 13,
-                      }}
-                    />
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        onClick={() => saveCTA(video)}
-                        disabled={!ctaText.trim() || !ctaUrl.trim()}
-                        style={{
-                          padding: "6px 16px", background: "var(--color-accent)", color: "var(--color-on-accent)",
-                          border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
-                          cursor: "pointer", opacity: (!ctaText.trim() || !ctaUrl.trim()) ? 0.5 : 1,
-                        }}
-                      >
-                        Save
-                      </button>
-                      {video.ctaText && (
-                        <button
-                          onClick={() => clearCTA(video)}
-                          style={{
-                            padding: "6px 16px", background: "transparent", color: "var(--color-error)",
-                            border: "1px solid var(--color-error)", borderRadius: 6, fontSize: 13,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Remove
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setCtaVideoId(null)}
-                        style={{
-                          padding: "6px 16px", background: "transparent", color: "var(--color-text-secondary)",
-                          border: "1px solid var(--color-border)", borderRadius: 6, fontSize: 13,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
           </div>
         ))}
       </div>
         </div>
       </div>
-
-      {brandingVideoId && (
-        <div
-          style={{
-            position: "fixed", inset: 0, background: "var(--color-overlay)", display: "flex",
-            alignItems: "center", justifyContent: "center", zIndex: 100,
-          }}
-          onClick={() => setBrandingVideoId(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "var(--color-surface)", borderRadius: 12, padding: 24,
-              width: "calc(100vw - 32px)", maxWidth: 400, maxHeight: "80vh", overflow: "auto",
-              border: "1px solid var(--color-border)",
-            }}
-          >
-            <h3 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Video Branding</h3>
-            <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 16px" }}>
-              Override your account branding for this video. Leave empty to inherit.
-            </p>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>Company name</span>
-              <input
-                type="text"
-                value={videoBranding.companyName ?? ""}
-                onChange={(e) => setVideoBranding({ ...videoBranding, companyName: e.target.value || null })}
-                placeholder="Inherit from account"
-                maxLength={200}
-                style={{
-                  background: "var(--color-bg)", border: "1px solid var(--color-border)",
-                  borderRadius: 4, color: "var(--color-text)", padding: "8px 12px", fontSize: 14, width: "100%",
-                }}
-              />
-            </label>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-              {(["colorBackground", "colorSurface", "colorText", "colorAccent"] as const).map((key) => {
-                const labels: Record<string, string> = {
-                  colorBackground: "Background", colorSurface: "Surface", colorText: "Text", colorAccent: "Accent",
-                };
-                return (
-                  <label key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>{labels[key]}</span>
-                    <input
-                      type="text"
-                      value={videoBranding[key] ?? ""}
-                      onChange={(e) => setVideoBranding({ ...videoBranding, [key]: e.target.value || null })}
-                      placeholder="Inherit"
-                      style={{
-                        background: "var(--color-bg)", border: "1px solid var(--color-border)",
-                        borderRadius: 4, color: "var(--color-text)", padding: "6px 10px", fontSize: 13, width: "100%",
-                      }}
-                    />
-                  </label>
-                );
-              })}
-            </div>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>Footer text</span>
-              <input
-                type="text"
-                value={videoBranding.footerText ?? ""}
-                onChange={(e) => setVideoBranding({ ...videoBranding, footerText: e.target.value || null })}
-                placeholder="Inherit from account"
-                maxLength={500}
-                style={{
-                  background: "var(--color-bg)", border: "1px solid var(--color-border)",
-                  borderRadius: 4, color: "var(--color-text)", padding: "8px 12px", fontSize: 14, width: "100%",
-                }}
-              />
-            </label>
-
-            {brandingMessage && (
-              <p style={{ color: brandingMessage === "Saved" ? "var(--color-accent)" : "var(--color-error)", fontSize: 13, margin: "0 0 12px" }}>
-                {brandingMessage}
-              </p>
-            )}
-
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={saveBranding}
-                disabled={savingBranding}
-                style={{
-                  background: "var(--color-accent)", color: "var(--color-text)",
-                  borderRadius: 4, padding: "8px 16px", fontSize: 14, fontWeight: 600,
-                  opacity: savingBranding ? 0.7 : 1, border: "none", cursor: "pointer",
-                }}
-              >
-                {savingBranding ? "Saving..." : "Save"}
-              </button>
-              <button
-                onClick={() => setBrandingVideoId(null)}
-                style={{
-                  background: "transparent", color: "var(--color-text-secondary)",
-                  border: "1px solid var(--color-border)", borderRadius: 4,
-                  padding: "8px 16px", fontSize: 14, cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {trimmingId && (() => {
-        const video = videos.find((v) => v.id === trimmingId);
-        if (!video) return null;
-        return (
-          <TrimModal
-            videoId={video.id}
-            shareToken={video.shareToken}
-            duration={video.duration}
-            onClose={() => setTrimmingId(null)}
-            onTrimStarted={() => {
-              setVideos((prev) =>
-                prev.map((v) => (v.id === trimmingId ? { ...v, status: "processing" } : v))
-              );
-              setTrimmingId(null);
-            }}
-          />
-        );
-      })()}
-
-      {fillerRemovalId && (() => {
-        const video = videos.find((v) => v.id === fillerRemovalId);
-        if (!video) return null;
-        return (
-          <FillerRemovalModal
-            videoId={video.id}
-            shareToken={video.shareToken}
-            duration={video.duration}
-            onClose={() => setFillerRemovalId(null)}
-            onRemovalStarted={() => {
-              setVideos((prev) =>
-                prev.map((v) => (v.id === fillerRemovalId ? { ...v, status: "processing" } : v))
-              );
-              setFillerRemovalId(null);
-              showToast("Removing filler words...");
-            }}
-          />
-        );
-      })()}
 
       {toast && (
         <div
