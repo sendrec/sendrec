@@ -20,6 +20,7 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/email"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/webhook"
 )
 
 type ObjectStorage interface {
@@ -63,6 +64,7 @@ type Handler struct {
 	brandingEnabled         bool
 	analyticsScript         string
 	aiEnabled               bool
+	webhookClient           *webhook.Client
 }
 
 func (h *Handler) SetCommentNotifier(n CommentNotifier) {
@@ -87,6 +89,10 @@ func (h *Handler) SetAnalyticsScript(script string) {
 
 func (h *Handler) SetAIEnabled(enabled bool) {
 	h.aiEnabled = enabled
+}
+
+func (h *Handler) SetWebhookClient(c *webhook.Client) {
+	h.webhookClient = c
 }
 
 func extensionForContentType(ct string) string {
