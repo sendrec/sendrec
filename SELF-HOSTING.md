@@ -274,6 +274,20 @@ Receive view and comment notifications in a Slack channel via incoming webhooks.
 
 No server-side configuration is needed — each user configures their own webhook URL in Settings.
 
+### Billing (optional)
+
+Enable subscription billing with [Creem](https://creem.io) (EU merchant of record). When configured, users see a billing section in Settings where they can upgrade to Pro. Without these variables, all users get the free tier and no billing UI is shown.
+
+| Variable | Description |
+|----------|-------------|
+| `CREEM_API_KEY` | Creem API key. Test keys (`creem_test_` prefix) auto-route to `test-api.creem.io`; production keys use `api.creem.io` |
+| `CREEM_PRO_PRODUCT_ID` | Creem product ID for the Pro plan. Must be a recurring/subscription product, not one-time |
+| `CREEM_WEBHOOK_SECRET` | Signing secret for verifying Creem webhook payloads (HMAC-SHA256) |
+
+**Creem webhook URL:** Configure `https://your-domain.com/api/webhooks/creem` in the Creem dashboard. Subscribe to all subscription events (`subscription.active`, `subscription.paid`, `subscription.canceled`, `subscription.expired`).
+
+**Self-hosters without billing:** Skip these variables entirely. Control limits with `MAX_VIDEOS_PER_MONTH` and `MAX_VIDEO_DURATION_SECONDS` (set to `0` for unlimited).
+
 ### Email notifications (optional)
 
 | Variable | Description |
@@ -354,7 +368,7 @@ To pin a specific version instead of `latest`:
 ```yaml
 services:
   sendrec:
-    image: ghcr.io/sendrec/sendrec:v1.25.0
+    image: ghcr.io/sendrec/sendrec:v1.48.0
 ```
 
 Check the [releases page](https://github.com/sendrec/sendrec/releases) for available versions and changelogs.

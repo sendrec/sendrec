@@ -56,6 +56,8 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 - **Custom branding** — logo, colors, footer text, custom CSS injection, per-user defaults with per-video overrides
 - **Library** — folders and tags, search by title and transcript, inline title editing, overflow menu with grouped actions
 - **Dark/light mode** — system preference detection, manual toggle, theme-aware charts
+- **Email gate** — require viewer email before watching, per-viewer analytics with email, completion tracking
+- **Subscription billing** — optional Creem integration for free/Pro tiers, webhook-based plan activation, customer portal
 - **Integrations** — Nextcloud (oEmbed + API keys), per-user API keys, OpenAPI docs
 - **Self-hostable** — single Go binary, Docker Compose, PostgreSQL, S3-compatible storage
 
