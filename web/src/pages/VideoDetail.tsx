@@ -310,15 +310,19 @@ export function VideoDetail() {
 
   async function saveCTA() {
     if (!video) return;
-    await apiFetch(`/api/videos/${video.id}/cta`, {
-      method: "PUT",
-      body: JSON.stringify({ text: ctaText, url: ctaUrl }),
-    });
-    setVideo((prev) =>
-      prev ? { ...prev, ctaText, ctaUrl } : prev,
-    );
-    setCtaFormOpen(false);
-    showToast("CTA saved");
+    try {
+      await apiFetch(`/api/videos/${video.id}/cta`, {
+        method: "PUT",
+        body: JSON.stringify({ text: ctaText, url: ctaUrl }),
+      });
+      setVideo((prev) =>
+        prev ? { ...prev, ctaText, ctaUrl } : prev,
+      );
+      setCtaFormOpen(false);
+      showToast("CTA saved");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to save CTA");
+    }
   }
 
   async function clearCTA() {
@@ -894,7 +898,7 @@ export function VideoDetail() {
               onClick={() => {
                 setCtaFormOpen(true);
                 setCtaText(video.ctaText ?? "");
-                setCtaUrl(video.ctaUrl ?? "");
+                setCtaUrl(video.ctaUrl ?? "https://");
               }}
               className="detail-btn"
             >
