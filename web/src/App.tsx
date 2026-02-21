@@ -13,6 +13,7 @@ import { ConfirmEmail } from "./pages/ConfirmEmail";
 import { NotFound } from "./pages/NotFound";
 import { Settings } from "./pages/Settings";
 import { Analytics } from "./pages/Analytics";
+import { VideoDetail } from "./pages/VideoDetail";
 import { Upload } from "./pages/Upload";
 import { useTheme } from "./hooks/useTheme";
 
@@ -71,6 +72,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <Library />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/videos/:id"
+        element={
+          <ProtectedRoute>
+            <VideoDetail />
           </ProtectedRoute>
         }
       />

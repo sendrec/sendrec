@@ -419,6 +419,111 @@ input:focus-visible {
   display: none;
 }
 
+/* Video detail page */
+.video-detail-section {
+  border-top: 1px solid var(--color-border);
+  padding: 20px 0;
+}
+
+.video-detail-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.detail-setting-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.detail-setting-label {
+  color: var(--color-text-secondary);
+  min-width: 120px;
+  font-size: 13px;
+}
+
+.detail-setting-value {
+  color: var(--color-text);
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-share-input {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: monospace;
+  flex: 1;
+  min-width: 0;
+  outline: none;
+}
+
+.detail-btn {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.detail-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-secondary);
+}
+
+.detail-btn--accent {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
+.detail-btn--accent:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.detail-btn--danger {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.detail-btn--danger:hover {
+  background: var(--color-error);
+  color: var(--color-on-accent);
+}
+
+.detail-toggle {
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.detail-toggle--active {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
 .pip-preview {
   border-radius: 8px;
   border: 2px solid var(--color-accent);
@@ -572,5 +677,13 @@ input:focus-visible {
 
   .auth-container {
     padding: 16px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
+  }
+
+  .detail-setting-row {
+    flex-wrap: wrap;
+  }
+
+  .detail-setting-label {
+    min-width: 100%;
   }
 }
