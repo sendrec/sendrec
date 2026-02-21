@@ -453,6 +453,9 @@ input:focus-visible {
   flex: 1;
   min-width: 0;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .detail-share-input {

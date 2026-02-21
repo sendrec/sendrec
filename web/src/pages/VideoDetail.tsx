@@ -609,7 +609,7 @@ export function VideoDetail() {
         </a>
       </div>
 
-      <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", gap: 24, alignItems: "flex-start", marginBottom: 8 }}>
         {video.thumbnailUrl && (
           <img
             src={video.thumbnailUrl}
@@ -731,7 +731,7 @@ export function VideoDetail() {
                     borderRadius: 12,
                     fontSize: 11,
                     fontWeight: 500,
-                    background: "var(--color-background)",
+                    background: "var(--color-bg)",
                     border: "1px solid var(--color-border)",
                     color: "var(--color-text-secondary)",
                   }}
@@ -770,7 +770,7 @@ export function VideoDetail() {
                 minWidth: 0,
                 padding: "6px 10px",
                 fontSize: 13,
-                background: "var(--color-background)",
+                background: "var(--color-bg)",
                 border: "1px solid var(--color-border)",
                 borderRadius: 4,
                 color: "var(--color-text)",
@@ -795,7 +795,7 @@ export function VideoDetail() {
                 minWidth: 0,
                 padding: "6px 10px",
                 fontSize: 13,
-                background: "var(--color-background)",
+                background: "var(--color-bg)",
                 border: "1px solid var(--color-border)",
                 borderRadius: 4,
                 color: "var(--color-text)",
@@ -924,7 +924,7 @@ export function VideoDetail() {
                 width: "100%",
                 padding: "8px 10px",
                 marginBottom: 8,
-                background: "var(--color-background)",
+                background: "var(--color-bg)",
                 border: "1px solid var(--color-border)",
                 borderRadius: 6,
                 color: "var(--color-text)",
@@ -942,7 +942,7 @@ export function VideoDetail() {
                 width: "100%",
                 padding: "8px 10px",
                 marginBottom: 8,
-                background: "var(--color-background)",
+                background: "var(--color-bg)",
                 border: "1px solid var(--color-border)",
                 borderRadius: 6,
                 color: "var(--color-text)",
@@ -1212,7 +1212,7 @@ export function VideoDetail() {
                       fontWeight: 500,
                       background: active
                         ? "var(--color-accent)"
-                        : "var(--color-background)",
+                        : "var(--color-bg)",
                       color: active
                         ? "var(--color-on-accent)"
                         : "var(--color-text-secondary)",
