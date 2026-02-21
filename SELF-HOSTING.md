@@ -251,6 +251,17 @@ Examples:
 - **OpenAI:** `AI_BASE_URL=https://api.openai.com`, `AI_API_KEY=your-key`, `AI_MODEL=gpt-4o-mini`
 - **Ollama (local):** `AI_BASE_URL=http://ollama:11434`, `AI_API_KEY=` (empty), `AI_MODEL=llama3.2`
 
+### Webhooks (optional)
+
+Receive real-time event notifications via HTTP POST to any URL. Events include video created, ready, deleted, viewed, commented, milestone reached, and CTA clicked. Each request includes an `X-Webhook-Signature` header (HMAC-SHA256) for payload verification.
+
+1. In SendRec **Settings > Webhooks**, enter your endpoint URL and click Save
+2. A signing secret is auto-generated — copy it to verify signatures on your end
+3. Click **Send test event** to verify delivery
+4. Recent deliveries (last 50) are shown in Settings with status codes and response bodies
+
+No server-side configuration is needed — each user configures their own webhook URL and secret in Settings.
+
 ### Slack notifications (optional)
 
 Receive view and comment notifications in a Slack channel via incoming webhooks.

@@ -49,7 +49,8 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 - **CTA buttons** — call-to-action overlay on video end with click tracking
 - **AI summaries** — AI-generated summaries and chapter markers via any OpenAI-compatible API
 - **Viewer analytics** — daily view charts, completion funnel, CTA click-through rates
-- **Slack webhook notifications** — per-user Slack incoming webhook for view and comment alerts
+- **Generic webhooks** — POST events (video created/ready/deleted, viewed, comment, milestone, CTA click) to any URL with HMAC-SHA256 signing, retries, and delivery log
+- **Slack notifications** — per-user Slack incoming webhook for view and comment alerts
 - **View notifications** — off, views only, comments only, both, or daily digest
 - **Embeddable player** — lightweight iframe with captions, CTA, and milestone tracking
 - **Custom branding** — logo, colors, footer text, custom CSS injection, per-user defaults with per-video overrides
