@@ -391,6 +391,17 @@ func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerE
 		}
 	}
 
+	// Webhook: fire-and-forget for video.viewed
+	h.dispatchWebhook(ownerID, webhook.Event{
+		Name:      "video.viewed",
+		Timestamp: time.Now().UTC(),
+		Data: map[string]any{
+			"videoId":  videoID,
+			"title":    videoTitle,
+			"watchUrl": watchURL,
+		},
+	})
+
 	// Email: gated on notification mode
 	if h.viewNotifier == nil {
 		return

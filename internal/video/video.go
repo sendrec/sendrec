@@ -95,6 +95,23 @@ func (h *Handler) SetWebhookClient(c *webhook.Client) {
 	h.webhookClient = c
 }
 
+func (h *Handler) dispatchWebhook(userID string, event webhook.Event) {
+	if h.webhookClient == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		webhookURL, secret, err := h.webhookClient.LookupConfigByUserID(ctx, userID)
+		if err != nil {
+			return
+		}
+		if err := h.webhookClient.Dispatch(ctx, userID, webhookURL, secret, event); err != nil {
+			log.Printf("webhook dispatch failed for user %s event %s: %v", userID, event.Name, err)
+		}
+	}()
+}
+
 func extensionForContentType(ct string) string {
 	switch ct {
 	case "video/mp4":
@@ -285,6 +302,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create video")
 		return
 	}
+
+	h.dispatchWebhook(userID, webhook.Event{
+		Name:      "video.created",
+		Timestamp: time.Now().UTC(),
+		Data: map[string]any{
+			"videoId":   videoID,
+			"title":     title,
+			"createdAt": time.Now().UTC().Format(time.RFC3339),
+		},
+	})
 
 	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), fileKey, contentType, req.FileSize, 30*time.Minute)
 	if err != nil {
@@ -506,6 +533,17 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		h.dispatchWebhook(userID, webhook.Event{
+			Name:      "video.ready",
+			Timestamp: time.Now().UTC(),
+			Data: map[string]any{
+				"videoId":    videoID,
+				"duration":   duration,
+				"shareToken": shareToken,
+				"watchUrl":   h.baseURL + "/watch/" + shareToken,
+			},
+		})
+
 		if webcamKey != nil {
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -696,16 +734,26 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	var thumbnailKey *string
 	var webcamKey *string
 	var transcriptKey *string
+	var title string
 	err := h.db.QueryRow(r.Context(),
 		`UPDATE videos SET status = 'deleted', updated_at = now()
 		 WHERE id = $1 AND user_id = $2 AND status != 'deleted'
-		 RETURNING file_key, thumbnail_key, webcam_key, transcript_key`,
+		 RETURNING file_key, thumbnail_key, webcam_key, transcript_key, title`,
 		videoID, userID,
-	).Scan(&fileKey, &thumbnailKey, &webcamKey, &transcriptKey)
+	).Scan(&fileKey, &thumbnailKey, &webcamKey, &transcriptKey, &title)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
+
+	h.dispatchWebhook(userID, webhook.Event{
+		Name:      "video.deleted",
+		Timestamp: time.Now().UTC(),
+		Data: map[string]any{
+			"videoId": videoID,
+			"title":   title,
+		},
+	})
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -1150,6 +1198,27 @@ func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			log.Printf("failed to record CTA click for %s: %v", videoID, err)
 		}
+		if h.webhookClient != nil {
+			var ownerID, ctaTitle string
+			if err := h.db.QueryRow(ctx,
+				`SELECT user_id, title FROM videos WHERE id = $1`, videoID,
+			).Scan(&ownerID, &ctaTitle); err == nil {
+				wURL, wSecret, wErr := h.webhookClient.LookupConfigByUserID(ctx, ownerID)
+				if wErr == nil {
+					if err := h.webhookClient.Dispatch(ctx, ownerID, wURL, wSecret, webhook.Event{
+						Name:      "video.cta_click",
+						Timestamp: time.Now().UTC(),
+						Data: map[string]any{
+							"videoId":    videoID,
+							"title":      ctaTitle,
+							"viewerHash": hash,
+						},
+					}); err != nil {
+						log.Printf("webhook dispatch failed for video.cta_click: %v", err)
+					}
+				}
+			}
+		}
 	}()
 
 	w.WriteHeader(http.StatusNoContent)
@@ -1193,6 +1262,28 @@ func (h *Handler) RecordMilestone(w http.ResponseWriter, r *http.Request) {
 			videoID, hash, req.Milestone,
 		); err != nil {
 			log.Printf("failed to record milestone for %s: %v", videoID, err)
+		}
+		if h.webhookClient != nil {
+			var ownerID, milestoneTitle string
+			if err := h.db.QueryRow(ctx,
+				`SELECT user_id, title FROM videos WHERE id = $1`, videoID,
+			).Scan(&ownerID, &milestoneTitle); err == nil {
+				wURL, wSecret, wErr := h.webhookClient.LookupConfigByUserID(ctx, ownerID)
+				if wErr == nil {
+					if err := h.webhookClient.Dispatch(ctx, ownerID, wURL, wSecret, webhook.Event{
+						Name:      "video.milestone",
+						Timestamp: time.Now().UTC(),
+						Data: map[string]any{
+							"videoId":    videoID,
+							"title":      milestoneTitle,
+							"milestone":  req.Milestone,
+							"viewerHash": hash,
+						},
+					}); err != nil {
+						log.Printf("webhook dispatch failed for video.milestone: %v", err)
+					}
+				}
+			}
 		}
 	}()
 
