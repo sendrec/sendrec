@@ -38,7 +38,7 @@ func TestCreateCheckout(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(checkoutResponse{
+		_ = json.NewEncoder(w).Encode(checkoutResponse{
 			CheckoutURL: "https://checkout.creem.io/pay/xyz",
 		})
 	}))
@@ -57,7 +57,7 @@ func TestCreateCheckout(t *testing.T) {
 func TestCreateCheckoutError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"invalid product_id"}`))
+		_, _ = w.Write([]byte(`{"error":"invalid product_id"}`))
 	}))
 	defer server.Close()
 
@@ -110,7 +110,7 @@ func TestGetPortalURL(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(SubscriptionInfo{
+		_ = json.NewEncoder(w).Encode(SubscriptionInfo{
 			ID:               "sub_789",
 			Status:           "active",
 			CurrentPeriodEnd: "2026-03-21T00:00:00Z",
