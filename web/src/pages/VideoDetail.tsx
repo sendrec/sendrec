@@ -153,34 +153,23 @@ export function VideoDetail() {
   useEffect(() => {
     async function fetchData() {
       try {
-        if (!routerState?.video) {
-          const [videos, limitsData, foldersData, tagsData] =
-            await Promise.all([
-              apiFetch<Video[]>("/api/videos"),
-              apiFetch<LimitsResponse>("/api/videos/limits"),
-              apiFetch<Folder[]>("/api/folders"),
-              apiFetch<Tag[]>("/api/tags"),
-            ]);
-          const found = videos?.find((v) => v.id === id) ?? null;
-          setVideo(found);
-          setLimits(limitsData ?? null);
-          setFolders(foldersData ?? []);
-          setTags(tagsData ?? []);
-          if (!found) {
-            setNotFound(true);
-          }
-        } else {
-          const [limitsData, foldersData, tagsData] = await Promise.all([
+        const [videos, limitsData, foldersData, tagsData] =
+          await Promise.all([
+            apiFetch<Video[]>("/api/videos"),
             apiFetch<LimitsResponse>("/api/videos/limits"),
             apiFetch<Folder[]>("/api/folders"),
             apiFetch<Tag[]>("/api/tags"),
           ]);
-          setLimits(limitsData ?? null);
-          setFolders(foldersData ?? []);
-          setTags(tagsData ?? []);
+        const found = videos?.find((v) => v.id === id) ?? null;
+        setVideo(found);
+        setLimits(limitsData ?? null);
+        setFolders(foldersData ?? []);
+        setTags(tagsData ?? []);
+        if (!found) {
+          setNotFound(true);
         }
       } catch {
-        if (!routerState?.video) {
+        if (!video) {
           setNotFound(true);
         }
       } finally {
@@ -189,7 +178,7 @@ export function VideoDetail() {
     }
 
     fetchData();
-  }, [id, routerState?.video]);
+  }, [id]);
 
   function showToast(message: string) {
     if (toastTimer.current) clearTimeout(toastTimer.current);

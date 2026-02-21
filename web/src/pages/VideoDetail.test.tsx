@@ -113,12 +113,14 @@ const defaultTags = [
 
 function setupDefaultMocks(
   overrides: {
+    video?: Record<string, unknown>;
     limits?: Record<string, unknown>;
     folders?: Record<string, unknown>[];
     tags?: Record<string, unknown>[];
   } = {},
 ) {
   mockApiFetch
+    .mockResolvedValueOnce([overrides.video ?? makeVideo()])
     .mockResolvedValueOnce(overrides.limits ?? defaultLimits)
     .mockResolvedValueOnce(overrides.folders ?? defaultFolders)
     .mockResolvedValueOnce(overrides.tags ?? defaultTags);
@@ -200,7 +202,7 @@ describe("VideoDetail", () => {
 
   it("shows view as viewer link pointing to /watch/{shareToken}", async () => {
     const video = makeVideo({ shareToken: "tok456" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
     renderVideoDetail("v1", { video });
 
@@ -279,7 +281,7 @@ describe("VideoDetail", () => {
 
   it("shows unique view count when different from total", async () => {
     const video = makeVideo({ viewCount: 10, uniqueViewCount: 7 });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
     renderVideoDetail("v1", { video });
 
@@ -513,7 +515,7 @@ describe("VideoDetail", () => {
 
   it("shows set expiry when never expires", async () => {
     const video = makeVideo({ shareExpiresAt: null });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
     renderVideoDetail("v1", { video });
 
@@ -612,7 +614,7 @@ describe("VideoDetail", () => {
 
   it("saves title on Enter key", async () => {
     const video = makeVideo({ title: "Old Title" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
     mockApiFetch.mockResolvedValueOnce(undefined);
 
     renderVideoDetail("v1", { video });
@@ -649,7 +651,7 @@ describe("VideoDetail", () => {
 
   it("shows transcript status 'Pending...' without action button", async () => {
     const video = makeVideo({ transcriptStatus: "pending" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
     renderVideoDetail("v1", { video });
 
@@ -663,7 +665,7 @@ describe("VideoDetail", () => {
 
   it("shows transcript status 'Transcribing...' without action button", async () => {
     const video = makeVideo({ transcriptStatus: "processing" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
     renderVideoDetail("v1", { video });
 
@@ -753,7 +755,7 @@ describe("VideoDetail", () => {
 
   it("shows Re-summarize when summary is ready", async () => {
     const video = makeVideo({ summaryStatus: "ready" });
-    setupDefaultMocks({ limits: { ...defaultLimits, aiEnabled: true } });
+    setupDefaultMocks({ video, limits: { ...defaultLimits, aiEnabled: true } });
 
     renderVideoDetail("v1", { video });
 
@@ -764,7 +766,7 @@ describe("VideoDetail", () => {
 
   it("disables summarize when pending", async () => {
     const video = makeVideo({ summaryStatus: "pending" });
-    setupDefaultMocks({ limits: { ...defaultLimits, aiEnabled: true } });
+    setupDefaultMocks({ video, limits: { ...defaultLimits, aiEnabled: true } });
 
     renderVideoDetail("v1", { video });
 
@@ -790,7 +792,7 @@ describe("VideoDetail", () => {
 
   it("accepts suggested title", async () => {
     const video = makeVideo({ suggestedTitle: "Better Title" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
     mockApiFetch.mockResolvedValueOnce(undefined);
 
     renderVideoDetail("v1", { video });
@@ -811,7 +813,7 @@ describe("VideoDetail", () => {
 
   it("dismisses suggested title", async () => {
     const video = makeVideo({ suggestedTitle: "Better Title" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
     mockApiFetch.mockResolvedValueOnce(undefined);
 
     renderVideoDetail("v1", { video });
@@ -899,7 +901,7 @@ describe("VideoDetail", () => {
 
   it("opens filler modal when remove fillers clicked", async () => {
     const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
     renderVideoDetail("v1", { video });
 
@@ -953,7 +955,7 @@ describe("VideoDetail", () => {
 
   it("hides reset thumbnail when no thumbnail", async () => {
     const video = makeVideo({ thumbnailUrl: undefined });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
     renderVideoDetail("v1", { video });
 
@@ -1073,7 +1075,7 @@ describe("VideoDetail", () => {
 
   it("shows selected folder in dropdown", async () => {
     const video = makeVideo({ folderId: "f1" });
-    setupDefaultMocks();
+    setupDefaultMocks({ video });
 
     renderVideoDetail("v1", { video });
 
@@ -1192,8 +1194,8 @@ describe("VideoDetail", () => {
 
     fireEvent.click(screen.getByText("Delete video"));
 
-    // Should not have called delete API (only the initial 3 setup calls)
-    expect(mockApiFetch).toHaveBeenCalledTimes(3);
+    // Should not have called delete API (only the initial 4 setup calls)
+    expect(mockApiFetch).toHaveBeenCalledTimes(4);
   });
 
   // ─── Toast ────────────────────────────────────────────────────
