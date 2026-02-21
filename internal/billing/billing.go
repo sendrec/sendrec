@@ -89,7 +89,7 @@ type Customer struct {
 }
 
 func (c *Client) GetSubscription(ctx context.Context, subscriptionID string) (*SubscriptionInfo, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/v1/subscriptions?id="+subscriptionID, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/v1/subscriptions?subscription_id="+subscriptionID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create subscription request: %w", err)
 	}

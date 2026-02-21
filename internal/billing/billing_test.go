@@ -102,8 +102,8 @@ func TestGetPortalURL(t *testing.T) {
 		if r.URL.Path != "/v1/subscriptions" {
 			t.Errorf("expected /v1/subscriptions, got %s", r.URL.Path)
 		}
-		if r.URL.Query().Get("id") != "sub_789" {
-			t.Errorf("expected id=sub_789, got %s", r.URL.Query().Get("id"))
+		if r.URL.Query().Get("subscription_id") != "sub_789" {
+			t.Errorf("expected subscription_id=sub_789, got %s", r.URL.Query().Get("subscription_id"))
 		}
 		if r.Header.Get("x-api-key") != "test-key" {
 			t.Errorf("expected x-api-key test-key, got %s", r.Header.Get("x-api-key"))

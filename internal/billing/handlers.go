@@ -164,7 +164,6 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 
 	signature := r.Header.Get("creem-signature")
 	if !h.verifySignature(body, signature) {
-		log.Printf("webhook signature mismatch: received=%s body=%s", signature, string(body))
 		httputil.WriteError(w, http.StatusUnauthorized, "invalid signature")
 		return
 	}
