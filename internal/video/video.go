@@ -227,6 +227,14 @@ func generateShareToken() (string, error) {
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
+	plan, _ := h.getUserPlan(r.Context(), userID)
+	maxVideos := h.maxVideosPerMonth
+	maxDuration := h.maxVideoDurationSeconds
+	if plan == "pro" || plan == "business" {
+		maxVideos = 0
+		maxDuration = 0
+	}
+
 	var req createRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
@@ -243,19 +251,19 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.maxVideoDurationSeconds > 0 && req.Duration > h.maxVideoDurationSeconds {
-		httputil.WriteError(w, http.StatusBadRequest, fmt.Sprintf("video duration exceeds the maximum of %d minutes", h.maxVideoDurationSeconds/60))
+	if maxDuration > 0 && req.Duration > maxDuration {
+		httputil.WriteError(w, http.StatusBadRequest, fmt.Sprintf("video duration exceeds the maximum of %d minutes", maxDuration/60))
 		return
 	}
 
-	if h.maxVideosPerMonth > 0 {
+	if maxVideos > 0 {
 		count, err := h.countVideosThisMonth(r.Context(), userID)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to check video limit")
 			return
 		}
-		if count >= h.maxVideosPerMonth {
-			httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("monthly video limit of %d reached", h.maxVideosPerMonth))
+		if count >= maxVideos {
+			httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("monthly video limit of %d reached", maxVideos))
 			return
 		}
 	}
@@ -346,6 +354,12 @@ type uploadRequest struct {
 func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
+	plan, _ := h.getUserPlan(r.Context(), userID)
+	maxVideos := h.maxVideosPerMonth
+	if plan == "pro" || plan == "business" {
+		maxVideos = 0
+	}
+
 	var req uploadRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
@@ -367,14 +381,14 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.maxVideosPerMonth > 0 {
+	if maxVideos > 0 {
 		count, err := h.countVideosThisMonth(r.Context(), userID)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to check video limit")
 			return
 		}
-		if count >= h.maxVideosPerMonth {
-			httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("monthly video limit of %d reached", h.maxVideosPerMonth))
+		if count >= maxVideos {
+			httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("monthly video limit of %d reached", maxVideos))
 			return
 		}
 	}
@@ -420,6 +434,15 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) getUserPlan(ctx context.Context, userID string) (string, error) {
+	var plan string
+	err := h.db.QueryRow(ctx, `SELECT subscription_plan FROM users WHERE id = $1`, userID).Scan(&plan)
+	if err != nil {
+		return "free", err
+	}
+	return plan, nil
+}
+
 func (h *Handler) countVideosThisMonth(ctx context.Context, userID string) (int, error) {
 	var count int
 	err := h.db.QueryRow(ctx,
@@ -440,8 +463,17 @@ type limitsResponse struct {
 func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
+	plan, _ := h.getUserPlan(r.Context(), userID)
+
+	maxVideos := h.maxVideosPerMonth
+	maxDuration := h.maxVideoDurationSeconds
+	if plan == "pro" || plan == "business" {
+		maxVideos = 0
+		maxDuration = 0
+	}
+
 	var videosUsed int
-	if h.maxVideosPerMonth > 0 {
+	if maxVideos > 0 {
 		var err error
 		videosUsed, err = h.countVideosThisMonth(r.Context(), userID)
 		if err != nil {
@@ -451,8 +483,8 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, limitsResponse{
-		MaxVideosPerMonth:       h.maxVideosPerMonth,
-		MaxVideoDurationSeconds: h.maxVideoDurationSeconds,
+		MaxVideosPerMonth:       maxVideos,
+		MaxVideoDurationSeconds: maxDuration,
 		VideosUsedThisMonth:     videosUsed,
 		BrandingEnabled:         h.brandingEnabled,
 		AiEnabled:               h.aiEnabled,
