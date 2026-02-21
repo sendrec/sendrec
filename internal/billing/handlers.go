@@ -132,8 +132,8 @@ func (h *Handlers) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 }
 
 type webhookPayload struct {
-	Event  string        `json:"event"`
-	Object webhookObject `json:"object"`
+	EventType string        `json:"eventType"`
+	Object    webhookObject `json:"object"`
 }
 
 type webhookObject struct {
@@ -176,18 +176,18 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 
 	userID := payload.Object.Metadata.UserID
 	if userID == "" {
-		log.Printf("webhook %s: missing userId in metadata", payload.Event)
+		log.Printf("webhook %s: missing userId in metadata", payload.EventType)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	switch payload.Event {
+	switch payload.EventType {
 	case "subscription.active", "subscription.paid":
 		h.handleSubscriptionActivated(r, w, payload, userID)
 	case "subscription.canceled", "subscription.expired":
 		h.handleSubscriptionCanceled(r, w, userID)
 	default:
-		log.Printf("webhook: unhandled event %s", payload.Event)
+		log.Printf("webhook: unhandled event %s", payload.EventType)
 		w.WriteHeader(http.StatusOK)
 	}
 }

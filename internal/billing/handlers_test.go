@@ -162,7 +162,7 @@ func TestWebhookSubscriptionActive(t *testing.T) {
 	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
 
 	payload := map[string]interface{}{
-		"event": "subscription.active",
+		"eventType": "subscription.active",
 		"object": map[string]interface{}{
 			"id":      "sub_001",
 			"product": map[string]interface{}{"id": "prod_pro"},
@@ -210,7 +210,7 @@ func TestWebhookSubscriptionCanceled(t *testing.T) {
 	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
 
 	payload := map[string]interface{}{
-		"event": "subscription.canceled",
+		"eventType": "subscription.canceled",
 		"object": map[string]interface{}{
 			"id":      "sub_002",
 			"product": map[string]interface{}{"id": "prod_pro"},
@@ -253,7 +253,7 @@ func TestWebhookInvalidSignature(t *testing.T) {
 	client := New("test-key", "https://api.creem.io")
 	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
 
-	payload := `{"event":"subscription.active","object":{"id":"sub_001"}}`
+	payload := `{"eventType":"subscription.active","object":{"id":"sub_001"}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/webhooks/creem", strings.NewReader(payload))
 	req.Header.Set("creem-signature", "invalidsignature")
 	rec := httptest.NewRecorder()
