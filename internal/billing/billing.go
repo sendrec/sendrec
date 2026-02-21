@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -18,7 +19,11 @@ type Client struct {
 
 func New(apiKey, baseURL string) *Client {
 	if baseURL == "" {
-		baseURL = "https://api.creem.io"
+		if strings.HasPrefix(apiKey, "creem_test_") {
+			baseURL = "https://test-api.creem.io"
+		} else {
+			baseURL = "https://api.creem.io"
+		}
 	}
 	return &Client{
 		apiKey:  apiKey,
