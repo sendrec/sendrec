@@ -18,6 +18,7 @@ import (
 	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/server"
 	slackpkg "github.com/sendrec/sendrec/internal/slack"
+	webhookpkg "github.com/sendrec/sendrec/internal/webhook"
 	"github.com/sendrec/sendrec/internal/storage"
 	"github.com/sendrec/sendrec/internal/video"
 	"github.com/sendrec/sendrec/web"
@@ -93,6 +94,7 @@ func main() {
 	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
 
 	slackClient := slackpkg.New(db.Pool)
+	webhookClient := webhookpkg.New(db.Pool)
 
 	srv := server.New(server.Config{
 		DB:                      db.Pool,
@@ -114,6 +116,7 @@ func main() {
 		CommentNotifier:         emailClient,
 		ViewNotifier:            emailClient,
 		SlackNotifier:           slackClient,
+		WebhookClient:           webhookClient,
 	})
 
 	var aiClient *video.AIClient
