@@ -64,9 +64,9 @@ func TestDispatchSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedSignature = r.Header.Get("X-Webhook-Signature")
 		receivedBody = make([]byte, r.ContentLength)
-		r.Body.Read(receivedBody)
+		_, _ = r.Body.Read(receivedBody)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 	defer server.Close()
 
@@ -118,11 +118,11 @@ func TestDispatchRetryOnServerError(t *testing.T) {
 		attempt := attemptCount.Add(1)
 		if attempt <= 2 {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("internal server error"))
+			_, _ = w.Write([]byte("internal server error"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 	defer server.Close()
 
@@ -164,7 +164,7 @@ func TestDispatchAllRetriesFail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attemptCount.Add(1)
 		w.WriteHeader(http.StatusBadGateway)
-		w.Write([]byte("bad gateway"))
+		_, _ = w.Write([]byte("bad gateway"))
 	}))
 	defer server.Close()
 
@@ -244,7 +244,7 @@ func TestResponseBodyTruncation(t *testing.T) {
 	longBody := strings.Repeat("x", 2000)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(longBody))
+		_, _ = w.Write([]byte(longBody))
 	}))
 	defer server.Close()
 

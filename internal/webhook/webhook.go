@@ -98,7 +98,7 @@ func (c *Client) doPost(ctx context.Context, url string, body []byte, signature 
 	if err != nil {
 		return nil, err.Error(), err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBytes, _ := io.ReadAll(io.LimitReader(resp.Body, int64(maxResponseBodyBytes)+1))
 	respBody := string(respBytes)
