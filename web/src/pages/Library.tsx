@@ -110,6 +110,8 @@ export function Library() {
   const [editingSidebarId, setEditingSidebarId] = useState<string | null>(null);
   const [editingSidebarName, setEditingSidebarName] = useState("");
   const [sidebarMenuId, setSidebarMenuId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
 
   const fetchVideosAndLimits = useCallback(async (query = "", filter = "all") => {
     const params = new URLSearchParams();
@@ -201,6 +203,7 @@ export function Library() {
 
   function handleFilterChange(filter: string) {
     setActiveFilter(filter);
+    setSelectedIds(new Set());
     fetchVideosAndLimits(searchQuery, filter);
   }
 
@@ -283,6 +286,77 @@ export function Library() {
     if (activeFilter === `${type}:${id}`) setActiveFilter("all");
     await fetchFoldersAndTags();
     await fetchVideosAndLimits(searchQuery, activeFilter === `${type}:${id}` ? "all" : activeFilter);
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(videos.map(v => v.id)));
+  }
+
+  function deselectAll() {
+    setSelectedIds(new Set());
+  }
+
+  async function batchDelete() {
+    if (!window.confirm(`Delete ${selectedIds.size} video(s)? This cannot be undone.`)) return;
+    setBatchLoading(true);
+    try {
+      await apiFetch("/api/videos/batch/delete", {
+        method: "POST",
+        body: JSON.stringify({ videoIds: Array.from(selectedIds) }),
+      });
+      showToast(`Deleted ${selectedIds.size} video(s)`);
+      setSelectedIds(new Set());
+      fetchVideosAndLimits(searchQuery, activeFilter);
+    } catch {
+      showToast("Failed to delete videos");
+    } finally {
+      setBatchLoading(false);
+    }
+  }
+
+  async function batchSetFolder(folderId: string | null) {
+    setBatchLoading(true);
+    try {
+      await apiFetch("/api/videos/batch/folder", {
+        method: "POST",
+        body: JSON.stringify({ videoIds: Array.from(selectedIds), folderId }),
+      });
+      showToast("Moved videos");
+      setSelectedIds(new Set());
+      fetchVideosAndLimits(searchQuery, activeFilter);
+      fetchFoldersAndTags();
+    } catch {
+      showToast("Failed to move videos");
+    } finally {
+      setBatchLoading(false);
+    }
+  }
+
+  async function batchSetTags(tagIds: string[]) {
+    setBatchLoading(true);
+    try {
+      await apiFetch("/api/videos/batch/tags", {
+        method: "POST",
+        body: JSON.stringify({ videoIds: Array.from(selectedIds), tagIds }),
+      });
+      showToast("Updated tags");
+      setSelectedIds(new Set());
+      fetchVideosAndLimits(searchQuery, activeFilter);
+      fetchFoldersAndTags();
+    } catch {
+      showToast("Failed to update tags");
+    } finally {
+      setBatchLoading(false);
+    }
   }
 
   if (loading) {
@@ -491,6 +565,33 @@ export function Library() {
         </Link>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="batch-toolbar">
+          <span style={{ fontWeight: 600, fontSize: 14 }}>
+            {selectedIds.size} selected
+          </span>
+          <button onClick={selectAll} className="detail-btn">Select all</button>
+          <button onClick={deselectAll} className="detail-btn">Deselect all</button>
+          <select
+            onChange={(e) => {
+              const val = e.target.value;
+              batchSetFolder(val === "__none__" ? null : val);
+              e.target.value = "";
+            }}
+            defaultValue=""
+            className="detail-btn"
+            style={{ cursor: "pointer" }}
+          >
+            <option value="" disabled>Move to folder...</option>
+            <option value="__none__">No folder</option>
+            {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+          <button onClick={batchDelete} className="detail-btn detail-btn--danger" disabled={batchLoading}>
+            Delete
+          </button>
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {videos.map((video) => (
           <div
@@ -503,6 +604,13 @@ export function Library() {
               padding: 16,
             }}
           >
+            <input
+              type="checkbox"
+              checked={selectedIds.has(video.id)}
+              onChange={() => toggleSelect(video.id)}
+              className={`video-select-checkbox${selectedIds.size > 0 ? " video-select-checkbox--visible" : ""}`}
+              aria-label={`Select ${video.title}`}
+            />
             <div className="video-card-top">
               {video.thumbnailUrl && (
                 <Link to={`/videos/${video.id}`} state={{ video }} style={{ flexShrink: 0 }}>
