@@ -2035,3 +2035,123 @@ func TestWatchPage_NoChaptersBar_WhenEmpty(t *testing.T) {
 	}
 	waitAndCheckExpectations(t, mock)
 }
+
+func serveWatchThumbnail(handler *Handler, req *http.Request) *httptest.ResponseRecorder {
+	r := chi.NewRouter()
+	r.Get("/api/watch/{shareToken}/thumbnail", handler.WatchThumbnail)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestWatchThumbnail_Redirects(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/thumb.jpg"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	thumbKey := "recordings/u1/thumb.jpg"
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at, v.status`).
+		WithArgs("validtoken12").
+		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at", "status"}).
+			AddRow(&thumbKey, &expiresAt, "ready"))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/watch/validtoken12/thumbnail", nil)
+	rec := serveWatchThumbnail(handler, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("expected 302, got %d", rec.Code)
+	}
+	location := rec.Header().Get("Location")
+	if location != "https://s3.example.com/thumb.jpg" {
+		t.Errorf("expected redirect to presigned URL, got %q", location)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestWatchThumbnail_NotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at, v.status`).
+		WithArgs("nonexistent").
+		WillReturnError(errors.New("no rows"))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/watch/nonexistent/thumbnail", nil)
+	rec := serveWatchThumbnail(handler, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestWatchThumbnail_NoThumbnail(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at, v.status`).
+		WithArgs("nothumbtoken").
+		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at", "status"}).
+			AddRow((*string)(nil), &expiresAt, "ready"))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/watch/nothumbtoken/thumbnail", nil)
+	rec := serveWatchThumbnail(handler, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestWatchThumbnail_Expired(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+
+	thumbKey := "recordings/u1/thumb.jpg"
+	expiredAt := time.Now().Add(-24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at, v.status`).
+		WithArgs("expiredtoken").
+		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at", "status"}).
+			AddRow(&thumbKey, &expiredAt, "ready"))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/watch/expiredtoken/thumbnail", nil)
+	rec := serveWatchThumbnail(handler, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}

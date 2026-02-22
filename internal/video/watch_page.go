@@ -2075,3 +2075,40 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		log.Printf("failed to render watch page: %v", err)
 	}
 }
+
+func (h *Handler) WatchThumbnail(w http.ResponseWriter, r *http.Request) {
+	shareToken := chi.URLParam(r, "shareToken")
+
+	var thumbnailKey *string
+	var shareExpiresAt *time.Time
+	var status string
+
+	err := h.db.QueryRow(r.Context(),
+		`SELECT v.thumbnail_key, v.share_expires_at, v.status
+		 FROM videos v
+		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
+		shareToken,
+	).Scan(&thumbnailKey, &shareExpiresAt, &status)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
+		http.NotFound(w, r)
+		return
+	}
+
+	if thumbnailKey == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	url, err := h.storage.GenerateDownloadURL(r.Context(), *thumbnailKey, 1*time.Hour)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	http.Redirect(w, r, url, http.StatusFound)
+}

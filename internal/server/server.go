@@ -283,6 +283,7 @@ func (s *Server) routes() {
 		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/identify", s.videoHandler.IdentifyViewer)
 		s.router.Post("/api/watch/{shareToken}/cta-click", s.videoHandler.RecordCTAClick)
 		s.router.Post("/api/watch/{shareToken}/milestone", s.videoHandler.RecordMilestone)
+		s.router.Get("/api/watch/{shareToken}/thumbnail", s.videoHandler.WatchThumbnail)
 		s.router.Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 		s.router.Get("/embed/{shareToken}", s.videoHandler.EmbedPage)
