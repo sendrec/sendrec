@@ -2,6 +2,7 @@ package video
 
 import (
 	"context"
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
@@ -12,16 +13,18 @@ import (
 )
 
 type embedPageData struct {
-	Title         string
-	VideoURL      string
-	ThumbnailURL  string
+	Title        string
+	VideoURL     string
+	ThumbnailURL string
 	TranscriptURL string
-	ShareToken    string
-	Nonce         string
-	BaseURL       string
-	ContentType   string
-	CtaText       string
-	CtaUrl        string
+	ShareToken   string
+	Nonce        string
+	BaseURL      string
+	ContentType  string
+	CtaText      string
+	CtaUrl       string
+	Chapters     []Chapter
+	ChaptersJSON template.JS
 }
 
 type embedPasswordPageData struct {
@@ -93,6 +96,42 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .cta-overlay.visible { display: block; }
         .cta-overlay a { display: inline-block; padding: 8px 24px; background: #22c55e; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
         .cta-overlay a:hover { opacity: 0.9; color: #fff; }
+        .chapters-bar {
+            position: relative;
+            height: 4px;
+            display: none;
+            border-radius: 2px;
+            overflow: hidden;
+            background: #1e293b;
+        }
+        .chapter-segment {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            background: #22c55e;
+            opacity: 0.3;
+        }
+        .chapter-segment:hover { opacity: 0.6; }
+        .chapter-segment.active { opacity: 0.7; }
+        .chapter-segment-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #e2e8f0;
+            color: #0f172a;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            margin-bottom: 2px;
+        }
+        .chapter-segment:hover .chapter-segment-tooltip { opacity: 1; }
     </style>
 </head>
 <body>
@@ -100,6 +139,9 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         <div class="video-wrapper">
             <video controls playsinline webkit-playsinline crossorigin="anonymous" controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>{{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles">{{end}}</video>
         </div>
+        {{if .Chapters}}
+        <div class="chapters-bar" id="chapters-bar"></div>
+        {{end}}
         {{if and .CtaText .CtaUrl}}
         <div class="cta-overlay" id="cta-overlay">
             <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" id="cta-btn">{{.CtaText}}</a>
@@ -135,6 +177,69 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
                 btn.addEventListener('click', function() {
                     fetch('/api/watch/{{.ShareToken}}/cta-click', { method: 'POST' }).catch(function() {});
                 });
+            }
+        })();
+        {{end}}
+        {{if .Chapters}}
+        (function() {
+            var chaptersBar = document.getElementById('chapters-bar');
+            if (!chaptersBar) return;
+            var v = document.querySelector('video');
+            var chapters = {{.ChaptersJSON}};
+
+            function renderChapters() {
+                var duration = v.duration;
+                if (!duration || !isFinite(duration) || chapters.length === 0) return;
+                chaptersBar.innerHTML = '';
+                chaptersBar.style.display = 'block';
+                for (var i = 0; i < chapters.length; i++) {
+                    var start = chapters[i].start;
+                    var end = (i + 1 < chapters.length) ? chapters[i + 1].start : duration;
+                    var leftPct = (start / duration) * 100;
+                    var widthPct = ((end - start) / duration) * 100;
+                    var seg = document.createElement('div');
+                    seg.className = 'chapter-segment';
+                    seg.style.left = leftPct + '%';
+                    seg.style.width = widthPct + '%';
+                    seg.setAttribute('data-start', start);
+                    seg.setAttribute('data-index', i);
+                    if (i > 0) {
+                        seg.style.left = (leftPct + 0.1) + '%';
+                        seg.style.width = (widthPct - 0.1) + '%';
+                    }
+                    var tooltip = document.createElement('div');
+                    tooltip.className = 'chapter-segment-tooltip';
+                    tooltip.textContent = chapters[i].title;
+                    seg.appendChild(tooltip);
+                    seg.addEventListener('click', (function(s) {
+                        return function() {
+                            v.currentTime = s;
+                            v.play().catch(function() {});
+                        };
+                    })(start));
+                    chaptersBar.appendChild(seg);
+                }
+            }
+
+            v.addEventListener('timeupdate', function() {
+                var segments = chaptersBar.querySelectorAll('.chapter-segment');
+                var currentTime = v.currentTime;
+                segments.forEach(function(seg) {
+                    var idx = parseInt(seg.getAttribute('data-index'));
+                    var start = chapters[idx].start;
+                    var end = (idx + 1 < chapters.length) ? chapters[idx + 1].start : v.duration;
+                    if (currentTime >= start && currentTime < end) {
+                        seg.classList.add('active');
+                    } else {
+                        seg.classList.remove('active');
+                    }
+                });
+            });
+
+            v.addEventListener('loadedmetadata', renderChapters);
+            v.addEventListener('durationchange', renderChapters);
+            if (v.duration && isFinite(v.duration)) {
+                renderChapters();
             }
         })();
         {{end}}
@@ -341,13 +446,14 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	var ctaText, ctaUrl *string
 	var transcriptKey *string
 	var emailGateEnabled bool
+	var chaptersJSON *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at,
 		        v.thumbnail_key, v.share_password, v.content_type,
 		        v.user_id, u.email, v.view_notification,
 		        v.cta_text, v.cta_url, v.transcript_key,
-		        v.email_gate_enabled
+		        v.email_gate_enabled, v.chapters
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
@@ -356,7 +462,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		&thumbnailKey, &sharePassword, &contentType,
 		&ownerID, &ownerEmail, &viewNotification,
 		&ctaText, &ctaUrl, &transcriptKey,
-		&emailGateEnabled)
+		&emailGateEnabled, &chaptersJSON)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -442,18 +548,26 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	chapterList := make([]Chapter, 0)
+	if chaptersJSON != nil {
+		_ = json.Unmarshal([]byte(*chaptersJSON), &chapterList)
+	}
+	chaptersJSONBytes, _ := json.Marshal(chapterList)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := embedPageTemplate.Execute(w, embedPageData{
-		Title:         title,
-		VideoURL:      videoURL,
-		ThumbnailURL:  thumbnailURL,
+		Title:        title,
+		VideoURL:     videoURL,
+		ThumbnailURL: thumbnailURL,
 		TranscriptURL: transcriptURL,
-		ShareToken:    shareToken,
-		Nonce:         nonce,
-		BaseURL:       h.baseURL,
-		ContentType:   contentType,
-		CtaText:       derefString(ctaText),
-		CtaUrl:        derefString(ctaUrl),
+		ShareToken:   shareToken,
+		Nonce:        nonce,
+		BaseURL:      h.baseURL,
+		ContentType:  contentType,
+		CtaText:      derefString(ctaText),
+		CtaUrl:       derefString(ctaUrl),
+		Chapters:     chapterList,
+		ChaptersJSON: template.JS(chaptersJSONBytes),
 	}); err != nil {
 		log.Printf("failed to render embed page: %v", err)
 	}

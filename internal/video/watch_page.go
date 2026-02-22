@@ -328,6 +328,49 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .marker-dot:focus-visible .marker-tooltip {
             display: block;
         }
+        .chapters-bar {
+            position: relative;
+            height: 6px;
+            display: none;
+            margin-top: 4px;
+            border-radius: 3px;
+            overflow: hidden;
+            background: var(--brand-surface);
+        }
+        .chapter-segment {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            background: var(--brand-accent);
+            opacity: 0.3;
+        }
+        .chapter-segment:hover {
+            opacity: 0.6;
+        }
+        .chapter-segment.active {
+            opacity: 0.7;
+        }
+        .chapter-segment-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--brand-text);
+            color: var(--brand-bg);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            margin-bottom: 4px;
+        }
+        .chapter-segment:hover .chapter-segment-tooltip {
+            opacity: 1;
+        }
         .reaction-bar {
             display: flex;
             gap: 0.5rem;
@@ -747,6 +790,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             {{end}}
         </div>
         <p class="comment-error reaction-error" id="reaction-error" role="alert"></p>
+        {{end}}
+        {{if .Chapters}}
+        <div class="chapters-bar" id="chapters-bar"></div>
         {{end}}
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
@@ -1401,6 +1447,69 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 });
             });
         })();
+        {{if .Chapters}}
+        (function() {
+            var chaptersBar = document.getElementById('chapters-bar');
+            if (!chaptersBar) return;
+            var player = document.getElementById('player');
+            var chapters = {{.ChaptersJSON}};
+
+            function renderChapters() {
+                var duration = player.duration;
+                if (!duration || !isFinite(duration) || chapters.length === 0) return;
+                chaptersBar.innerHTML = '';
+                chaptersBar.style.display = 'block';
+                for (var i = 0; i < chapters.length; i++) {
+                    var start = chapters[i].start;
+                    var end = (i + 1 < chapters.length) ? chapters[i + 1].start : duration;
+                    var leftPct = (start / duration) * 100;
+                    var widthPct = ((end - start) / duration) * 100;
+                    var seg = document.createElement('div');
+                    seg.className = 'chapter-segment';
+                    seg.style.left = leftPct + '%';
+                    seg.style.width = widthPct + '%';
+                    seg.setAttribute('data-start', start);
+                    seg.setAttribute('data-index', i);
+                    if (i > 0) {
+                        seg.style.left = (leftPct + 0.1) + '%';
+                        seg.style.width = (widthPct - 0.1) + '%';
+                    }
+                    var tooltip = document.createElement('div');
+                    tooltip.className = 'chapter-segment-tooltip';
+                    tooltip.textContent = chapters[i].title;
+                    seg.appendChild(tooltip);
+                    seg.addEventListener('click', (function(s) {
+                        return function() {
+                            player.currentTime = s;
+                            player.play().catch(function() {});
+                        };
+                    })(start));
+                    chaptersBar.appendChild(seg);
+                }
+            }
+
+            player.addEventListener('timeupdate', function() {
+                var segments = chaptersBar.querySelectorAll('.chapter-segment');
+                var currentTime = player.currentTime;
+                segments.forEach(function(seg) {
+                    var idx = parseInt(seg.getAttribute('data-index'));
+                    var start = chapters[idx].start;
+                    var end = (idx + 1 < chapters.length) ? chapters[idx + 1].start : player.duration;
+                    if (currentTime >= start && currentTime < end) {
+                        seg.classList.add('active');
+                    } else {
+                        seg.classList.remove('active');
+                    }
+                });
+            });
+
+            player.addEventListener('loadedmetadata', renderChapters);
+            player.addEventListener('durationchange', renderChapters);
+            if (player.duration && isFinite(player.duration)) {
+                renderChapters();
+            }
+        })();
+        {{end}}
         {{if and .CtaText .CtaUrl}}
         (function() {
             var player = document.getElementById('player');
@@ -1574,6 +1683,7 @@ type watchPageData struct {
 	CtaUrl             string
 	Summary            string
 	Chapters           []Chapter
+	ChaptersJSON       template.JS
 	SummaryStatus      string
 }
 
@@ -1925,6 +2035,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	if chaptersJSON != nil {
 		_ = json.Unmarshal([]byte(*chaptersJSON), &chapterList)
 	}
+	chaptersJSONBytes, _ := json.Marshal(chapterList)
 
 	reactionEmojisJSON, err := json.Marshal(quickReactionEmojis)
 	if err != nil {
@@ -1958,6 +2069,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		CtaUrl:             derefString(ctaUrl),
 		Summary:            summaryStr,
 		Chapters:           chapterList,
+		ChaptersJSON:       template.JS(chaptersJSONBytes),
 		SummaryStatus:      summaryStatus,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
