@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
 import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
 
-type RecordingState = "idle" | "recording" | "paused" | "stopped";
+type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 
 interface RecorderProps {
   onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void;
@@ -18,6 +18,7 @@ function formatDuration(seconds: number): string {
 export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: RecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [duration, setDuration] = useState(0);
+  const [countdownValue, setCountdownValue] = useState(3);
   const [webcamEnabled, setWebcamEnabled] = useState(false);
   const [captureWidth, setCaptureWidth] = useState(1920);
   const [captureHeight, setCaptureHeight] = useState(1080);
@@ -31,9 +32,11 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const pauseStartRef = useRef<number>(0);
   const totalPausedRef = useRef<number>(0);
 
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>);
   const webcamStreamRef = useRef<MediaStream | null>(null);
   const webcamRecorderRef = useRef<MediaRecorder | null>(null);
   const webcamChunksRef = useRef<Blob[]>([]);
+  const webcamBlobPromiseRef = useRef<Promise<Blob> | null>(null);
   const webcamVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
     if (node && webcamStreamRef.current) {
       node.srcObject = webcamStreamRef.current;
@@ -137,6 +140,34 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     }
   }, [startTimer]);
 
+  const beginRecording = useCallback(() => {
+    clearInterval(countdownTimerRef.current);
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.start(1000);
+    }
+    if (webcamRecorderRef.current) {
+      webcamRecorderRef.current.start(1000);
+    }
+    startTimeRef.current = Date.now();
+    setDuration(0);
+    startTimer();
+    setRecordingState("recording");
+  }, [startTimer]);
+
+  const abortCountdown = useCallback(() => {
+    clearInterval(countdownTimerRef.current);
+    stopCompositing();
+    if (screenVideoRef.current) {
+      screenVideoRef.current.srcObject = null;
+    }
+    stopAllStreams();
+    mediaRecorderRef.current = null;
+    webcamRecorderRef.current = null;
+    webcamBlobPromiseRef.current = null;
+    setRecordingState("idle");
+    setCountdownValue(3);
+  }, [stopAllStreams, stopCompositing]);
+
   async function toggleWebcam() {
     if (webcamEnabled) {
       stopWebcamStream();
@@ -204,8 +235,8 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       pauseStartRef.current = 0;
       totalPausedRef.current = 0;
 
-      // Set up webcam recorder if webcam is enabled
-      let webcamBlobPromise: Promise<Blob> | null = null;
+      // Set up webcam recorder if webcam is enabled (but don't start yet)
+      webcamBlobPromiseRef.current = null;
       if (webcamEnabled && webcamStreamRef.current) {
         const webcamRecorder = new MediaRecorder(webcamStreamRef.current, {
           mimeType: "video/webm;codecs=vp9",
@@ -219,13 +250,11 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
           }
         };
 
-        webcamBlobPromise = new Promise<Blob>((resolve) => {
+        webcamBlobPromiseRef.current = new Promise<Blob>((resolve) => {
           webcamRecorder.onstop = () => {
             resolve(new Blob(webcamChunksRef.current, { type: "video/webm" }));
           };
         });
-
-        webcamRecorder.start(1000);
       }
 
       recorder.ondataavailable = (event) => {
@@ -237,26 +266,40 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       recorder.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "video/webm" });
         const elapsed = elapsedSeconds();
-        const webcamBlob = webcamBlobPromise ? await webcamBlobPromise : undefined;
+        const webcamBlob = webcamBlobPromiseRef.current ? await webcamBlobPromiseRef.current : undefined;
         onRecordingComplete(blob, elapsed, webcamBlob);
       };
 
       screenStream.getVideoTracks()[0].addEventListener("ended", () => {
-        stopRecording();
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+          stopRecording();
+        } else {
+          abortCountdown();
+        }
       });
 
-      startTimeRef.current = Date.now();
-      setDuration(0);
-      startTimer();
-
-      recorder.start(1000);
-      setRecordingState("recording");
+      setCountdownValue(3);
+      setRecordingState("countdown");
     } catch (err) {
       console.error("Screen capture failed", err);
       alert("Screen recording was blocked or failed. Please allow screen capture and try again.");
       stopAllStreams();
     }
   }
+
+  useEffect(() => {
+    if (recordingState !== "countdown") return;
+    countdownTimerRef.current = setInterval(() => {
+      setCountdownValue((prev) => {
+        if (prev <= 1) {
+          beginRecording();
+          return 3;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(countdownTimerRef.current);
+  }, [recordingState, beginRecording]);
 
   useEffect(() => {
     if (
@@ -271,6 +314,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
+      clearInterval(countdownTimerRef.current);
       stopCompositing();
       stopAllStreams();
     };
@@ -285,8 +329,10 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   }, [previewExpanded]);
 
   const isIdle = recordingState === "idle";
+  const isCountdown = recordingState === "countdown";
   const isPaused = recordingState === "paused";
-  const isRecording = !isIdle && recordingState !== "stopped";
+  const isActive = !isIdle && recordingState !== "stopped";
+  const isRecording = recordingState === "recording" || isPaused;
   const remaining = maxDurationSeconds > 0 ? maxDurationSeconds - duration : null;
 
   return (
@@ -294,7 +340,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       {/* Screen preview with drawing overlay — hidden in idle, visible during recording */}
       <div style={{
         position: "relative",
-        display: isRecording ? "block" : "none",
+        display: isActive ? "block" : "none",
         ...(previewExpanded
           ? { width: "100vw", maxWidth: "none" }
           : { width: "100%", maxWidth: 960 }),
@@ -356,6 +402,16 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         >
           {previewExpanded ? "\u2199" : "\u2197"}
         </button>
+        {isCountdown && (
+          <div
+            className="countdown-overlay"
+            data-testid="countdown-overlay"
+            onClick={beginRecording}
+          >
+            <div className="countdown-number">{countdownValue}</div>
+            <div className="countdown-hint">Click to start now</div>
+          </div>
+        )}
       </div>
 
       {/* Hidden compositing canvas — always mounted so ref is available */}
