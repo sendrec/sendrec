@@ -10,7 +10,7 @@ test:
 
 # Build Go binary (requires web/dist to exist)
 build: build-web
-	go build -o bin/sendrec ./cmd/sendrec
+	go build -ldflags="-X main.version=$$(git describe --tags --always --dirty)" -o bin/sendrec ./cmd/sendrec
 
 # Build frontend
 build-web:

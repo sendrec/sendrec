@@ -24,6 +24,8 @@ import (
 	"github.com/sendrec/sendrec/web"
 )
 
+var version = "dev"
+
 func main() {
 	port := getEnv("PORT", "8080")
 
@@ -100,7 +102,10 @@ func main() {
 	creemWebhookSecret := os.Getenv("CREEM_WEBHOOK_SECRET")
 	creemProProductID := os.Getenv("CREEM_PRO_PRODUCT_ID")
 
+	log.Printf("sendrec %s starting", version)
+
 	srv := server.New(server.Config{
+		Version:                 version,
 		DB:                      db.Pool,
 		Pinger:                  db,
 		Storage:                 store,

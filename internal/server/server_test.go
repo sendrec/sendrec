@@ -112,7 +112,7 @@ func TestHealthEndpointReturnsOK(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok"}`
+	expected := `{"status":"ok","version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -140,7 +140,7 @@ func TestHealthEndpointWithPingSuccess(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok"}`
+	expected := `{"status":"ok","version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -156,7 +156,7 @@ func TestHealthEndpointWithPingFailure(t *testing.T) {
 		t.Errorf("expected status 503, got %d", rec.Code)
 	}
 
-	expected := `{"status":"unhealthy","error":"database unreachable"}`
+	expected := `{"status":"unhealthy","version":"","error":"database unreachable"}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -547,7 +547,7 @@ func TestSPADoesNotInterceptHealthEndpoint(t *testing.T) {
 		t.Errorf("expected status 200 for health endpoint with SPA, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok"}`
+	expected := `{"status":"ok","version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected health JSON, got %q", rec.Body.String())
 	}

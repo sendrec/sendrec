@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -23,6 +24,7 @@ type Pinger interface {
 }
 
 type Config struct {
+	Version                 string
 	DB                      database.DBTX
 	Pinger                  Pinger
 	Storage                 video.ObjectStorage
@@ -50,6 +52,7 @@ type Config struct {
 
 type Server struct {
 	router          chi.Router
+	version         string
 	pinger          Pinger
 	authHandler     *auth.Handler
 	videoHandler    *video.Handler
@@ -69,7 +72,7 @@ func New(cfg Config) *Server {
 		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
 	}))
 
-	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs}
+	s := &Server{router: r, version: cfg.Version, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -300,9 +303,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if s.pinger != nil {
 		if err := s.pinger.Ping(r.Context()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = w.Write([]byte(`{"status":"unhealthy","error":"database unreachable"}`))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"status":"unhealthy","version":%q,"error":"database unreachable"}`, s.version)))
 			return
 		}
 	}
-	_, _ = w.Write([]byte(`{"status":"ok"}`))
+	_, _ = w.Write([]byte(fmt.Sprintf(`{"status":"ok","version":%q}`, s.version)))
 }
