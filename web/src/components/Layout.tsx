@@ -44,6 +44,12 @@ export function Layout({ children }: LayoutProps) {
           SendRec
         </Link>
 
+        {plan && (
+          <span className={`plan-badge${plan === "pro" ? " plan-badge--pro" : ""}`}>
+            {plan === "pro" ? "Pro" : "Free"}
+          </span>
+        )}
+
         <button
           className="nav-hamburger"
           onClick={() => setMenuOpen(!menuOpen)}
@@ -86,12 +92,6 @@ export function Layout({ children }: LayoutProps) {
           >
             Settings
           </Link>
-
-          {plan && (
-            <span className={`plan-badge${plan === "pro" ? " plan-badge--pro" : ""}`}>
-              {plan === "pro" ? "Pro" : "Free"}
-            </span>
-          )}
 
           <button className="nav-signout" onClick={signOut}>
             Sign out

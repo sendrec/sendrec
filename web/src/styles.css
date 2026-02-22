@@ -130,7 +130,6 @@ input:focus-visible {
   background: var(--color-surface);
   color: var(--color-text-secondary);
   border: 1px solid var(--color-border);
-  margin-left: auto;
 }
 
 .plan-badge--pro {
@@ -652,12 +651,6 @@ input:focus-visible {
     min-height: 44px;
     display: flex;
     align-items: center;
-  }
-
-  .plan-badge {
-    margin-left: 0;
-    align-self: flex-start;
-    margin: 8px 16px;
   }
 
   .nav-signout {
