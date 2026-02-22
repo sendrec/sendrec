@@ -1,6 +1,10 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { setAccessToken } from "../api/client";
+import { apiFetch, setAccessToken } from "../api/client";
+
+interface BillingResponse {
+  plan: string;
+}
 
 interface LayoutProps {
   children: ReactNode;
@@ -10,6 +14,13 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [plan, setPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<BillingResponse>("/api/settings/billing")
+      .then((res) => { if (res?.plan) setPlan(res.plan); })
+      .catch(() => {});
+  }, []);
 
   function isActive(path: string): boolean {
     return location.pathname === path;
@@ -75,6 +86,12 @@ export function Layout({ children }: LayoutProps) {
           >
             Settings
           </Link>
+
+          {plan && (
+            <span className={`plan-badge${plan === "pro" ? " plan-badge--pro" : ""}`}>
+              {plan === "pro" ? "Pro" : "Free"}
+            </span>
+          )}
 
           <button className="nav-signout" onClick={signOut}>
             Sign out

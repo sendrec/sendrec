@@ -116,7 +116,7 @@ describe("Record", () => {
     });
   });
 
-  it("shows remaining videos count when limits active", async () => {
+  it("shows usage progress bar when limits active", async () => {
     mockApiFetch.mockResolvedValueOnce({
       maxVideosPerMonth: 25,
       maxVideoDurationSeconds: 300,
@@ -125,8 +125,41 @@ describe("Record", () => {
     renderRecord();
 
     await waitFor(() => {
-      expect(screen.getByText(/5 videos remaining/i)).toBeInTheDocument();
+      expect(screen.getByText("20 / 25 videos this month")).toBeInTheDocument();
     });
+    const bar = screen.getByRole("progressbar");
+    expect(bar).toBeInTheDocument();
+    expect(bar).toHaveAttribute("aria-valuenow", "20");
+    expect(bar).toHaveAttribute("aria-valuemax", "25");
+  });
+
+  it("shows red progress bar at 80%+ usage", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 25,
+      maxVideoDurationSeconds: 300,
+      videosUsedThisMonth: 22,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByText("22 / 25 videos this month")).toBeInTheDocument();
+    });
+    const fill = screen.getByRole("progressbar").querySelector(".usage-bar-fill");
+    expect(fill).toHaveClass("usage-bar-fill--warning");
+  });
+
+  it("hides progress bar for unlimited plan", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 5,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
   it("includes webcamFileSize in create request when webcam blob provided", async () => {
@@ -924,7 +957,7 @@ describe("Record", () => {
     });
   });
 
-  it("shows remaining videos count with CameraRecorder", async () => {
+  it("shows usage progress bar with CameraRecorder", async () => {
     Object.defineProperty(navigator, "mediaDevices", {
       value: { getUserMedia: vi.fn() },
       writable: true,
@@ -939,8 +972,9 @@ describe("Record", () => {
     renderRecord();
 
     await waitFor(() => {
-      expect(screen.getByText(/5 videos remaining/i)).toBeInTheDocument();
+      expect(screen.getByText("20 / 25 videos this month")).toBeInTheDocument();
     });
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
   });
 
   it("shows unsupported message when both APIs are unavailable", async () => {

@@ -355,10 +355,10 @@ export function Record() {
     );
   }
 
-  const remaining =
-    limits && limits.maxVideosPerMonth > 0
-      ? limits.maxVideosPerMonth - limits.videosUsedThisMonth
-      : null;
+  const hasLimits = limits !== null && limits.maxVideosPerMonth > 0;
+  const usagePercent = hasLimits
+    ? (limits.videosUsedThisMonth / limits.maxVideosPerMonth) * 100
+    : 0;
 
   return (
     <div className="page-container page-container--centered">
@@ -372,10 +372,24 @@ export function Record() {
       >
         New Recording
       </h1>
-      {remaining !== null && (
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 16 }}>
-          {remaining} videos remaining this month
-        </p>
+      {hasLimits && (
+        <div style={{ marginBottom: 16, maxWidth: 300, margin: "0 auto 16px" }}>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 6 }}>
+            {limits.videosUsedThisMonth} / {limits.maxVideosPerMonth} videos this month
+          </p>
+          <div
+            className="usage-bar"
+            role="progressbar"
+            aria-valuenow={limits.videosUsedThisMonth}
+            aria-valuemin={0}
+            aria-valuemax={limits.maxVideosPerMonth}
+          >
+            <div
+              className={`usage-bar-fill${usagePercent >= 80 ? " usage-bar-fill--warning" : ""}`}
+              style={{ width: `${Math.min(usagePercent, 100)}%` }}
+            />
+          </div>
+        </div>
       )}
       {screenRecordingSupported ? (
         <Recorder
