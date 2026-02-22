@@ -1939,3 +1939,99 @@ func TestWatchPage_SummaryTab(t *testing.T) {
 	}
 	waitAndCheckExpectations(t, mock)
 }
+
+func TestWatchPage_ChaptersBar(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	shareToken := "chapterbar12"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	summaryText := "A short summary."
+	chaptersJSON := `[{"title":"Intro","start":0},{"title":"Main","start":30}]`
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "Chapters Video", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+			false,
+			&summaryText, &chaptersJSON, "ready",
+		))
+	expectViewRecording(mock, "vid-1")
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "chapters-bar") {
+		t.Error("expected chapters-bar element in response")
+	}
+	if !strings.Contains(body, "chapter-segment") {
+		t.Error("expected chapter-segment CSS class in response")
+	}
+	if !strings.Contains(body, "chapter-segment-tooltip") {
+		t.Error("expected chapter-segment-tooltip CSS class in response")
+	}
+	if !strings.Contains(body, `"Intro"`) {
+		t.Error("expected chapter title 'Intro' in chapters JSON")
+	}
+	if !strings.Contains(body, `"Main"`) {
+		t.Error("expected chapter title 'Main' in chapters JSON")
+	}
+	waitAndCheckExpectations(t, mock)
+}
+
+func TestWatchPage_NoChaptersBar_WhenEmpty(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	shareToken := "nochapters12"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "No Chapters", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+			false,
+			(*string)(nil), (*string)(nil), "none",
+		))
+	expectViewRecording(mock, "vid-1")
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if strings.Contains(body, `id="chapters-bar"`) {
+		t.Error("expected no chapters-bar element when chapters are empty")
+	}
+	waitAndCheckExpectations(t, mock)
+}
