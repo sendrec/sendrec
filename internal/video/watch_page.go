@@ -44,6 +44,27 @@ func formatISO8601Duration(totalSeconds int) string {
 	return fmt.Sprintf("PT%dS", s)
 }
 
+func buildVideoObjectJSONLD(title, description, baseURL, shareToken string, createdAt time.Time, duration int, downloadEnabled bool) string {
+	obj := map[string]string{
+		"@context":     "https://schema.org",
+		"@type":        "VideoObject",
+		"name":         title,
+		"description":  description,
+		"thumbnailUrl": baseURL + "/api/watch/" + shareToken + "/thumbnail",
+		"uploadDate":   createdAt.Format(time.RFC3339),
+		"embedUrl":     baseURL + "/embed/" + shareToken,
+	}
+	iso := formatISO8601Duration(duration)
+	if iso != "" {
+		obj["duration"] = iso
+	}
+	if downloadEnabled {
+		obj["contentUrl"] = baseURL + "/api/watch/" + shareToken + "/download"
+	}
+	b, _ := json.Marshal(obj)
+	return string(b)
+}
+
 var watchFuncs = template.FuncMap{
 	"formatTimestamp": func(seconds float64) string {
 		return formatDuration(int(seconds))
@@ -57,6 +78,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAeGVYSWZNTQAqAAAACAAEARoABQAAAAEAAAA+ARsABQAAAAEAAABGASgAAwAAAAEAAgAAh2kABAAAAAEAAABOAAAAAAAAAEgAAAABAAAASAAAAAEAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACfCVbEAAAACXBIWXMAAAsTAAALEwEAmpwYAAAEa0lEQVRYCe1VW2icRRQ+Z+af/xK1kdQlvlhatWC7tamKoIilVrFSjdhoIqZtQBERn7RKXwQJvigUqy8iIQ9KU4Msrq0+eHlJUChiIWLTpFHrgxAkIiE2t+a/zMzxzCYb/t3ECyj4spNsZnbmzPm+850zJwCN0VCgocD/rAD+V/i3fFoqxHHc6ilPo68nR/f1LP4T3/+aQLF88nbjyaNkabew1AKIBqSYJKKSDOUb4w90zfwVkb8lsP2TwSKCuMuQ3miF6P+xvXu66nBb+cRhUOodkN4VNssA7cqJFICBAkrTc5jajonHDl6s3qmf/5TAztKJLZmvXrOCHhZSRSIIwC7MHZt45NBR52Rn+eQdqSeHgCACY4AjB4684p/sMhPh+0BJ8m1zCPd8s//QXD24+758o+6k+NFAWxqqIQjU42ApsmkKZn7BmT+7/cP3is48ldALSkbE4OSA3ceaKbL6EipZ8WiTFDCKbp2N4bnKxjp/1hDYderdqw2I91nWzXYpYaccnJCAygPZvOEqQnFgx8eDrUS4G1LNgXOCUGhp9ItKYdHzqA20KaNSFTjKKjade4Z7vXXwYc1mTN5TGAXFCjirip4HmGVjwsCItXZOePgBoS4KGUTgnDMQ6fTr8Y7Dx1cAfucgXoo17kOJV7Iqbvv6+ZkbCjxPrdisTjUEOkslOYZpFxkLSMTOfUCTDXKJPZN/VjeVB/bKQHD62UYwS8KJVY+8iEnMA1EKwglMTkUv9mlZkrwhr2tS8IMXb7QEN6JmAk52qxcFyVfy4O6+QNziao5/XX7cPOmW1SGF9zSnrAWI/VR+aAaWwnWfY40CRkOIEgJXxS63/LZnm8Xib1XH1dkibHJr6/LP4bHl9zvKAw9SGB7kgi0Ywr3uZTiC7jlCbL4af7TLVfGaUaOAyOQ8a7/AQbFyjoQozKb+zflbe4aHPY5ql0uTG6S5Dsj+zGQewih8Ajz/PkZmXiw9p4CyLGYt38r7yK8rKq5ucEq3nR74HP3wfuInxE0GUOtzYLInizYavQBzzaSil8nzjjjgivxkLjUtia1JqAtGqrPcAbnwHDizkDLFLDky3tHz9ipG3aJGAaelsNjvCrCSYa5yfo5tVnhnRlU6YlX4HTA4OHCHEfggLHwx0t09PdbRM4HW9EluPq4qBHFsxsSC9Gd1mDVfawnwUeH8T6etTk9hU1DhQDpjJIgkE0Epr3PgyPJLfp6QJNOCst6qRyHEMZskU64pkUuhUhsI1KvV8/Xm2hSsWBRLpRbrJwOciv3cVMDyx4W80nQYXPFe9gvZrIflHco75n9Oz0MYvkkpNzH2zqQMarr3fEf3l3m76nqNAu5gvKtrRqTBAUySF7gYL7Ajjd5ye2VlfzU67Rdpdnc9uLsrF22/TZZGXed0BMCTksC+fltfX5M7rx/rKpA3urN0PJoPrt3K+WwliZelsRdHO3rWPM38He6Em43ftEnHS8BpI5FpGYTXnB1pb7+ct2usGwo0FGgo4BT4A0kx06ZKzSjiAAAAAElFTkSuQmCC">
     <title>{{.Title}} — {{.Branding.CompanyName}}</title>
+    <link rel="canonical" href="{{.BaseURL}}/watch/{{.ShareToken}}">
+    <meta name="description" content="{{.Description}}">
     <meta property="og:title" content="{{.Title}}">
     <meta property="og:type" content="video.other">
     <meta property="og:description" content="{{.Description}}">
@@ -71,6 +94,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
     <meta name="twitter:title" content="{{.Title}}">
     <meta name="twitter:description" content="{{.Description}}">
     {{if .HasThumbnail}}<meta name="twitter:image" content="{{.BaseURL}}/api/watch/{{.ShareToken}}/thumbnail">{{end}}
+    <script type="application/ld+json">{{.JSONLD}}</script>
     <style nonce="{{.Nonce}}">
         :root {
             --brand-bg: {{.Branding.ColorBackground}};
@@ -1715,6 +1739,9 @@ type watchPageData struct {
 	Description        string
 	Duration           int
 	HasThumbnail       bool
+	UploadDate         string
+	ISO8601Dur         string
+	JSONLD             template.JS
 }
 
 type expiredPageData struct {
@@ -2083,6 +2110,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	jsonLD := buildVideoObjectJSONLD(title, description, h.baseURL, shareToken, createdAt, duration, downloadEnabled)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := watchPageTemplate.Execute(w, watchPageData{
 		Title:              title,
@@ -2114,6 +2143,9 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Description:        description,
 		Duration:           duration,
 		HasThumbnail:       thumbnailKey != nil,
+		UploadDate:         createdAt.Format(time.RFC3339),
+		ISO8601Dur:         formatISO8601Duration(duration),
+		JSONLD:             template.JS(jsonLD),
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}
