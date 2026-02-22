@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type RecordingState = "idle" | "recording" | "paused" | "stopped";
+type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 
 interface CameraRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
@@ -24,6 +24,7 @@ function getSupportedMimeType(): string {
 export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: CameraRecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [duration, setDuration] = useState(0);
+  const [countdownValue, setCountdownValue] = useState(3);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [cameraError, setCameraError] = useState<string | null>(null);
 
@@ -33,6 +34,7 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>);
   const pauseStartRef = useRef(0);
   const totalPausedRef = useRef(0);
   const mimeTypeRef = useRef("");
@@ -86,6 +88,31 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
     startPreview();
   }, [facingMode, stopStream]);
 
+  const beginRecording = useCallback(() => {
+    clearInterval(countdownTimerRef.current);
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.start(1000);
+    }
+    startTimeRef.current = Date.now();
+    setDuration(0);
+    startTimer();
+    setRecordingState("recording");
+  }, [startTimer]);
+
+  useEffect(() => {
+    if (recordingState !== "countdown") return;
+    countdownTimerRef.current = setInterval(() => {
+      setCountdownValue((prev) => {
+        if (prev <= 1) {
+          beginRecording();
+          return 3;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(countdownTimerRef.current);
+  }, [recordingState, beginRecording]);
+
   useEffect(() => {
     if (
       recordingState === "recording" &&
@@ -99,6 +126,7 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
   useEffect(() => {
     return () => {
       clearInterval(timerRef.current);
+      clearInterval(countdownTimerRef.current);
       stopStream();
     };
   }, [stopStream]);
@@ -132,12 +160,8 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
       onRecordingComplete(blob, elapsed);
     };
 
-    startTimeRef.current = Date.now();
-    setDuration(0);
-    startTimer();
-
-    recorder.start(1000);
-    setRecordingState("recording");
+    setCountdownValue(3);
+    setRecordingState("countdown");
   }
 
   function pauseRecording() {
@@ -159,8 +183,10 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
   }
 
   const isIdle = recordingState === "idle";
+  const isCountdown = recordingState === "countdown";
   const isPaused = recordingState === "paused";
-  const isRecording = !isIdle && recordingState !== "stopped";
+  const isActive = !isIdle && recordingState !== "stopped";
+  const isRecording = recordingState === "recording" || isPaused;
   const remaining = maxDurationSeconds > 0 ? maxDurationSeconds - duration : null;
 
   if (cameraError) {
@@ -192,7 +218,7 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
         />
         <button
           onClick={flipCamera}
-          disabled={isRecording}
+          disabled={isActive}
           aria-label="Flip camera"
           style={{
             position: "absolute",
@@ -204,8 +230,8 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
             border: "none",
             background: "rgba(0, 0, 0, 0.5)",
             color: "#fff",
-            cursor: isRecording ? "default" : "pointer",
-            opacity: isRecording ? 0.4 : 1,
+            cursor: isActive ? "default" : "pointer",
+            opacity: isActive ? 0.4 : 1,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -215,6 +241,16 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
         >
           &#x21C4;
         </button>
+        {isCountdown && (
+          <div
+            className="countdown-overlay"
+            data-testid="countdown-overlay"
+            onClick={beginRecording}
+          >
+            <div className="countdown-number">{countdownValue}</div>
+            <div className="countdown-hint">Click to start now</div>
+          </div>
+        )}
       </div>
 
       {isIdle && (

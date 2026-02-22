@@ -183,6 +183,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(screen.getByRole("button", { name: "Pause recording" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop recording" })).toBeInTheDocument();
@@ -197,6 +198,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(screen.queryByRole("button", { name: "Start recording" })).not.toBeInTheDocument();
   });
@@ -210,6 +212,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
 
     expect(screen.getByRole("button", { name: "Resume recording" })).toBeInTheDocument();
@@ -225,6 +228,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
 
     expect(screen.getByText("(Paused)")).toBeInTheDocument();
@@ -239,6 +243,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
     await user.click(screen.getByRole("button", { name: "Resume recording" }));
 
@@ -256,6 +261,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     await vi.waitFor(() => {
@@ -276,6 +282,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(screen.getByText(/2:00 remaining/)).toBeInTheDocument();
   });
@@ -292,6 +299,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     await act(() => {
       vi.advanceTimersByTime(3000);
@@ -342,6 +350,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(screen.getByRole("button", { name: "Flip camera" })).toBeDisabled();
   });
@@ -359,6 +368,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     await vi.waitFor(() => {
@@ -383,6 +393,7 @@ describe("CameraRecorder", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     await vi.waitFor(() => {
@@ -391,5 +402,49 @@ describe("CameraRecorder", () => {
 
     const blob = onComplete.mock.calls[0][0] as Blob;
     expect(blob.type).toBe("video/webm");
+  });
+
+  it("shows countdown after clicking start recording", async () => {
+    const user = userEvent.setup();
+    render(<CameraRecorder onRecordingComplete={vi.fn()} />);
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("clicking countdown overlay skips to recording", async () => {
+    const user = userEvent.setup();
+    render(<CameraRecorder onRecordingComplete={vi.fn()} />);
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(screen.queryByTestId("countdown-overlay")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause recording" })).toBeInTheDocument();
+  });
+
+  it("shows click to start hint during countdown", async () => {
+    const user = userEvent.setup();
+    render(<CameraRecorder onRecordingComplete={vi.fn()} />);
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(screen.getByText("Click to start now")).toBeInTheDocument();
   });
 });

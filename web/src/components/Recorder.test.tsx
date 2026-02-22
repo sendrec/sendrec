@@ -121,6 +121,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(
       screen.getByRole("button", { name: /drawing/i }),
@@ -131,6 +132,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(screen.getByTestId("screen-preview")).toBeInTheDocument();
   });
@@ -139,6 +141,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(screen.getByTestId("drawing-canvas")).toBeInTheDocument();
   });
@@ -147,6 +150,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     const canvas = screen.getByTestId("drawing-canvas");
     expect(canvas.style.touchAction).toBe("none");
@@ -156,6 +160,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     const canvas = screen.getByTestId("compositing-canvas");
     expect(canvas.style.display).toBe("none");
@@ -165,6 +170,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(
       screen.getByRole("button", { name: "Pause recording" }),
@@ -178,6 +184,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: /drawing/i }));
 
     expect(mockToggleDrawMode).toHaveBeenCalledTimes(1);
@@ -188,6 +195,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(screen.getByTestId("color-picker")).toBeInTheDocument();
   });
@@ -197,6 +205,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(
       screen.getByRole("button", { name: "Clear drawing" }),
@@ -208,6 +217,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Clear drawing" }));
 
     expect(mockClearCanvas).toHaveBeenCalledTimes(1);
@@ -255,6 +265,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
 
     expect(
@@ -266,6 +277,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
 
     expect(
@@ -277,6 +289,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
 
     expect(screen.getByText("(Paused)")).toBeInTheDocument();
@@ -286,6 +299,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
     await user.click(screen.getByRole("button", { name: "Resume recording" }));
 
@@ -302,6 +316,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={onComplete} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     // After stop, compositing is cleaned up
@@ -317,6 +332,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={onComplete} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     // The onstop handler fires asynchronously via setTimeout
@@ -334,6 +350,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     mockStopCompositing.mockClear();
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
@@ -348,6 +365,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     expect(stopTrack).toHaveBeenCalled();
@@ -414,6 +432,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     const colorPicker = screen.getByTestId("color-picker");
     // fireEvent is needed for native input change since userEvent doesn't support color inputs well
@@ -427,6 +446,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} maxDurationSeconds={300} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(screen.getByText(/remaining/)).toBeInTheDocument();
   });
@@ -435,6 +455,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
 
     mockStopCompositing.mockClear();
@@ -447,6 +468,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} maxDurationSeconds={120} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     // During recording with maxDuration, remaining time is shown
     expect(screen.getByText(/remaining/)).toBeInTheDocument();
@@ -459,6 +481,7 @@ describe("Recorder", () => {
 
     render(<Recorder onRecordingComplete={vi.fn()} maxDurationSeconds={2} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     // Advance timers past the max duration to trigger the auto-stop effect
     await act(() => {
@@ -498,6 +521,7 @@ describe("Recorder", () => {
 
     // Start recording with webcam enabled
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     // Should be in recording state with webcam active
     expect(
@@ -548,6 +572,7 @@ describe("Recorder", () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
 
     expect(endedCallback).toBeDefined();
 
@@ -558,5 +583,85 @@ describe("Recorder", () => {
     });
 
     expect(mockStopCompositing).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows countdown after clicking start recording", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("countdown decrements from 3 to 2 to 1", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("3")).toBeInTheDocument();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    await vi.waitFor(() => {
+      expect(screen.getByText("2")).toBeInTheDocument();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    await vi.waitFor(() => {
+      expect(screen.getByText("1")).toBeInTheDocument();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    // After countdown finishes, overlay should be gone and recording controls visible
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId("countdown-overlay")).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Pause recording" })).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("clicking countdown overlay skips to recording", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(screen.queryByTestId("countdown-overlay")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pause recording" })).toBeInTheDocument();
+  });
+
+  it("shows click to start hint during countdown", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(screen.getByText("Click to start now")).toBeInTheDocument();
+  });
+
+  it("hides recording controls during countdown", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    // Countdown overlay should be visible
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+    // Recording controls should NOT be visible
+    expect(screen.queryByRole("button", { name: "Pause recording" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stop recording" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /drawing/i })).not.toBeInTheDocument();
   });
 });
