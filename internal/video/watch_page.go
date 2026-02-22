@@ -39,6 +39,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
     <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAeGVYSWZNTQAqAAAACAAEARoABQAAAAEAAAA+ARsABQAAAAEAAABGASgAAwAAAAEAAgAAh2kABAAAAAEAAABOAAAAAAAAAEgAAAABAAAASAAAAAEAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACfCVbEAAAACXBIWXMAAAsTAAALEwEAmpwYAAAEa0lEQVRYCe1VW2icRRQ+Z+af/xK1kdQlvlhatWC7tamKoIilVrFSjdhoIqZtQBERn7RKXwQJvigUqy8iIQ9KU4Msrq0+eHlJUChiIWLTpFHrgxAkIiE2t+a/zMzxzCYb/t3ECyj4spNsZnbmzPm+850zJwCN0VCgocD/rAD+V/i3fFoqxHHc6ilPo68nR/f1LP4T3/+aQLF88nbjyaNkabew1AKIBqSYJKKSDOUb4w90zfwVkb8lsP2TwSKCuMuQ3miF6P+xvXu66nBb+cRhUOodkN4VNssA7cqJFICBAkrTc5jajonHDl6s3qmf/5TAztKJLZmvXrOCHhZSRSIIwC7MHZt45NBR52Rn+eQdqSeHgCACY4AjB4684p/sMhPh+0BJ8m1zCPd8s//QXD24+758o+6k+NFAWxqqIQjU42ApsmkKZn7BmT+7/cP3is48ldALSkbE4OSA3ceaKbL6EipZ8WiTFDCKbp2N4bnKxjp/1hDYderdqw2I91nWzXYpYaccnJCAygPZvOEqQnFgx8eDrUS4G1LNgXOCUGhp9ItKYdHzqA20KaNSFTjKKjade4Z7vXXwYc1mTN5TGAXFCjirip4HmGVjwsCItXZOePgBoS4KGUTgnDMQ6fTr8Y7Dx1cAfucgXoo17kOJV7Iqbvv6+ZkbCjxPrdisTjUEOkslOYZpFxkLSMTOfUCTDXKJPZN/VjeVB/bKQHD62UYwS8KJVY+8iEnMA1EKwglMTkUv9mlZkrwhr2tS8IMXb7QEN6JmAk52qxcFyVfy4O6+QNziao5/XX7cPOmW1SGF9zSnrAWI/VR+aAaWwnWfY40CRkOIEgJXxS63/LZnm8Xib1XH1dkibHJr6/LP4bHl9zvKAw9SGB7kgi0Ywr3uZTiC7jlCbL4af7TLVfGaUaOAyOQ8a7/AQbFyjoQozKb+zflbe4aHPY5ql0uTG6S5Dsj+zGQewih8Ajz/PkZmXiw9p4CyLGYt38r7yK8rKq5ucEq3nR74HP3wfuInxE0GUOtzYLInizYavQBzzaSil8nzjjjgivxkLjUtia1JqAtGqrPcAbnwHDizkDLFLDky3tHz9ipG3aJGAaelsNjvCrCSYa5yfo5tVnhnRlU6YlX4HTA4OHCHEfggLHwx0t09PdbRM4HW9EluPq4qBHFsxsSC9Gd1mDVfawnwUeH8T6etTk9hU1DhQDpjJIgkE0Epr3PgyPJLfp6QJNOCst6qRyHEMZskU64pkUuhUhsI1KvV8/Xm2hSsWBRLpRbrJwOciv3cVMDyx4W80nQYXPFe9gvZrIflHco75n9Oz0MYvkkpNzH2zqQMarr3fEf3l3m76nqNAu5gvKtrRqTBAUySF7gYL7Ajjd5ye2VlfzU67Rdpdnc9uLsrF22/TZZGXed0BMCTksC+fltfX5M7rx/rKpA3urN0PJoPrt3K+WwliZelsRdHO3rWPM38He6Em43ftEnHS8BpI5FpGYTXnB1pb7+ct2usGwo0FGgo4BT4A0kx06ZKzSjiAAAAAElFTkSuQmCC">
     <title>{{.Title}} — {{.Branding.CompanyName}}</title>
     <meta property="og:title" content="{{.Title}}">
+    <meta property="og:description" content="{{.Description}}">
     <meta property="og:type" content="video.other">
     {{if .DownloadEnabled}}<meta property="og:video" content="{{.VideoURL}}">
     <meta property="og:video:type" content="{{.ContentType}}">{{end}}
@@ -1685,6 +1686,8 @@ type watchPageData struct {
 	Chapters           []Chapter
 	ChaptersJSON       template.JS
 	SummaryStatus      string
+	Description        string
+	Duration           int
 }
 
 type expiredPageData struct {
@@ -1901,6 +1904,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var summaryText *string
 	var chaptersJSON *string
 	var summaryStatus string
+	var duration int
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
@@ -1909,7 +1913,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
 		        v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled,
-		        v.summary, v.chapters, v.summary_status
+		        v.summary, v.chapters, v.summary_status, v.duration
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
@@ -1922,7 +1926,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
 		&downloadEnabled,
 		&ctaText, &ctaUrl, &emailGateEnabled,
-		&summaryText, &chaptersJSON, &summaryStatus)
+		&summaryText, &chaptersJSON, &summaryStatus, &duration)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -2037,6 +2041,22 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	}
 	chaptersJSONBytes, _ := json.Marshal(chapterList)
 
+	description := summaryStr
+	if description == "" {
+		if duration > 0 {
+			total := duration
+			var formatted string
+			if total >= 3600 {
+				formatted = fmt.Sprintf("%d:%02d:%02d", total/3600, (total%3600)/60, total%60)
+			} else {
+				formatted = fmt.Sprintf("%d:%02d", total/60, total%60)
+			}
+			description = fmt.Sprintf("Video by %s (%s)", creator, formatted)
+		} else {
+			description = title
+		}
+	}
+
 	reactionEmojisJSON, err := json.Marshal(quickReactionEmojis)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -2071,6 +2091,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Chapters:           chapterList,
 		ChaptersJSON:       template.JS(chaptersJSONBytes),
 		SummaryStatus:      summaryStatus,
+		Description:        description,
+		Duration:           duration,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}
