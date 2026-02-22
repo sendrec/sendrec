@@ -2225,6 +2225,7 @@ func TestWatchPage_Success(t *testing.T) {
 			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary", "chapters", "summary_status"}).
 				AddRow("vid-1", "Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), "disabled", (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), true, (*string)(nil), (*string)(nil), false, (*string)(nil), (*string)(nil), "none"),
 		)
+	expectViewRecording(mock, "vid-1")
 
 	r := chi.NewRouter()
 	r.Get("/watch/{shareToken}", handler.WatchPage)
@@ -2259,9 +2260,7 @@ func TestWatchPage_Success(t *testing.T) {
 		}
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet pgxmock expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_VideoNotFound(t *testing.T) {
@@ -2316,6 +2315,7 @@ func TestWatchPage_StorageError(t *testing.T) {
 			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary", "chapters", "summary_status"}).
 				AddRow("vid-1", "Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), "disabled", (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), true, (*string)(nil), (*string)(nil), false, (*string)(nil), (*string)(nil), "none"),
 		)
+	expectViewRecording(mock, "vid-1")
 
 	r := chi.NewRouter()
 	r.Get("/watch/{shareToken}", handler.WatchPage)
@@ -2333,9 +2333,7 @@ func TestWatchPage_StorageError(t *testing.T) {
 		t.Errorf("expected response body to contain %q, got %q", "internal server error", body)
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet pgxmock expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_ExpiredLink(t *testing.T) {
@@ -2923,6 +2921,7 @@ func TestWatchPage_ContainsNonceInStyleTag(t *testing.T) {
 			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary", "chapters", "summary_status"}).
 				AddRow("vid-1", "Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), "disabled", (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), true, (*string)(nil), (*string)(nil), false, (*string)(nil), (*string)(nil), "none"),
 		)
+	expectViewRecording(mock, "vid-1")
 
 	r := chi.NewRouter()
 	r.Use(nonceMiddleware("test-nonce-abc123"))
@@ -2940,6 +2939,7 @@ func TestWatchPage_ContainsNonceInStyleTag(t *testing.T) {
 	if !strings.Contains(body, `<style nonce="test-nonce-abc123">`) {
 		t.Error("expected watch page to contain <style> tag with nonce attribute")
 	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_ContainsNonceInScriptTag(t *testing.T) {
@@ -2962,6 +2962,7 @@ func TestWatchPage_ContainsNonceInScriptTag(t *testing.T) {
 			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary", "chapters", "summary_status"}).
 				AddRow("vid-1", "Test Video", "recordings/user-1/abc.webm", "Tester", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), "disabled", (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), true, (*string)(nil), (*string)(nil), false, (*string)(nil), (*string)(nil), "none"),
 		)
+	expectViewRecording(mock, "vid-1")
 
 	r := chi.NewRouter()
 	r.Use(nonceMiddleware("test-nonce-abc123"))
@@ -2975,6 +2976,7 @@ func TestWatchPage_ContainsNonceInScriptTag(t *testing.T) {
 	if !strings.Contains(body, `<script nonce="test-nonce-abc123">`) {
 		t.Error("expected watch page to contain <script> tag with nonce attribute")
 	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_ExpiredContainsNonce(t *testing.T) {
@@ -3038,6 +3040,7 @@ func TestWatchPage_ContainsPosterAndOGImage(t *testing.T) {
 			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary", "chapters", "summary_status"}).
 				AddRow("vid-1", "Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, &thumbKey, (*string)(nil), "disabled", (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), true, (*string)(nil), (*string)(nil), false, (*string)(nil), (*string)(nil), "none"),
 		)
+	expectViewRecording(mock, "vid-1")
 
 	r := chi.NewRouter()
 	r.Get("/watch/{shareToken}", handler.WatchPage)
@@ -3061,9 +3064,7 @@ func TestWatchPage_ContainsPosterAndOGImage(t *testing.T) {
 		t.Errorf("expected watch page to contain thumbnail URL %q", downloadURL)
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet pgxmock expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_NoPosterWhenNoThumbnail(t *testing.T) {
@@ -3087,6 +3088,7 @@ func TestWatchPage_NoPosterWhenNoThumbnail(t *testing.T) {
 			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary", "chapters", "summary_status"}).
 				AddRow("vid-1", "Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), "disabled", (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), true, (*string)(nil), (*string)(nil), false, (*string)(nil), (*string)(nil), "none"),
 		)
+	expectViewRecording(mock, "vid-1")
 
 	r := chi.NewRouter()
 	r.Get("/watch/{shareToken}", handler.WatchPage)
@@ -3107,9 +3109,7 @@ func TestWatchPage_NoPosterWhenNoThumbnail(t *testing.T) {
 		t.Error("expected watch page NOT to contain og:image meta tag when no thumbnail")
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet pgxmock expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_ContainsDownloadButton(t *testing.T) {
@@ -3133,6 +3133,7 @@ func TestWatchPage_ContainsDownloadButton(t *testing.T) {
 			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary", "chapters", "summary_status"}).
 				AddRow("vid-1", "Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), "disabled", (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), true, (*string)(nil), (*string)(nil), false, (*string)(nil), (*string)(nil), "none"),
 		)
+	expectViewRecording(mock, "vid-1")
 
 	r := chi.NewRouter()
 	r.Get("/watch/{shareToken}", handler.WatchPage)
@@ -3153,9 +3154,7 @@ func TestWatchPage_ContainsDownloadButton(t *testing.T) {
 		t.Errorf("expected watch page to contain download API URL for share token %s", shareToken)
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet pgxmock expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_ContainsSpeedButtons(t *testing.T) {
@@ -3178,6 +3177,7 @@ func TestWatchPage_ContainsSpeedButtons(t *testing.T) {
 			pgxmock.NewRows([]string{"id", "title", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "comment_mode", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary", "chapters", "summary_status"}).
 				AddRow("vid-1", "Demo Recording", "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), "disabled", (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), true, (*string)(nil), (*string)(nil), false, (*string)(nil), (*string)(nil), "none"),
 		)
+	expectViewRecording(mock, "vid-1")
 
 	r := chi.NewRouter()
 	r.Get("/watch/{shareToken}", handler.WatchPage)
@@ -3207,9 +3207,7 @@ func TestWatchPage_ContainsSpeedButtons(t *testing.T) {
 		t.Error("expected watch page to contain playbackRate JavaScript")
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet pgxmock expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 // --- viewerHash Tests ---

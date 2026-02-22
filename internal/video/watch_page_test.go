@@ -40,6 +40,20 @@ func serveWatchPage(handler *Handler, req *http.Request) *httptest.ResponseRecor
 	return rec
 }
 
+func expectViewRecording(mock pgxmock.PgxPoolIface, videoID string) {
+	mock.ExpectExec(`INSERT INTO video_views`).
+		WithArgs(videoID, pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+}
+
+func waitAndCheckExpectations(t *testing.T, mock pgxmock.PgxPoolIface) {
+	t.Helper()
+	time.Sleep(50 * time.Millisecond)
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
 func TestWatchPage_NotFound_Returns404(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -139,6 +153,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -161,9 +176,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 			t.Errorf("expected %s (%q) in response", name, want)
 		}
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
@@ -192,6 +205,7 @@ func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -218,9 +232,7 @@ func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
 	if !strings.Contains(body, `class="speed-btn active" data-speed="1"`) {
 		t.Error("expected 1x speed button to have active class")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_WithThumbnail_RendersPosterAndOGImage(t *testing.T) {
@@ -250,6 +262,7 @@ func TestWatchPage_WithThumbnail_RendersPosterAndOGImage(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -264,9 +277,7 @@ func TestWatchPage_WithThumbnail_RendersPosterAndOGImage(t *testing.T) {
 	if !strings.Contains(body, `og:image`) {
 		t.Error("expected og:image meta tag")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_WithoutThumbnail_NoPosterOrOGImage(t *testing.T) {
@@ -295,6 +306,7 @@ func TestWatchPage_WithoutThumbnail_NoPosterOrOGImage(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -309,9 +321,7 @@ func TestWatchPage_WithoutThumbnail_NoPosterOrOGImage(t *testing.T) {
 	if strings.Contains(body, `og:image`) {
 		t.Error("expected no og:image meta tag without thumbnail")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
@@ -340,6 +350,7 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -386,9 +397,7 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 	if !strings.Contains(body, `reactionErrorEl.textContent =`) {
 		t.Error("expected reaction errors to be surfaced to users")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
@@ -417,6 +426,7 @@ func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -434,9 +444,7 @@ func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
 	if strings.Contains(body, `id="markers-bar"`) {
 		t.Error("expected no markers-bar div when comments disabled")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_NameRequired_RendersNameField(t *testing.T) {
@@ -465,6 +473,7 @@ func TestWatchPage_NameRequired_RendersNameField(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -479,9 +488,7 @@ func TestWatchPage_NameRequired_RendersNameField(t *testing.T) {
 	if strings.Contains(body, `id="comment-email"`) {
 		t.Error("expected no email input for name_required mode")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_NameEmailRequired_RendersBothFields(t *testing.T) {
@@ -510,6 +517,7 @@ func TestWatchPage_NameEmailRequired_RendersBothFields(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -524,9 +532,7 @@ func TestWatchPage_NameEmailRequired_RendersBothFields(t *testing.T) {
 	if !strings.Contains(body, `id="comment-email"`) {
 		t.Error("expected email input field")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_TranscriptReady_RendersSegments(t *testing.T) {
@@ -562,6 +568,7 @@ func TestWatchPage_TranscriptReady_RendersSegments(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -589,9 +596,7 @@ func TestWatchPage_TranscriptReady_RendersSegments(t *testing.T) {
 	if !strings.Contains(body, `<track kind="subtitles"`) {
 		t.Error("expected <track> element for subtitles")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_TranscriptPending_ShowsQueueMessage(t *testing.T) {
@@ -620,6 +625,7 @@ func TestWatchPage_TranscriptPending_ShowsQueueMessage(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -631,9 +637,7 @@ func TestWatchPage_TranscriptPending_ShowsQueueMessage(t *testing.T) {
 	if !strings.Contains(body, "Transcription queued") {
 		t.Error("expected 'Transcription queued' message")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_TranscriptProcessing_ShowsProgressMessage(t *testing.T) {
@@ -662,6 +666,7 @@ func TestWatchPage_TranscriptProcessing_ShowsProgressMessage(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -673,9 +678,7 @@ func TestWatchPage_TranscriptProcessing_ShowsProgressMessage(t *testing.T) {
 	if !strings.Contains(body, "Transcription in progress") {
 		t.Error("expected 'Transcription in progress' message")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_TranscriptFailed_ShowsFailedMessage(t *testing.T) {
@@ -704,6 +707,7 @@ func TestWatchPage_TranscriptFailed_ShowsFailedMessage(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -715,9 +719,7 @@ func TestWatchPage_TranscriptFailed_ShowsFailedMessage(t *testing.T) {
 	if !strings.Contains(body, "Transcription failed") {
 		t.Error("expected 'Transcription failed' message")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_StorageError_Returns500(t *testing.T) {
@@ -746,15 +748,14 @@ func TestWatchPage_StorageError_Returns500(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", rec.Code)
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
@@ -833,6 +834,7 @@ func TestWatchPage_PasswordProtected_ValidCookie_ShowsPlayer(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	sig := signWatchCookie(testHMACSecret, shareToken, passwordHash)
 	req := watchPageRequest(shareToken)
@@ -854,9 +856,7 @@ func TestWatchPage_PasswordProtected_ValidCookie_ShowsPlayer(t *testing.T) {
 	if !strings.Contains(body, "<video") {
 		t.Error("expected video player when valid cookie present")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_OGMetaTags(t *testing.T) {
@@ -885,6 +885,7 @@ func TestWatchPage_OGMetaTags(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -904,9 +905,7 @@ func TestWatchPage_OGMetaTags(t *testing.T) {
 			t.Errorf("expected %q in OG meta tags", check)
 		}
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_CrossOriginAttribute(t *testing.T) {
@@ -935,6 +934,7 @@ func TestWatchPage_CrossOriginAttribute(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -946,9 +946,7 @@ func TestWatchPage_CrossOriginAttribute(t *testing.T) {
 	if !strings.Contains(body, `crossorigin="anonymous"`) {
 		t.Error("expected crossorigin=anonymous on video element for CORS subtitle loading")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_PlaysInlineAttribute(t *testing.T) {
@@ -977,6 +975,7 @@ func TestWatchPage_PlaysInlineAttribute(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -988,9 +987,7 @@ func TestWatchPage_PlaysInlineAttribute(t *testing.T) {
 	if !strings.Contains(body, "playsinline") {
 		t.Error("expected playsinline attribute on video element for iOS Safari")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_CSPNonce(t *testing.T) {
@@ -1019,6 +1016,7 @@ func TestWatchPage_CSPNonce(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1035,9 +1033,7 @@ func TestWatchPage_CSPNonce(t *testing.T) {
 	if nonceCount < 2 {
 		t.Errorf("expected nonce on multiple tags (style + scripts), found %d occurrences", nonceCount)
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_TitleInHTMLTitle(t *testing.T) {
@@ -1066,6 +1062,7 @@ func TestWatchPage_TitleInHTMLTitle(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1077,9 +1074,7 @@ func TestWatchPage_TitleInHTMLTitle(t *testing.T) {
 	if !strings.Contains(body, "<title>My Special Recording") {
 		t.Error("expected video title in HTML <title> tag")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_AutoplayScript(t *testing.T) {
@@ -1108,6 +1103,7 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1123,9 +1119,7 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 	if !strings.Contains(body, "v.muted = true") {
 		t.Error("expected muted fallback in autoplay script")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
@@ -1154,6 +1148,7 @@ func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1171,9 +1166,7 @@ func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
 	if !strings.Contains(body, `src="/images/logo.png"`) {
 		t.Error("expected logo to use /images/logo.png, not a data URI")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestFormatTimestamp_TemplateFuncMap(t *testing.T) {
@@ -1224,10 +1217,7 @@ func TestWatchPage_RecordsView(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
-
-	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("vid-1", pgxmock.AnyArg()).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1235,12 +1225,7 @@ func TestWatchPage_RecordsView(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	// Give the goroutine time to execute
-	time.Sleep(50 * time.Millisecond)
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_NotFound_HasNonceInTemplate(t *testing.T) {
@@ -1326,10 +1311,7 @@ func TestWatchPage_AnalyticsScriptRendered(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
-
-	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("vid-1", pgxmock.AnyArg()).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1345,10 +1327,7 @@ func TestWatchPage_AnalyticsScriptRendered(t *testing.T) {
 		t.Error("expected analytics script with data-website-id")
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_NoAnalyticsWhenEmpty(t *testing.T) {
@@ -1378,10 +1357,7 @@ func TestWatchPage_NoAnalyticsWhenEmpty(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
-
-	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("vid-1", pgxmock.AnyArg()).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1394,10 +1370,7 @@ func TestWatchPage_NoAnalyticsWhenEmpty(t *testing.T) {
 		t.Error("expected no analytics script when not configured")
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_ResponsiveCSS(t *testing.T) {
@@ -1426,6 +1399,7 @@ func TestWatchPage_ResponsiveCSS(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1440,9 +1414,7 @@ func TestWatchPage_ResponsiveCSS(t *testing.T) {
 	if !strings.Contains(body, "max-width: 640px") {
 		t.Error("expected mobile breakpoint at 640px")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_SafariWebMWarningElement(t *testing.T) {
@@ -1471,6 +1443,7 @@ func TestWatchPage_SafariWebMWarningElement(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1485,9 +1458,7 @@ func TestWatchPage_SafariWebMWarningElement(t *testing.T) {
 	if !strings.Contains(body, "browser-warning") {
 		t.Error("expected browser-warning CSS class")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_DownloadEnabled_ShowsButton(t *testing.T) {
@@ -1516,6 +1487,7 @@ func TestWatchPage_DownloadEnabled_ShowsButton(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1530,9 +1502,7 @@ func TestWatchPage_DownloadEnabled_ShowsButton(t *testing.T) {
 	if strings.Contains(body, `controlsList="nodownload"`) {
 		t.Error("expected no controlsList=nodownload when download is enabled")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_DownloadDisabled_HidesButton(t *testing.T) {
@@ -1561,6 +1531,7 @@ func TestWatchPage_DownloadDisabled_HidesButton(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1581,9 +1552,7 @@ func TestWatchPage_DownloadDisabled_HidesButton(t *testing.T) {
 	if strings.Contains(body, `og:video`) {
 		t.Error("expected no og:video meta tag when download is disabled")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_CustomCSS_Injected(t *testing.T) {
@@ -1615,6 +1584,7 @@ func TestWatchPage_CustomCSS_Injected(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1627,9 +1597,7 @@ func TestWatchPage_CustomCSS_Injected(t *testing.T) {
 		t.Error("expected custom CSS to be injected in the page")
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_NoCustomCSS(t *testing.T) {
@@ -1659,6 +1627,7 @@ func TestWatchPage_NoCustomCSS(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1671,9 +1640,7 @@ func TestWatchPage_NoCustomCSS(t *testing.T) {
 		t.Error("expected no custom CSS when NULL")
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_NeverExpires(t *testing.T) {
@@ -1703,10 +1670,7 @@ func TestWatchPage_NeverExpires(t *testing.T) {
 				(*string)(nil), (*string)(nil), "none",
 			),
 		)
-
-	mock.ExpectExec("INSERT INTO video_views").
-		WithArgs("vid-1", pgxmock.AnyArg()).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	expectViewRecording(mock, "vid-1")
 
 	req := watchPageRequest("token-never")
 	rec := serveWatchPage(handler, req)
@@ -1720,9 +1684,7 @@ func TestWatchPage_NeverExpires(t *testing.T) {
 		t.Error("expected video title in response")
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_RendersCtaCard(t *testing.T) {
@@ -1752,10 +1714,7 @@ func TestWatchPage_RendersCtaCard(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
-
-	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("video-001", pgxmock.AnyArg()).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	expectViewRecording(mock, "video-001")
 
 	rec := serveWatchPage(handler, watchPageRequest("test-token"))
 
@@ -1774,11 +1733,7 @@ func TestWatchPage_RendersCtaCard(t *testing.T) {
 		t.Error("expected CTA URL")
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_NoCtaWhenNotSet(t *testing.T) {
@@ -1805,10 +1760,7 @@ func TestWatchPage_NoCtaWhenNotSet(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
-
-	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("video-001", pgxmock.AnyArg()).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	expectViewRecording(mock, "video-001")
 
 	rec := serveWatchPage(handler, watchPageRequest("test-token"))
 
@@ -1821,11 +1773,7 @@ func TestWatchPage_NoCtaWhenNotSet(t *testing.T) {
 		t.Error("expected no CTA card element when CTA is not set")
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_MilestoneTrackingScript(t *testing.T) {
@@ -1852,10 +1800,7 @@ func TestWatchPage_MilestoneTrackingScript(t *testing.T) {
 			false,
 			(*string)(nil), (*string)(nil), "none",
 		))
-
-	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("video-001", pgxmock.AnyArg()).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	expectViewRecording(mock, "video-001")
 
 	rec := serveWatchPage(handler, watchPageRequest("test-token"))
 
@@ -1871,11 +1816,7 @@ func TestWatchPage_MilestoneTrackingScript(t *testing.T) {
 		t.Error("expected timeupdate event listener in response")
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
 
 func TestWatchPage_EmailGate_ShowsForm(t *testing.T) {
@@ -1963,6 +1904,7 @@ func TestWatchPage_SummaryTab(t *testing.T) {
 			false,
 			&summaryText, &chaptersJSON, "ready",
 		))
+	expectViewRecording(mock, "vid-1")
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
 
@@ -1995,7 +1937,5 @@ func TestWatchPage_SummaryTab(t *testing.T) {
 	if !strings.Contains(body, "summary-panel") {
 		t.Error("expected summary-panel element")
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	waitAndCheckExpectations(t, mock)
 }
