@@ -600,19 +600,12 @@ export function VideoDetail() {
         </a>
       </div>
 
-      <div style={{ display: "flex", gap: 24, alignItems: "flex-start", marginBottom: 8 }}>
+      <div className="video-detail-hero">
         {video.thumbnailUrl && (
           <img
             src={video.thumbnailUrl}
             alt="Video thumbnail"
-            style={{
-              width: 240,
-              height: 135,
-              objectFit: "cover",
-              borderRadius: 8,
-              background: "var(--color-border)",
-              flexShrink: 0,
-            }}
+            className="video-detail-thumbnail"
           />
         )}
 
@@ -678,16 +671,13 @@ export function VideoDetail() {
             )}
           </div>
 
-          <p
-            style={{
-              color: "var(--color-text-secondary)",
-              fontSize: 14,
-              margin: "8px 0 0",
-            }}
-          >
-            {formatDuration(video.duration)} &middot;{" "}
-            {formatDate(video.createdAt)} &middot;{" "}
-            {viewCountLabel(video.viewCount, video.uniqueViewCount)} &middot;{" "}
+          <p className="video-detail-meta">
+            <span>{formatDuration(video.duration)}</span>
+            <span>&middot;</span>
+            <span>{formatDate(video.createdAt)}</span>
+            <span>&middot;</span>
+            <span>{viewCountLabel(video.viewCount, video.uniqueViewCount)}</span>
+            <span>&middot;</span>
             <span
               style={{
                 color:
@@ -695,7 +685,7 @@ export function VideoDetail() {
                     ? "var(--color-accent)"
                     : expiry.expired
                       ? "var(--color-error)"
-                      : "var(--color-text-secondary)",
+                      : undefined,
               }}
             >
               {expiry.text}

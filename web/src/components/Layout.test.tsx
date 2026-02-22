@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Layout } from "./Layout";
@@ -11,8 +11,10 @@ vi.mock("react-router-dom", async () => {
 });
 
 const mockSetAccessToken = vi.fn();
+const mockApiFetch = vi.fn();
 vi.mock("../api/client", () => ({
   setAccessToken: (...args: unknown[]) => mockSetAccessToken(...args),
+  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
 function renderLayout(path = "/") {
@@ -29,6 +31,8 @@ describe("Layout", () => {
   beforeEach(() => {
     mockNavigate.mockReset();
     mockSetAccessToken.mockReset();
+    mockApiFetch.mockReset();
+    mockApiFetch.mockRejectedValue(new Error("not available"));
     globalThis.fetch = vi.fn().mockResolvedValue({});
   });
 
@@ -119,5 +123,37 @@ describe("Layout", () => {
     renderLayout();
     const nav = screen.getByRole("navigation");
     expect(nav).toHaveClass("nav-bar");
+  });
+
+  it("shows Free badge for free plan", async () => {
+    mockApiFetch.mockResolvedValueOnce({ plan: "free" });
+    renderLayout();
+
+    await waitFor(() => {
+      expect(screen.getByText("Free")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Free")).toHaveClass("plan-badge");
+  });
+
+  it("shows Pro badge for pro plan", async () => {
+    mockApiFetch.mockResolvedValueOnce({ plan: "pro" });
+    renderLayout();
+
+    await waitFor(() => {
+      expect(screen.getByText("Pro")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Pro")).toHaveClass("plan-badge", "plan-badge--pro");
+  });
+
+  it("shows no badge when billing API fails", async () => {
+    mockApiFetch.mockRejectedValueOnce(new Error("not available"));
+    renderLayout();
+
+    // Wait for the fetch to settle
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/settings/billing");
+    });
+    expect(screen.queryByText("Free")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pro")).not.toBeInTheDocument();
   });
 });

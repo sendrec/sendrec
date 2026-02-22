@@ -13,6 +13,35 @@ docker compose -f docker-compose.dev.yml up --build
 
 Open http://localhost:8080, register an account, and start recording or uploading videos.
 
+## Standalone binary
+
+SendRec is a single ~32 MB executable with the React frontend, database migrations, and HTML templates all embedded. No Docker required — just a PostgreSQL database and S3-compatible storage.
+
+Download the binary from the [releases page](https://github.com/sendrec/sendrec/releases), set the required environment variables, and run:
+
+```bash
+export DATABASE_URL=postgres://sendrec:secret@localhost:5432/sendrec?sslmode=disable
+export JWT_SECRET=$(openssl rand -hex 32)
+export BASE_URL=https://videos.example.com
+export S3_ENDPOINT=https://storage.example.com
+export S3_ACCESS_KEY=your-key
+export S3_SECRET_KEY=your-secret
+export S3_BUCKET=recordings
+
+./sendrec
+```
+
+Migrations run automatically on startup. See the [environment variables](#environment-variables) section for all configuration options.
+
+To build from source:
+
+```bash
+git clone https://github.com/sendrec/sendrec.git
+cd sendrec
+make build   # builds frontend + Go binary
+./sendrec
+```
+
 ## Production setup
 
 SendRec uses [Garage](https://garagehq.deuxfleurs.fr/) for S3-compatible object storage. Garage is lightweight (uses ~50 MB RAM), open source (AGPL-3.0), and purpose-built for self-hosted deployments. Any S3-compatible storage works — just change the `S3_ENDPOINT` and credentials.
