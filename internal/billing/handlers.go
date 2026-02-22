@@ -184,7 +184,12 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 	switch payload.EventType {
 	case "subscription.active", "subscription.paid":
 		h.handleSubscriptionActivated(r, w, payload, userID)
-	case "subscription.canceled", "subscription.expired":
+	case "subscription.canceled":
+		// Grace period: keep Pro until billing period ends.
+		// Creem sends subscription.expired when the period actually ends.
+		log.Printf("webhook: subscription canceled for user %s, keeping plan until expiry", userID)
+		w.WriteHeader(http.StatusOK)
+	case "subscription.expired":
 		h.handleSubscriptionCanceled(r, w, userID)
 	default:
 		log.Printf("webhook: unhandled event %s", payload.EventType)

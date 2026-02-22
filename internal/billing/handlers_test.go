@@ -195,7 +195,52 @@ func TestWebhookSubscriptionActive(t *testing.T) {
 	}
 }
 
-func TestWebhookSubscriptionCanceled(t *testing.T) {
+func TestWebhookSubscriptionCanceled_GracePeriod(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	// No DB update expected — canceled keeps Pro until expiry
+	client := New("test-key", "https://api.creem.io")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+
+	payload := map[string]interface{}{
+		"eventType": "subscription.canceled",
+		"object": map[string]interface{}{
+			"id":      "sub_002",
+			"product": map[string]interface{}{"id": "prod_pro"},
+			"customer": map[string]interface{}{
+				"id": "cust_002",
+			},
+			"metadata": map[string]interface{}{
+				"userId": "user-789",
+			},
+		},
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	mac := hmac.New(sha256.New, []byte("webhook-secret"))
+	mac.Write(payloadBytes)
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/webhooks/creem", strings.NewReader(string(payloadBytes)))
+	req.Header.Set("creem-signature", signature)
+	rec := httptest.NewRecorder()
+
+	handlers.Webhook(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+func TestWebhookSubscriptionExpired(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -210,7 +255,7 @@ func TestWebhookSubscriptionCanceled(t *testing.T) {
 	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
 
 	payload := map[string]interface{}{
-		"eventType": "subscription.canceled",
+		"eventType": "subscription.expired",
 		"object": map[string]interface{}{
 			"id":      "sub_002",
 			"product": map[string]interface{}{"id": "prod_pro"},

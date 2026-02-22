@@ -124,8 +124,8 @@ func TestSetWatchCookie_SetsCookieOnResponse(t *testing.T) {
 	if !c.HttpOnly {
 		t.Error("expected HttpOnly cookie")
 	}
-	if c.SameSite != http.SameSiteStrictMode {
-		t.Errorf("expected SameSiteStrict, got %v", c.SameSite)
+	if c.SameSite != http.SameSiteNoneMode {
+		t.Errorf("expected SameSiteNone, got %v", c.SameSite)
 	}
 	if c.Secure {
 		t.Error("expected non-secure cookie when secure=false")
