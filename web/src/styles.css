@@ -95,6 +95,7 @@ input:focus-visible {
   color: var(--color-text);
   margin-right: 16px;
   text-decoration: none;
+  position: relative;
 }
 
 .nav-logo img {
@@ -123,13 +124,16 @@ input:focus-visible {
 }
 
 .plan-badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
   background: var(--color-surface);
   color: var(--color-text-secondary);
   border: 1px solid var(--color-border);
+  position: absolute;
+  bottom: -2px;
+  right: -16px;
 }
 
 .plan-badge--pro {
