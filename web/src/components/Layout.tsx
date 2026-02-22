@@ -42,13 +42,12 @@ export function Layout({ children }: LayoutProps) {
         <Link to="/" className="nav-logo" onClick={handleNavClick}>
           <img src="/images/logo.png" alt="SendRec" width="48" height="48" />
           SendRec
+          {plan && (
+            <span className={`plan-badge${plan === "pro" ? " plan-badge--pro" : ""}`}>
+              {plan === "pro" ? "Pro" : "Free"}
+            </span>
+          )}
         </Link>
-
-        {plan && (
-          <span className={`plan-badge${plan === "pro" ? " plan-badge--pro" : ""}`}>
-            {plan === "pro" ? "Pro" : "Free"}
-          </span>
-        )}
 
         <button
           className="nav-hamburger"
