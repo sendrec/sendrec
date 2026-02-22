@@ -124,16 +124,17 @@ input:focus-visible {
 }
 
 .plan-badge {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 8px;
+  padding: 0px 5px;
+  border-radius: 6px;
   background: var(--color-surface);
   color: var(--color-text-secondary);
   border: 1px solid var(--color-border);
   position: absolute;
-  bottom: -2px;
-  right: -16px;
+  bottom: 0px;
+  right: -12px;
+  line-height: 16px;
 }
 
 .plan-badge--pro {
