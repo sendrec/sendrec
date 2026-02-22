@@ -2347,10 +2347,10 @@ func TestWatchThumbnail_Redirects(t *testing.T) {
 	thumbKey := "recordings/u1/thumb.jpg"
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at, v.status`).
+	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at`).
 		WithArgs("validtoken12").
-		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at", "status"}).
-			AddRow(&thumbKey, &expiresAt, "ready"))
+		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at"}).
+			AddRow(&thumbKey, &expiresAt))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/watch/validtoken12/thumbnail", nil)
 	rec := serveWatchThumbnail(handler, req)
@@ -2376,7 +2376,7 @@ func TestWatchThumbnail_NotFound(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
 
-	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at, v.status`).
+	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at`).
 		WithArgs("nonexistent").
 		WillReturnError(errors.New("no rows"))
 
@@ -2402,10 +2402,10 @@ func TestWatchThumbnail_NoThumbnail(t *testing.T) {
 
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at, v.status`).
+	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at`).
 		WithArgs("nothumbtoken").
-		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at", "status"}).
-			AddRow((*string)(nil), &expiresAt, "ready"))
+		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at"}).
+			AddRow((*string)(nil), &expiresAt))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/watch/nothumbtoken/thumbnail", nil)
 	rec := serveWatchThumbnail(handler, req)
@@ -2430,10 +2430,10 @@ func TestWatchThumbnail_Expired(t *testing.T) {
 	thumbKey := "recordings/u1/thumb.jpg"
 	expiredAt := time.Now().Add(-24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at, v.status`).
+	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at`).
 		WithArgs("expiredtoken").
-		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at", "status"}).
-			AddRow(&thumbKey, &expiredAt, "ready"))
+		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at"}).
+			AddRow(&thumbKey, &expiredAt))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/watch/expiredtoken/thumbnail", nil)
 	rec := serveWatchThumbnail(handler, req)

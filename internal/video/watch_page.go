@@ -21,13 +21,16 @@ func derefString(s *string) string {
 	return *s
 }
 
+func formatDuration(totalSeconds int) string {
+	if totalSeconds >= 3600 {
+		return fmt.Sprintf("%d:%02d:%02d", totalSeconds/3600, (totalSeconds%3600)/60, totalSeconds%60)
+	}
+	return fmt.Sprintf("%d:%02d", totalSeconds/60, totalSeconds%60)
+}
+
 var watchFuncs = template.FuncMap{
 	"formatTimestamp": func(seconds float64) string {
-		total := int(seconds)
-		if total >= 3600 {
-			return fmt.Sprintf("%d:%02d:%02d", total/3600, (total%3600)/60, total%60)
-		}
-		return fmt.Sprintf("%d:%02d", total/60, total%60)
+		return formatDuration(int(seconds))
 	},
 }
 
@@ -2052,14 +2055,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	description := summaryStr
 	if description == "" {
 		if duration > 0 {
-			total := duration
-			var formatted string
-			if total >= 3600 {
-				formatted = fmt.Sprintf("%d:%02d:%02d", total/3600, (total%3600)/60, total%60)
-			} else {
-				formatted = fmt.Sprintf("%d:%02d", total/60, total%60)
-			}
-			description = fmt.Sprintf("Video by %s (%s)", creator, formatted)
+			description = fmt.Sprintf("Video by %s (%s)", creator, formatDuration(duration))
 		} else {
 			description = title
 		}
@@ -2112,14 +2108,13 @@ func (h *Handler) WatchThumbnail(w http.ResponseWriter, r *http.Request) {
 
 	var thumbnailKey *string
 	var shareExpiresAt *time.Time
-	var status string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.thumbnail_key, v.share_expires_at, v.status
+		`SELECT v.thumbnail_key, v.share_expires_at
 		 FROM videos v
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
-	).Scan(&thumbnailKey, &shareExpiresAt, &status)
+	).Scan(&thumbnailKey, &shareExpiresAt)
 	if err != nil {
 		http.NotFound(w, r)
 		return
