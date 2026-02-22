@@ -145,15 +145,13 @@ describe("Layout", () => {
     expect(screen.getByText("Pro")).toHaveClass("plan-badge", "plan-badge--pro");
   });
 
-  it("shows no badge when billing API fails", async () => {
+  it("shows Free badge when billing API fails", async () => {
     mockApiFetch.mockRejectedValueOnce(new Error("not available"));
     renderLayout();
 
-    // Wait for the fetch to settle
     await waitFor(() => {
-      expect(mockApiFetch).toHaveBeenCalledWith("/api/settings/billing");
+      expect(screen.getByText("Free")).toBeInTheDocument();
     });
-    expect(screen.queryByText("Free")).not.toBeInTheDocument();
     expect(screen.queryByText("Pro")).not.toBeInTheDocument();
   });
 });

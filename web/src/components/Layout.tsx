@@ -18,8 +18,8 @@ export function Layout({ children }: LayoutProps) {
 
   useEffect(() => {
     apiFetch<BillingResponse>("/api/settings/billing")
-      .then((res) => { if (res?.plan) setPlan(res.plan); })
-      .catch(() => {});
+      .then((res) => { if (res?.plan) setPlan(res.plan); else setPlan("free"); })
+      .catch(() => setPlan("free"));
   }, []);
 
   function isActive(path: string): boolean {
