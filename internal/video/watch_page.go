@@ -44,15 +44,17 @@ func formatISO8601Duration(totalSeconds int) string {
 	return fmt.Sprintf("PT%dS", s)
 }
 
-func buildVideoObjectJSONLD(title, description, baseURL, shareToken string, createdAt time.Time, duration int, downloadEnabled bool) string {
+func buildVideoObjectJSONLD(title, description, baseURL, shareToken string, createdAt time.Time, duration int, downloadEnabled, hasThumbnail bool) string {
 	obj := map[string]string{
-		"@context":     "https://schema.org",
-		"@type":        "VideoObject",
-		"name":         title,
-		"description":  description,
-		"thumbnailUrl": baseURL + "/api/watch/" + shareToken + "/thumbnail",
-		"uploadDate":   createdAt.Format(time.RFC3339),
-		"embedUrl":     baseURL + "/embed/" + shareToken,
+		"@context":    "https://schema.org",
+		"@type":       "VideoObject",
+		"name":        title,
+		"description": description,
+		"uploadDate":  createdAt.Format(time.RFC3339),
+		"embedUrl":    baseURL + "/embed/" + shareToken,
+	}
+	if hasThumbnail {
+		obj["thumbnailUrl"] = baseURL + "/api/watch/" + shareToken + "/thumbnail"
 	}
 	iso := formatISO8601Duration(duration)
 	if iso != "" {
@@ -1739,8 +1741,6 @@ type watchPageData struct {
 	Description        string
 	Duration           int
 	HasThumbnail       bool
-	UploadDate         string
-	ISO8601Dur         string
 	JSONLD             template.JS
 }
 
@@ -2110,7 +2110,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonLD := buildVideoObjectJSONLD(title, description, h.baseURL, shareToken, createdAt, duration, downloadEnabled)
+	jsonLD := buildVideoObjectJSONLD(title, description, h.baseURL, shareToken, createdAt, duration, downloadEnabled, thumbnailKey != nil)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := watchPageTemplate.Execute(w, watchPageData{
@@ -2143,8 +2143,6 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Description:        description,
 		Duration:           duration,
 		HasThumbnail:       thumbnailKey != nil,
-		UploadDate:         createdAt.Format(time.RFC3339),
-		ISO8601Dur:         formatISO8601Duration(duration),
 		JSONLD:             template.JS(jsonLD),
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
