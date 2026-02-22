@@ -8,28 +8,73 @@ interface UploadResponse {
   shareToken: string;
 }
 
+interface LimitsResponse {
+  maxVideosPerMonth: number;
+  videosUsedThisMonth: number;
+}
+
+interface FileEntry {
+  file: File;
+  title: string;
+}
+
+interface UploadResult {
+  fileName: string;
+  shareUrl: string;
+  error?: string;
+}
+
+const MAX_FILES = 10;
+const SUPPORTED_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+
 export function Upload() {
-  const [file, setFile] = useState<File | null>(null);
-  const [title, setTitle] = useState("");
+  const [files, setFiles] = useState<FileEntry[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [results, setResults] = useState<UploadResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
 
-  function acceptFile(selected: File) {
-    setFile(selected);
-    const nameWithoutExt = selected.name.replace(/\.[^.]+$/, "");
-    setTitle(nameWithoutExt);
-    setError(null);
+  function acceptFiles(selected: File[]) {
+    const valid = selected.filter((f) => SUPPORTED_TYPES.includes(f.type));
+    if (valid.length === 0) {
+      setError("Only MP4, WebM, and MOV files are supported");
+      return;
+    }
+    if (valid.length < selected.length) {
+      setError(`${selected.length - valid.length} unsupported file(s) skipped`);
+    } else {
+      setError(null);
+    }
+
+    const total = files.length + valid.length;
+    if (total > MAX_FILES) {
+      const allowed = valid.slice(0, MAX_FILES - files.length);
+      if (allowed.length === 0) {
+        setError(`Maximum ${MAX_FILES} files allowed`);
+        return;
+      }
+      setError(`Only ${allowed.length} of ${valid.length} files added (maximum ${MAX_FILES})`);
+      setFiles((prev) => [
+        ...prev,
+        ...allowed.map((f) => ({ file: f, title: f.name.replace(/\.[^.]+$/, "") })),
+      ]);
+      return;
+    }
+
+    setFiles((prev) => [
+      ...prev,
+      ...valid.map((f) => ({ file: f, title: f.name.replace(/\.[^.]+$/, "") })),
+    ]);
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
-    acceptFile(selected);
+    const selected = Array.from(e.target.files || []);
+    if (selected.length === 0) return;
+    acceptFiles(selected);
   }
 
   function handleDragEnter(e: React.DragEvent) {
@@ -59,84 +104,127 @@ export function Upload() {
     dragCounter.current = 0;
     setDragging(false);
 
-    const dropped = e.dataTransfer.files[0];
-    if (!dropped) return;
+    const dropped = Array.from(e.dataTransfer.files);
+    if (dropped.length === 0) return;
+    acceptFiles(dropped);
+  }
 
-    if (dropped.type !== "video/mp4" && dropped.type !== "video/webm" && dropped.type !== "video/quicktime") {
-      setError("Only MP4, WebM, and MOV files are supported");
-      return;
-    }
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setError(null);
+  }
 
-    acceptFile(dropped);
+  function updateTitle(index: number, title: string) {
+    setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, title } : f)));
   }
 
   async function handleUpload() {
-    if (!file) return;
+    if (files.length === 0) return;
+
+    setError(null);
+
+    // Check monthly quota upfront
+    try {
+      const limits = await apiFetch<LimitsResponse>("/api/videos/limits");
+      if (limits && limits.maxVideosPerMonth > 0) {
+        const remaining = limits.maxVideosPerMonth - limits.videosUsedThisMonth;
+        if (files.length > remaining) {
+          setError(
+            remaining <= 0
+              ? "Monthly video limit reached"
+              : `You can only upload ${remaining} more video${remaining === 1 ? "" : "s"} this month`
+          );
+          return;
+        }
+      }
+    } catch {
+      // If limits check fails, proceed and let backend enforce
+    }
 
     setUploading(true);
-    setError(null);
+    setCurrentFileIndex(0);
     setProgress(0);
-    let videoId: string | null = null;
 
-    try {
-      const fileContentType = file.type === "video/webm" ? "video/webm" : file.type === "video/quicktime" ? "video/quicktime" : "video/mp4";
+    const uploadResults: UploadResult[] = [];
 
-      setProgress(10);
+    for (let i = 0; i < files.length; i++) {
+      setCurrentFileIndex(i);
+      setProgress(0);
+      const entry = files[i];
+      let videoId: string | null = null;
 
-      const result = await apiFetch<UploadResponse>("/api/videos/upload", {
-        method: "POST",
-        body: JSON.stringify({
-          title: title || file.name.replace(/\.[^.]+$/, ""),
-          fileSize: file.size,
-          contentType: fileContentType,
-        }),
-      });
+      try {
+        const fileContentType =
+          entry.file.type === "video/webm"
+            ? "video/webm"
+            : entry.file.type === "video/quicktime"
+              ? "video/quicktime"
+              : "video/mp4";
 
-      if (!result) {
-        throw new Error("Failed to create upload");
+        setProgress(10);
+
+        const result = await apiFetch<UploadResponse>("/api/videos/upload", {
+          method: "POST",
+          body: JSON.stringify({
+            title: entry.title || entry.file.name.replace(/\.[^.]+$/, ""),
+            fileSize: entry.file.size,
+            contentType: fileContentType,
+          }),
+        });
+
+        if (!result) {
+          throw new Error("Failed to create upload");
+        }
+
+        videoId = result.id;
+        setProgress(20);
+
+        const uploadResp = await fetch(result.uploadUrl, {
+          method: "PUT",
+          body: entry.file,
+          headers: { "Content-Type": fileContentType },
+        });
+
+        if (!uploadResp.ok) {
+          throw new Error("Upload failed");
+        }
+
+        setProgress(80);
+
+        await apiFetch(`/api/videos/${result.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "ready" }),
+        });
+
+        setProgress(100);
+        uploadResults.push({
+          fileName: entry.file.name,
+          shareUrl: `${window.location.origin}/watch/${result.shareToken}`,
+        });
+      } catch (err) {
+        if (videoId) {
+          apiFetch(`/api/videos/${videoId}`, { method: "DELETE" }).catch(() => {});
+        }
+        uploadResults.push({
+          fileName: entry.file.name,
+          shareUrl: "",
+          error: err instanceof Error ? err.message : "Upload failed",
+        });
       }
-
-      videoId = result.id;
-      setProgress(20);
-
-      const uploadResp = await fetch(result.uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": fileContentType },
-      });
-
-      if (!uploadResp.ok) {
-        throw new Error("Upload failed");
-      }
-
-      setProgress(80);
-
-      await apiFetch(`/api/videos/${result.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "ready" }),
-      });
-
-      setProgress(100);
-      setShareUrl(`${window.location.origin}/watch/${result.shareToken}`);
-    } catch (err) {
-      if (videoId) {
-        apiFetch(`/api/videos/${videoId}`, { method: "DELETE" }).catch(() => {});
-      }
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(false);
     }
+
+    setUploading(false);
+    setResults(uploadResults);
   }
 
-  const [copied, setCopied] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  async function copyShareUrl() {
-    if (!shareUrl) return;
+  async function copyShareUrl(url: string, index: number) {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(url);
     } catch {
       const textArea = document.createElement("textarea");
-      textArea.value = shareUrl;
+      textArea.value = url;
       textArea.style.position = "fixed";
       textArea.style.opacity = "0";
       document.body.appendChild(textArea);
@@ -144,16 +232,16 @@ export function Upload() {
       document.execCommand("copy");
       document.body.removeChild(textArea);
     }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
   }
 
   function uploadAnother() {
-    setFile(null);
-    setTitle("");
-    setShareUrl(null);
+    setFiles([]);
+    setResults(null);
     setError(null);
     setProgress(0);
+    setCopiedIndex(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -165,7 +253,14 @@ export function Upload() {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
   }
 
+  function formatType(type: string): string {
+    if (type === "video/webm") return "WebM";
+    if (type === "video/quicktime") return "MOV";
+    return "MP4";
+  }
+
   if (uploading) {
+    const currentFile = files[currentFileIndex];
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
         <div style={{ width: "100%", maxWidth: 480 }}>
@@ -182,10 +277,10 @@ export function Upload() {
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
             <p style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-              Uploading...
+              Uploading {currentFileIndex + 1} of {files.length}...
             </p>
             <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 16 }}>
-              {file?.name}
+              {currentFile?.file.name}
             </p>
             <div style={{
               background: "var(--color-bg)",
@@ -207,48 +302,10 @@ export function Upload() {
     );
   }
 
-  if (error) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
-        <div style={{ width: "100%", maxWidth: 480 }}>
-          <div style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 12,
-            padding: 32,
-            textAlign: "center",
-          }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 16 }}>
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <p style={{ color: "var(--color-error)", fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-              Upload failed
-            </p>
-            <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginBottom: 24 }}>
-              {error}
-            </p>
-            <button
-              onClick={uploadAnother}
-              style={{
-                background: "var(--color-accent)",
-                color: "var(--color-text)",
-                borderRadius: 8,
-                padding: "10px 24px",
-                fontSize: 14,
-                fontWeight: 600,
-              }}
-            >
-              Try again
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (results) {
+    const succeeded = results.filter((r) => !r.error);
+    const failed = results.filter((r) => r.error);
 
-  if (shareUrl) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
         <div style={{ width: "100%", maxWidth: 480 }}>
@@ -259,73 +316,78 @@ export function Upload() {
             padding: 32,
             textAlign: "center",
           }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 16 }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={failed.length > 0 ? "var(--color-warning, #f59e0b)" : "var(--color-accent)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 16 }}>
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
             <h2 style={{ color: "var(--color-text)", fontSize: 20, fontWeight: 600, marginBottom: 16 }}>
-              Upload complete
+              {failed.length === 0
+                ? results.length === 1
+                  ? "Upload complete"
+                  : `${succeeded.length} videos uploaded`
+                : `${succeeded.length} of ${results.length} uploaded`}
             </h2>
 
-            <div style={{
-              background: "var(--color-bg)",
-              borderRadius: 8,
-              padding: "10px 16px",
-              marginBottom: 24,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 13, wordBreak: "break-all", flex: 1, textAlign: "left" }}>
-                {shareUrl}
-              </span>
-              <button
-                onClick={copyShareUrl}
-                style={{
-                  background: "var(--color-accent)",
-                  color: "var(--color-text)",
-                  borderRadius: 6,
-                  padding: "6px 14px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {copied ? "Copied!" : "Copy"}
-              </button>
-            </div>
+            {succeeded.map((result, i) => (
+              <div key={i} style={{
+                background: "var(--color-bg)",
+                borderRadius: 8,
+                padding: "10px 16px",
+                marginBottom: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}>
+                <span style={{ color: "var(--color-text-secondary)", fontSize: 13, wordBreak: "break-all", flex: 1, textAlign: "left" }}>
+                  {result.shareUrl}
+                </span>
+                <button
+                  onClick={() => copyShareUrl(result.shareUrl, i)}
+                  data-testid={`copy-btn-${i}`}
+                  style={{
+                    background: "var(--color-accent)",
+                    color: "var(--color-text)",
+                    borderRadius: 6,
+                    padding: "6px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {copiedIndex === i ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            ))}
 
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              <a
-                href={shareUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  background: "var(--color-accent)",
-                  color: "var(--color-text)",
-                  borderRadius: 8,
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  textDecoration: "none",
-                }}
-              >
-                Watch video
-              </a>
+            {failed.map((result, i) => (
+              <div key={`err-${i}`} style={{
+                background: "var(--color-bg)",
+                borderRadius: 8,
+                padding: "10px 16px",
+                marginBottom: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}>
+                <span style={{ color: "var(--color-error)", fontSize: 13, flex: 1, textAlign: "left" }}>
+                  {result.fileName}: {result.error}
+                </span>
+              </div>
+            ))}
 
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 16 }}>
               <button
                 onClick={uploadAnother}
                 style={{
-                  background: "transparent",
-                  color: "var(--color-accent)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--color-accent)",
+                  color: "var(--color-text)",
                   borderRadius: 8,
                   padding: "10px 20px",
                   fontSize: 14,
                   fontWeight: 600,
                 }}
               >
-                Upload another
+                Upload more
               </button>
 
               <Link
@@ -361,6 +423,7 @@ export function Upload() {
           ref={fileInputRef}
           type="file"
           accept="video/mp4,video/webm,video/quicktime,.mov"
+          multiple
           onChange={handleFileSelect}
           data-testid="file-input"
           style={{ display: "none" }}
@@ -378,40 +441,27 @@ export function Upload() {
           style={{
             border: `2px dashed ${dragging ? "var(--color-accent)" : "var(--color-border)"}`,
             borderRadius: 12,
-            padding: file ? "20px 24px" : "48px 24px",
+            padding: files.length > 0 ? "20px 24px" : "48px 24px",
             textAlign: "center",
             cursor: "pointer",
             background: dragging ? "var(--color-drag-highlight)" : "var(--color-surface)",
             transition: "border-color 0.2s, background 0.2s",
           }}
         >
-          {file ? (
+          {files.length > 0 ? (
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="23 7 16 12 23 17 23 7" />
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
               <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
-                <p style={{ color: "var(--color-text)", fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {file.name}
+                <p style={{ color: "var(--color-text)", fontSize: 14, fontWeight: 500 }}>
+                  {files.length} file{files.length !== 1 ? "s" : ""} selected
                 </p>
                 <p style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
-                  {formatFileSize(file.size)} &middot; {file.type === "video/webm" ? "WebM" : file.type === "video/quicktime" ? "MOV" : "MP4"}
+                  Click or drop to add more
                 </p>
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); uploadAnother(); }}
-                style={{
-                  background: "transparent",
-                  color: "var(--color-text-secondary)",
-                  fontSize: 12,
-                  padding: "4px 8px",
-                  borderRadius: 4,
-                  border: "1px solid var(--color-border)",
-                }}
-              >
-                Change
-              </button>
             </div>
           ) : (
             <>
@@ -421,10 +471,10 @@ export function Upload() {
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
               <p style={{ color: "var(--color-text)", fontSize: 15, fontWeight: 500, marginBottom: 4 }}>
-                Drag and drop your video here
+                Drag and drop your videos here
               </p>
               <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 16 }}>
-                or click to browse
+                or click to browse (up to {MAX_FILES} files)
               </p>
               <span style={{
                 display: "inline-block",
@@ -440,29 +490,67 @@ export function Upload() {
           )}
         </div>
 
-        {file && (
+        {error && (
+          <p style={{ color: "var(--color-error)", fontSize: 13, textAlign: "center" }}>
+            {error}
+          </p>
+        )}
+
+        {files.length > 0 && (
           <>
-            <label style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
-              Title
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={500}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  marginTop: 4,
-                  padding: "10px 12px",
-                  fontSize: 14,
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {files.map((entry, i) => (
+                <div key={i} style={{
                   background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  boxSizing: "border-box",
-                }}
-              />
-            </label>
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <input
+                      type="text"
+                      value={entry.title}
+                      onChange={(e) => updateTitle(i, e.target.value)}
+                      maxLength={500}
+                      aria-label={`Title for ${entry.file.name}`}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "4px 8px",
+                        fontSize: 13,
+                        borderRadius: 4,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-bg)",
+                        color: "var(--color-text)",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <p style={{ color: "var(--color-text-secondary)", fontSize: 11, marginTop: 2 }}>
+                      {formatFileSize(entry.file.size)} &middot; {formatType(entry.file.type)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => removeFile(i)}
+                    aria-label={`Remove ${entry.file.name}`}
+                    style={{
+                      background: "transparent",
+                      color: "var(--color-text-secondary)",
+                      fontSize: 18,
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      border: "none",
+                      cursor: "pointer",
+                      lineHeight: 1,
+                    }}
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
 
             <button
               onClick={handleUpload}
@@ -477,7 +565,7 @@ export function Upload() {
                 width: "100%",
               }}
             >
-              Upload
+              Upload {files.length} video{files.length !== 1 ? "s" : ""}
             </button>
           </>
         )}

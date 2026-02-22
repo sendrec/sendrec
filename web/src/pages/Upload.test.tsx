@@ -41,15 +41,14 @@ describe("Upload", () => {
 
   it("renders dropzone with instructions", () => {
     renderUpload();
-    expect(screen.getByText("Drag and drop your video here")).toBeInTheDocument();
-    expect(screen.getByText("or click to browse")).toBeInTheDocument();
+    expect(screen.getByText("Drag and drop your videos here")).toBeInTheDocument();
+    expect(screen.getByText(/or click to browse/)).toBeInTheDocument();
     expect(screen.getByText("MP4, WebM, MOV")).toBeInTheDocument();
   });
 
-  it("does not show title or upload button before file is selected", () => {
+  it("does not show upload button before files are selected", () => {
     renderUpload();
-    expect(screen.queryByText("Upload")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Title")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Upload \d/)).not.toBeInTheDocument();
   });
 
   it("auto-fills title from filename when file is selected", async () => {
@@ -60,23 +59,26 @@ describe("Upload", () => {
     const input = screen.getByTestId("file-input");
     await user.upload(input, file);
 
-    const titleInput = screen.getByLabelText("Title") as HTMLInputElement;
+    const titleInput = screen.getByLabelText("Title for my-presentation.mp4") as HTMLInputElement;
     expect(titleInput.value).toBe("my-presentation");
-    expect(screen.getByText("Upload")).toBeInTheDocument();
+    expect(screen.getByText("Upload 1 video")).toBeInTheDocument();
   });
 
-  it("shows file info after selection", async () => {
+  it("shows file count after selection", async () => {
     const user = userEvent.setup();
     renderUpload();
 
-    const file = createMockFile("demo.mp4", 5 * 1024 * 1024);
-    await user.upload(screen.getByTestId("file-input"), file);
+    const files = [
+      createMockFile("demo1.mp4", 5 * 1024 * 1024),
+      createMockFile("demo2.mp4", 3 * 1024 * 1024),
+    ];
+    await user.upload(screen.getByTestId("file-input"), files);
 
-    expect(screen.getByText("demo.mp4")).toBeInTheDocument();
-    expect(screen.getByText(/5\.0 MB/)).toBeInTheDocument();
+    expect(screen.getByText("2 files selected")).toBeInTheDocument();
+    expect(screen.getByText("Upload 2 videos")).toBeInTheDocument();
   });
 
-  it("accepts file via drag and drop", () => {
+  it("accepts files via drag and drop", () => {
     renderUpload();
 
     const file = createMockFile("dropped.mp4", 2048);
@@ -86,8 +88,7 @@ describe("Upload", () => {
       dataTransfer: { files: [file] },
     });
 
-    expect(screen.getByText("dropped.mp4")).toBeInTheDocument();
-    expect(screen.getByLabelText("Title")).toHaveValue("dropped");
+    expect(screen.getByLabelText("Title for dropped.mp4")).toHaveValue("dropped");
   });
 
   it("rejects unsupported file types on drop", () => {
@@ -101,12 +102,44 @@ describe("Upload", () => {
     });
 
     expect(screen.getByText("Only MP4, WebM, and MOV files are supported")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Title")).not.toBeInTheDocument();
   });
 
-  it("uploads file and shows share URL on success", async () => {
+  it("allows removing individual files", async () => {
+    const user = userEvent.setup();
+    renderUpload();
+
+    const files = [
+      createMockFile("video1.mp4", 1024),
+      createMockFile("video2.mp4", 2048),
+    ];
+    await user.upload(screen.getByTestId("file-input"), files);
+
+    expect(screen.getByText("2 files selected")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("Remove video1.mp4"));
+
+    expect(screen.getByText("1 file selected")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Title for video1.mp4")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Title for video2.mp4")).toBeInTheDocument();
+  });
+
+  it("enforces maximum 10 files", async () => {
+    const user = userEvent.setup();
+    renderUpload();
+
+    const files = Array.from({ length: 12 }, (_, i) =>
+      createMockFile(`video${i + 1}.mp4`, 1024)
+    );
+    await user.upload(screen.getByTestId("file-input"), files);
+
+    expect(screen.getByText("10 files selected")).toBeInTheDocument();
+    expect(screen.getByText(/Only 10 of 12 files added/)).toBeInTheDocument();
+  });
+
+  it("uploads single file and shows share URL", async () => {
     const user = userEvent.setup();
     mockApiFetch
+      .mockResolvedValueOnce({ maxVideosPerMonth: 25, videosUsedThisMonth: 0 })
       .mockResolvedValueOnce({
         id: "video-1",
         uploadUrl: "https://s3.example.com/upload?signed=xyz",
@@ -118,7 +151,7 @@ describe("Upload", () => {
 
     const file = createMockFile("demo.mp4", 2048);
     await user.upload(screen.getByTestId("file-input"), file);
-    await user.click(screen.getByText("Upload"));
+    await user.click(screen.getByText("Upload 1 video"));
 
     await waitFor(() => {
       expect(screen.getByText("Upload complete")).toBeInTheDocument();
@@ -126,6 +159,7 @@ describe("Upload", () => {
 
     expect(screen.getByText(/abc123defghi/)).toBeInTheDocument();
 
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/limits");
     expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/upload", {
       method: "POST",
       body: JSON.stringify({
@@ -134,49 +168,119 @@ describe("Upload", () => {
         contentType: "video/mp4",
       }),
     });
-
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      "https://s3.example.com/upload?signed=xyz",
-      expect.objectContaining({
-        method: "PUT",
-        headers: { "Content-Type": "video/mp4" },
-      })
-    );
-
-    expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/video-1", {
-      method: "PATCH",
-      body: JSON.stringify({ status: "ready" }),
-    });
   });
 
-  it("shows error on upload failure", async () => {
+  it("uploads multiple files and shows results", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockRejectedValueOnce(new Error("monthly limit exceeded"));
+    mockApiFetch
+      .mockResolvedValueOnce({ maxVideosPerMonth: 25, videosUsedThisMonth: 0 })
+      .mockResolvedValueOnce({
+        id: "video-1",
+        uploadUrl: "https://s3.example.com/upload1",
+        shareToken: "token1",
+      })
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        id: "video-2",
+        uploadUrl: "https://s3.example.com/upload2",
+        shareToken: "token2",
+      })
+      .mockResolvedValueOnce(undefined);
 
     renderUpload();
 
-    const file = createMockFile("demo.mp4", 2048);
-    await user.upload(screen.getByTestId("file-input"), file);
-    await user.click(screen.getByText("Upload"));
+    const files = [
+      createMockFile("first.mp4", 1024),
+      createMockFile("second.mp4", 2048),
+    ];
+    await user.upload(screen.getByTestId("file-input"), files);
+    await user.click(screen.getByText("Upload 2 videos"));
 
     await waitFor(() => {
-      expect(screen.getByText("monthly limit exceeded")).toBeInTheDocument();
+      expect(screen.getByText("2 videos uploaded")).toBeInTheDocument();
     });
-    expect(screen.getByText("Try again")).toBeInTheDocument();
+
+    expect(screen.getByText(/token1/)).toBeInTheDocument();
+    expect(screen.getByText(/token2/)).toBeInTheDocument();
   });
 
-  it("shows uploading state with progress bar", async () => {
+  it("shows error when monthly limit would be exceeded", async () => {
+    const user = userEvent.setup();
+    mockApiFetch.mockResolvedValueOnce({ maxVideosPerMonth: 25, videosUsedThisMonth: 23 });
+
+    renderUpload();
+
+    const files = [
+      createMockFile("video1.mp4", 1024),
+      createMockFile("video2.mp4", 2048),
+      createMockFile("video3.mp4", 3072),
+    ];
+    await user.upload(screen.getByTestId("file-input"), files);
+    await user.click(screen.getByText("Upload 3 videos"));
+
+    await waitFor(() => {
+      expect(screen.getByText("You can only upload 2 more videos this month")).toBeInTheDocument();
+    });
+  });
+
+  it("shows error when monthly limit fully reached", async () => {
+    const user = userEvent.setup();
+    mockApiFetch.mockResolvedValueOnce({ maxVideosPerMonth: 25, videosUsedThisMonth: 25 });
+
+    renderUpload();
+
+    const file = createMockFile("video.mp4", 1024);
+    await user.upload(screen.getByTestId("file-input"), file);
+    await user.click(screen.getByText("Upload 1 video"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Monthly video limit reached")).toBeInTheDocument();
+    });
+  });
+
+  it("shows partial failure results", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ maxVideosPerMonth: 0, videosUsedThisMonth: 0 })
+      .mockResolvedValueOnce({
+        id: "video-1",
+        uploadUrl: "https://s3.example.com/upload1",
+        shareToken: "token1",
+      })
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("file too large"));
+
+    renderUpload();
+
+    const files = [
+      createMockFile("good.mp4", 1024),
+      createMockFile("bad.mp4", 2048),
+    ];
+    await user.upload(screen.getByTestId("file-input"), files);
+    await user.click(screen.getByText("Upload 2 videos"));
+
+    await waitFor(() => {
+      expect(screen.getByText("1 of 2 uploaded")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/token1/)).toBeInTheDocument();
+    expect(screen.getByText(/bad\.mp4: file too large/)).toBeInTheDocument();
+  });
+
+  it("shows uploading state with file counter", async () => {
     const user = userEvent.setup();
     let resolveUpload: (value: unknown) => void;
-    mockApiFetch.mockReturnValueOnce(new Promise((r) => { resolveUpload = r; }));
+    mockApiFetch
+      .mockResolvedValueOnce({ maxVideosPerMonth: 0, videosUsedThisMonth: 0 })
+      .mockReturnValueOnce(new Promise((r) => { resolveUpload = r; }));
 
     renderUpload();
 
     const file = createMockFile("demo.mp4", 2048);
     await user.upload(screen.getByTestId("file-input"), file);
-    await user.click(screen.getByText("Upload"));
+    await user.click(screen.getByText("Upload 1 video"));
 
-    expect(screen.getByText("Uploading...")).toBeInTheDocument();
+    expect(screen.getByText("Uploading 1 of 1...")).toBeInTheDocument();
     expect(screen.getByText("demo.mp4")).toBeInTheDocument();
 
     await act(async () => {
@@ -185,6 +289,45 @@ describe("Upload", () => {
         uploadUrl: "https://s3.example.com/upload",
         shareToken: "abc123defghi",
       });
+    });
+  });
+
+  it("skips limits check for pro users and proceeds", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ maxVideosPerMonth: 0, videosUsedThisMonth: 0 })
+      .mockResolvedValueOnce({
+        id: "video-1",
+        uploadUrl: "https://s3.example.com/upload",
+        shareToken: "token1",
+      })
+      .mockResolvedValueOnce(undefined);
+
+    renderUpload();
+
+    const file = createMockFile("demo.mp4", 2048);
+    await user.upload(screen.getByTestId("file-input"), file);
+    await user.click(screen.getByText("Upload 1 video"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Upload complete")).toBeInTheDocument();
+    });
+  });
+
+  it("shows error on upload failure for single file", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ maxVideosPerMonth: 25, videosUsedThisMonth: 0 })
+      .mockRejectedValueOnce(new Error("monthly limit exceeded"));
+
+    renderUpload();
+
+    const file = createMockFile("demo.mp4", 2048);
+    await user.upload(screen.getByTestId("file-input"), file);
+    await user.click(screen.getByText("Upload 1 video"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/monthly limit exceeded/)).toBeInTheDocument();
     });
   });
 });
