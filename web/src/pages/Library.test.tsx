@@ -583,4 +583,104 @@ describe("Library", () => {
       expect(analyticsLink).toHaveAttribute("href", "/videos/v1/analytics");
     });
   });
+
+  describe("batch operations", () => {
+    it("shows checkbox on video cards", async () => {
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole("checkbox", { name: "Select My Recording" })).toBeInTheDocument();
+    });
+
+    it("shows batch toolbar when videos are selected", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("checkbox", { name: "Select My Recording" }));
+
+      expect(screen.getByText("1 selected")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Select all" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Deselect all" })).toBeInTheDocument();
+    });
+
+    it("batch delete calls API and refreshes", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(window, "confirm").mockReturnValue(true);
+      mockFetch([makeVideo(), makeVideo({ id: "v2", title: "Second Recording" })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("checkbox", { name: "Select My Recording" }));
+      await user.click(screen.getByRole("checkbox", { name: "Select Second Recording" }));
+
+      expect(screen.getByText("2 selected")).toBeInTheDocument();
+
+      // Mock batch delete response + subsequent refresh (videos, limits, folders, tags)
+      mockApiFetch.mockResolvedValueOnce({ deleted: 2 });
+      mockApiFetch.mockResolvedValueOnce([]);
+      mockApiFetch.mockResolvedValueOnce(unlimitedLimits);
+      mockApiFetch.mockResolvedValueOnce([]);
+      mockApiFetch.mockResolvedValueOnce([]);
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => {
+        expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/batch/delete", {
+          method: "POST",
+          body: JSON.stringify({ videoIds: ["v1", "v2"] }),
+        });
+      });
+    });
+
+    it("deselect all clears selection", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("checkbox", { name: "Select My Recording" }));
+      expect(screen.getByText("1 selected")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Deselect all" }));
+
+      expect(screen.queryByText("1 selected")).not.toBeInTheDocument();
+    });
+
+    it("select all selects all visible videos", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo(), makeVideo({ id: "v2", title: "Second Recording" })]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      // Click one checkbox to show toolbar
+      await user.click(screen.getByRole("checkbox", { name: "Select My Recording" }));
+      expect(screen.getByText("1 selected")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Select all" }));
+      expect(screen.getByText("2 selected")).toBeInTheDocument();
+
+      const checkboxes = screen.getAllByRole("checkbox");
+      for (const cb of checkboxes) {
+        expect(cb).toBeChecked();
+      }
+    });
+  });
 });
