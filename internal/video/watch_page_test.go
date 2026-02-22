@@ -2171,6 +2171,161 @@ func TestWatchPage_OGDescription_FallbackToCreator(t *testing.T) {
 	waitAndCheckExpectations(t, mock)
 }
 
+func TestWatchPage_TwitterCardTags(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	shareToken := "twittercard1"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	thumbKey := "recordings/u1/thumb.jpg"
+	summaryText := "A walkthrough of the new features."
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "Twitter Card Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
+			&thumbKey, (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+			false,
+			&summaryText, (*string)(nil), "ready",
+			120,
+		))
+	expectViewRecording(mock, "vid-1")
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	checks := []string{
+		`twitter:card`,
+		`summary_large_image`,
+		`twitter:title`,
+		`twitter:description`,
+		`twitter:image`,
+		testBaseURL + "/api/watch/" + shareToken + "/thumbnail",
+	}
+	for _, check := range checks {
+		if !strings.Contains(body, check) {
+			t.Errorf("expected %q in Twitter Card meta tags", check)
+		}
+	}
+	waitAndCheckExpectations(t, mock)
+}
+
+func TestWatchPage_OGImageUsesProxyURL(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	shareToken := "ogimgproxy1"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	thumbKey := "recordings/u1/thumb.jpg"
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "OG Image Proxy", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
+			&thumbKey, (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+			false,
+			(*string)(nil), (*string)(nil), "none",
+			0,
+		))
+	expectViewRecording(mock, "vid-1")
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	expectedProxyURL := testBaseURL + "/api/watch/" + shareToken + "/thumbnail"
+	if !strings.Contains(body, `og:image`) {
+		t.Error("expected og:image meta tag when thumbnail exists")
+	}
+	if !strings.Contains(body, expectedProxyURL) {
+		t.Error("expected og:image to use proxy URL, not presigned S3 URL")
+	}
+	// Verify og:image does not reference the presigned S3 URL
+	if strings.Contains(body, `og:image" content="https://s3.example.com`) {
+		t.Error("og:image should NOT contain presigned S3 URL")
+	}
+	// Verify poster attribute still uses the presigned S3 URL for browser playback
+	if !strings.Contains(body, `poster="https://s3.example.com`) {
+		t.Error("poster attribute should still use presigned S3 URL for browser playback")
+	}
+	waitAndCheckExpectations(t, mock)
+}
+
+func TestWatchPage_OGUrl(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	shareToken := "ogurltoken12"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "OG URL Test", "recordings/u1/abc.webm", "Alice", createdAt, &expiresAt,
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+			false,
+			(*string)(nil), (*string)(nil), "none",
+			0,
+		))
+	expectViewRecording(mock, "vid-1")
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	expectedURL := testBaseURL + "/watch/" + shareToken
+	if !strings.Contains(body, `og:url`) {
+		t.Error("expected og:url meta tag in response")
+	}
+	if !strings.Contains(body, expectedURL) {
+		t.Errorf("expected og:url to contain %q", expectedURL)
+	}
+	waitAndCheckExpectations(t, mock)
+}
+
 func serveWatchThumbnail(handler *Handler, req *http.Request) *httptest.ResponseRecorder {
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/thumbnail", handler.WatchThumbnail)
