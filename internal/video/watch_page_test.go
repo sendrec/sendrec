@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -2443,5 +2444,29 @@ func TestWatchThumbnail_Expired(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestFormatISO8601Duration(t *testing.T) {
+	tests := []struct {
+		seconds  int
+		expected string
+	}{
+		{0, ""},
+		{30, "PT30S"},
+		{60, "PT1M0S"},
+		{90, "PT1M30S"},
+		{154, "PT2M34S"},
+		{3600, "PT1H0M0S"},
+		{3661, "PT1H1M1S"},
+		{7384, "PT2H3M4S"},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%d_seconds", tt.seconds), func(t *testing.T) {
+			got := formatISO8601Duration(tt.seconds)
+			if got != tt.expected {
+				t.Errorf("formatISO8601Duration(%d) = %q, want %q", tt.seconds, got, tt.expected)
+			}
+		})
 	}
 }

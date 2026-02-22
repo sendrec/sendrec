@@ -28,6 +28,22 @@ func formatDuration(totalSeconds int) string {
 	return fmt.Sprintf("%d:%02d", totalSeconds/60, totalSeconds%60)
 }
 
+func formatISO8601Duration(totalSeconds int) string {
+	if totalSeconds <= 0 {
+		return ""
+	}
+	h := totalSeconds / 3600
+	m := (totalSeconds % 3600) / 60
+	s := totalSeconds % 60
+	if h > 0 {
+		return fmt.Sprintf("PT%dH%dM%dS", h, m, s)
+	}
+	if m > 0 {
+		return fmt.Sprintf("PT%dM%dS", m, s)
+	}
+	return fmt.Sprintf("PT%dS", s)
+}
+
 var watchFuncs = template.FuncMap{
 	"formatTimestamp": func(seconds float64) string {
 		return formatDuration(int(seconds))
