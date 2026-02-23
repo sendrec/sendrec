@@ -446,7 +446,7 @@ func (h *Handler) getUserPlan(ctx context.Context, userID string) (string, error
 func (h *Handler) countVideosThisMonth(ctx context.Context, userID string) (int, error) {
 	var count int
 	err := h.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM videos WHERE user_id = $1 AND created_at >= date_trunc('month', now())`,
+		`SELECT COUNT(*) FROM videos WHERE user_id = $1 AND created_at >= date_trunc('month', now()) AND status != 'deleted'`,
 		userID,
 	).Scan(&count)
 	return count, err
