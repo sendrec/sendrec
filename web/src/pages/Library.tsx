@@ -370,21 +370,64 @@ export function Library() {
   if (videos.length === 0) {
     return (
       <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16, marginBottom: 16 }}>No recordings yet.</p>
-        <Link
-          to="/"
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 8,
-            padding: "10px 24px",
-            fontSize: 14,
-            fontWeight: 600,
-            textDecoration: "none",
-          }}
-        >
-          Create your first recording
-        </Link>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 16, marginBottom: 20 }}>No recordings yet.</p>
+        <div style={{
+          maxWidth: 400,
+          margin: "0 auto 24px",
+          padding: "20px 24px",
+          background: "var(--color-surface)",
+          borderRadius: 12,
+          textAlign: "left",
+        }}>
+          <p style={{ color: "var(--color-text)", fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
+            Get started in 3 steps
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>1.</span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Record your screen or upload a video</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>2.</span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Share the link with anyone</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>3.</span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Track views and get feedback</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+          <Link
+            to="/"
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Record
+          </Link>
+          <Link
+            to="/upload"
+            style={{
+              background: "transparent",
+              color: "var(--color-accent)",
+              border: "1px solid var(--color-accent)",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Upload
+          </Link>
+        </div>
         {limits && limits.maxVideosPerMonth > 0 && (
           <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginTop: 16 }}>
             {limits.videosUsedThisMonth} / {limits.maxVideosPerMonth} videos this month
