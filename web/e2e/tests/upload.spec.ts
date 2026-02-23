@@ -37,15 +37,8 @@ test.describe("Upload", () => {
 
   test("uploaded video appears in library", async ({ page }) => {
     await page.goto("/library");
-    const emptyState = page.getByText(/no recordings yet/i);
-    const isEmpty = await emptyState
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-
-    if (!isEmpty) {
-      await expect(page.locator(".video-card").first()).toBeVisible({
-        timeout: 5000,
-      });
-    }
+    await expect(page.locator(".video-card").first()).toBeVisible({
+      timeout: 15000,
+    });
   });
 });

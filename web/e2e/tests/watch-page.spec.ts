@@ -4,7 +4,7 @@ import { queryRows } from "../helpers/db";
 test.describe("Watch Page", () => {
   test("watch page renders for a valid share token", async ({ page }) => {
     const rows = await queryRows<{ share_token: string }>(
-      "SELECT share_token FROM videos WHERE status = 'ready' LIMIT 1"
+      "SELECT share_token FROM videos LIMIT 1"
     );
 
     test.skip(rows.length === 0, "No video available for watch page test");

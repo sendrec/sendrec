@@ -31,9 +31,10 @@ export async function queryRows<T>(
 export async function truncateAllTables(): Promise<void> {
   await query(`
     TRUNCATE users, videos, refresh_tokens, password_resets,
-             email_confirmations, comments, video_views, folders,
-             tags, video_tags, notification_preferences,
-             api_keys, webhook_deliveries
+             email_confirmations, video_comments, video_views,
+             folders, tags, video_tags, notification_preferences,
+             api_keys, webhook_deliveries, user_branding,
+             cta_clicks, view_milestones, video_viewers
     CASCADE
   `);
 }
