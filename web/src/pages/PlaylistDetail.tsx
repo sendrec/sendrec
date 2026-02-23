@@ -71,8 +71,6 @@ export function PlaylistDetail() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [passwordInput, setPasswordInput] = useState("");
-
   const fetchPlaylist = useCallback(async () => {
     try {
       const data = await apiFetch<PlaylistData>(`/api/playlists/${id}`);
@@ -167,18 +165,20 @@ export function PlaylistDetail() {
   }
 
   async function setSharePassword() {
-    if (!playlist || !passwordInput.trim()) return;
+    if (!playlist) return;
+    const password = window.prompt("Enter a password for this playlist:");
+    if (!password) return;
     await apiFetch(`/api/playlists/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ sharePassword: passwordInput }),
+      body: JSON.stringify({ sharePassword: password }),
     });
-    setPasswordInput("");
     setPlaylist((prev) => (prev ? { ...prev, hasPassword: true } : prev));
     showToast("Password set");
   }
 
   async function removeSharePassword() {
     if (!playlist) return;
+    if (!window.confirm("Remove the password from this playlist?")) return;
     await apiFetch(`/api/playlists/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ sharePassword: "" }),
@@ -706,37 +706,12 @@ export function PlaylistDetail() {
                     Remove password
                   </button>
                 ) : (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "center",
-                    }}
+                  <button
+                    onClick={setSharePassword}
+                    className="detail-btn"
                   >
-                    <input
-                      type="password"
-                      value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
-                      placeholder="Set a password"
-                      aria-label="Share password"
-                      style={{
-                        padding: "6px 10px",
-                        fontSize: 13,
-                        background: "var(--color-bg)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 4,
-                        color: "var(--color-text)",
-                        width: 160,
-                      }}
-                    />
-                    <button
-                      onClick={setSharePassword}
-                      disabled={!passwordInput.trim()}
-                      className="detail-btn"
-                    >
-                      Set password
-                    </button>
-                  </div>
+                    Set password
+                  </button>
                 )}
               </div>
             </div>
