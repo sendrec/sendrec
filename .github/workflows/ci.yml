@@ -130,13 +130,16 @@ jobs:
           for i in $(seq 1 60); do
             if curl -sf http://localhost:8080/api/health > /dev/null 2>&1; then
               echo "App is healthy!"
+              docker compose -f docker-compose.e2e.yml logs garage-init
+              echo "Testing S3 connectivity on port 3900..."
+              curl -sv http://localhost:3900/ 2>&1 | head -20 || true
               exit 0
             fi
             echo "Attempt $i/60 - waiting..."
             sleep 3
           done
           echo "App failed to start"
-          docker compose -f docker-compose.e2e.yml logs sendrec
+          docker compose -f docker-compose.e2e.yml logs
           exit 1
 
       - uses: pnpm/action-setup@v4

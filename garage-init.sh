@@ -53,25 +53,32 @@ fi
 echo "Configuring CORS..."
 ADMIN_URL="http://localhost:3903"
 ADMIN_TOKEN="sendrec-dev-admin-token"
+CORS_SET='[{"allowedOrigins":["*"],"allowedMethods":["GET","PUT","HEAD"],"allowedHeaders":["*"],"exposeHeaders":["ETag"],"maxAgeSeconds":3600}]'
 
+# Try admin API first (v2 endpoint names)
 BUCKET_ID=$(curl -sf -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-  "${ADMIN_URL}/v2/GetBucketInfo?globalAlias=${S3_BUCKET}" | jq -r '.id')
+  "${ADMIN_URL}/v2/GetBucketInfo?globalAlias=${S3_BUCKET}" 2>/dev/null | jq -r '.id // empty')
 
-if [ -n "${BUCKET_ID}" ] && [ "${BUCKET_ID}" != "null" ]; then
+if [ -n "${BUCKET_ID}" ]; then
   echo "Bucket ID: ${BUCKET_ID}"
-  CORS_BODY='{"corsConfig":{"set":[{"allowedOrigins":["*"],"allowedMethods":["GET","PUT","HEAD"],"allowedHeaders":["*"],"exposeHeaders":["ETag"],"maxAgeSeconds":3600}]}}'
   if curl -sf -X POST "${ADMIN_URL}/v2/UpdateBucket?id=${BUCKET_ID}" \
     -H "Authorization: Bearer ${ADMIN_TOKEN}" \
     -H "Content-Type: application/json" \
-    -d "${CORS_BODY}" > /dev/null; then
-    echo "CORS configured for bucket '${S3_BUCKET}'."
+    -d "{\"corsConfig\":{\"set\":${CORS_SET}}}" > /dev/null 2>&1; then
+    echo "CORS configured via admin API."
   else
-    echo "ERROR: Failed to configure CORS via admin API"
-    exit 1
+    echo "Admin API UpdateBucket failed, trying garage json-api..."
+    garage json-api UpdateBucket "{\"id\":\"${BUCKET_ID}\",\"corsConfig\":{\"set\":${CORS_SET}}}" 2>&1 || echo "WARNING: garage json-api also failed"
   fi
 else
-  echo "ERROR: Could not get bucket ID for '${S3_BUCKET}'"
-  exit 1
+  echo "Admin API GetBucketInfo not available, trying garage json-api..."
+  BUCKET_ID=$(garage json-api GetBucketInfo "{\"globalAlias\":\"${S3_BUCKET}\"}" 2>/dev/null | jq -r '.id // empty')
+  if [ -n "${BUCKET_ID}" ]; then
+    echo "Bucket ID: ${BUCKET_ID}"
+    garage json-api UpdateBucket "{\"id\":\"${BUCKET_ID}\",\"corsConfig\":{\"set\":${CORS_SET}}}" 2>&1 || echo "WARNING: CORS configuration failed"
+  else
+    echo "WARNING: Could not determine bucket ID for CORS configuration"
+  fi
 fi
 
 echo "Garage initialization complete."
