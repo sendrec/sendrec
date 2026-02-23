@@ -313,14 +313,20 @@ func (h *Handler) UpdatePlaylist(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.SharePassword != nil {
-		hash, err := hashSharePassword(*req.SharePassword)
-		if err != nil {
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to hash password")
-			return
+		if *req.SharePassword == "" {
+			setClauses = append(setClauses, fmt.Sprintf("share_password = $%d", paramIdx))
+			args = append(args, nil)
+			paramIdx++
+		} else {
+			hash, err := hashSharePassword(*req.SharePassword)
+			if err != nil {
+				httputil.WriteError(w, http.StatusInternalServerError, "failed to hash password")
+				return
+			}
+			setClauses = append(setClauses, fmt.Sprintf("share_password = $%d", paramIdx))
+			args = append(args, hash)
+			paramIdx++
 		}
-		setClauses = append(setClauses, fmt.Sprintf("share_password = $%d", paramIdx))
-		args = append(args, hash)
-		paramIdx++
 	}
 	if req.RequireEmail != nil {
 		setClauses = append(setClauses, fmt.Sprintf("require_email = $%d", paramIdx))
