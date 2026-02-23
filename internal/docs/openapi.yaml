@@ -855,7 +855,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: Email not verified. Error body contains `{"error": "email_not_verified"}`.
+          description: 'Email not verified. Error body contains {"error": "email_not_verified"}.'
           content:
             application/json:
               schema:
