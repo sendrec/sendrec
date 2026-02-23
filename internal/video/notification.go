@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -387,7 +387,7 @@ func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerE
 	// Slack: always send (Slack client gates on webhook URL presence in DB)
 	if h.slackNotifier != nil {
 		if err := h.slackNotifier.SendViewNotification(ctx, ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
-			log.Printf("failed to send Slack view notification for %s: %v", videoID, err)
+			slog.Error("notification: failed to send Slack view notification", "video_id", videoID, "error", err)
 		}
 	}
 
@@ -421,6 +421,6 @@ func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerE
 	}
 
 	if err := h.viewNotifier.SendViewNotification(ctx, ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
-		log.Printf("failed to send view notification for %s: %v", videoID, err)
+		slog.Error("notification: failed to send view notification", "video_id", videoID, "error", err)
 	}
 }

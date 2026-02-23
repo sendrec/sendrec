@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"sort"
@@ -107,7 +107,7 @@ func (h *Handler) dispatchWebhook(userID string, event webhook.Event) {
 			return
 		}
 		if err := h.webhookClient.Dispatch(ctx, userID, webhookURL, secret, event); err != nil {
-			log.Printf("webhook dispatch failed for user %s event %s: %v", userID, event.Name, err)
+			slog.Error("webhook: dispatch failed", "user_id", userID, "event", event.Name, "error", err)
 		}
 	}()
 }
@@ -589,7 +589,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 				GenerateThumbnail(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken))
 			}()
 			if err := EnqueueTranscription(r.Context(), h.db, videoID); err != nil {
-				log.Printf("failed to enqueue transcription for %s: %v", videoID, err)
+				slog.Error("video: failed to enqueue transcription", "video_id", videoID, "error", err)
 			}
 			if duration == 0 {
 				go func() {
@@ -753,7 +753,7 @@ func deleteWithRetry(ctx context.Context, storage ObjectStorage, key string, max
 		if lastErr == nil {
 			return nil
 		}
-		log.Printf("delete attempt %d/%d failed for %s: %v", attempt+1, maxAttempts, key, lastErr)
+		slog.Error("storage: delete attempt failed", "attempt", attempt+1, "max_attempts", maxAttempts, "key", key, "error", lastErr)
 	}
 	return fmt.Errorf("all %d delete attempts failed for %s: %w", maxAttempts, key, lastErr)
 }
@@ -791,29 +791,29 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 		if err := deleteWithRetry(ctx, h.storage, fileKey, 3); err != nil {
-			log.Printf("all delete retries failed for %s: %v", fileKey, err)
+			slog.Error("video: all delete retries failed", "key", fileKey, "error", err)
 			return
 		}
 		if thumbnailKey != nil {
 			if err := deleteWithRetry(ctx, h.storage, *thumbnailKey, 3); err != nil {
-				log.Printf("thumbnail delete failed for %s: %v", *thumbnailKey, err)
+				slog.Error("video: thumbnail delete failed", "key", *thumbnailKey, "error", err)
 			}
 		}
 		if webcamKey != nil {
 			if err := deleteWithRetry(ctx, h.storage, *webcamKey, 3); err != nil {
-				log.Printf("webcam delete failed for %s: %v", *webcamKey, err)
+				slog.Error("video: webcam delete failed", "key", *webcamKey, "error", err)
 			}
 		}
 		if transcriptKey != nil {
 			if err := deleteWithRetry(ctx, h.storage, *transcriptKey, 3); err != nil {
-				log.Printf("transcript delete failed for %s: %v", *transcriptKey, err)
+				slog.Error("video: transcript delete failed", "key", *transcriptKey, "error", err)
 			}
 		}
 		if _, err := h.db.Exec(ctx,
 			`UPDATE videos SET file_purged_at = now() WHERE file_key = $1`,
 			fileKey,
 		); err != nil {
-			log.Printf("failed to mark file_purged_at for %s: %v", fileKey, err)
+			slog.Error("video: failed to mark file_purged_at", "key", fileKey, "error", err)
 		}
 	}()
 
@@ -909,7 +909,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 				`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
 				videoID, hash,
 			); err != nil {
-				log.Printf("failed to record view for %s: %v", videoID, err)
+				slog.Error("video: failed to record view", "video_id", videoID, "error", err)
 			}
 			h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 		}()
@@ -1228,7 +1228,7 @@ func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
 			`INSERT INTO cta_clicks (video_id, viewer_hash) VALUES ($1, $2)`,
 			videoID, hash,
 		); err != nil {
-			log.Printf("failed to record CTA click for %s: %v", videoID, err)
+			slog.Error("video: failed to record CTA click", "video_id", videoID, "error", err)
 		}
 		if h.webhookClient != nil {
 			var ownerID, ctaTitle string
@@ -1246,7 +1246,7 @@ func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
 							"viewerHash": hash,
 						},
 					}); err != nil {
-						log.Printf("webhook dispatch failed for video.cta_click: %v", err)
+						slog.Error("webhook: dispatch failed for video.cta_click", "video_id", videoID, "error", err)
 					}
 				}
 			}
@@ -1293,7 +1293,7 @@ func (h *Handler) RecordMilestone(w http.ResponseWriter, r *http.Request) {
 			`INSERT INTO view_milestones (video_id, viewer_hash, milestone) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
 			videoID, hash, req.Milestone,
 		); err != nil {
-			log.Printf("failed to record milestone for %s: %v", videoID, err)
+			slog.Error("video: failed to record milestone", "video_id", videoID, "error", err)
 		}
 		if h.webhookClient != nil {
 			var ownerID, milestoneTitle string
@@ -1312,7 +1312,7 @@ func (h *Handler) RecordMilestone(w http.ResponseWriter, r *http.Request) {
 							"viewerHash": hash,
 						},
 					}); err != nil {
-						log.Printf("webhook dispatch failed for video.milestone: %v", err)
+						slog.Error("webhook: dispatch failed for video.milestone", "video_id", videoID, "error", err)
 					}
 				}
 			}

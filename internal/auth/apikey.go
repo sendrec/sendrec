@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -195,7 +195,7 @@ func LookupAPIKey(ctx context.Context, db database.DBTX, token string) (string, 
 		if _, err := db.Exec(context.Background(),
 			"UPDATE api_keys SET last_used_at = now() WHERE key_hash = $1", keyHash,
 		); err != nil {
-			log.Printf("failed to update API key last_used_at: %v", err)
+			slog.Error("failed to update API key last_used_at", "error", err)
 		}
 	}()
 

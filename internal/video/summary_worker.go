@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -35,7 +35,7 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 		 WHERE summary_status = 'processing'
 		   AND (summary_started_at < now() - INTERVAL '10 minutes' OR summary_started_at IS NULL)`,
 	); err != nil {
-		log.Printf("summary-worker: failed to reset stuck jobs: %v", err)
+		slog.Error("summary-worker: failed to reset stuck jobs", "error", err)
 	}
 
 	var videoID string
@@ -52,20 +52,20 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 	).Scan(&videoID, &transcriptJSON)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			log.Printf("summary-worker: failed to claim job: %v", err)
+			slog.Error("summary-worker: failed to claim job", "error", err)
 		}
 		return
 	}
 
 	var segments []TranscriptSegment
 	if err := json.Unmarshal(transcriptJSON, &segments); err != nil {
-		log.Printf("summary-worker: failed to parse transcript for video %s: %v", videoID, err)
+		slog.Error("summary-worker: failed to parse transcript", "video_id", videoID, "error", err)
 		markSummaryFailed(ctx, db, videoID)
 		return
 	}
 
 	if len(segments) < 2 {
-		log.Printf("summary-worker: skipping video %s (only %d segments)", videoID, len(segments))
+		slog.Warn("summary-worker: skipping video, insufficient segments", "video_id", videoID, "segments", len(segments))
 		markSummaryFailed(ctx, db, videoID)
 		return
 	}
@@ -73,14 +73,14 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 	transcript := formatTranscriptForLLM(segments)
 	result, err := ai.GenerateSummary(ctx, transcript)
 	if err != nil {
-		log.Printf("summary-worker: AI generation failed for video %s: %v", videoID, err)
+		slog.Error("summary-worker: AI generation failed", "video_id", videoID, "error", err)
 		markSummaryFailed(ctx, db, videoID)
 		return
 	}
 
 	chaptersJSON, err := json.Marshal(result.Chapters)
 	if err != nil {
-		log.Printf("summary-worker: failed to marshal chapters for video %s: %v", videoID, err)
+		slog.Error("summary-worker: failed to marshal chapters", "video_id", videoID, "error", err)
 		markSummaryFailed(ctx, db, videoID)
 		return
 	}
@@ -90,7 +90,7 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 		 WHERE id = $3`,
 		result.Summary, chaptersJSON, videoID,
 	); err != nil {
-		log.Printf("summary-worker: failed to save summary for video %s: %v", videoID, err)
+		slog.Error("summary-worker: failed to save summary", "video_id", videoID, "error", err)
 		return
 	}
 
@@ -114,7 +114,7 @@ func markSummaryFailed(ctx context.Context, db database.DBTX, videoID string) {
 		 WHERE id = $1`,
 		videoID,
 	); err != nil {
-		log.Printf("summary-worker: failed to mark video %s as failed: %v", videoID, err)
+		slog.Error("summary-worker: failed to mark video as failed", "video_id", videoID, "error", err)
 	}
 }
 
@@ -151,7 +151,7 @@ func processNextTitleSuggestion(ctx context.Context, db database.DBTX, ai *AICli
 
 	suggestedTitle, err := ai.GenerateTitle(ctx, titleTranscript)
 	if err != nil {
-		log.Printf("title-suggestion: AI generation failed for video %s: %v", videoID, err)
+		slog.Error("title-suggestion: AI generation failed", "video_id", videoID, "error", err)
 		return
 	}
 	if suggestedTitle == "" {
@@ -162,9 +162,9 @@ func processNextTitleSuggestion(ctx context.Context, db database.DBTX, ai *AICli
 		`UPDATE videos SET suggested_title = $1, updated_at = now() WHERE id = $2`,
 		suggestedTitle, videoID,
 	); err != nil {
-		log.Printf("title-suggestion: failed to save for video %s: %v", videoID, err)
+		slog.Error("title-suggestion: failed to save", "video_id", videoID, "error", err)
 	} else {
-		log.Printf("title-suggestion: suggested %q for video %s", suggestedTitle, videoID)
+		slog.Info("title-suggestion: suggested title", "video_id", videoID, "suggested_title", suggestedTitle)
 	}
 }
 
@@ -173,13 +173,13 @@ func StartSummaryWorker(ctx context.Context, db database.DBTX, ai *AIClient, int
 		return
 	}
 	go func() {
-		log.Println("summary-worker: started")
+		slog.Info("summary-worker: started")
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
-				log.Println("summary-worker: shutting down")
+				slog.Info("summary-worker: shutting down")
 				return
 			case <-ticker.C:
 				processNextSummary(ctx, db, ai)

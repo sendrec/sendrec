@@ -3,7 +3,7 @@ package video
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 
@@ -37,21 +37,21 @@ func trimVideo(inputPath, outputPath, contentType string, startSeconds, endSecon
 }
 
 func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, thumbnailKey, contentType string, startSeconds, endSeconds float64) {
-	log.Printf("trim: starting for video %s (%.1f-%.1f)", videoID, startSeconds, endSeconds)
+	slog.Info("trim: starting", "video_id", videoID, "start_seconds", startSeconds, "end_seconds", endSeconds)
 
 	setReadyFallback := func() {
 		if _, err := db.Exec(ctx,
 			`UPDATE videos SET status = 'ready', updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
-			log.Printf("trim: failed to set fallback ready status for %s: %v", videoID, err)
+			slog.Error("trim: failed to set fallback ready status", "video_id", videoID, "error", err)
 		}
 	}
 
 	ext := extensionForContentType(contentType)
 	tmpInput, err := os.CreateTemp("", "sendrec-trim-input-*"+ext)
 	if err != nil {
-		log.Printf("trim: failed to create temp input file: %v", err)
+		slog.Error("trim: failed to create temp input file", "error", err)
 		setReadyFallback()
 		return
 	}
@@ -60,14 +60,14 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 	defer func() { _ = os.Remove(tmpInputPath) }()
 
 	if err := storage.DownloadToFile(ctx, fileKey, tmpInputPath); err != nil {
-		log.Printf("trim: failed to download video %s: %v", videoID, err)
+		slog.Error("trim: failed to download video", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
 
 	tmpOutput, err := os.CreateTemp("", "sendrec-trim-output-*"+ext)
 	if err != nil {
-		log.Printf("trim: failed to create temp output file: %v", err)
+		slog.Error("trim: failed to create temp output file", "error", err)
 		setReadyFallback()
 		return
 	}
@@ -76,13 +76,13 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
 	if err := trimVideo(tmpInputPath, tmpOutputPath, contentType, startSeconds, endSeconds); err != nil {
-		log.Printf("trim: ffmpeg failed for %s: %v", videoID, err)
+		slog.Error("trim: ffmpeg failed", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
 
 	if err := storage.UploadFile(ctx, fileKey, tmpOutputPath, contentType); err != nil {
-		log.Printf("trim: failed to upload trimmed video %s: %v", videoID, err)
+		slog.Error("trim: failed to upload trimmed video", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
@@ -92,13 +92,13 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 		`UPDATE videos SET status = 'ready', duration = $1, updated_at = now() WHERE id = $2`,
 		newDuration, videoID,
 	); err != nil {
-		log.Printf("trim: failed to update status for %s: %v", videoID, err)
+		slog.Error("trim: failed to update status", "video_id", videoID, "error", err)
 		return
 	}
 
 	GenerateThumbnail(ctx, db, storage, videoID, fileKey, thumbnailKey)
 	if err := EnqueueTranscription(ctx, db, videoID); err != nil {
-		log.Printf("trim: failed to enqueue transcription for %s: %v", videoID, err)
+		slog.Error("trim: failed to enqueue transcription", "video_id", videoID, "error", err)
 	}
-	log.Printf("trim: completed for video %s", videoID)
+	slog.Info("trim: completed", "video_id", videoID)
 }

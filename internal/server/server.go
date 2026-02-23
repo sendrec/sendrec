@@ -64,7 +64,7 @@ type Server struct {
 
 func New(cfg Config) *Server {
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	r.Use(slogMiddleware)
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders(SecurityConfig{
 		BaseURL:               cfg.BaseURL,

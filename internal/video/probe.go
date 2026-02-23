@@ -2,7 +2,7 @@ package video
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strconv"
@@ -12,11 +12,11 @@ import (
 )
 
 func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey string) {
-	log.Printf("probe: starting duration probe for video %s", videoID)
+	slog.Info("probe: starting duration probe", "video_id", videoID)
 
 	tmpFile, err := os.CreateTemp("", "sendrec-probe-*")
 	if err != nil {
-		log.Printf("probe: failed to create temp file: %v", err)
+		slog.Error("probe: failed to create temp file", "error", err)
 		return
 	}
 	tmpPath := tmpFile.Name()
@@ -24,7 +24,7 @@ func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage,
 	defer func() { _ = os.Remove(tmpPath) }()
 
 	if err := storage.DownloadToFile(ctx, fileKey, tmpPath); err != nil {
-		log.Printf("probe: failed to download video %s: %v", videoID, err)
+		slog.Error("probe: failed to download video", "video_id", videoID, "error", err)
 		return
 	}
 
@@ -36,20 +36,20 @@ func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage,
 	)
 	output, err := cmd.Output()
 	if err != nil {
-		log.Printf("probe: ffprobe failed for %s: %v", videoID, err)
+		slog.Error("probe: ffprobe failed", "video_id", videoID, "error", err)
 		return
 	}
 
 	durationStr := strings.TrimSpace(string(output))
 	durationFloat, err := strconv.ParseFloat(durationStr, 64)
 	if err != nil {
-		log.Printf("probe: failed to parse duration %q for %s: %v", durationStr, videoID, err)
+		slog.Error("probe: failed to parse duration", "video_id", videoID, "raw_duration", durationStr, "error", err)
 		return
 	}
 
 	duration := int(durationFloat)
 	if duration <= 0 {
-		log.Printf("probe: invalid duration %d for %s", duration, videoID)
+		slog.Warn("probe: invalid duration", "video_id", videoID, "duration", duration)
 		return
 	}
 
@@ -57,9 +57,9 @@ func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage,
 		`UPDATE videos SET duration = $1, updated_at = now() WHERE id = $2`,
 		duration, videoID,
 	); err != nil {
-		log.Printf("probe: failed to update duration for %s: %v", videoID, err)
+		slog.Error("probe: failed to update duration", "video_id", videoID, "error", err)
 		return
 	}
 
-	log.Printf("probe: video %s duration is %ds", videoID, duration)
+	slog.Info("probe: video duration detected", "video_id", videoID, "duration", duration)
 }

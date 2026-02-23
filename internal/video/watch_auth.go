@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -204,7 +204,7 @@ func (h *Handler) IdentifyViewer(w http.ResponseWriter, r *http.Request) {
 			 ON CONFLICT (video_id, email) DO NOTHING`,
 			videoID, req.Email, hash,
 		); err != nil {
-			log.Printf("failed to record viewer identity for %s: %v", videoID, err)
+			slog.Error("watch-auth: failed to record viewer identity", "video_id", videoID, "error", err)
 		}
 	}()
 

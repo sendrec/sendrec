@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"log"
+	"log/slog"
 )
 
 type contextKey string
@@ -14,7 +14,7 @@ const nonceKey contextKey = "csp-nonce"
 func GenerateNonce() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		log.Printf("failed to generate CSP nonce: %v", err)
+		slog.Error("failed to generate CSP nonce", "error", err)
 		return ""
 	}
 	return base64.RawURLEncoding.EncodeToString(b)
