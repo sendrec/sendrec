@@ -128,6 +128,9 @@ func (c *Client) CancelSubscription(ctx context.Context, subscriptionID string) 
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		if resp.StatusCode == http.StatusBadRequest && strings.Contains(string(respBody), "already canceled") {
+			return nil
+		}
 		return fmt.Errorf("creem cancel returned %d: %s", resp.StatusCode, string(respBody))
 	}
 	return nil
