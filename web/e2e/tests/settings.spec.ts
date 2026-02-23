@@ -8,9 +8,9 @@ test.describe("Settings", () => {
 
   test("settings page loads with user profile", async ({ page }) => {
     await page.goto("/settings");
-    await expect(page.getByDisplayValue(TEST_USER.name)).toBeVisible({
+    await expect(page.locator(`input[value="${TEST_USER.name}"]`)).toBeVisible({
       timeout: 5000,
     });
-    await expect(page.getByDisplayValue(TEST_USER.email)).toBeVisible();
+    await expect(page.getByText(TEST_USER.email)).toBeVisible();
   });
 });

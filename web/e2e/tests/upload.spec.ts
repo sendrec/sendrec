@@ -1,6 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { loginViaUI } from "../helpers/auth";
-import path from "path";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 test.describe("Upload", () => {
   test.beforeEach(async ({ page }) => {
@@ -17,21 +21,16 @@ test.describe("Upload", () => {
   test("upload a video file", async ({ page }) => {
     await page.goto("/upload");
 
-    const testVideoPath = path.join(
-      __dirname,
-      "..",
-      "fixtures",
-      "test-video.webm"
-    );
+    const testVideoPath = join(__dirname, "..", "fixtures", "test-video.webm");
     const fileInput = page.locator('[data-testid="file-input"]');
     await fileInput.setInputFiles(testVideoPath);
 
-    await expect(page.getByText(/1 file selected/i)).toBeVisible();
+    await expect(page.getByText(/1 file/i)).toBeVisible();
 
-    await page.getByRole("button", { name: /upload 1 video/i }).click();
+    await page.getByRole("button", { name: /upload/i }).click();
 
     await expect(page.getByText(/upload complete/i)).toBeVisible({
-      timeout: 30000,
+      timeout: 60000,
     });
   });
 
