@@ -651,7 +651,7 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(r.Context(),
 		`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id,
-		        EXISTS(SELECT 1 FROM video_thumbnails vt WHERE vt.video_id = v.id) AS has_thumbnail
+		        v.thumbnail_key IS NOT NULL AS has_thumbnail
 		 FROM playlist_videos pv
 		 JOIN videos v ON v.id = pv.video_id AND v.status IN ('ready', 'processing')
 		 WHERE pv.playlist_id = $1

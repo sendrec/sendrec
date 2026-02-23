@@ -192,8 +192,7 @@ func (h *Handler) GetPlaylist(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(r.Context(),
 		`SELECT v.id, v.title, v.duration, v.share_token, v.status, v.created_at,
-		        (SELECT key FROM video_thumbnails WHERE video_id = v.id LIMIT 1) AS thumbnail_key,
-		        pv.position
+		        v.thumbnail_key, pv.position
 		 FROM playlist_videos pv
 		 JOIN videos v ON v.id = pv.video_id AND v.status != 'deleted'
 		 WHERE pv.playlist_id = $1
