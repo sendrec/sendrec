@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -141,12 +141,12 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		"UPDATE email_confirmations SET used_at = now() WHERE user_id = $1 AND used_at IS NULL",
 		userID,
 	); err != nil {
-		log.Printf("register: failed to invalidate old confirmation tokens: %v", err)
+		slog.Error("register: failed to invalidate old confirmation tokens", "error", err)
 	}
 
 	rawToken, tokenHash, err := generateSecureToken()
 	if err != nil {
-		log.Printf("register: failed to generate confirmation token: %v", err)
+		slog.Error("register: failed to generate confirmation token", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create account")
 		return
 	}
@@ -155,7 +155,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		"INSERT INTO email_confirmations (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
 		tokenHash, userID, time.Now().Add(confirmTokenExpiry),
 	); err != nil {
-		log.Printf("register: failed to store confirmation token: %v", err)
+		slog.Error("register: failed to store confirmation token", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create account")
 		return
 	}
@@ -163,7 +163,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	confirmLink := h.baseURL + "/confirm-email?token=" + rawToken
 	if h.emailSender != nil {
 		if err := h.emailSender.SendConfirmation(r.Context(), req.Email, req.Name, confirmLink); err != nil {
-			log.Printf("register: failed to send confirmation email: %v", err)
+			slog.Error("register: failed to send confirmation email", "error", err)
 		}
 	}
 
@@ -312,12 +312,12 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		"UPDATE password_resets SET used_at = now() WHERE user_id = $1 AND used_at IS NULL",
 		userID,
 	); err != nil {
-		log.Printf("forgot-password: failed to invalidate old tokens: %v", err)
+		slog.Error("forgot-password: failed to invalidate old tokens", "error", err)
 	}
 
 	rawToken, tokenHash, err := generateSecureToken()
 	if err != nil {
-		log.Printf("forgot-password: failed to generate token: %v", err)
+		slog.Error("forgot-password: failed to generate token", "error", err)
 		httputil.WriteJSON(w, http.StatusOK, response)
 		return
 	}
@@ -326,7 +326,7 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		"INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
 		tokenHash, userID, time.Now().Add(resetTokenExpiry),
 	); err != nil {
-		log.Printf("forgot-password: failed to store token: %v", err)
+		slog.Error("forgot-password: failed to store token", "error", err)
 		httputil.WriteJSON(w, http.StatusOK, response)
 		return
 	}
@@ -334,7 +334,7 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	resetLink := h.baseURL + "/reset-password?token=" + rawToken
 	if h.emailSender != nil {
 		if err := h.emailSender.SendPasswordReset(r.Context(), req.Email, userName, resetLink); err != nil {
-			log.Printf("forgot-password: failed to send email: %v", err)
+			slog.Error("forgot-password: failed to send email", "error", err)
 		}
 	}
 
@@ -406,7 +406,7 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		"UPDATE refresh_tokens SET revoked = true, revoked_at = now() WHERE user_id = $1 AND revoked = false",
 		userID,
 	); err != nil {
-		log.Printf("reset-password: failed to revoke refresh tokens: %v", err)
+		slog.Error("reset-password: failed to revoke refresh tokens", "error", err)
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, messageResponse{Message: "Password updated successfully"})
@@ -496,12 +496,12 @@ func (h *Handler) ResendConfirmation(w http.ResponseWriter, r *http.Request) {
 		"UPDATE email_confirmations SET used_at = now() WHERE user_id = $1 AND used_at IS NULL",
 		userID,
 	); err != nil {
-		log.Printf("resend-confirmation: failed to invalidate old tokens: %v", err)
+		slog.Error("resend-confirmation: failed to invalidate old tokens", "error", err)
 	}
 
 	rawToken, tokenHash, err := generateSecureToken()
 	if err != nil {
-		log.Printf("resend-confirmation: failed to generate token: %v", err)
+		slog.Error("resend-confirmation: failed to generate token", "error", err)
 		httputil.WriteJSON(w, http.StatusOK, response)
 		return
 	}
@@ -510,7 +510,7 @@ func (h *Handler) ResendConfirmation(w http.ResponseWriter, r *http.Request) {
 		"INSERT INTO email_confirmations (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
 		tokenHash, userID, time.Now().Add(confirmTokenExpiry),
 	); err != nil {
-		log.Printf("resend-confirmation: failed to store token: %v", err)
+		slog.Error("resend-confirmation: failed to store token", "error", err)
 		httputil.WriteJSON(w, http.StatusOK, response)
 		return
 	}
@@ -518,7 +518,7 @@ func (h *Handler) ResendConfirmation(w http.ResponseWriter, r *http.Request) {
 	confirmLink := h.baseURL + "/confirm-email?token=" + rawToken
 	if h.emailSender != nil {
 		if err := h.emailSender.SendConfirmation(r.Context(), req.Email, userName, confirmLink); err != nil {
-			log.Printf("resend-confirmation: failed to send email: %v", err)
+			slog.Error("resend-confirmation: failed to send email", "error", err)
 		}
 	}
 
