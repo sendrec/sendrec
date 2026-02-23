@@ -1,0 +1,75 @@
+services:
+  sendrec:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - garage-keys:/run/garage-keys:ro
+    environment:
+      - DATABASE_URL=postgres://sendrec:sendrec@postgres:5432/sendrec?sslmode=disable
+      - S3_ENDPOINT=http://garage:3900
+      - S3_PUBLIC_ENDPOINT=http://localhost:3900
+      - S3_REGION=eu-central-1
+      - S3_BUCKET=recordings
+      - JWT_SECRET=e2e-test-secret
+      - BASE_URL=http://localhost:8080
+      - MAX_UPLOAD_BYTES=524288000
+      - AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+      - AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+    depends_on:
+      postgres:
+        condition: service_healthy
+      garage-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  postgres:
+    image: postgres:18-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: sendrec
+      POSTGRES_PASSWORD: sendrec
+      POSTGRES_DB: sendrec
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sendrec"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  garage:
+    image: dxflrs/garage:v2.2.0
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - sendrec-e2e-storage-meta:/var/lib/garage/meta
+      - sendrec-e2e-storage-data:/var/lib/garage/data
+    ports:
+      - "3900:3900"
+      - "3903:3903"
+
+  garage-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.garage-init
+    network_mode: "service:garage"
+    depends_on:
+      garage:
+        condition: service_started
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - sendrec-e2e-storage-meta:/var/lib/garage/meta:ro
+      - garage-keys:/run/garage-keys
+      - ./garage-init.sh:/garage-init.sh:ro
+    environment:
+      - S3_BUCKET=recordings
+    entrypoint: ["/bin/sh", "/garage-init.sh"]
+
+volumes:
+  sendrec-e2e-storage-meta:
+  sendrec-e2e-storage-data:
+  garage-keys:
