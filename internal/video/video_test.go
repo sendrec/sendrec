@@ -1489,9 +1489,9 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]").
-				AddRow("video-2", "Second Video", "uploading", 60, "xyz789uvwklm", createdAt.Add(-time.Hour), &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]").
+				AddRow("video-2", "Second Video", "uploading", 60, "xyz789uvwklm", createdAt.Add(-time.Hour), &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -1564,8 +1564,8 @@ func TestList_ShareURLIncludesBaseURL(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "My Video", "ready", 90, shareToken, createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "My Video", "ready", 90, shareToken, createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -1606,7 +1606,7 @@ func TestList_EmptyList(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}),
 		)
 
 	r := chi.NewRouter()
@@ -1688,8 +1688,8 @@ func TestList_IncludesViewCounts(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(15), int64(8), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(15), int64(8), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -1740,8 +1740,8 @@ func TestList_IncludesThumbnailURL(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(5), int64(3), &thumbKey, (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(5), int64(3), &thumbKey, (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -1787,9 +1787,9 @@ func TestList_IncludesCommentModeAndCount(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(5), int64(3), (*string)(nil), (*string)(nil), "anonymous", int64(7), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]").
-				AddRow("video-2", "Second Video", "ready", 60, "xyz789uvwklm", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(5), int64(3), (*string)(nil), (*string)(nil), "anonymous", int64(7), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]").
+				AddRow("video-2", "Second Video", "ready", 60, "xyz789uvwklm", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -3449,6 +3449,9 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(12))
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -3464,6 +3467,8 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 		MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
 		MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
 		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+		MaxPlaylists            int `json:"maxPlaylists"`
+		PlaylistsUsed           int `json:"playlistsUsed"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -3476,6 +3481,12 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	}
 	if resp.VideosUsedThisMonth != 12 {
 		t.Errorf("expected videosUsedThisMonth 12, got %d", resp.VideosUsedThisMonth)
+	}
+	if resp.MaxPlaylists != 3 {
+		t.Errorf("expected maxPlaylists 3, got %d", resp.MaxPlaylists)
+	}
+	if resp.PlaylistsUsed != 1 {
+		t.Errorf("expected playlistsUsed 1, got %d", resp.PlaylistsUsed)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -3494,7 +3505,10 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
-	// No ExpectQuery — should not query COUNT when unlimited
+	// No ExpectQuery for video COUNT when unlimited
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -3510,6 +3524,8 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 		MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
 		MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
 		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+		MaxPlaylists            int `json:"maxPlaylists"`
+		PlaylistsUsed           int `json:"playlistsUsed"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -3519,6 +3535,9 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	}
 	if resp.VideosUsedThisMonth != 0 {
 		t.Errorf("expected videosUsedThisMonth 0, got %d", resp.VideosUsedThisMonth)
+	}
+	if resp.MaxPlaylists != 3 {
+		t.Errorf("expected maxPlaylists 3, got %d", resp.MaxPlaylists)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -3537,7 +3556,7 @@ func TestLimits_ProUser(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, testJWTSecret, false)
 
 	expectPlanQuery(mock, "pro")
-	// No ExpectQuery for COUNT — pro users have unlimited videos
+	// No ExpectQuery for COUNT — pro users have unlimited videos and playlists
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -3553,6 +3572,8 @@ func TestLimits_ProUser(t *testing.T) {
 		MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
 		MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
 		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+		MaxPlaylists            int `json:"maxPlaylists"`
+		PlaylistsUsed           int `json:"playlistsUsed"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -3565,6 +3586,12 @@ func TestLimits_ProUser(t *testing.T) {
 	}
 	if resp.VideosUsedThisMonth != 0 {
 		t.Errorf("expected videosUsedThisMonth 0 for pro user, got %d", resp.VideosUsedThisMonth)
+	}
+	if resp.MaxPlaylists != 0 {
+		t.Errorf("expected maxPlaylists 0 for pro user, got %d", resp.MaxPlaylists)
+	}
+	if resp.PlaylistsUsed != 0 {
+		t.Errorf("expected playlistsUsed 0 for pro user, got %d", resp.PlaylistsUsed)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -4447,9 +4474,9 @@ func TestList_IncludesTranscriptStatus(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "ready", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]").
-				AddRow("video-2", "Second Video", "ready", 60, "xyz789uvwklm", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "processing", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "ready", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]").
+				AddRow("video-2", "Second Video", "ready", 60, "xyz789uvwklm", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "processing", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4498,8 +4525,8 @@ func TestList_SearchByQuery(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, "%deploy%", 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "Deploy walkthrough", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Deploy walkthrough", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4543,7 +4570,7 @@ func TestList_EmptyQueryIgnored(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}),
 		)
 
 	r := chi.NewRouter()
@@ -4575,8 +4602,8 @@ func TestList_NeverExpiresVideo(t *testing.T) {
 	mock.ExpectQuery("SELECT v.id").
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("v1", "Test Video", "ready", 60, "tok123", createdAt, (*time.Time)(nil), int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("v1", "Test Video", "ready", 60, "tok123", createdAt, (*time.Time)(nil), int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4619,8 +4646,8 @@ func TestList_FilterByFolderId(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, folderID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "In Folder", "ready", 60, "tok123", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), &folderID, "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "In Folder", "ready", 60, "tok123", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), &folderID, "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4666,8 +4693,8 @@ func TestList_FilterByUnfiled(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "Unfiled Video", "ready", 60, "tok456", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Unfiled Video", "ready", 60, "tok456", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4714,8 +4741,8 @@ func TestList_FilterByTagId(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, tagID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "Tagged Video", "ready", 60, "tok789", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), `[{"id":"tag-xyz-789","name":"Important","color":null}]`),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Tagged Video", "ready", 60, "tok789", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), `[{"id":"tag-xyz-789","name":"Important","color":null}]`, "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4763,8 +4790,8 @@ func TestList_IncludesFolderIdAndTags(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "Organized Video", "ready", 90, "tok-org", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), &folderID, `[{"id":"tag-1","name":"Bug","color":"#ff0000"},{"id":"tag-2","name":"Feature","color":null}]`),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Organized Video", "ready", 90, "tok-org", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), &folderID, `[{"id":"tag-1","name":"Bug","color":"#ff0000"},{"id":"tag-2","name":"Feature","color":null}]`, "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -6308,8 +6335,8 @@ func TestList_IncludesSuggestedTitle(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json"}).
-				AddRow("video-1", "Recording 2026-02-05", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", &suggestedTitle, (*string)(nil), "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Recording 2026-02-05", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", &suggestedTitle, (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()

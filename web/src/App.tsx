@@ -15,6 +15,8 @@ import { Settings } from "./pages/Settings";
 import { Analytics } from "./pages/Analytics";
 import { VideoDetail } from "./pages/VideoDetail";
 import { Upload } from "./pages/Upload";
+import { Playlists } from "./pages/Playlists";
+import { PlaylistDetail } from "./pages/PlaylistDetail";
 import { useTheme } from "./hooks/useTheme";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -72,6 +74,22 @@ export function App() {
         element={
           <ProtectedRoute>
             <Library />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/playlists"
+        element={
+          <ProtectedRoute>
+            <Playlists />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/playlists/:id"
+        element={
+          <ProtectedRoute>
+            <PlaylistDetail />
           </ProtectedRoute>
         }
       />

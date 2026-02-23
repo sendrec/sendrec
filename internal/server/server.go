@@ -274,6 +274,19 @@ func (s *Server) routes() {
 			r.Delete("/{id}", s.videoHandler.DeleteTag)
 		})
 
+		s.router.Route("/api/playlists", func(r chi.Router) {
+			r.Use(s.authHandler.Middleware)
+			r.Use(maxBodySize(64 * 1024))
+			r.Get("/", s.videoHandler.ListPlaylists)
+			r.Post("/", s.videoHandler.CreatePlaylist)
+			r.Get("/{id}", s.videoHandler.GetPlaylist)
+			r.Patch("/{id}", s.videoHandler.UpdatePlaylist)
+			r.Delete("/{id}", s.videoHandler.DeletePlaylist)
+			r.Post("/{id}/videos", s.videoHandler.AddPlaylistVideos)
+			r.Delete("/{id}/videos/{videoId}", s.videoHandler.RemovePlaylistVideo)
+			r.Patch("/{id}/videos/reorder", s.videoHandler.ReorderPlaylistVideos)
+		})
+
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
 		commentLimiter := ratelimit.NewLimiter(0.2, 3)
 		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
@@ -288,6 +301,10 @@ func (s *Server) routes() {
 		s.router.Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 		s.router.Get("/embed/{shareToken}", s.videoHandler.EmbedPage)
+
+		s.router.Get("/watch/playlist/{shareToken}", s.videoHandler.PlaylistWatchPage)
+		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/playlist/{shareToken}/verify", s.videoHandler.VerifyPlaylistWatchPassword)
+		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/playlist/{shareToken}/identify", s.videoHandler.IdentifyPlaylistViewer)
 
 		if s.billingHandlers != nil {
 			s.router.Post("/api/webhooks/creem", s.billingHandlers.Webhook)

@@ -182,14 +182,20 @@ type listItem struct {
 	EmailGateEnabled  bool          `json:"emailGateEnabled"`
 	SummaryStatus     string        `json:"summaryStatus"`
 	SuggestedTitle    *string       `json:"suggestedTitle"`
-	FolderID          *string       `json:"folderId"`
-	Tags              []listItemTag `json:"tags"`
+	FolderID          *string            `json:"folderId"`
+	Tags              []listItemTag      `json:"tags"`
+	Playlists         []listItemPlaylist `json:"playlists"`
 }
 
 type listItemTag struct {
 	ID    string  `json:"id"`
 	Name  string  `json:"name"`
 	Color *string `json:"color"`
+}
+
+type listItemPlaylist struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
 }
 
 type updateRequest struct {
@@ -458,6 +464,8 @@ type limitsResponse struct {
 	VideosUsedThisMonth     int  `json:"videosUsedThisMonth"`
 	BrandingEnabled         bool `json:"brandingEnabled"`
 	AiEnabled               bool `json:"aiEnabled"`
+	MaxPlaylists            int  `json:"maxPlaylists"`
+	PlaylistsUsed           int  `json:"playlistsUsed"`
 }
 
 func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
@@ -482,12 +490,25 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	maxPlaylists := maxPlaylistsFreeTier
+	var playlistsUsed int
+	if plan == "pro" || plan == "business" {
+		maxPlaylists = 0
+	} else {
+		_ = h.db.QueryRow(r.Context(),
+			`SELECT COUNT(*) FROM playlists WHERE user_id = $1`,
+			userID,
+		).Scan(&playlistsUsed)
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, limitsResponse{
 		MaxVideosPerMonth:       maxVideos,
 		MaxVideoDurationSeconds: maxDuration,
 		VideosUsedThisMonth:     videosUsed,
 		BrandingEnabled:         h.brandingEnabled,
 		AiEnabled:               h.aiEnabled,
+		MaxPlaylists:            maxPlaylists,
+		PlaylistsUsed:           playlistsUsed,
 	})
 }
 
@@ -654,7 +675,10 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    v.suggested_title, v.folder_id,
 		    COALESCE((SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY t.name)
 		      FROM video_tags vt JOIN tags t ON t.id = vt.tag_id
-		      WHERE vt.video_id = v.id), '[]'::json) AS tags_json
+		      WHERE vt.video_id = v.id), '[]'::json) AS tags_json,
+		    COALESCE((SELECT json_agg(json_build_object('id', p.id, 'title', p.title) ORDER BY p.title)
+		      FROM playlist_videos pv JOIN playlists p ON p.id = pv.playlist_id
+		      WHERE pv.video_id = v.id), '[]'::json) AS playlists_json
 		 FROM videos v
 		 WHERE v.status != 'deleted'`
 
@@ -709,7 +733,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var thumbnailKey *string
 		var sharePassword *string
 		var tagsJSON string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.SuggestedTitle, &item.FolderID, &tagsJSON); err != nil {
+		var playlistsJSON string
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.SuggestedTitle, &item.FolderID, &tagsJSON, &playlistsJSON); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -718,6 +743,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		if item.Tags == nil {
 			item.Tags = make([]listItemTag, 0)
+		}
+		if err := json.Unmarshal([]byte(playlistsJSON), &item.Playlists); err != nil {
+			item.Playlists = make([]listItemPlaylist, 0)
+		}
+		if item.Playlists == nil {
+			item.Playlists = make([]listItemPlaylist, 0)
 		}
 		item.CreatedAt = createdAt.Format(time.RFC3339)
 		if shareExpiresAt != nil {
