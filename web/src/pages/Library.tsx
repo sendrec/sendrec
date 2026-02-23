@@ -221,6 +221,7 @@ export function Library() {
     try {
       await apiFetch(`/api/videos/${id}`, { method: "DELETE" });
       setVideos((prev) => prev.filter((v) => v.id !== id));
+      setLimits((prev) => prev ? { ...prev, videosUsedThisMonth: Math.max(0, prev.videosUsedThisMonth - 1) } : prev);
     } finally {
       setDeletingId(null);
     }
