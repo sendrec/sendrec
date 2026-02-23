@@ -14,7 +14,7 @@ import (
 
 func newBrandingHandler(t *testing.T, mock pgxmock.PgxPoolIface, storage *mockStorage) *Handler {
 	t.Helper()
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.brandingEnabled = true
 	return handler
 }
@@ -28,7 +28,7 @@ func TestGetBrandingSettings_DisabledReturns403(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/settings/branding", handler.GetBrandingSettings)
@@ -53,7 +53,7 @@ func TestPutBrandingSettings_DisabledReturns403(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(setBrandingRequest{})
 	r := chi.NewRouter()
@@ -74,7 +74,7 @@ func TestSetVideoBranding_DisabledReturns403(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(setVideoBrandingRequest{})
 	r := chi.NewRouter()

@@ -19,7 +19,7 @@ func TestRemoveSegments_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -55,7 +55,7 @@ func TestRemoveSegments_EmptySegments(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/remove-segments", handler.RemoveSegments)
@@ -77,7 +77,7 @@ func TestRemoveSegments_OverlappingSegments(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/remove-segments", handler.RemoveSegments)
@@ -99,7 +99,7 @@ func TestRemoveSegments_SegmentsExceedDuration(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -127,7 +127,7 @@ func TestRemoveSegments_TooManySegments(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/remove-segments", handler.RemoveSegments)
@@ -161,7 +161,7 @@ func TestRemoveSegments_ResultDurationTooShort(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -189,7 +189,7 @@ func TestRemoveSegments_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -220,7 +220,7 @@ func TestRemoveSegments_VideoNotReady(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -252,7 +252,7 @@ func TestRemoveSegments_ConcurrentProcessing(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -288,7 +288,7 @@ func TestRemoveSegments_UnsortedSegments(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/remove-segments", handler.RemoveSegments)
@@ -310,7 +310,7 @@ func TestRemoveSegments_NegativeStart(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/remove-segments", handler.RemoveSegments)
@@ -332,7 +332,7 @@ func TestRemoveSegments_EndLessThanOrEqualStart(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/remove-segments", handler.RemoveSegments)

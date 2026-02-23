@@ -64,7 +64,7 @@ func TestWatchPage_NotFound_Returns404(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs("nonexistent").
@@ -97,7 +97,7 @@ func TestWatchPage_Expired_Returns410(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{downloadURL: "https://s3.example.com/video"}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{downloadURL: "https://s3.example.com/video"}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "expiredtoken1"
 	createdAt := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 	expiredAt := time.Now().Add(-24 * time.Hour) // expired yesterday
@@ -140,7 +140,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "validtoken12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -194,7 +194,7 @@ func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "speedtoken12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -252,7 +252,7 @@ func TestWatchPage_WithThumbnail_RendersPosterAndOGImage(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "thumbtoken12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -299,7 +299,7 @@ func TestWatchPage_WithoutThumbnail_NoPosterOrOGImage(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "nothumbtoken"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -345,7 +345,7 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "commtoken123"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -423,7 +423,7 @@ func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "nocommtoken1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -472,7 +472,7 @@ func TestWatchPage_NameRequired_RendersNameField(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "namereqtoken"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -518,7 +518,7 @@ func TestWatchPage_NameEmailRequired_RendersBothFields(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "emailreqtokn"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -564,7 +564,7 @@ func TestWatchPage_TranscriptReady_RendersSegments(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "transreadytk"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -630,7 +630,7 @@ func TestWatchPage_TranscriptPending_ShowsQueueMessage(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "transpendtok"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -673,7 +673,7 @@ func TestWatchPage_TranscriptProcessing_ShowsProgressMessage(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "transproctok"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -716,7 +716,7 @@ func TestWatchPage_TranscriptFailed_ShowsFailedMessage(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "transfailtok"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -759,7 +759,7 @@ func TestWatchPage_StorageError_Returns500(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadErr: errors.New("storage unavailable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "storageerrtk"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -798,7 +798,7 @@ func TestWatchPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 
 	passwordHash, _ := hashSharePassword("secret123")
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "pwdtoken1234"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -849,7 +849,7 @@ func TestWatchPage_PasswordProtected_ValidCookie_ShowsPlayer(t *testing.T) {
 
 	passwordHash, _ := hashSharePassword("secret123")
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "pwdvalid1234"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -902,7 +902,7 @@ func TestWatchPage_OGMetaTags(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "ogmetatoken1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -953,7 +953,7 @@ func TestWatchPage_CrossOriginAttribute(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "corstoken123"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -996,7 +996,7 @@ func TestWatchPage_PlaysInlineAttribute(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "inlinetoken1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1039,7 +1039,7 @@ func TestWatchPage_CSPNonce(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "noncetoken12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1087,7 +1087,7 @@ func TestWatchPage_TitleInHTMLTitle(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "titletoken12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1130,7 +1130,7 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "autoplaytkn1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1177,7 +1177,7 @@ func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "brandingtkn1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1248,7 +1248,7 @@ func TestWatchPage_RecordsView(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "viewtoken123"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1286,7 +1286,7 @@ func TestWatchPage_NotFound_HasNonceInTemplate(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs("missing12345").
@@ -1342,7 +1342,7 @@ func TestWatchPage_AnalyticsScriptRendered(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	handler.SetAnalyticsScript(`<script defer src="/script.js" data-website-id="test-id"></script>`)
 
 	shareToken := "analytics123"
@@ -1391,7 +1391,7 @@ func TestWatchPage_NoAnalyticsWhenEmpty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	shareToken := "noanalytics1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1436,7 +1436,7 @@ func TestWatchPage_ResponsiveCSS(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "responsive01"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1482,7 +1482,7 @@ func TestWatchPage_SafariWebMWarningElement(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "safariwebm1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1528,7 +1528,7 @@ func TestWatchPage_DownloadEnabled_ShowsButton(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "dlenabledtk1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1574,7 +1574,7 @@ func TestWatchPage_DownloadDisabled_HidesButton(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "dldisabledtk"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1626,7 +1626,7 @@ func TestWatchPage_CustomCSS_Injected(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	handler.brandingEnabled = true
 
 	shareToken := "custom-css-token"
@@ -1673,7 +1673,7 @@ func TestWatchPage_NoCustomCSS(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	shareToken := "no-css-token"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1718,7 +1718,7 @@ func TestWatchPage_NeverExpires(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	createdAt := time.Now().Add(-30 * 24 * time.Hour)
 
@@ -1764,7 +1764,7 @@ func TestWatchPage_RendersCtaCard(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	ctaText := "Book a demo"
 	ctaUrl := "https://example.com/demo"
@@ -1815,7 +1815,7 @@ func TestWatchPage_NoCtaWhenNotSet(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs("test-token").
@@ -1857,7 +1857,7 @@ func TestWatchPage_MilestoneTrackingScript(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs("test-token").
@@ -1902,7 +1902,7 @@ func TestWatchPage_EmailGate_ShowsForm(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "emailgatetk1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -1955,7 +1955,7 @@ func TestWatchPage_SummaryTab(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "summarytab12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2027,7 +2027,7 @@ func TestWatchPage_ChaptersBar(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "chapterbar12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2084,7 +2084,7 @@ func TestWatchPage_NoChaptersBar_WhenEmpty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "nochapters12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2127,7 +2127,7 @@ func TestWatchPage_OGDescription_WithSummary(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "ogdescsumm12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2174,7 +2174,7 @@ func TestWatchPage_OGDescription_FallbackToCreator(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "ogdescfall12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2223,7 +2223,7 @@ func TestWatchPage_TwitterCardTags(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "twittercard1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2278,7 +2278,7 @@ func TestWatchPage_OGImageUsesProxyURL(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "ogimgproxy1"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2334,7 +2334,7 @@ func TestWatchPage_OGUrl(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "ogurltoken12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2389,7 +2389,7 @@ func TestWatchThumbnail_Redirects(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/thumb.jpg"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	thumbKey := "recordings/u1/thumb.jpg"
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2421,7 +2421,7 @@ func TestWatchThumbnail_NotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at`).
 		WithArgs("nonexistent").
@@ -2445,7 +2445,7 @@ func TestWatchThumbnail_NoThumbnail(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 
@@ -2472,7 +2472,7 @@ func TestWatchThumbnail_Expired(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	thumbKey := "recordings/u1/thumb.jpg"
 	expiredAt := time.Now().Add(-24 * time.Hour)
@@ -2525,7 +2525,7 @@ func TestWatchPage_JSONLDVideoObject(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "jsonldtoken1"
 	createdAt := time.Date(2026, 2, 5, 14, 30, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2581,7 +2581,7 @@ func TestWatchPage_JSONLDVideoObject_WithDownload(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "jsonlddl1234"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2624,7 +2624,7 @@ func TestWatchPage_JSONLDVideoObject_NoDownload(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "jsonldnodl12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2666,7 +2666,7 @@ func TestWatchPage_CanonicalURL(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "canonical123"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2709,7 +2709,7 @@ func TestWatchPage_MetaDescription(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "metadesc1234"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -2752,7 +2752,7 @@ func TestWatchPageFreeUserAlwaysShowsSendRecBadge(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "badge-test-token"
 	customFooter := "My Company"
 
@@ -2797,7 +2797,7 @@ func TestWatchPageProUserCanRemoveSendRecBadge(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "pro-badge-token"
 	customFooter := "Pro Company Footer"
 

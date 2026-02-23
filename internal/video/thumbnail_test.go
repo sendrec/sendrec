@@ -124,7 +124,7 @@ func TestUploadThumbnail_ValidJPEG(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=thumb"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-thumb-1"
 	shareToken := "abc123thumb"
@@ -176,7 +176,7 @@ func TestUploadThumbnail_ValidPNG(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=png"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-thumb-2"
 	shareToken := "def456thumb"
@@ -228,7 +228,7 @@ func TestUploadThumbnail_ValidWebP(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=webp"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-thumb-3"
 	shareToken := "ghi789thumb"
@@ -271,7 +271,7 @@ func TestUploadThumbnail_InvalidType(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(struct {
 		ContentType   string `json:"contentType"`
@@ -304,7 +304,7 @@ func TestUploadThumbnail_TooLarge(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(struct {
 		ContentType   string `json:"contentType"`
@@ -337,7 +337,7 @@ func TestUploadThumbnail_VideoNotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
 		WithArgs("nonexistent-video", testUserID).
@@ -381,7 +381,7 @@ func TestResetThumbnail_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-reset-1"
 	shareToken := "resettoken123"
@@ -414,7 +414,7 @@ func TestResetThumbnail_VideoNotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
 		WithArgs("nonexistent-video", testUserID).

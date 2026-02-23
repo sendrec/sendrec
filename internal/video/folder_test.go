@@ -22,7 +22,7 @@ func TestCreateFolder_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	now := time.Now().UTC().Truncate(time.Second)
 
@@ -80,7 +80,7 @@ func TestCreateFolder_NameTooLong(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	longName := strings.Repeat("a", 101)
 	body, _ := json.Marshal(createFolderRequest{Name: longName})
@@ -109,7 +109,7 @@ func TestCreateFolder_EmptyName(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(createFolderRequest{Name: ""})
 
@@ -137,7 +137,7 @@ func TestCreateFolder_WhitespaceOnlyName(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(createFolderRequest{Name: "   "})
 
@@ -165,7 +165,7 @@ func TestCreateFolder_DuplicateName(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM folders WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -205,7 +205,7 @@ func TestCreateFolder_MaxFoldersReached(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM folders WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -241,7 +241,7 @@ func TestListFolders_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	earlier := now.Add(-1 * time.Hour)
@@ -295,7 +295,7 @@ func TestListFolders_Empty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT f\.id, f\.name, f\.position, f\.created_at`).
 		WithArgs(testUserID).
@@ -338,7 +338,7 @@ func TestUpdateFolder_Rename(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	folderID := "folder-1"
 	newName := "Renamed Folder"
@@ -372,7 +372,7 @@ func TestUpdateFolder_Reorder(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	folderID := "folder-1"
 	newPosition := 3
@@ -406,7 +406,7 @@ func TestUpdateFolder_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	folderID := "nonexistent"
 	newName := "Updated Name"
@@ -445,7 +445,7 @@ func TestDeleteFolder_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	folderID := "folder-1"
 
@@ -476,7 +476,7 @@ func TestDeleteFolder_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	folderID := "nonexistent"
 
@@ -512,7 +512,7 @@ func TestSetVideoFolder_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-1"
 	folderID := "folder-1"
@@ -550,7 +550,7 @@ func TestSetVideoFolder_Unfile(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-1"
 
@@ -583,7 +583,7 @@ func TestSetVideoFolder_FolderNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-1"
 	folderID := "nonexistent"
@@ -622,7 +622,7 @@ func TestSetVideoFolder_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "nonexistent"
 	folderID := "folder-1"

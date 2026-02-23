@@ -56,6 +56,7 @@ type Handler struct {
 	maxUploadBytes          int64
 	maxVideosPerMonth       int
 	maxVideoDurationSeconds int
+	maxPlaylists            int
 	hmacSecret              string
 	secureCookies           bool
 	commentNotifier         CommentNotifier
@@ -131,7 +132,7 @@ func webcamFileKey(userID, shareToken string) string {
 	return fmt.Sprintf("recordings/%s/%s_webcam.webm", userID, shareToken)
 }
 
-func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64, maxVideosPerMonth int, maxVideoDurationSeconds int, hmacSecret string, secureCookies bool) *Handler {
+func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64, maxVideosPerMonth int, maxVideoDurationSeconds int, maxPlaylists int, hmacSecret string, secureCookies bool) *Handler {
 	return &Handler{
 		db:                      db,
 		storage:                 s,
@@ -139,6 +140,7 @@ func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadByte
 		maxUploadBytes:          maxUploadBytes,
 		maxVideosPerMonth:       maxVideosPerMonth,
 		maxVideoDurationSeconds: maxVideoDurationSeconds,
+		maxPlaylists:            maxPlaylists,
 		hmacSecret:              hmacSecret,
 		secureCookies:           secureCookies,
 	}
@@ -490,7 +492,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	maxPlaylists := maxPlaylistsFreeTier
+	maxPlaylists := h.maxPlaylists
 	var playlistsUsed int
 	if plan == "pro" || plan == "business" {
 		maxPlaylists = 0

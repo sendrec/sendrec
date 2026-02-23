@@ -26,7 +26,7 @@ func TestGetNotificationPreferences_ExistingRow(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT view_notification, slack_webhook_url, webhook_url, webhook_secret FROM notification_preferences WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -59,7 +59,7 @@ func TestGetNotificationPreferences_DefaultWhenNoRow(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT view_notification, slack_webhook_url, webhook_url, webhook_secret FROM notification_preferences WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -96,7 +96,7 @@ func TestPutNotificationPreferences_ValidMode(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`INSERT INTO notification_preferences`).
 		WithArgs(testUserID, "digest", (*string)(nil), (*string)(nil), "").
@@ -126,7 +126,7 @@ func TestPutNotificationPreferences_InvalidMode(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(setNotificationPreferencesRequest{NotificationMode: "invalid"})
 
@@ -148,7 +148,7 @@ func TestGetNotificationPreferences_IncludesSlackWebhookUrl(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	slackURL := "https://hooks.slack.com/services/T/B/X"
 	mock.ExpectQuery(`SELECT view_notification, slack_webhook_url, webhook_url, webhook_secret FROM notification_preferences WHERE user_id = \$1`).
@@ -185,7 +185,7 @@ func TestGetNotificationPreferences_SlackWebhookUrlNull(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT view_notification, slack_webhook_url, webhook_url, webhook_secret FROM notification_preferences WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -221,7 +221,7 @@ func TestPutNotificationPreferences_SavesSlackWebhookUrl(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	slackURL := "https://hooks.slack.com/services/T/B/X"
 	mock.ExpectExec(`INSERT INTO notification_preferences`).
@@ -252,7 +252,7 @@ func TestPutNotificationPreferences_ClearsSlackWebhookUrl(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`INSERT INTO notification_preferences`).
 		WithArgs(testUserID, "off", (*string)(nil), (*string)(nil), "").
@@ -282,7 +282,7 @@ func TestPutNotificationPreferences_RejectsInvalidWebhookUrl(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body := []byte(`{"notificationMode":"views_only","slackWebhookUrl":"https://evil.com/webhook"}`)
 
@@ -304,7 +304,7 @@ func TestPutNotificationPreferences_RejectsLongWebhookUrl(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	longURL := "https://hooks.slack.com/services/" + strings.Repeat("x", 500)
 	body := []byte(`{"notificationMode":"views_only","slackWebhookUrl":"` + longURL + `"}`)
@@ -329,7 +329,7 @@ func TestTestSlackWebhook_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	fakeSlack := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -363,7 +363,7 @@ func TestTestSlackWebhook_NoUrlConfigured_Returns400(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT slack_webhook_url FROM notification_preferences WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -389,7 +389,7 @@ func TestSetVideoNotification_SetMode(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	every := "every"
@@ -421,7 +421,7 @@ func TestSetVideoNotification_ClearOverride(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-456"
 
 	mock.ExpectExec(`UPDATE videos SET view_notification = \$1`).
@@ -452,7 +452,7 @@ func TestSetVideoNotification_InvalidMode(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body := []byte(`{"viewNotification":"first"}`)
 
@@ -474,7 +474,7 @@ func TestSetVideoNotification_NotOwner(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	every := "every"
 	mock.ExpectExec(`UPDATE videos SET view_notification = \$1`).
@@ -497,7 +497,7 @@ func TestSetVideoNotification_NotOwner(t *testing.T) {
 // --- viewerUserIDFromRequest Tests ---
 
 func TestViewerUserIDFromRequest_ValidRefreshToken(t *testing.T) {
-	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	tokenID := "test-token-id"
 	refreshToken, err := auth.GenerateRefreshToken(testJWTSecret, testUserID, tokenID)
@@ -515,7 +515,7 @@ func TestViewerUserIDFromRequest_ValidRefreshToken(t *testing.T) {
 }
 
 func TestViewerUserIDFromRequest_NoCookie(t *testing.T) {
-	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	req := httptest.NewRequest(http.MethodGet, "/watch/abc", nil)
 
@@ -526,7 +526,7 @@ func TestViewerUserIDFromRequest_NoCookie(t *testing.T) {
 }
 
 func TestViewerUserIDFromRequest_InvalidToken(t *testing.T) {
-	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	req := httptest.NewRequest(http.MethodGet, "/watch/abc", nil)
 	req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "invalid-token"})
@@ -538,7 +538,7 @@ func TestViewerUserIDFromRequest_InvalidToken(t *testing.T) {
 }
 
 func TestViewerUserIDFromRequest_AccessTokenRejected(t *testing.T) {
-	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	accessToken, err := auth.GenerateAccessToken(testJWTSecret, testUserID)
 	if err != nil {
@@ -564,7 +564,7 @@ func TestResolveAndNotify_SkipsWhenViewerIsOwner(t *testing.T) {
 	defer mock.Close()
 
 	notifier := &mockViewNotifier{}
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetViewNotifier(notifier)
 
 	every := "every"
@@ -583,7 +583,7 @@ func TestResolveAndNotify_SendsWhenViewerIsDifferent(t *testing.T) {
 	defer mock.Close()
 
 	notifier := &mockViewNotifier{}
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetViewNotifier(notifier)
 
 	every := "every"
@@ -602,7 +602,7 @@ func TestResolveAndNotify_SendsWhenViewerIsAnonymous(t *testing.T) {
 	defer mock.Close()
 
 	notifier := &mockViewNotifier{}
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetViewNotifier(notifier)
 
 	every := "every"
@@ -621,7 +621,7 @@ func TestResolveAndNotify_UsesAccountModeAndSkipsCommentsOnly(t *testing.T) {
 	defer mock.Close()
 
 	notifier := &mockViewNotifier{}
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetViewNotifier(notifier)
 
 	mock.ExpectQuery(`SELECT view_notification FROM notification_preferences WHERE user_id = \$1`).
@@ -647,7 +647,7 @@ func TestResolveAndNotify_UsesAccountModeAndSendsViewsOnly(t *testing.T) {
 	defer mock.Close()
 
 	notifier := &mockViewNotifier{}
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetViewNotifier(notifier)
 
 	mock.ExpectQuery(`SELECT view_notification FROM notification_preferences WHERE user_id = \$1`).
@@ -674,7 +674,7 @@ func TestResolveAndNotify_SlackFiresWhenModeIsOff(t *testing.T) {
 
 	emailNotifier := &mockViewNotifier{}
 	slackNotifier := &mockSlackNotifier{}
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetViewNotifier(emailNotifier)
 	handler.SetSlackNotifier(slackNotifier)
 
@@ -704,7 +704,7 @@ func TestResolveAndNotify_SlackSkippedWhenViewerIsOwner(t *testing.T) {
 	defer mock.Close()
 
 	slackNotifier := &mockSlackNotifier{}
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetSlackNotifier(slackNotifier)
 
 	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", testUserID, nil)
@@ -723,7 +723,7 @@ func TestResolveAndNotify_BothFireWhenModeIsViewsOnly(t *testing.T) {
 
 	emailNotifier := &mockViewNotifier{}
 	slackNotifier := &mockSlackNotifier{}
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetViewNotifier(emailNotifier)
 	handler.SetSlackNotifier(slackNotifier)
 
@@ -754,7 +754,7 @@ func TestGetNotificationPreferences_IncludesWebhook(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	webhookURL := "https://example.com/webhook"
 	webhookSecret := "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
@@ -792,7 +792,7 @@ func TestPutNotificationPreferences_SavesWebhookUrl(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	webhookURL := "https://example.com/webhook"
 	mock.ExpectExec(`INSERT INTO notification_preferences`).
@@ -823,7 +823,7 @@ func TestPutNotificationPreferences_RejectsHttpWebhookUrl(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body := []byte(`{"notificationMode":"views_only","webhookUrl":"http://example.com/webhook"}`)
 
@@ -845,7 +845,7 @@ func TestPutNotificationPreferences_AllowsLocalhostHttp(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	localhostURL := "http://localhost:8080/webhook"
 	mock.ExpectExec(`INSERT INTO notification_preferences`).
@@ -876,7 +876,7 @@ func TestPutNotificationPreferences_ClearsWebhookWithEmpty(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`INSERT INTO notification_preferences`).
 		WithArgs(testUserID, "off", (*string)(nil), (*string)(nil), "").
@@ -906,7 +906,7 @@ func TestRegenerateWebhookSecret(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE notification_preferences SET webhook_secret = \$1, updated_at = now\(\) WHERE user_id = \$2 AND webhook_url IS NOT NULL`).
 		WithArgs(pgxmock.AnyArg(), testUserID).
@@ -943,7 +943,7 @@ func TestRegenerateWebhookSecret_NoWebhookConfigured(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE notification_preferences SET webhook_secret = \$1, updated_at = now\(\) WHERE user_id = \$2 AND webhook_url IS NOT NULL`).
 		WithArgs(pgxmock.AnyArg(), testUserID).
@@ -967,7 +967,7 @@ func TestTestWebhook_NoUrl(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT webhook_url, webhook_secret FROM notification_preferences WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -991,7 +991,7 @@ func TestTestWebhook_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1033,7 +1033,7 @@ func TestListWebhookDeliveries(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	statusCode := 200
 	createdAt := time.Date(2026, 2, 21, 12, 0, 0, 0, time.UTC)
@@ -1078,7 +1078,7 @@ func TestListWebhookDeliveries_Empty(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT id, event, payload, status_code, response_body, attempt, created_at FROM webhook_deliveries WHERE user_id = \$1`).
 		WithArgs(testUserID).

@@ -20,7 +20,7 @@ func TestCreatePlaylist_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	now := time.Now().UTC().Truncate(time.Second)
 
@@ -83,7 +83,7 @@ func TestCreatePlaylist_EmptyTitle(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(map[string]string{"title": ""})
 
@@ -111,7 +111,7 @@ func TestCreatePlaylist_TitleTooLong(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	longTitle := strings.Repeat("a", 201)
 	body, _ := json.Marshal(map[string]string{"title": longTitle})
@@ -140,7 +140,7 @@ func TestCreatePlaylist_FreeTierLimitReached(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 3, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -178,7 +178,7 @@ func TestCreatePlaylist_ProUnlimited(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	now := time.Now().UTC().Truncate(time.Second)
 
@@ -218,7 +218,7 @@ func TestListPlaylists_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	earlier := now.Add(-1 * time.Hour)
@@ -284,7 +284,7 @@ func TestListPlaylists_Empty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT p\.id, p\.title, p\.description, p\.is_shared, p\.share_token, p\.position, p\.created_at, p\.updated_at`).
 		WithArgs(testUserID).
@@ -326,7 +326,7 @@ func TestGetPlaylist_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://storage.sendrec.eu/thumb.jpg"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	shareToken := "playlisttoken"
@@ -402,7 +402,7 @@ func TestGetPlaylist_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT p\.id, p\.title, p\.description, p\.is_shared, p\.share_token, p\.require_email, p\.share_password IS NOT NULL, p\.position, p\.created_at, p\.updated_at`).
 		WithArgs("nonexistent", testUserID).
@@ -436,7 +436,7 @@ func TestUpdatePlaylist_Rename(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "playlist-1"
 	newTitle := "Renamed Playlist"
@@ -470,7 +470,7 @@ func TestUpdatePlaylist_EnableSharing(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "playlist-1"
 
@@ -503,7 +503,7 @@ func TestUpdatePlaylist_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "nonexistent"
 	newTitle := "Updated Title"
@@ -542,7 +542,7 @@ func TestDeletePlaylist_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "playlist-1"
 
@@ -573,7 +573,7 @@ func TestDeletePlaylist_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "nonexistent"
 
@@ -609,7 +609,7 @@ func TestAddPlaylistVideos_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "playlist-1"
 
@@ -662,7 +662,7 @@ func TestAddPlaylistVideos_EmptyVideoIDs(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(addPlaylistVideosRequest{VideoIDs: []string{}})
 
@@ -690,7 +690,7 @@ func TestAddPlaylistVideos_PlaylistNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "nonexistent"
 
@@ -728,7 +728,7 @@ func TestRemovePlaylistVideo_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "playlist-1"
 	videoID := "video-1"
@@ -764,7 +764,7 @@ func TestRemovePlaylistVideo_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "playlist-1"
 	videoID := "nonexistent"
@@ -801,7 +801,7 @@ func TestReorderPlaylistVideos_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "playlist-1"
 
@@ -851,7 +851,7 @@ func TestReorderPlaylistVideos_PlaylistNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	playlistID := "nonexistent"
 

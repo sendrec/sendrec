@@ -190,7 +190,7 @@ func TestVerifyWatchPassword_CorrectPassword(t *testing.T) {
 
 	passwordHash, _ := hashSharePassword("secret123")
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 
 	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
@@ -231,7 +231,7 @@ func TestVerifyWatchPassword_WrongPassword(t *testing.T) {
 
 	passwordHash, _ := hashSharePassword("secret123")
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 
 	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
@@ -263,7 +263,7 @@ func TestVerifyWatchPassword_NoPasswordSet(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 
 	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
@@ -295,7 +295,7 @@ func TestVerifyWatchPassword_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 
 	mock.ExpectQuery(`SELECT share_password FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
@@ -330,7 +330,7 @@ func TestWatch_PasswordProtected_NoCookie(t *testing.T) {
 
 	passwordHash, _ := hashSharePassword("secret123")
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -367,7 +367,7 @@ func TestWatch_PasswordProtected_ValidCookie(t *testing.T) {
 
 	passwordHash, _ := hashSharePassword("secret123")
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -417,7 +417,7 @@ func TestWatchDownload_PasswordProtected_NoCookie(t *testing.T) {
 
 	passwordHash, _ := hashSharePassword("secret123")
 	storage := &mockStorage{downloadDispositionURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
@@ -480,7 +480,7 @@ func TestIdentifyViewer(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id FROM videos`).
 		WithArgs("validtoken1").
@@ -528,7 +528,7 @@ func TestWatchPage_PasswordProtected_ShowsPasswordForm(t *testing.T) {
 
 	passwordHash, _ := hashSharePassword("secret123")
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)

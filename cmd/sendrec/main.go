@@ -118,6 +118,7 @@ func main() {
 		MaxUploadBytes:          getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
 		MaxVideosPerMonth:       int(getEnvInt64("MAX_VIDEOS_PER_MONTH", int64(plans.Free.MaxVideosPerMonth))),
 		MaxVideoDurationSeconds: int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),
+		MaxPlaylists:            int(getEnvInt64("MAX_PLAYLISTS", int64(plans.Free.MaxPlaylists))),
 		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
 		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",

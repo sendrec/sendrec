@@ -19,7 +19,7 @@ func TestBatchDelete_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoIDs := []string{"video-1", "video-2"}
 
@@ -62,7 +62,7 @@ func TestBatchDelete_PartialOwnership(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoIDs := []string{"video-1", "video-2"}
 
@@ -104,7 +104,7 @@ func TestBatchDelete_EmptyList(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(batchRequest{VideoIDs: []string{}})
 
@@ -132,7 +132,7 @@ func TestBatchDelete_TooManyItems(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	ids := make([]string, 101)
 	for i := range ids {
@@ -164,7 +164,7 @@ func TestBatchDelete_InvalidBody(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/batch/delete", handler.BatchDelete)
@@ -190,7 +190,7 @@ func TestBatchSetFolder_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoIDs := []string{"video-1", "video-2"}
 	folderID := "folder-1"
@@ -228,7 +228,7 @@ func TestBatchSetFolder_NullClearsFolder(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoIDs := []string{"video-1", "video-2"}
 
@@ -261,7 +261,7 @@ func TestBatchSetFolder_InvalidFolder(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoIDs := []string{"video-1"}
 	folderID := "nonexistent-folder"
@@ -300,7 +300,7 @@ func TestBatchSetTags_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoIDs := []string{"video-1", "video-2"}
 	tagIDs := []string{"tag-1", "tag-2"}
@@ -352,7 +352,7 @@ func TestBatchSetTags_InvalidTag(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoIDs := []string{"video-1"}
 	tagIDs := []string{"tag-1", "nonexistent"}
@@ -392,7 +392,7 @@ func TestBatchSetTags_EmptyTagsClearsAll(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoIDs := []string{"video-1", "video-2"}
 

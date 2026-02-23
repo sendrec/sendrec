@@ -44,7 +44,7 @@ func TestPlaylistWatchPage_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://storage.example.com/test-url"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "pltoken12345"
 
 	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
@@ -103,7 +103,7 @@ func TestPlaylistWatchPage_NotShared(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
 		WithArgs("notshared123").
@@ -127,7 +127,7 @@ func TestPlaylistWatchPage_NotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
 		WithArgs("nonexistent1").
@@ -152,7 +152,7 @@ func TestPlaylistWatchPage_PasswordProtected(t *testing.T) {
 	defer mock.Close()
 
 	passwordHash, _ := hashSharePassword("secret123")
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "pwdtoken1234"
 
 	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
@@ -194,7 +194,7 @@ func TestVerifyPlaylistWatchPassword_Success(t *testing.T) {
 	defer mock.Close()
 
 	passwordHash, _ := hashSharePassword("secret123")
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "plpwdtoken12"
 
 	mock.ExpectQuery(`SELECT share_password FROM playlists WHERE share_token = \$1 AND is_shared = true`).
@@ -234,7 +234,7 @@ func TestVerifyPlaylistWatchPassword_Wrong(t *testing.T) {
 	defer mock.Close()
 
 	passwordHash, _ := hashSharePassword("secret123")
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "plpwdtoken12"
 
 	mock.ExpectQuery(`SELECT share_password FROM playlists WHERE share_token = \$1 AND is_shared = true`).
@@ -265,7 +265,7 @@ func TestIdentifyPlaylistViewer_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "plidtoken123"
 
 	mock.ExpectQuery(`SELECT id FROM playlists WHERE share_token = \$1 AND is_shared = true`).

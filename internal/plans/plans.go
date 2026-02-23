@@ -12,6 +12,7 @@ var freeJSON []byte
 type FreePlan struct {
 	MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
 	MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
+	MaxPlaylists            int `json:"maxPlaylists"`
 }
 
 var Free FreePlan

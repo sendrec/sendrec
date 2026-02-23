@@ -13,7 +13,6 @@ import (
 	"github.com/sendrec/sendrec/internal/httputil"
 )
 
-const maxPlaylistsFreeTier = 3
 const maxPlaylistTitleLength = 200
 const maxPlaylistDescriptionLength = 2000
 
@@ -96,8 +95,8 @@ func (h *Handler) CreatePlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	plan, _ := h.getUserPlan(r.Context(), userID)
-	if plan == "free" && count >= maxPlaylistsFreeTier {
-		httputil.WriteError(w, http.StatusForbidden, "free plan limited to 3 playlists, upgrade to create more")
+	if plan == "free" && h.maxPlaylists > 0 && count >= h.maxPlaylists {
+		httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("free plan limited to %d playlists, upgrade to create more", h.maxPlaylists))
 		return
 	}
 

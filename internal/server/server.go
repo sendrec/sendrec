@@ -34,6 +34,7 @@ type Config struct {
 	MaxUploadBytes          int64
 	MaxVideosPerMonth       int
 	MaxVideoDurationSeconds int
+	MaxPlaylists            int
 	S3PublicEndpoint        string
 	EnableDocs              bool
 	BrandingEnabled         bool
@@ -90,7 +91,7 @@ func New(cfg Config) *Server {
 		if cfg.EmailSender != nil {
 			s.authHandler.SetEmailSender(cfg.EmailSender, baseURL)
 		}
-		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes, cfg.MaxVideosPerMonth, cfg.MaxVideoDurationSeconds, jwtSecret, secureCookies)
+		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes, cfg.MaxVideosPerMonth, cfg.MaxVideoDurationSeconds, cfg.MaxPlaylists, jwtSecret, secureCookies)
 		if cfg.CommentNotifier != nil {
 			s.videoHandler.SetCommentNotifier(cfg.CommentNotifier)
 		}

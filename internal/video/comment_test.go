@@ -24,7 +24,7 @@ func TestSetCommentMode_ValidMode(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-123"
 
@@ -57,7 +57,7 @@ func TestSetCommentMode_InvalidMode(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(setCommentModeRequest{CommentMode: "invalid_mode"})
 
@@ -80,7 +80,7 @@ func TestSetCommentMode_NotOwner(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-123"
 
@@ -117,7 +117,7 @@ func TestSetCommentMode_AllValidModes(t *testing.T) {
 			defer mock.Close()
 
 			storage := &mockStorage{}
-			handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+			handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 			mock.ExpectExec(`UPDATE videos SET comment_mode = \$1 WHERE id = \$2 AND user_id = \$3`).
 				WithArgs(mode, "video-123", testUserID).
@@ -173,7 +173,7 @@ func TestPostWatchComment_AnonymousMode_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	notifier := &mockCommentNotifier{}
 	handler.SetCommentNotifier(notifier)
 
@@ -242,7 +242,7 @@ func TestPostWatchComment_DisabledMode_Returns403(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -278,7 +278,7 @@ func TestPostWatchComment_NameRequired_MissingName_Returns400(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -310,7 +310,7 @@ func TestPostWatchComment_NameEmailRequired_MissingEmail_Returns400(t *testing.T
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -342,7 +342,7 @@ func TestPostWatchComment_NameRequired_ReactionAllowsAnonymous(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	videoID := "video-123"
@@ -379,7 +379,7 @@ func TestPostWatchComment_NameEmailRequired_ReactionAllowsAnonymous(t *testing.T
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	videoID := "video-123"
@@ -416,7 +416,7 @@ func TestPostWatchComment_NameRequired_NonQuickReactionEmojiStillRequiresName(t 
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -448,7 +448,7 @@ func TestPostWatchComment_QuickReaction_DoesNotSendCommentNotification(t *testin
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	notifier := &mockCommentNotifier{}
 	handler.SetCommentNotifier(notifier)
 
@@ -494,7 +494,7 @@ func TestPostWatchComment_NotificationModeViewsOnly_DoesNotSendCommentNotificati
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	notifier := &mockCommentNotifier{}
 	handler.SetCommentNotifier(notifier)
 
@@ -550,7 +550,7 @@ func TestPostWatchComment_NotificationModeCommentsOnly_SendsCommentNotification(
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	notifier := &mockCommentNotifier{}
 	handler.SetCommentNotifier(notifier)
 
@@ -610,7 +610,7 @@ func TestPostWatchComment_EmptyBody_Returns400(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -642,7 +642,7 @@ func TestPostWatchComment_NameTooLong_Returns400(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -686,7 +686,7 @@ func TestPostWatchComment_EmailTooLong_Returns400(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -731,7 +731,7 @@ func TestPostWatchComment_PrivateWithoutJWT_Returns401(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -763,7 +763,7 @@ func TestPostWatchComment_ExpiredVideo_Returns410(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(-1 * time.Hour) // expired
@@ -795,7 +795,7 @@ func TestPostWatchComment_VideoNotFound_Returns404(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "nonexistent12"
 
@@ -826,7 +826,7 @@ func TestPostWatchComment_BodyTooLong_Returns400(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -864,7 +864,7 @@ func TestPostWatchComment_WithValidTimestamp_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	videoID := "video-123"
@@ -922,7 +922,7 @@ func TestPostWatchComment_NegativeTimestamp_Returns400(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -967,7 +967,7 @@ func TestPostWatchComment_NilTimestamp_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	videoID := "video-123"
@@ -1019,7 +1019,7 @@ func TestListWatchComments_IncludesTimestamp(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	videoID := "video-123"
@@ -1088,7 +1088,7 @@ func TestListWatchComments_PublicOnly(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	videoID := "video-123"
@@ -1144,7 +1144,7 @@ func TestListWatchComments_DisabledMode_ReturnsEmptyArray(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -1184,7 +1184,7 @@ func TestListWatchComments_WithJWT_NonOwner_ExcludesPrivate(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	videoID := "video-123"
@@ -1229,7 +1229,7 @@ func TestListWatchComments_WithJWT_Owner_IncludesPrivate(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	videoID := "video-123"
@@ -1279,7 +1279,7 @@ func TestListWatchComments_ExpiredVideo_Returns410(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	expiresAt := time.Now().Add(-1 * time.Hour)
@@ -1310,7 +1310,7 @@ func TestListOwnerComments_ReturnsAllComments(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-123"
 	now := time.Now()
@@ -1357,7 +1357,7 @@ func TestListOwnerComments_NotOwner_Returns404(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-123"
 
@@ -1386,7 +1386,7 @@ func TestDeleteComment_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-123"
 	commentID := "comment-1"
@@ -1418,7 +1418,7 @@ func TestDeleteComment_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-123"
 	commentID := "nonexistent"

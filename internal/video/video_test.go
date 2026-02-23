@@ -221,7 +221,7 @@ func TestCreate_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -283,7 +283,7 @@ func TestCreate_DefaultTitleWhenEmpty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -328,7 +328,7 @@ func TestCreate_InvalidJSONBody(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 
@@ -356,7 +356,7 @@ func TestCreate_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -406,7 +406,7 @@ func TestCreate_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadErr: errors.New("s3 unavailable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -458,7 +458,7 @@ func TestCreate_RejectsDurationExceedingLimit(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, testJWTSecret, false) // 5 min limit
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, 0, testJWTSecret, false) // 5 min limit
 
 	expectPlanQuery(mock, "free")
 
@@ -496,7 +496,7 @@ func TestCreate_AllowsDurationWithinLimit(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -541,7 +541,7 @@ func TestCreate_AllowsAnyDurationWhenLimitIsZero(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false) // no limit
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false) // no limit
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -588,7 +588,7 @@ func TestCreate_RejectsWhenMonthlyLimitReached(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, testJWTSecret, false) // 25/month limit
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, 0, testJWTSecret, false) // 25/month limit
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
@@ -629,7 +629,7 @@ func TestCreate_AllowsWhenBelowMonthlyLimit(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
@@ -678,7 +678,7 @@ func TestCreate_SkipsMonthlyCheckWhenLimitIsZero(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false) // no limit
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false) // no limit
 
 	expectPlanQuery(mock, "free")
 	// No ExpectQuery for COUNT — should not query at all
@@ -724,7 +724,7 @@ func TestCreate_MonthlyLimitCountQueryError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
@@ -765,7 +765,7 @@ func TestCreate_WithWebcam_ReturnsWebcamUploadURL(t *testing.T) {
 		uploadURL:       "https://s3.example.com/upload?signed=screen",
 		webcamUploadURL: "https://s3.example.com/upload?signed=webcam",
 	}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -822,7 +822,7 @@ func TestCreate_WithoutWebcam_OmitsWebcamUploadURL(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=screen"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -875,7 +875,7 @@ func TestCreate_WithContentTypeMp4(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -929,7 +929,7 @@ func TestCreate_RejectsInvalidContentType(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 
@@ -965,7 +965,7 @@ func TestUpload_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -1024,7 +1024,7 @@ func TestUpload_InvalidContentType(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 
@@ -1054,7 +1054,7 @@ func TestUpload_MissingFileSize(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 
@@ -1084,7 +1084,7 @@ func TestUpload_ExceedsMaxSize(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 1000, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 1000, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 
@@ -1114,7 +1114,7 @@ func TestUpload_MonthlyLimit(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 5, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 5, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT`).
@@ -1154,7 +1154,7 @@ func TestUpdate_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 100000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 	fileKey := "recordings/user/video.webm"
 	fileSize := int64(100000)
@@ -1192,7 +1192,7 @@ func TestUpdate_InvalidStatus(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	body, _ := json.Marshal(updateRequest{Status: "processing"})
@@ -1221,7 +1221,7 @@ func TestUpdate_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT file_key, file_size, share_token, webcam_key, content_type, duration FROM videos`).
@@ -1258,7 +1258,7 @@ func TestUpdate_InvalidJSON(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	r := chi.NewRouter()
@@ -1285,7 +1285,7 @@ func TestUpdate_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 1000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT file_key, file_size, share_token, webcam_key, content_type, duration FROM videos`).
@@ -1328,7 +1328,7 @@ func TestUpdate_WithWebcam_SetsProcessingStatus(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 100000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-webcam"
 	fileKey := "recordings/user/video.webm"
 	fileSize := int64(100000)
@@ -1368,7 +1368,7 @@ func TestUpdate_WithoutWebcam_SetsReadyStatus(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 100000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-noweb"
 	fileKey := "recordings/user/video.webm"
 	fileSize := int64(100000)
@@ -1407,7 +1407,7 @@ func TestUpdate_MP4ContentType(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{headSize: 100000, headType: "video/mp4"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-mp4"
 	fileKey := "recordings/user/video.mp4"
 	fileSize := int64(100000)
@@ -1446,7 +1446,7 @@ func TestUpdate_RejectsWrongContentType(t *testing.T) {
 
 	// Storage returns video/webm but DB expects video/mp4
 	storage := &mockStorage{headSize: 100000, headType: "video/webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-mp4"
 
 	mock.ExpectQuery(`SELECT file_key, file_size, share_token, webcam_key, content_type, duration FROM videos`).
@@ -1481,7 +1481,7 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -1555,7 +1555,7 @@ func TestList_ShareURLIncludesBaseURL(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
@@ -1601,7 +1601,7 @@ func TestList_EmptyList(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
@@ -1646,7 +1646,7 @@ func TestList_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
@@ -1680,7 +1680,7 @@ func TestList_IncludesViewCounts(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -1731,7 +1731,7 @@ func TestList_IncludesThumbnailURL(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/thumb?signed=abc"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -1779,7 +1779,7 @@ func TestList_IncludesCommentModeAndCount(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -1840,7 +1840,7 @@ func TestDelete_Success(t *testing.T) {
 
 	deleteCalled := make(chan string, 1)
 	storage := &mockStorage{deleteCalled: deleteCalled}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 	fileKey := "recordings/user-1/abc.webm"
 
@@ -1880,7 +1880,7 @@ func TestDelete_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
@@ -1918,7 +1918,7 @@ func TestWatch_Success(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -1989,7 +1989,7 @@ func TestWatch_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "nonexistent12"
 
@@ -2026,7 +2026,7 @@ func TestWatch_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2078,7 +2078,7 @@ func TestWatch_ExpiredLink(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2126,7 +2126,7 @@ func TestNewHandler_SetsFields(t *testing.T) {
 	storage := &mockStorage{}
 	baseURL := "https://example.com"
 
-	handler := NewHandler(mock, storage, baseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, baseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	if handler.db != mock {
 		t.Error("expected db to be set")
@@ -2149,7 +2149,7 @@ func TestCreate_FileKeyContainsUserIDAndShareToken(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`INSERT INTO videos`).
@@ -2213,7 +2213,7 @@ func TestWatchPage_Success(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2271,7 +2271,7 @@ func TestWatchPage_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "nonexistent12"
 
@@ -2303,7 +2303,7 @@ func TestWatchPage_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2344,7 +2344,7 @@ func TestWatchPage_ExpiredLink(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2387,7 +2387,7 @@ func TestWatch_RecordsView(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2435,7 +2435,7 @@ func TestWatch_IncludesThumbnailURL(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2492,7 +2492,7 @@ func TestExtend_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	expiresAt := time.Now().Add(3 * 24 * time.Hour)
@@ -2528,7 +2528,7 @@ func TestExtend_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT share_expires_at FROM videos`).
@@ -2563,7 +2563,7 @@ func TestExtend_DatabaseError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	expiresAt := time.Now().Add(3 * 24 * time.Hour)
@@ -2604,7 +2604,7 @@ func TestExtend_AlreadyNeverExpires(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT share_expires_at FROM videos`).
@@ -2642,7 +2642,7 @@ func TestTrim_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -2678,7 +2678,7 @@ func TestTrim_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -2709,7 +2709,7 @@ func TestTrim_VideoNotReady(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -2741,7 +2741,7 @@ func TestTrim_InvalidBody(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/trim", handler.Trim)
@@ -2762,7 +2762,7 @@ func TestTrim_StartAfterEnd(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/trim", handler.Trim)
@@ -2784,7 +2784,7 @@ func TestTrim_NegativeStart(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/trim", handler.Trim)
@@ -2806,7 +2806,7 @@ func TestTrim_EndBeyondDuration(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -2834,7 +2834,7 @@ func TestTrim_TrimTooShort(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -2862,7 +2862,7 @@ func TestTrim_RaceCondition(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
@@ -2909,7 +2909,7 @@ func TestWatchPage_ContainsNonceInStyleTag(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2950,7 +2950,7 @@ func TestWatchPage_ContainsNonceInScriptTag(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -2987,7 +2987,7 @@ func TestWatchPage_ExpiredContainsNonce(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -3027,7 +3027,7 @@ func TestWatchPage_ContainsPosterAndOGImage(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -3076,7 +3076,7 @@ func TestWatchPage_NoPosterWhenNoThumbnail(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -3121,7 +3121,7 @@ func TestWatchPage_ContainsDownloadButton(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -3165,7 +3165,7 @@ func TestWatchPage_ContainsSpeedButtons(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/download?signed=xyz"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -3337,7 +3337,7 @@ func TestDelete_MarksFilePurgedOnSuccess(t *testing.T) {
 
 	deleteCalled := make(chan string, 1)
 	storage := &mockStorage{deleteCalled: deleteCalled}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 	fileKey := "recordings/user-1/abc.webm"
 
@@ -3384,7 +3384,7 @@ func TestDelete_CleansUpWebcamFile(t *testing.T) {
 
 	deleteCalled := make(chan string, 3)
 	storage := &mockStorage{deleteCalled: deleteCalled}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-webcam-del"
 	fileKey := "recordings/user-1/abc.webm"
 	webcamKey := "recordings/user-1/abc_webcam.webm"
@@ -3443,7 +3443,7 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
@@ -3502,7 +3502,7 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
 	// No ExpectQuery for video COUNT when unlimited
@@ -3536,8 +3536,8 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	if resp.VideosUsedThisMonth != 0 {
 		t.Errorf("expected videosUsedThisMonth 0, got %d", resp.VideosUsedThisMonth)
 	}
-	if resp.MaxPlaylists != 3 {
-		t.Errorf("expected maxPlaylists 3, got %d", resp.MaxPlaylists)
+	if resp.MaxPlaylists != 0 {
+		t.Errorf("expected maxPlaylists 0 (unlimited), got %d", resp.MaxPlaylists)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -3553,7 +3553,7 @@ func TestLimits_ProUser(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
 
 	expectPlanQuery(mock, "pro")
 	// No ExpectQuery for COUNT — pro users have unlimited videos and playlists
@@ -3607,7 +3607,7 @@ func TestCreate_ProUserNoLimitCheck(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
 
 	expectPlanQuery(mock, "pro")
 	// No ExpectQuery for COUNT — pro users skip the monthly limit check
@@ -3653,7 +3653,7 @@ func TestUpload_ProUserNoLimitCheck(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{uploadURL: "https://s3.example.com/upload?signed=abc"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 5, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 5, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "pro")
 	// No ExpectQuery for COUNT — pro users skip the monthly limit check
@@ -3703,7 +3703,7 @@ func TestDownload_Success(t *testing.T) {
 
 	dispositionURL := "https://s3.example.com/download?signed=xyz&disposition=attachment"
 	storage := &mockStorage{downloadDispositionURL: dispositionURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT title, file_key, content_type FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
@@ -3744,7 +3744,7 @@ func TestDownload_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT title, file_key, content_type FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
@@ -3779,7 +3779,7 @@ func TestDownload_StorageError(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadDispositionErr: errors.New("s3 unreachable")}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT title, file_key, content_type FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
@@ -3813,7 +3813,7 @@ func TestWatchDownload_Success(t *testing.T) {
 
 	dispositionURL := "https://s3.example.com/download?signed=xyz&disposition=attachment"
 	storage := &mockStorage{downloadDispositionURL: dispositionURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -3857,7 +3857,7 @@ func TestWatchDownload_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "nonexistent12"
 
@@ -3894,7 +3894,7 @@ func TestWatchDownload_Expired(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadDispositionURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(-1 * time.Hour)
@@ -3934,7 +3934,7 @@ func TestSetDownloadEnabled_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET download_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
@@ -3965,7 +3965,7 @@ func TestSetDownloadEnabled_NotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE videos SET download_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
 		WithArgs(true, "video-999", testUserID).
@@ -3996,7 +3996,7 @@ func TestWatchDownload_Disabled(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadDispositionURL: "https://s3.example.com/download"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -4036,7 +4036,7 @@ func TestSetLinkExpiry_NeverExpires(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
@@ -4067,7 +4067,7 @@ func TestSetLinkExpiry_SevenDays(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-456"
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at = now\(\) \+ INTERVAL '7 days', updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
@@ -4098,7 +4098,7 @@ func TestSetLinkExpiry_NotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
 		WithArgs("video-999", testUserID).
@@ -4131,7 +4131,7 @@ func TestSetPassword_SetNewPassword(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "550e8400-e29b-41d4-a716-446655440099"
 
 	mock.ExpectExec(`UPDATE videos SET share_password = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
@@ -4162,7 +4162,7 @@ func TestSetPassword_RemovePassword(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "550e8400-e29b-41d4-a716-446655440099"
 
 	mock.ExpectExec(`UPDATE videos SET share_password = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
@@ -4193,7 +4193,7 @@ func TestSetPassword_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "550e8400-e29b-41d4-a716-446655440099"
 
 	mock.ExpectExec(`UPDATE videos SET share_password = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
@@ -4227,7 +4227,7 @@ func TestWatch_IncludesTranscriptWhenReady(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -4295,7 +4295,7 @@ func TestWatch_OmitsTranscriptWhenNone(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -4355,7 +4355,7 @@ func TestWatch_TranscriptPoll_SkipsViewRecording(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/download?signed=xyz"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -4409,7 +4409,7 @@ func TestDelete_CleansUpTranscriptFile(t *testing.T) {
 
 	deleteCalled := make(chan string, 3)
 	storage := &mockStorage{deleteCalled: deleteCalled}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-transcript-del"
 	fileKey := "recordings/user-1/abc.webm"
 	transcriptKey := "recordings/user-1/abc.vtt"
@@ -4466,7 +4466,7 @@ func TestList_IncludesTranscriptStatus(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -4517,7 +4517,7 @@ func TestList_SearchByQuery(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -4565,7 +4565,7 @@ func TestList_EmptyQueryIgnored(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, 50, 0).
@@ -4596,7 +4596,7 @@ func TestList_NeverExpiresVideo(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Now()
 	mock.ExpectQuery("SELECT v.id").
@@ -4637,7 +4637,7 @@ func TestList_FilterByFolderId(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	folderID := "folder-abc-123"
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
@@ -4685,7 +4685,7 @@ func TestList_FilterByUnfiled(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
@@ -4732,7 +4732,7 @@ func TestList_FilterByTagId(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	tagID := "tag-xyz-789"
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
@@ -4780,7 +4780,7 @@ func TestList_IncludesFolderIdAndTags(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	folderID := "folder-abc-123"
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
@@ -4856,7 +4856,7 @@ func TestAnalytics_Returns7DayStats(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
 	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
@@ -4929,7 +4929,7 @@ func TestAnalytics_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
@@ -4965,7 +4965,7 @@ func TestAnalytics_InvalidRange(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
 	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
@@ -5001,7 +5001,7 @@ func TestAnalytics_DefaultsTo7d(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
 	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
@@ -5053,7 +5053,7 @@ func TestAnalytics_30DayRange(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
 	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
@@ -5114,7 +5114,7 @@ func TestAnalytics_AllRange(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
 	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
@@ -5176,7 +5176,7 @@ func TestAnalytics_EmptyViews(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
 	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
@@ -5253,7 +5253,7 @@ func TestAnalytics_AllRangeEmptyViews(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
 	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
@@ -5311,7 +5311,7 @@ func TestAnalytics_PeakDayAndAverage(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-analytics-1"
 
 	mock.ExpectQuery("SELECT id, email_gate_enabled FROM videos").
@@ -5392,7 +5392,7 @@ func TestAnalytics_IncludesCtaClicks(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-001"
 
@@ -5445,7 +5445,7 @@ func TestAnalytics_IncludesMilestones(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-001"
 
@@ -5518,7 +5518,7 @@ func TestAnalytics_ViewerList(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-001"
 	firstViewedAt := time.Date(2026, 2, 18, 10, 0, 0, 0, time.UTC)
@@ -5604,7 +5604,7 @@ func TestAnalytics_ViewerListEmptyWhenEmailGateDisabled(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-001"
 
@@ -5668,7 +5668,7 @@ func TestOEmbed_Success(t *testing.T) {
 
 	downloadURL := "https://s3.example.com/thumb?signed=abc"
 	storage := &mockStorage{downloadURL: downloadURL}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 10, 14, 30, 0, 0, time.UTC)
@@ -5747,7 +5747,7 @@ func TestOEmbed_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "nonexistent12"
 
@@ -5784,7 +5784,7 @@ func TestOEmbed_ExpiredLink(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -5826,7 +5826,7 @@ func TestOEmbed_NoThumbnail(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/thumb?signed=abc"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	shareToken := "abc123defghi"
 	createdAt := time.Date(2026, 2, 10, 14, 30, 0, 0, time.UTC)
@@ -5880,7 +5880,7 @@ func TestSetCTA_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE videos SET cta_text`).
 		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), "video-001", testUserID).
@@ -5912,7 +5912,7 @@ func TestSetCTA_Clear(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE videos SET cta_text`).
 		WithArgs((*string)(nil), (*string)(nil), "video-001", testUserID).
@@ -5934,7 +5934,7 @@ func TestSetCTA_Clear(t *testing.T) {
 }
 
 func TestSetCTA_TextTooLong(t *testing.T) {
-	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	longText := strings.Repeat("a", 101)
 	body := fmt.Sprintf(`{"text":"%s","url":"https://example.com"}`, longText)
@@ -5953,7 +5953,7 @@ func TestSetCTA_TextTooLong(t *testing.T) {
 }
 
 func TestSetCTA_InvalidURL(t *testing.T) {
-	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(nil, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body := `{"text":"Click me","url":"ftp://bad.com"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/videos/video-001/cta", strings.NewReader(body))
@@ -5977,7 +5977,7 @@ func TestRecordCTAClick_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
 		WithArgs("abc123defghi").
@@ -6014,7 +6014,7 @@ func TestRecordCTAClick_VideoNotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
 		WithArgs("nonexistent").
@@ -6039,7 +6039,7 @@ func TestRecordMilestone_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
 		WithArgs("abc123defghi").
@@ -6077,7 +6077,7 @@ func TestRecordMilestone_InvalidValue(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.Post("/api/watch/{shareToken}/milestone", handler.RecordMilestone)
@@ -6099,7 +6099,7 @@ func TestRecordMilestone_VideoNotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT id FROM videos WHERE share_token`).
 		WithArgs("nonexistent").
@@ -6127,7 +6127,7 @@ func TestSetEmailGate_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET email_gate_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
@@ -6158,7 +6158,7 @@ func TestSetEmailGate_NotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE videos SET email_gate_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND status != 'deleted'`).
 		WithArgs(false, "video-999", testUserID).
@@ -6188,7 +6188,7 @@ func TestSummarize_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetAIEnabled(true)
 	videoID := "video-123"
 
@@ -6218,7 +6218,7 @@ func TestSummarize_AiDisabled(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/summarize", handler.Summarize)
@@ -6238,7 +6238,7 @@ func TestSummarize_NotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	handler.SetAIEnabled(true)
 
 	mock.ExpectExec(`UPDATE videos SET summary_status = 'pending'`).
@@ -6269,7 +6269,7 @@ func TestDismissTitle_Success(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET suggested_title = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
@@ -6298,7 +6298,7 @@ func TestDismissTitle_NotFound(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE videos SET suggested_title = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
 		WithArgs("video-999", testUserID).
@@ -6326,7 +6326,7 @@ func TestList_IncludesSuggestedTitle(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)

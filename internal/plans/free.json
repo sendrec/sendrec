@@ -1,4 +1,5 @@
 {
   "maxVideosPerMonth": 25,
-  "maxVideoDurationSeconds": 300
+  "maxVideoDurationSeconds": 300,
+  "maxPlaylists": 3
 }

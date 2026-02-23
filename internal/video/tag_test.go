@@ -23,7 +23,7 @@ func TestCreateTag_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	color := "#ff0000"
@@ -82,7 +82,7 @@ func TestCreateTag_WithoutColor(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	now := time.Now().UTC().Truncate(time.Second)
 
@@ -131,7 +131,7 @@ func TestCreateTag_InvalidColor(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	badColor := "red"
 	body, _ := json.Marshal(createTagRequest{Name: "Bad Color", Color: &badColor})
@@ -160,7 +160,7 @@ func TestCreateTag_NameTooLong(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	longName := strings.Repeat("a", 51)
 	body, _ := json.Marshal(createTagRequest{Name: longName})
@@ -189,7 +189,7 @@ func TestCreateTag_EmptyName(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	body, _ := json.Marshal(createTagRequest{Name: ""})
 
@@ -217,7 +217,7 @@ func TestCreateTag_DuplicateName(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM tags WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -257,7 +257,7 @@ func TestCreateTag_MaxTagsReached(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM tags WHERE user_id = \$1`).
 		WithArgs(testUserID).
@@ -293,7 +293,7 @@ func TestListTags_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	earlier := now.Add(-1 * time.Hour)
@@ -354,7 +354,7 @@ func TestListTags_Empty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT t\.id, t\.name, t\.color, t\.created_at`).
 		WithArgs(testUserID).
@@ -396,7 +396,7 @@ func TestUpdateTag_Rename(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	tagID := "tag-1"
 	newName := "Renamed Tag"
@@ -430,7 +430,7 @@ func TestUpdateTag_ChangeColor(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	tagID := "tag-1"
 	newColor := "#0000ff"
@@ -464,7 +464,7 @@ func TestDeleteTag_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	tagID := "tag-1"
 
@@ -495,7 +495,7 @@ func TestDeleteTag_NotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	tagID := "nonexistent"
 
@@ -531,7 +531,7 @@ func TestSetVideoTags_Success(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-1"
 	tagIDs := []string{"tag-1", "tag-2"}
@@ -581,7 +581,7 @@ func TestSetVideoTags_EmptyArray(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-1"
 
@@ -618,7 +618,7 @@ func TestSetVideoTags_TagNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-1"
 	tagIDs := []string{"tag-1", "nonexistent"}
@@ -661,7 +661,7 @@ func TestSetVideoTags_TooManyTags(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "video-1"
 	tagIDs := make([]string, 11)
@@ -695,7 +695,7 @@ func TestSetVideoTags_VideoNotFound(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	videoID := "nonexistent"
 	tagIDs := []string{"tag-1"}

@@ -42,7 +42,7 @@ func TestEmbedPage_NotFound_Returns404(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
 		WithArgs("nonexistent").
@@ -73,7 +73,7 @@ func TestEmbedPage_Expired_Returns410(t *testing.T) {
 	}
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{downloadURL: "https://s3.example.com/video"}, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, &mockStorage{downloadURL: "https://s3.example.com/video"}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "expiredtoken1"
 	createdAt := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 	expiredAt := time.Now().Add(-24 * time.Hour)
@@ -111,7 +111,7 @@ func TestEmbedPage_Success_RendersVideoPlayer(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "validtoken12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -160,7 +160,7 @@ func TestEmbedPage_WithThumbnail_RendersPoster(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "thumbtoken12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -201,7 +201,7 @@ func TestEmbedPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 
 	passwordHash, _ := hashSharePassword("secret123")
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "pwdtoken1234"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -243,7 +243,7 @@ func TestEmbedPage_RecordsView(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "viewtoken123"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -285,7 +285,7 @@ func TestEmbedPage_CSPNonce(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "noncetoken12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -324,7 +324,7 @@ func TestEmbedPage_NeverExpires(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	createdAt := time.Now().Add(-30 * 24 * time.Hour)
 
@@ -372,7 +372,7 @@ func TestEmbedPage_ResponsiveLayout(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "responsive01"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -414,7 +414,7 @@ func TestEmbedPage_RendersCtaOverlay(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	ctaText := "Get started"
 	ctaUrl := "https://example.com/start"
@@ -469,7 +469,7 @@ func TestEmbedPage_RendersSubtitleTrack(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	transcriptKey := "recordings/u1/abc.vtt"
 	shareToken := "subtitletest1"
@@ -523,7 +523,7 @@ func TestEmbedPage_MilestoneTrackingScript(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	shareToken := "milestone-test"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
@@ -573,7 +573,7 @@ func TestEmbedPage_EmailGate_ShowsForm(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "emailgate123"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
@@ -618,7 +618,7 @@ func TestEmbedPage_ChaptersBar(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	chaptersJSON := `[{"title":"Intro","start":0},{"title":"Demo","start":60}]`
 	shareToken := "embedchap123"
@@ -675,7 +675,7 @@ func TestEmbedPage_NoChaptersBar_WhenEmpty(t *testing.T) {
 	defer mock.Close()
 
 	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
-	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testHMACSecret, false)
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	shareToken := "noembed-ch12"
 	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
