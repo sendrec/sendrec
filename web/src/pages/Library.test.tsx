@@ -88,7 +88,8 @@ describe("Library", () => {
     await waitFor(() => {
       expect(screen.getByText("No recordings yet.")).toBeInTheDocument();
     });
-    expect(screen.getByRole("link", { name: "Create your first recording" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/upload");
   });
 
   it("renders video list with title and metadata", async () => {
@@ -581,6 +582,29 @@ describe("Library", () => {
 
       const analyticsLink = screen.getByRole("link", { name: "Analytics" });
       expect(analyticsLink).toHaveAttribute("href", "/videos/v1/analytics");
+    });
+  });
+
+  describe("onboarding empty state", () => {
+    it("shows getting started steps when library is empty", async () => {
+      mockFetch([]);
+      renderLibrary();
+
+      expect(await screen.findByText(/get started in 3 steps/i)).toBeInTheDocument();
+      expect(screen.getByText(/record your screen/i)).toBeInTheDocument();
+      expect(screen.getByText(/share the link/i)).toBeInTheDocument();
+      expect(screen.getByText(/track views/i)).toBeInTheDocument();
+    });
+
+    it("shows both Record and Upload buttons when library is empty", async () => {
+      mockFetch([]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("No recordings yet.")).toBeInTheDocument();
+      });
+      expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
+      expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/upload");
     });
   });
 

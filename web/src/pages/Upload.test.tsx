@@ -27,6 +27,8 @@ describe("Upload", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+    // Default: mock initial limits fetch on mount (user has videos, so guide is hidden)
+    mockApiFetch.mockResolvedValueOnce({ maxVideosPerMonth: 25, videosUsedThisMonth: 5 });
   });
 
   afterEach(() => {
@@ -328,6 +330,32 @@ describe("Upload", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/monthly limit exceeded/)).toBeInTheDocument();
+    });
+  });
+
+  describe("onboarding empty state", () => {
+    it("shows getting started guide when user has no videos", async () => {
+      mockApiFetch.mockReset();
+      mockApiFetch.mockResolvedValueOnce({
+        maxVideosPerMonth: 25,
+        videosUsedThisMonth: 0,
+      });
+      renderUpload();
+
+      expect(await screen.findByText(/get started in 3 steps/i)).toBeInTheDocument();
+      expect(screen.getByText(/record your screen/i)).toBeInTheDocument();
+      expect(screen.getByText(/share the link/i)).toBeInTheDocument();
+      expect(screen.getByText(/track views/i)).toBeInTheDocument();
+    });
+
+    it("does not show guide when user has videos", async () => {
+      // beforeEach already mocks limits with videosUsedThisMonth: 5
+      renderUpload();
+
+      await waitFor(() => {
+        expect(screen.getByText("Upload Video")).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/get started in 3 steps/i)).not.toBeInTheDocument();
     });
   });
 });

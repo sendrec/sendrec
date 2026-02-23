@@ -1619,7 +1619,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         })();
         {{end}}
         </script>
-        <p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Shared via <a href="https://sendrec.eu">SendRec</a>{{if not .Branding.FooterText}} — open-source video messaging{{end}}</p>
+        {{if eq .SubscriptionPlan "pro"}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Shared via <a href="https://sendrec.eu">SendRec</a>{{if not .Branding.FooterText}} — open-source video messaging{{end}}</p>{{end}}
     </div>
 {{.AnalyticsScript}}
 </body>
@@ -1742,6 +1742,7 @@ type watchPageData struct {
 	Duration           int
 	HasThumbnail       bool
 	JSONLD             template.JS
+	SubscriptionPlan   string
 }
 
 type expiredPageData struct {
@@ -1959,6 +1960,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var chaptersJSON *string
 	var summaryStatus string
 	var duration int
+	var subscriptionPlan string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
@@ -1967,7 +1969,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
 		        v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled,
-		        v.summary, v.chapters, v.summary_status, v.duration
+		        v.summary, v.chapters, v.summary_status, v.duration,
+		        u.subscription_plan
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
@@ -1980,7 +1983,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
 		&downloadEnabled,
 		&ctaText, &ctaUrl, &emailGateEnabled,
-		&summaryText, &chaptersJSON, &summaryStatus, &duration)
+		&summaryText, &chaptersJSON, &summaryStatus, &duration, &subscriptionPlan)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -2144,6 +2147,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Duration:           duration,
 		HasThumbnail:       thumbnailKey != nil,
 		JSONLD:             template.JS(jsonLD),
+		SubscriptionPlan:   subscriptionPlan,
 	}); err != nil {
 		log.Printf("failed to render watch page: %v", err)
 	}

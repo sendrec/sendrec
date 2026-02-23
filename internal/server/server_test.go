@@ -537,6 +537,33 @@ func TestDocsEnabledWhenConfigured(t *testing.T) {
 	}
 }
 
+// --- Robots.txt ---
+
+func TestRobotsTxtReturnsCorrectContent(t *testing.T) {
+	srv := newServerWithoutDB()
+	rec := executeRequest(srv, http.MethodGet, "/robots.txt")
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", rec.Code)
+	}
+
+	contentType := rec.Header().Get("Content-Type")
+	if contentType != "text/plain; charset=utf-8" {
+		t.Errorf("expected Content-Type text/plain, got %q", contentType)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Allow: /watch/") {
+		t.Error("expected robots.txt to allow /watch/")
+	}
+	if !strings.Contains(body, "Allow: /embed/") {
+		t.Error("expected robots.txt to allow /embed/")
+	}
+	if !strings.Contains(body, "Disallow: /") {
+		t.Error("expected robots.txt to disallow /")
+	}
+}
+
 // --- SPA does not intercept API routes ---
 
 func TestSPADoesNotInterceptHealthEndpoint(t *testing.T) {

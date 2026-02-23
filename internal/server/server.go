@@ -158,6 +158,7 @@ func maxBodySize(maxBytes int64) func(http.Handler) http.Handler {
 
 func (s *Server) routes() {
 	s.router.Get("/api/health", s.handleHealth)
+	s.router.Get("/robots.txt", s.handleRobotsTxt)
 	if s.enableDocs {
 		s.router.Get("/api/docs", docs.HandleDocs)
 		s.router.Get("/api/docs/openapi.yaml", docs.HandleSpec)
@@ -309,4 +310,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	_, _ = fmt.Fprintf(w, `{"status":"ok","version":%q}`, s.version)
+}
+
+func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte("User-agent: *\nAllow: /watch/\nAllow: /embed/\nDisallow: /\n"))
 }

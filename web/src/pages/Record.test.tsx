@@ -1074,6 +1074,36 @@ describe("Record", () => {
     globalThis.fetch = originalFetch;
   });
 
+  describe("onboarding empty state", () => {
+    it("shows getting started guide when user has no videos", async () => {
+      mockApiFetch.mockResolvedValueOnce({
+        maxVideosPerMonth: 25,
+        maxVideoDurationSeconds: 300,
+        videosUsedThisMonth: 0,
+      });
+      renderRecord();
+
+      expect(await screen.findByText(/get started in 3 steps/i)).toBeInTheDocument();
+      expect(screen.getByText(/record your screen/i)).toBeInTheDocument();
+      expect(screen.getByText(/share the link/i)).toBeInTheDocument();
+      expect(screen.getByText(/track views/i)).toBeInTheDocument();
+    });
+
+    it("does not show guide when user has videos", async () => {
+      mockApiFetch.mockResolvedValueOnce({
+        maxVideosPerMonth: 25,
+        maxVideoDurationSeconds: 300,
+        videosUsedThisMonth: 5,
+      });
+      renderRecord();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("recorder")).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/get started in 3 steps/i)).not.toBeInTheDocument();
+    });
+  });
+
   it("falls back to execCommand copy when clipboard API fails", async () => {
     const user = userEvent.setup();
 
