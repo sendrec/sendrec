@@ -94,6 +94,20 @@ func TestCancelSubscription(t *testing.T) {
 	}
 }
 
+func TestCancelSubscriptionAlreadyCanceled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"status":400,"error":"Bad Request","message":"Subscription already canceled"}`))
+	}))
+	defer server.Close()
+
+	client := New("test-key", server.URL)
+	err := client.CancelSubscription(context.Background(), "sub_456")
+	if err != nil {
+		t.Fatalf("expected nil error for already canceled subscription, got: %v", err)
+	}
+}
+
 func TestGetPortalURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
