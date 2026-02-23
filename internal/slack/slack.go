@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -83,7 +83,7 @@ func (c *Client) postMessage(ctx context.Context, webhookURL string, p payload) 
 func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int) error {
 	webhookURL, err := c.lookupWebhookURL(ctx, toEmail)
 	if err != nil {
-		log.Printf("slack: no webhook for %s: %v", toEmail, err)
+		slog.Warn("slack: no webhook configured", "user_email", toEmail, "error", err)
 		return nil
 	}
 
@@ -114,7 +114,7 @@ func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, vide
 	}
 
 	if err := c.postMessage(ctx, webhookURL, p); err != nil {
-		log.Printf("slack: failed to send view notification: %v", err)
+		slog.Error("slack: failed to send view notification", "error", err)
 	}
 	return nil
 }
@@ -122,7 +122,7 @@ func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, vide
 func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error {
 	webhookURL, err := c.lookupWebhookURL(ctx, toEmail)
 	if err != nil {
-		log.Printf("slack: no webhook for %s: %v", toEmail, err)
+		slog.Warn("slack: no webhook configured", "user_email", toEmail, "error", err)
 		return nil
 	}
 
@@ -146,7 +146,7 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 	}
 
 	if err := c.postMessage(ctx, webhookURL, p); err != nil {
-		log.Printf("slack: failed to send comment notification: %v", err)
+		slog.Error("slack: failed to send comment notification", "error", err)
 	}
 	return nil
 }
@@ -154,7 +154,7 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 func (c *Client) SendDigestNotification(ctx context.Context, toEmail, toName string, videos []email.DigestVideoSummary) error {
 	webhookURL, err := c.lookupWebhookURL(ctx, toEmail)
 	if err != nil {
-		log.Printf("slack: no webhook for %s: %v", toEmail, err)
+		slog.Warn("slack: no webhook configured", "user_email", toEmail, "error", err)
 		return nil
 	}
 
@@ -180,7 +180,7 @@ func (c *Client) SendDigestNotification(ctx context.Context, toEmail, toName str
 	}
 
 	if err := c.postMessage(ctx, webhookURL, p); err != nil {
-		log.Printf("slack: failed to send digest notification: %v", err)
+		slog.Error("slack: failed to send digest notification", "error", err)
 	}
 	return nil
 }

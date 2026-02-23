@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -115,7 +115,7 @@ func (c *Client) logDelivery(ctx context.Context, userID, event string, payload 
 		 VALUES ($1, $2, $3, $4, $5, $6)`,
 		userID, event, payload, statusCode, responseBody, attempt,
 	); err != nil {
-		log.Printf("webhook: failed to log delivery for user %s: %v", userID, err)
+		slog.Error("webhook: failed to log delivery", "user_id", userID, "error", err)
 	}
 }
 

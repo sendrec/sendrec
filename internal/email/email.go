@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -88,7 +88,7 @@ func (c *Client) isAllowed(recipientEmail string) bool {
 			return true
 		}
 	}
-	log.Printf("email blocked by allowlist: %s", recipientEmail)
+	slog.Warn("email blocked by allowlist", "recipient", recipientEmail)
 	return false
 }
 
@@ -140,7 +140,7 @@ func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 
 func (c *Client) SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error {
 	if c.config.BaseURL == "" {
-		log.Printf("email not configured — password reset requested for %s (link not logged for security)", toEmail)
+		slog.Warn("email not configured, password reset requested", "recipient", toEmail)
 		return nil
 	}
 
@@ -165,12 +165,12 @@ func (c *Client) SendPasswordReset(ctx context.Context, toEmail, toName, resetLi
 
 func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error {
 	if c.config.BaseURL == "" {
-		log.Printf("email not configured — new comment on %q by %s", videoTitle, commentAuthor)
+		slog.Warn("email not configured, comment notification skipped", "video_title", videoTitle, "comment_author", commentAuthor)
 		return nil
 	}
 
 	if c.config.CommentTemplateID == 0 {
-		log.Printf("LISTMONK_COMMENT_TEMPLATE_ID not set — skipping comment notification for %q", videoTitle)
+		slog.Warn("comment template ID not set, skipping comment notification", "video_title", videoTitle)
 		return nil
 	}
 
@@ -198,12 +198,12 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 
 func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int) error {
 	if c.config.BaseURL == "" {
-		log.Printf("email not configured — view notification for %q skipped", videoTitle)
+		slog.Warn("email not configured, view notification skipped", "video_title", videoTitle)
 		return nil
 	}
 
 	if c.config.ViewTemplateID == 0 {
-		log.Printf("LISTMONK_VIEW_TEMPLATE_ID not set — skipping view notification for %q", videoTitle)
+		slog.Warn("view template ID not set, skipping view notification", "video_title", videoTitle)
 		return nil
 	}
 
@@ -231,12 +231,12 @@ func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, vide
 
 func (c *Client) SendConfirmation(ctx context.Context, toEmail, toName, confirmLink string) error {
 	if c.config.BaseURL == "" {
-		log.Printf("email not configured — confirmation email for %s (link not logged for security)", toEmail)
+		slog.Warn("email not configured, confirmation email skipped", "recipient", toEmail)
 		return nil
 	}
 
 	if c.config.ConfirmTemplateID == 0 {
-		log.Printf("LISTMONK_CONFIRM_TEMPLATE_ID not set — skipping confirmation email for %s", toEmail)
+		slog.Warn("confirm template ID not set, skipping confirmation email", "recipient", toEmail)
 		return nil
 	}
 
@@ -259,12 +259,12 @@ func (c *Client) SendConfirmation(ctx context.Context, toEmail, toName, confirmL
 
 func (c *Client) SendDigestNotification(ctx context.Context, toEmail, toName string, videos []DigestVideoSummary) error {
 	if c.config.BaseURL == "" {
-		log.Printf("email not configured — digest notification skipped")
+		slog.Warn("email not configured, digest notification skipped")
 		return nil
 	}
 
 	if c.config.ViewTemplateID == 0 {
-		log.Printf("LISTMONK_VIEW_TEMPLATE_ID not set — skipping digest notification")
+		slog.Warn("view template ID not set, skipping digest notification")
 		return nil
 	}
 

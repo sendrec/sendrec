@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/sendrec/sendrec/internal/auth"
@@ -55,7 +55,7 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	successURL := h.baseURL + "/settings?billing=success"
 	checkoutURL, err := h.creem.CreateCheckout(r.Context(), h.proProductID, userID, successURL)
 	if err != nil {
-		log.Printf("create checkout: %v", err)
+		slog.Error("failed to create checkout", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create checkout")
 		return
 	}
@@ -81,7 +81,7 @@ func (h *Handlers) GetBilling(w http.ResponseWriter, r *http.Request) {
 		userID,
 	).Scan(&plan, &subscriptionID, &customerID)
 	if err != nil {
-		log.Printf("get billing info: %v", err)
+		slog.Error("failed to get billing info", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to get billing info")
 		return
 	}
@@ -94,7 +94,7 @@ func (h *Handlers) GetBilling(w http.ResponseWriter, r *http.Request) {
 	if subscriptionID != nil {
 		info, err := h.creem.GetSubscription(r.Context(), *subscriptionID)
 		if err != nil {
-			log.Printf("get subscription info: %v", err)
+			slog.Error("failed to get subscription info", "error", err)
 		} else if info.Customer.PortalURL != "" {
 			resp.PortalURL = &info.Customer.PortalURL
 		}
@@ -112,7 +112,7 @@ func (h *Handlers) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 		userID,
 	).Scan(&subscriptionID)
 	if err != nil {
-		log.Printf("get subscription for cancel: %v", err)
+		slog.Error("failed to get subscription for cancel", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to get subscription")
 		return
 	}
@@ -123,7 +123,7 @@ func (h *Handlers) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.creem.CancelSubscription(r.Context(), *subscriptionID); err != nil {
-		log.Printf("cancel subscription: %v", err)
+		slog.Error("failed to cancel subscription", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to cancel subscription")
 		return
 	}
@@ -176,7 +176,7 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 
 	userID := payload.Object.Metadata.UserID
 	if userID == "" {
-		log.Printf("webhook %s: missing userId in metadata", payload.EventType)
+		slog.Warn("webhook: missing userId in metadata", "event_type", payload.EventType)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -187,12 +187,12 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 	case "subscription.canceled":
 		// Grace period: keep Pro until billing period ends.
 		// Creem sends subscription.expired when the period actually ends.
-		log.Printf("webhook: subscription canceled for user %s, keeping plan until expiry", userID)
+		slog.Info("webhook: subscription canceled, keeping plan until expiry", "user_id", userID)
 		w.WriteHeader(http.StatusOK)
 	case "subscription.expired":
 		h.handleSubscriptionCanceled(r, w, userID)
 	default:
-		log.Printf("webhook: unhandled event %s", payload.EventType)
+		slog.Warn("webhook: unhandled event", "event_type", payload.EventType)
 		w.WriteHeader(http.StatusOK)
 	}
 }
@@ -200,7 +200,7 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseWriter, payload webhookPayload, userID string) {
 	plan := h.planFromProductID(payload.Object.Product.ID)
 	if plan == "" {
-		log.Printf("webhook: unknown product ID %s", payload.Object.Product.ID)
+		slog.Warn("webhook: unknown product ID", "product_id", payload.Object.Product.ID)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -210,7 +210,7 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 		plan, payload.Object.ID, payload.Object.Customer.ID, userID,
 	)
 	if err != nil {
-		log.Printf("update subscription: %v", err)
+		slog.Error("failed to update subscription", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
 		return
 	}
@@ -224,7 +224,7 @@ func (h *Handlers) handleSubscriptionCanceled(r *http.Request, w http.ResponseWr
 		"free", userID,
 	)
 	if err != nil {
-		log.Printf("cancel subscription: %v", err)
+		slog.Error("failed to cancel subscription", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
 		return
 	}
