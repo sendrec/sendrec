@@ -458,6 +458,8 @@ type limitsResponse struct {
 	VideosUsedThisMonth     int  `json:"videosUsedThisMonth"`
 	BrandingEnabled         bool `json:"brandingEnabled"`
 	AiEnabled               bool `json:"aiEnabled"`
+	MaxPlaylists            int  `json:"maxPlaylists"`
+	PlaylistsUsed           int  `json:"playlistsUsed"`
 }
 
 func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
@@ -482,12 +484,25 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	maxPlaylists := maxPlaylistsFreeTier
+	var playlistsUsed int
+	if plan == "pro" || plan == "business" {
+		maxPlaylists = 0
+	} else {
+		_ = h.db.QueryRow(r.Context(),
+			`SELECT COUNT(*) FROM playlists WHERE user_id = $1`,
+			userID,
+		).Scan(&playlistsUsed)
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, limitsResponse{
 		MaxVideosPerMonth:       maxVideos,
 		MaxVideoDurationSeconds: maxDuration,
 		VideosUsedThisMonth:     videosUsed,
 		BrandingEnabled:         h.brandingEnabled,
 		AiEnabled:               h.aiEnabled,
+		MaxPlaylists:            maxPlaylists,
+		PlaylistsUsed:           playlistsUsed,
 	})
 }
 

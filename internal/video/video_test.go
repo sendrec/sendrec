@@ -3449,6 +3449,9 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(12))
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -3464,6 +3467,8 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 		MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
 		MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
 		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+		MaxPlaylists            int `json:"maxPlaylists"`
+		PlaylistsUsed           int `json:"playlistsUsed"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -3476,6 +3481,12 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	}
 	if resp.VideosUsedThisMonth != 12 {
 		t.Errorf("expected videosUsedThisMonth 12, got %d", resp.VideosUsedThisMonth)
+	}
+	if resp.MaxPlaylists != 3 {
+		t.Errorf("expected maxPlaylists 3, got %d", resp.MaxPlaylists)
+	}
+	if resp.PlaylistsUsed != 1 {
+		t.Errorf("expected playlistsUsed 1, got %d", resp.PlaylistsUsed)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -3494,7 +3505,10 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
 	expectPlanQuery(mock, "free")
-	// No ExpectQuery — should not query COUNT when unlimited
+	// No ExpectQuery for video COUNT when unlimited
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -3510,6 +3524,8 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 		MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
 		MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
 		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+		MaxPlaylists            int `json:"maxPlaylists"`
+		PlaylistsUsed           int `json:"playlistsUsed"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -3519,6 +3535,9 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	}
 	if resp.VideosUsedThisMonth != 0 {
 		t.Errorf("expected videosUsedThisMonth 0, got %d", resp.VideosUsedThisMonth)
+	}
+	if resp.MaxPlaylists != 3 {
+		t.Errorf("expected maxPlaylists 3, got %d", resp.MaxPlaylists)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -3537,7 +3556,7 @@ func TestLimits_ProUser(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, testJWTSecret, false)
 
 	expectPlanQuery(mock, "pro")
-	// No ExpectQuery for COUNT — pro users have unlimited videos
+	// No ExpectQuery for COUNT — pro users have unlimited videos and playlists
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -3553,6 +3572,8 @@ func TestLimits_ProUser(t *testing.T) {
 		MaxVideosPerMonth       int `json:"maxVideosPerMonth"`
 		MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
 		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
+		MaxPlaylists            int `json:"maxPlaylists"`
+		PlaylistsUsed           int `json:"playlistsUsed"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -3565,6 +3586,12 @@ func TestLimits_ProUser(t *testing.T) {
 	}
 	if resp.VideosUsedThisMonth != 0 {
 		t.Errorf("expected videosUsedThisMonth 0 for pro user, got %d", resp.VideosUsedThisMonth)
+	}
+	if resp.MaxPlaylists != 0 {
+		t.Errorf("expected maxPlaylists 0 for pro user, got %d", resp.MaxPlaylists)
+	}
+	if resp.PlaylistsUsed != 0 {
+		t.Errorf("expected playlistsUsed 0 for pro user, got %d", resp.PlaylistsUsed)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
