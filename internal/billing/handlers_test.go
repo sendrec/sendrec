@@ -14,6 +14,18 @@ import (
 	"github.com/sendrec/sendrec/internal/auth"
 )
 
+func signPayload(t *testing.T, payload interface{}) ([]byte, string) {
+	t.Helper()
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mac := hmac.New(sha256.New, []byte("webhook-secret"))
+	mac.Write(payloadBytes)
+	signature := hex.EncodeToString(mac.Sum(nil))
+	return payloadBytes, signature
+}
+
 func TestCheckoutHandler(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -154,6 +166,10 @@ func TestWebhookSubscriptionActive(t *testing.T) {
 	}
 	defer mock.Close()
 
+	mock.ExpectExec(`INSERT INTO creem_webhook_events`).
+		WithArgs("evt_001", "subscription.active", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
 	mock.ExpectExec(`UPDATE users SET subscription_plan`).
 		WithArgs("pro", "sub_001", "cust_001", "user-456").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
@@ -162,7 +178,9 @@ func TestWebhookSubscriptionActive(t *testing.T) {
 	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
 
 	payload := map[string]interface{}{
-		"eventType": "subscription.active",
+		"id":         "evt_001",
+		"eventType":  "subscription.active",
+		"created_at": 1728734325927,
 		"object": map[string]interface{}{
 			"id":      "sub_001",
 			"product": map[string]interface{}{"id": "prod_pro"},
@@ -174,11 +192,7 @@ func TestWebhookSubscriptionActive(t *testing.T) {
 			},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
-
-	mac := hmac.New(sha256.New, []byte("webhook-secret"))
-	mac.Write(payloadBytes)
-	signature := hex.EncodeToString(mac.Sum(nil))
+	payloadBytes, signature := signPayload(t, payload)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/webhooks/creem", strings.NewReader(string(payloadBytes)))
 	req.Header.Set("creem-signature", signature)
@@ -202,12 +216,18 @@ func TestWebhookSubscriptionCanceled_GracePeriod(t *testing.T) {
 	}
 	defer mock.Close()
 
+	mock.ExpectExec(`INSERT INTO creem_webhook_events`).
+		WithArgs("evt_002", "subscription.canceled", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
 	// No DB update expected — canceled keeps Pro until expiry
 	client := New("test-key", "https://api.creem.io")
 	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
 
 	payload := map[string]interface{}{
-		"eventType": "subscription.canceled",
+		"id":         "evt_002",
+		"eventType":  "subscription.canceled",
+		"created_at": 1728734325927,
 		"object": map[string]interface{}{
 			"id":      "sub_002",
 			"product": map[string]interface{}{"id": "prod_pro"},
@@ -219,11 +239,7 @@ func TestWebhookSubscriptionCanceled_GracePeriod(t *testing.T) {
 			},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
-
-	mac := hmac.New(sha256.New, []byte("webhook-secret"))
-	mac.Write(payloadBytes)
-	signature := hex.EncodeToString(mac.Sum(nil))
+	payloadBytes, signature := signPayload(t, payload)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/webhooks/creem", strings.NewReader(string(payloadBytes)))
 	req.Header.Set("creem-signature", signature)
@@ -247,6 +263,10 @@ func TestWebhookSubscriptionExpired(t *testing.T) {
 	}
 	defer mock.Close()
 
+	mock.ExpectExec(`INSERT INTO creem_webhook_events`).
+		WithArgs("evt_003", "subscription.expired", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
 	mock.ExpectExec(`UPDATE users SET subscription_plan`).
 		WithArgs("free", "user-789").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
@@ -255,7 +275,9 @@ func TestWebhookSubscriptionExpired(t *testing.T) {
 	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
 
 	payload := map[string]interface{}{
-		"eventType": "subscription.expired",
+		"id":         "evt_003",
+		"eventType":  "subscription.expired",
+		"created_at": 1728734325927,
 		"object": map[string]interface{}{
 			"id":      "sub_002",
 			"product": map[string]interface{}{"id": "prod_pro"},
@@ -267,11 +289,7 @@ func TestWebhookSubscriptionExpired(t *testing.T) {
 			},
 		},
 	}
-	payloadBytes, _ := json.Marshal(payload)
-
-	mac := hmac.New(sha256.New, []byte("webhook-secret"))
-	mac.Write(payloadBytes)
-	signature := hex.EncodeToString(mac.Sum(nil))
+	payloadBytes, signature := signPayload(t, payload)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/webhooks/creem", strings.NewReader(string(payloadBytes)))
 	req.Header.Set("creem-signature", signature)
@@ -307,5 +325,151 @@ func TestWebhookInvalidSignature(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWebhookDuplicateEventIgnored(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectExec(`INSERT INTO creem_webhook_events`).
+		WithArgs("evt_dup", "subscription.active", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 0))
+
+	// No UPDATE expected — duplicate event is silently ignored
+
+	client := New("test-key", "https://api.creem.io")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+
+	payload := map[string]interface{}{
+		"id":         "evt_dup",
+		"eventType":  "subscription.active",
+		"created_at": 1728734325927,
+		"object": map[string]interface{}{
+			"id":      "sub_001",
+			"product": map[string]interface{}{"id": "prod_pro"},
+			"customer": map[string]interface{}{
+				"id": "cust_001",
+			},
+			"metadata": map[string]interface{}{
+				"userId": "user-456",
+			},
+		},
+	}
+	payloadBytes, signature := signPayload(t, payload)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/webhooks/creem", strings.NewReader(string(payloadBytes)))
+	req.Header.Set("creem-signature", signature)
+	rec := httptest.NewRecorder()
+
+	handlers.Webhook(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+func TestWebhookRefundCreated(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectExec(`INSERT INTO creem_webhook_events`).
+		WithArgs("evt_refund", "refund.created", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	mock.ExpectExec(`UPDATE users SET subscription_plan`).
+		WithArgs("free", "user-456").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	client := New("test-key", "https://api.creem.io")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+
+	payload := map[string]interface{}{
+		"id":         "evt_refund",
+		"eventType":  "refund.created",
+		"created_at": 1728734325927,
+		"object": map[string]interface{}{
+			"id":      "sub_001",
+			"product": map[string]interface{}{"id": "prod_pro"},
+			"customer": map[string]interface{}{
+				"id": "cust_001",
+			},
+			"metadata": map[string]interface{}{
+				"userId": "user-456",
+			},
+		},
+	}
+	payloadBytes, signature := signPayload(t, payload)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/webhooks/creem", strings.NewReader(string(payloadBytes)))
+	req.Header.Set("creem-signature", signature)
+	rec := httptest.NewRecorder()
+
+	handlers.Webhook(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+func TestWebhookDisputeCreated(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectExec(`INSERT INTO creem_webhook_events`).
+		WithArgs("evt_dispute", "dispute.created", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	// No UPDATE expected — dispute only logs, no plan change
+
+	client := New("test-key", "https://api.creem.io")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+
+	payload := map[string]interface{}{
+		"id":         "evt_dispute",
+		"eventType":  "dispute.created",
+		"created_at": 1728734325927,
+		"object": map[string]interface{}{
+			"id":      "sub_001",
+			"product": map[string]interface{}{"id": "prod_pro"},
+			"customer": map[string]interface{}{
+				"id": "cust_001",
+			},
+			"metadata": map[string]interface{}{
+				"userId": "user-456",
+			},
+		},
+	}
+	payloadBytes, signature := signPayload(t, payload)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/webhooks/creem", strings.NewReader(string(payloadBytes)))
+	req.Header.Set("creem-signature", signature)
+	rec := httptest.NewRecorder()
+
+	handlers.Webhook(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
 	}
 }

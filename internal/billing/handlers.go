@@ -1,6 +1,7 @@
 package billing
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
@@ -132,7 +134,9 @@ func (h *Handlers) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 }
 
 type webhookPayload struct {
+	ID        string        `json:"id"`
 	EventType string        `json:"eventType"`
+	CreatedAt int64         `json:"created_at"`
 	Object    webhookObject `json:"object"`
 }
 
@@ -174,9 +178,27 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if payload.ID == "" {
+		slog.Warn("webhook: missing event ID", "event_type", payload.EventType)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	duplicate, err := h.recordEvent(r.Context(), payload, body)
+	if err != nil {
+		slog.Error("webhook: failed to record event", "error", err, "event_id", payload.ID)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to process webhook")
+		return
+	}
+	if duplicate {
+		slog.Info("webhook: duplicate event ignored", "event_id", payload.ID, "event_type", payload.EventType)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	userID := payload.Object.Metadata.UserID
 	if userID == "" {
-		slog.Warn("webhook: missing userId in metadata", "event_type", payload.EventType)
+		slog.Warn("webhook: missing userId in metadata", "event_type", payload.EventType, "event_id", payload.ID)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -184,15 +206,21 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 	switch payload.EventType {
 	case "subscription.active", "subscription.paid":
 		h.handleSubscriptionActivated(r, w, payload, userID)
-	case "subscription.canceled":
-		// Grace period: keep Pro until billing period ends.
-		// Creem sends subscription.expired when the period actually ends.
-		slog.Info("webhook: subscription canceled, keeping plan until expiry", "user_id", userID)
+	case "subscription.canceled", "subscription.scheduled_cancel":
+		slog.Info("webhook: subscription cancel requested, keeping plan until expiry", "user_id", userID, "event_id", payload.ID)
 		w.WriteHeader(http.StatusOK)
 	case "subscription.expired":
 		h.handleSubscriptionCanceled(r, w, userID)
+	case "subscription.past_due":
+		slog.Warn("webhook: subscription past due, payment retrying", "user_id", userID, "event_id", payload.ID)
+		w.WriteHeader(http.StatusOK)
+	case "refund.created":
+		h.handleSubscriptionCanceled(r, w, userID)
+	case "dispute.created":
+		slog.Error("webhook: dispute created, manual review needed", "user_id", userID, "event_id", payload.ID)
+		w.WriteHeader(http.StatusOK)
 	default:
-		slog.Warn("webhook: unhandled event", "event_type", payload.EventType)
+		slog.Warn("webhook: unhandled event", "event_type", payload.EventType, "event_id", payload.ID)
 		w.WriteHeader(http.StatusOK)
 	}
 }
@@ -218,6 +246,8 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 	w.WriteHeader(http.StatusOK)
 }
 
+// handleSubscriptionCanceled downgrades to free but preserves creem_subscription_id
+// and creem_customer_id for audit trail and potential re-subscription.
 func (h *Handlers) handleSubscriptionCanceled(r *http.Request, w http.ResponseWriter, userID string) {
 	_, err := h.db.Exec(r.Context(),
 		"UPDATE users SET subscription_plan = $1 WHERE id = $2",
@@ -244,4 +274,25 @@ func (h *Handlers) planFromProductID(productID string) string {
 		return "pro"
 	}
 	return ""
+}
+
+func (h *Handlers) recordEvent(ctx context.Context, payload webhookPayload, body []byte) (duplicate bool, err error) {
+	var userID *string
+	if uid := payload.Object.Metadata.UserID; uid != "" {
+		userID = &uid
+	}
+
+	createdAt := time.UnixMilli(payload.CreatedAt)
+
+	tag, err := h.db.Exec(ctx,
+		`INSERT INTO creem_webhook_events (event_id, event_type, user_id, payload, created_at)
+		 VALUES ($1, $2, $3, $4, $5)
+		 ON CONFLICT (event_id) DO NOTHING`,
+		payload.ID, payload.EventType, userID, body, createdAt,
+	)
+	if err != nil {
+		return false, err
+	}
+
+	return tag.RowsAffected() == 0, nil
 }
