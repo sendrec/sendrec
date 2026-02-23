@@ -65,6 +65,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     summaryStatus: "none",
     folderId: null,
     tags: [],
+    playlists: [],
     ...overrides,
   };
 }
@@ -111,19 +112,36 @@ const defaultTags = [
   },
 ];
 
+const defaultPlaylists = [
+  {
+    id: "pl1",
+    title: "Onboarding",
+    videoCount: 3,
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "pl2",
+    title: "Product Demos",
+    videoCount: 1,
+    createdAt: "2026-01-02T00:00:00Z",
+  },
+];
+
 function setupDefaultMocks(
   overrides: {
     video?: Record<string, unknown>;
     limits?: Record<string, unknown>;
     folders?: Record<string, unknown>[];
     tags?: Record<string, unknown>[];
+    playlists?: Record<string, unknown>[];
   } = {},
 ) {
   mockApiFetch
     .mockResolvedValueOnce([overrides.video ?? makeVideo()])
     .mockResolvedValueOnce(overrides.limits ?? defaultLimits)
     .mockResolvedValueOnce(overrides.folders ?? defaultFolders)
-    .mockResolvedValueOnce(overrides.tags ?? defaultTags);
+    .mockResolvedValueOnce(overrides.tags ?? defaultTags)
+    .mockResolvedValueOnce(overrides.playlists ?? defaultPlaylists);
 }
 
 function renderVideoDetail(videoId = "v1") {
@@ -1193,8 +1211,8 @@ describe("VideoDetail", () => {
 
     fireEvent.click(screen.getByText("Delete video"));
 
-    // Should not have called delete API (only the initial 4 setup calls)
-    expect(mockApiFetch).toHaveBeenCalledTimes(4);
+    // Should not have called delete API (only the initial 5 setup calls)
+    expect(mockApiFetch).toHaveBeenCalledTimes(5);
   });
 
   // ─── Toast ────────────────────────────────────────────────────

@@ -35,6 +35,7 @@ interface Video {
   summaryStatus: string;
   folderId: string | null;
   tags: VideoTag[];
+  playlists: { id: string; title: string }[];
 }
 
 interface Folder {
@@ -51,6 +52,12 @@ interface Tag {
   color: string | null;
   videoCount: number;
   createdAt: string;
+}
+
+interface PlaylistInfo {
+  id: string;
+  title: string;
+  videoCount: number;
 }
 
 interface LimitsResponse {
@@ -120,6 +127,8 @@ export function VideoDetail() {
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
+  const [playlistSearch, setPlaylistSearch] = useState("");
 
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -151,18 +160,20 @@ export function VideoDetail() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [videos, limitsData, foldersData, tagsData] =
+        const [videos, limitsData, foldersData, tagsData, playlistsData] =
           await Promise.all([
             apiFetch<Video[]>("/api/videos"),
             apiFetch<LimitsResponse>("/api/videos/limits"),
             apiFetch<Folder[]>("/api/folders"),
             apiFetch<Tag[]>("/api/tags"),
+            apiFetch<PlaylistInfo[]>("/api/playlists"),
           ]);
         const found = videos?.find((v) => v.id === id) ?? null;
         setVideo(found);
         setLimits(limitsData ?? null);
         setFolders(foldersData ?? []);
         setTags(tagsData ?? []);
+        setPlaylists(playlistsData ?? []);
         if (!found) {
           setNotFound(true);
         }
@@ -522,6 +533,34 @@ export function VideoDetail() {
       .filter((t) => newIds.includes(t.id))
       .map((t) => ({ id: t.id, name: t.name, color: t.color }));
     setVideo((prev) => (prev ? { ...prev, tags: matchingTags } : prev));
+  }
+
+  async function togglePlaylist(playlistId: string) {
+    if (!video) return;
+    const isInPlaylist = video.playlists.some((p) => p.id === playlistId);
+    if (isInPlaylist) {
+      await apiFetch(`/api/playlists/${playlistId}/videos/${video.id}`, {
+        method: "DELETE",
+      });
+      setVideo((prev) =>
+        prev
+          ? { ...prev, playlists: prev.playlists.filter((p) => p.id !== playlistId) }
+          : prev,
+      );
+    } else {
+      await apiFetch(`/api/playlists/${playlistId}/videos`, {
+        method: "POST",
+        body: JSON.stringify({ videoIds: [video.id] }),
+      });
+      const playlist = playlists.find((p) => p.id === playlistId);
+      if (playlist) {
+        setVideo((prev) =>
+          prev
+            ? { ...prev, playlists: [...prev.playlists, { id: playlist.id, title: playlist.title }] }
+            : prev,
+        );
+      }
+    }
   }
 
   async function deleteVideo() {
@@ -1216,6 +1255,56 @@ export function VideoDetail() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {playlists.length > 0 && (
+          <div className="detail-setting-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+            <span className="detail-setting-label">Playlists</span>
+            {playlists.length > 5 && (
+              <input
+                type="text"
+                value={playlistSearch}
+                onChange={(e) => setPlaylistSearch(e.target.value)}
+                placeholder="Search playlists..."
+                style={{
+                  padding: "4px 8px",
+                  fontSize: 13,
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 4,
+                  color: "var(--color-text)",
+                }}
+              />
+            )}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {playlists
+                .filter((p) => !playlistSearch || p.title.toLowerCase().includes(playlistSearch.toLowerCase()))
+                .map((playlist) => {
+                  const active = video.playlists.some((vp) => vp.id === playlist.id);
+                  return (
+                    <button
+                      key={playlist.id}
+                      onClick={() => togglePlaylist(playlist.id)}
+                      aria-label={`Playlist ${playlist.title}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        padding: "2px 8px",
+                        borderRadius: 12,
+                        fontSize: 11,
+                        fontWeight: 500,
+                        background: active ? "var(--color-accent)" : "var(--color-bg)",
+                        color: active ? "var(--color-on-accent)" : "var(--color-text-secondary)",
+                        border: active ? "1px solid var(--color-accent)" : "1px solid var(--color-border)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {playlist.title}
+                    </button>
+                  );
+                })}
             </div>
           </div>
         )}

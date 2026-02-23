@@ -65,6 +65,8 @@ export function PlaylistDetail() {
   );
   const [addingVideos, setAddingVideos] = useState(false);
 
+  const [videoSearch, setVideoSearch] = useState("");
+
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -226,6 +228,7 @@ export function PlaylistDetail() {
   async function openAddVideos() {
     setShowAddVideos(true);
     setSelectedVideoIds(new Set());
+    setVideoSearch("");
     try {
       const videos = await apiFetch<LibraryVideo[]>("/api/videos");
       setLibraryVideos(videos ?? []);
@@ -306,9 +309,9 @@ export function PlaylistDetail() {
   }
 
   const existingVideoIds = new Set(playlist.videos.map((v) => v.id));
-  const availableVideos = libraryVideos.filter(
-    (v) => !existingVideoIds.has(v.id) && v.status === "ready",
-  );
+  const availableVideos = libraryVideos
+    .filter((v) => !existingVideoIds.has(v.id) && v.status === "ready")
+    .filter((v) => !videoSearch || v.title.toLowerCase().includes(videoSearch.toLowerCase()));
 
   return (
     <div className="page-container">
@@ -789,6 +792,25 @@ export function PlaylistDetail() {
             >
               Add Videos
             </h3>
+
+            <input
+              type="text"
+              value={videoSearch}
+              onChange={(e) => setVideoSearch(e.target.value)}
+              placeholder="Search videos..."
+              autoFocus
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                fontSize: 14,
+                background: "var(--color-bg)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 6,
+                color: "var(--color-text)",
+                marginBottom: 12,
+                boxSizing: "border-box",
+              }}
+            />
 
             {availableVideos.length === 0 ? (
               <p
