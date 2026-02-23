@@ -1,7 +1,7 @@
 openapi: "3.0.3"
 info:
   title: SendRec API
-  version: "1.42.0"
+  version: "1.57.1"
   description: API for SendRec, an open-source EU-native async video messaging platform.
   license:
     name: MIT
@@ -26,6 +26,14 @@ tags:
     description: User account settings and notification preferences
   - name: Watch
     description: Public video watching and interaction
+  - name: Folders
+    description: Video folder management
+  - name: Tags
+    description: Video tag management
+  - name: Playlists
+    description: Playlist management and sharing
+  - name: Billing
+    description: Subscription and billing management
 
 components:
   securitySchemes:
@@ -266,6 +274,12 @@ components:
           nullable: true
           maxLength: 500
           description: Slack incoming webhook URL for notifications. Must start with https://hooks.slack.com/
+        webhookUrl:
+          type: string
+          nullable: true
+        webhookSecret:
+          type: string
+          nullable: true
 
     UpdateNotificationPreferencesRequest:
       type: object
@@ -279,6 +293,10 @@ components:
           nullable: true
           maxLength: 500
           description: Slack incoming webhook URL. Must start with https://hooks.slack.com/. Send empty string to clear.
+        webhookUrl:
+          type: string
+          nullable: true
+          maxLength: 500
 
     SetVideoNotificationRequest:
       type: object
@@ -764,6 +782,416 @@ components:
       required: [error]
       properties:
         error:
+          type: string
+
+    FolderItem:
+      type: object
+      required: [id, name, position, videoCount, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        position:
+          type: integer
+        videoCount:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateFolderRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+
+    UpdateFolderRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          nullable: true
+        position:
+          type: integer
+          nullable: true
+
+    TagItem:
+      type: object
+      required: [id, name, videoCount, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        color:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+        videoCount:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateTagRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        color:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+
+    UpdateTagRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+          nullable: true
+        color:
+          type: string
+          nullable: true
+          pattern: "^#[0-9a-fA-F]{6}$"
+
+    SetVideoFolderRequest:
+      type: object
+      properties:
+        folderId:
+          type: string
+          nullable: true
+          description: Set to null to remove from folder
+
+    SetVideoTagsRequest:
+      type: object
+      required: [tagIds]
+      properties:
+        tagIds:
+          type: array
+          items:
+            type: string
+
+    BatchRequest:
+      type: object
+      required: [videoIds]
+      properties:
+        videoIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 100
+
+    BatchDeleteResponse:
+      type: object
+      required: [deleted]
+      properties:
+        deleted:
+          type: integer
+
+    BatchFolderRequest:
+      type: object
+      required: [videoIds]
+      properties:
+        videoIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 100
+        folderId:
+          type: string
+          nullable: true
+
+    BatchTagsRequest:
+      type: object
+      required: [videoIds, tagIds]
+      properties:
+        videoIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 100
+        tagIds:
+          type: array
+          items:
+            type: string
+          maxItems: 10
+
+    SetDownloadEnabledRequest:
+      type: object
+      required: [downloadEnabled]
+      properties:
+        downloadEnabled:
+          type: boolean
+
+    SetLinkExpiryRequest:
+      type: object
+      required: [neverExpires]
+      properties:
+        neverExpires:
+          type: boolean
+          description: 'true sets share_expires_at to NULL, false resets to 7 days from now'
+
+    ThumbnailUploadRequest:
+      type: object
+      required: [contentType, contentLength]
+      properties:
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        contentLength:
+          type: integer
+          minimum: 1
+          maximum: 2097152
+          description: File size in bytes, max 2MB
+
+    ThumbnailUploadResponse:
+      type: object
+      required: [uploadUrl]
+      properties:
+        uploadUrl:
+          type: string
+          format: uri
+
+    RemoveSegmentsRequest:
+      type: object
+      required: [segments]
+      properties:
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/SegmentRange"
+          minItems: 1
+          maxItems: 200
+
+    SegmentRange:
+      type: object
+      required: [start, end]
+      properties:
+        start:
+          type: number
+          format: double
+          minimum: 0
+        end:
+          type: number
+          format: double
+          description: Must be greater than start
+
+    PlaylistItem:
+      type: object
+      required: [id, title, isShared, position, videoCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        isShared:
+          type: boolean
+        shareToken:
+          type: string
+          nullable: true
+        shareUrl:
+          type: string
+          nullable: true
+          format: uri
+        position:
+          type: integer
+        videoCount:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PlaylistDetail:
+      allOf:
+        - $ref: "#/components/schemas/PlaylistItem"
+        - type: object
+          required: [requireEmail, hasPassword, videos]
+          properties:
+            requireEmail:
+              type: boolean
+            hasPassword:
+              type: boolean
+            videos:
+              type: array
+              items:
+                $ref: "#/components/schemas/PlaylistVideo"
+
+    PlaylistVideo:
+      type: object
+      required: [id, title, duration, shareToken, shareUrl, status, position, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        duration:
+          type: integer
+        shareToken:
+          type: string
+        shareUrl:
+          type: string
+          format: uri
+        status:
+          type: string
+        position:
+          type: integer
+        thumbnailUrl:
+          type: string
+          nullable: true
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+
+    CreatePlaylistRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+          maxLength: 2000
+
+    UpdatePlaylistRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          nullable: true
+        description:
+          type: string
+          nullable: true
+          maxLength: 2000
+        position:
+          type: integer
+          nullable: true
+        isShared:
+          type: boolean
+          nullable: true
+        sharePassword:
+          type: string
+          nullable: true
+          description: Set to empty string to remove password
+        requireEmail:
+          type: boolean
+          nullable: true
+
+    AddPlaylistVideosRequest:
+      type: object
+      required: [videoIds]
+      properties:
+        videoIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+
+    ReorderPlaylistVideosRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReorderItem"
+
+    ReorderItem:
+      type: object
+      required: [videoId, position]
+      properties:
+        videoId:
+          type: string
+        position:
+          type: integer
+
+    BillingResponse:
+      type: object
+      required: [plan]
+      properties:
+        plan:
+          type: string
+          enum: [free, pro]
+        subscriptionId:
+          type: string
+          nullable: true
+        subscriptionStatus:
+          type: string
+          nullable: true
+        portalUrl:
+          type: string
+          nullable: true
+          format: uri
+
+    CheckoutPlanRequest:
+      type: object
+      required: [plan]
+      properties:
+        plan:
+          type: string
+          enum: [pro]
+
+    CheckoutResponse:
+      type: object
+      required: [checkoutUrl]
+      properties:
+        checkoutUrl:
+          type: string
+          format: uri
+
+    WebhookDeliveryItem:
+      type: object
+      required: [id, event, payload, responseBody, attempt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        event:
+          type: string
+        payload:
+          type: object
+        statusCode:
+          type: integer
+          nullable: true
+        responseBody:
+          type: string
+        attempt:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    RegenerateWebhookSecretResponse:
+      type: object
+      required: [webhookSecret]
+      properties:
+        webhookSecret:
           type: string
 
 paths:
@@ -2510,6 +2938,1340 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "410":
           description: Share link expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/folders:
+    get:
+      tags: [Folders]
+      summary: List folders
+      description: Returns all folders for the authenticated user.
+      operationId: listFolders
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of folders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FolderItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Folders]
+      summary: Create a folder
+      description: Creates a new folder for organizing videos.
+      operationId: createFolder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFolderRequest"
+      responses:
+        "201":
+          description: Folder created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FolderItem"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Maximum of 50 folders reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Duplicate folder name
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/folders/{id}:
+    put:
+      tags: [Folders]
+      summary: Update a folder
+      description: Updates the name or position of a folder.
+      operationId: updateFolder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFolderRequest"
+      responses:
+        "204":
+          description: Folder updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Folder not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Duplicate folder name
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Folders]
+      summary: Delete a folder
+      description: Deletes a folder. Videos in the folder are not deleted.
+      operationId: deleteFolder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Folder deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Folder not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/tags:
+    get:
+      tags: [Tags]
+      summary: List tags
+      description: Returns all tags for the authenticated user.
+      operationId: listTags
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TagItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Tags]
+      summary: Create a tag
+      description: Creates a new tag for labeling videos.
+      operationId: createTag
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTagRequest"
+      responses:
+        "201":
+          description: Tag created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagItem"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Maximum of 100 tags reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Duplicate tag name
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/tags/{id}:
+    put:
+      tags: [Tags]
+      summary: Update a tag
+      description: Updates the name or color of a tag.
+      operationId: updateTag
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTagRequest"
+      responses:
+        "204":
+          description: Tag updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Tag not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Duplicate tag name
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Tags]
+      summary: Delete a tag
+      description: Deletes a tag. Videos with the tag are not deleted.
+      operationId: deleteTag
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Tag deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Tag not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/folder:
+    put:
+      tags: [Videos]
+      summary: Set video folder
+      description: Assigns a video to a folder or removes it from a folder.
+      operationId: setVideoFolder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVideoFolderRequest"
+      responses:
+        "204":
+          description: Video folder updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/tags:
+    put:
+      tags: [Videos]
+      summary: Set video tags
+      description: Replaces all tags on a video. Maximum 10 tags per video.
+      operationId: setVideoTags
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVideoTagsRequest"
+      responses:
+        "204":
+          description: Video tags updated
+        "400":
+          description: Validation error or maximum of 10 tags exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/download-enabled:
+    put:
+      tags: [Videos]
+      summary: Enable or disable download
+      description: Controls whether the download button is shown on the watch page.
+      operationId: setDownloadEnabled
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetDownloadEnabledRequest"
+      responses:
+        "204":
+          description: Download setting updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/link-expiry:
+    put:
+      tags: [Videos]
+      summary: Set link expiry
+      description: Controls whether the share link expires or stays active indefinitely.
+      operationId: setLinkExpiry
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetLinkExpiryRequest"
+      responses:
+        "204":
+          description: Link expiry updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/thumbnail:
+    post:
+      tags: [Videos]
+      summary: Upload custom thumbnail
+      description: Returns a presigned URL for uploading a custom thumbnail image.
+      operationId: uploadThumbnail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ThumbnailUploadRequest"
+      responses:
+        "200":
+          description: Upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThumbnailUploadResponse"
+        "400":
+          description: Invalid content type or size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Videos]
+      summary: Reset thumbnail
+      description: Removes the custom thumbnail and regenerates from the video.
+      operationId: resetThumbnail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Thumbnail reset started
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/summarize:
+    post:
+      tags: [Videos]
+      summary: Summarize video
+      description: Triggers AI-powered summarization of the video transcript.
+      operationId: summarizeVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Summarization started
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: AI not enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video or transcript not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/remove-segments:
+    post:
+      tags: [Videos]
+      summary: Remove segments from video
+      description: Removes specified time segments from the video. Processing happens asynchronously.
+      operationId: removeSegments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoveSegmentsRequest"
+      responses:
+        "202":
+          description: Segment removal started
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Video is already being processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/dismiss-title:
+    put:
+      tags: [Videos]
+      summary: Dismiss AI-suggested title
+      description: Dismisses the AI-generated title suggestion for a video.
+      operationId: dismissTitle
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Title suggestion dismissed
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/batch/delete:
+    post:
+      tags: [Videos]
+      summary: Batch delete videos
+      description: Deletes multiple videos at once. Maximum 100 videos per request.
+      operationId: batchDeleteVideos
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchRequest"
+      responses:
+        "200":
+          description: Videos deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchDeleteResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/batch/folder:
+    post:
+      tags: [Videos]
+      summary: Batch set folder
+      description: Assigns multiple videos to a folder or removes them from a folder.
+      operationId: batchSetFolder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchFolderRequest"
+      responses:
+        "204":
+          description: Folder updated for all videos
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Folder not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/batch/tags:
+    post:
+      tags: [Videos]
+      summary: Batch set tags
+      description: Sets tags on multiple videos at once.
+      operationId: batchSetTags
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchTagsRequest"
+      responses:
+        "204":
+          description: Tags updated for all videos
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/playlists:
+    get:
+      tags: [Playlists]
+      summary: List playlists
+      description: Returns all playlists for the authenticated user.
+      operationId: listPlaylists
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of playlists
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlaylistItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Playlists]
+      summary: Create a playlist
+      description: Creates a new playlist for grouping and sharing videos.
+      operationId: createPlaylist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePlaylistRequest"
+      responses:
+        "201":
+          description: Playlist created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaylistItem"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Maximum of 3 playlists reached (free tier)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/playlists/{id}:
+    get:
+      tags: [Playlists]
+      summary: Get playlist details
+      description: Returns full playlist details including videos.
+      operationId: getPlaylist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Playlist details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaylistDetail"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Playlist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Playlists]
+      summary: Update a playlist
+      description: Updates playlist metadata, sharing settings, or position.
+      operationId: updatePlaylist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlaylistRequest"
+      responses:
+        "204":
+          description: Playlist updated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Playlist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Playlists]
+      summary: Delete a playlist
+      description: Deletes a playlist. Videos in the playlist are not deleted.
+      operationId: deletePlaylist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Playlist deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Playlist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/playlists/{id}/videos:
+    post:
+      tags: [Playlists]
+      summary: Add videos to playlist
+      description: Adds one or more videos to a playlist.
+      operationId: addPlaylistVideos
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddPlaylistVideosRequest"
+      responses:
+        "204":
+          description: Videos added to playlist
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Playlist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/playlists/{id}/videos/{videoId}:
+    delete:
+      tags: [Playlists]
+      summary: Remove video from playlist
+      description: Removes a single video from a playlist.
+      operationId: removePlaylistVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Video removed from playlist
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Playlist or video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/playlists/{id}/videos/reorder:
+    patch:
+      tags: [Playlists]
+      summary: Reorder playlist videos
+      description: Reorders videos within a playlist by setting their positions.
+      operationId: reorderPlaylistVideos
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderPlaylistVideosRequest"
+      responses:
+        "204":
+          description: Videos reordered
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Playlist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/watch/{shareToken}/thumbnail:
+    get:
+      tags: [Watch]
+      summary: Get video thumbnail
+      description: Redirects to a presigned URL for the video thumbnail.
+      operationId: getWatchThumbnail
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to presigned thumbnail URL
+          headers:
+            Location:
+              description: Presigned S3 URL for the thumbnail
+              schema:
+                type: string
+                format: uri
+        "404":
+          description: Video or thumbnail not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/watch/playlist/{shareToken}/verify:
+    post:
+      tags: [Watch]
+      summary: Verify playlist share password
+      description: Verifies the password for a shared playlist. Sets an authentication cookie on success. Rate limited.
+      operationId: verifyPlaylistWatchPassword
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyPasswordRequest"
+      responses:
+        "200":
+          description: Password verified, auth cookie set
+          headers:
+            Set-Cookie:
+              description: Playlist watch authentication cookie
+              schema:
+                type: string
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Incorrect password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Playlist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/watch/playlist/{shareToken}/identify:
+    post:
+      tags: [Watch]
+      summary: Identify playlist viewer by email
+      description: Stores the viewer's email for playlists with email gate enabled. Rate limited.
+      operationId: identifyPlaylistViewer
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  maxLength: 320
+      responses:
+        "200":
+          description: Viewer identified
+        "400":
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Playlist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/billing:
+    get:
+      tags: [Billing]
+      summary: Get billing information
+      description: Returns the current user's subscription plan and billing details.
+      operationId: getBilling
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Billing information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/billing/checkout:
+    post:
+      tags: [Billing]
+      summary: Create checkout session
+      description: Creates a Creem checkout session for upgrading to a paid plan.
+      operationId: createCheckout
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutPlanRequest"
+      responses:
+        "200":
+          description: Checkout URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/billing/cancel:
+    post:
+      tags: [Billing]
+      summary: Cancel subscription
+      description: Cancels the current subscription. Access continues until the end of the billing period.
+      operationId: cancelSubscription
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Subscription canceled
+        "400":
+          description: No active subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/notifications/test-webhook:
+    post:
+      tags: [Settings]
+      summary: Send test webhook notification
+      description: Sends a test payload to the user's configured webhook URL. The webhook URL must be saved first via PUT /api/settings/notifications.
+      operationId: testWebhook
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Test webhook sent successfully
+        "400":
+          description: No webhook URL configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Webhook delivery failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/notifications/regenerate-webhook-secret:
+    post:
+      tags: [Settings]
+      summary: Regenerate webhook secret
+      description: Generates a new webhook signing secret. The old secret is immediately invalidated.
+      operationId: regenerateWebhookSecret
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: New webhook secret generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegenerateWebhookSecretResponse"
+        "400":
+          description: No webhook URL configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/notifications/webhook-deliveries:
+    get:
+      tags: [Settings]
+      summary: List webhook deliveries
+      description: Returns recent webhook delivery attempts for the authenticated user.
+      operationId: listWebhookDeliveries
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of webhook deliveries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WebhookDeliveryItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/webhooks/creem:
+    post:
+      tags: [Billing]
+      summary: Creem payment webhook
+      description: Receives Creem payment webhooks. Verified via HMAC-SHA256 signature.
+      operationId: creemWebhook
+      responses:
+        "200":
+          description: Webhook processed
+        "400":
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid signature
           content:
             application/json:
               schema:
