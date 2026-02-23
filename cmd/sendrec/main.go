@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,6 +28,8 @@ import (
 var version = "dev"
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
 	port := getEnv("PORT", "8080")
 
 	databaseURL := os.Getenv("DATABASE_URL")
@@ -51,7 +54,7 @@ func main() {
 	if err := db.Migrate(databaseURL); err != nil {
 		log.Fatalf("database migration failed: %v", err)
 	}
-	log.Println("database migrations applied")
+	slog.Info("database migrations applied")
 
 	store, err := storage.New(ctx, storage.Config{
 		Endpoint:       getEnv("S3_ENDPOINT", "http://localhost:3900"),
@@ -72,14 +75,14 @@ func main() {
 
 	baseURL := getEnv("BASE_URL", "http://localhost:8080")
 
-	log.Println("storage bucket ready")
+	slog.Info("storage bucket ready")
 
 	var webFS fs.FS
 	if sub, err := fs.Sub(web.DistFS, "dist"); err == nil {
 		webFS = sub
-		log.Println("embedded frontend loaded")
+		slog.Info("embedded frontend loaded")
 	} else {
-		log.Println("no embedded frontend found, SPA serving disabled")
+		slog.Info("no embedded frontend found, SPA serving disabled")
 	}
 
 	emailClient := email.New(email.Config{
@@ -102,7 +105,7 @@ func main() {
 	creemWebhookSecret := os.Getenv("CREEM_WEBHOOK_SECRET")
 	creemProProductID := os.Getenv("CREEM_PRO_PRODUCT_ID")
 
-	log.Printf("sendrec %s starting", version)
+	slog.Info("sendrec starting", "version", version)
 
 	srv := server.New(server.Config{
 		Version:                 version,
@@ -132,7 +135,7 @@ func main() {
 	})
 
 	if creemAPIKey != "" {
-		log.Println("Creem billing enabled")
+		slog.Info("Creem billing enabled")
 	}
 
 	var aiClient *video.AIClient
@@ -149,7 +152,7 @@ func main() {
 			getEnv("AI_MODEL", "mistral-small-latest"),
 			aiTimeout,
 		)
-		log.Printf("AI summaries enabled (model: %s, timeout: %s)", getEnv("AI_MODEL", "mistral-small-latest"), aiTimeout)
+		slog.Info("AI summaries enabled", "model", getEnv("AI_MODEL", "mistral-small-latest"), "timeout", aiTimeout.String())
 	}
 
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
@@ -172,21 +175,21 @@ func main() {
 	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("sendrec listening on :%s", port)
+		slog.Info("sendrec listening", "port", port)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 		}
 	}()
 
 	<-shutdownCh
-	log.Println("shutting down...")
+	slog.Info("shutting down")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("shutdown failed: %v", err)
 	}
-	log.Println("shutdown complete")
+	slog.Info("shutdown complete")
 }
 
 func getEnv(key, fallback string) string {
