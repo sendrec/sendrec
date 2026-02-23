@@ -24,4 +24,5 @@ docs/plans/
 
 # Playwright
 web/playwright-report/
+web/playwright-results.json
 web/test-results/
