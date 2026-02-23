@@ -7,7 +7,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: process.env.CI
-    ? [["html"], ["github"], ["json", { outputFile: "playwright-results.json" }]]
+    ? [["html"], ["github"], ["json", { outputFile: "../playwright-results.json" }]]
     : [["html"]],
   timeout: 30_000,
   use: {

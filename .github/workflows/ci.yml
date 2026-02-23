@@ -168,6 +168,12 @@ jobs:
       - name: E2E test summary
         if: always()
         run: |
+          if [ ! -f web/playwright-results.json ]; then
+            echo "## E2E Tests (Playwright)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ No test results found (tests may not have run)" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
           node -e "
             const fs = require('fs');
             const data = JSON.parse(fs.readFileSync('web/playwright-results.json', 'utf8'));
