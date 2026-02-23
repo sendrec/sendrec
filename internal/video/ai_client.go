@@ -28,13 +28,16 @@ type AIClient struct {
 	httpClient *http.Client
 }
 
-func NewAIClient(baseURL, apiKey, model string) *AIClient {
+func NewAIClient(baseURL, apiKey, model string, timeout time.Duration) *AIClient {
+	if timeout <= 0 {
+		timeout = 60 * time.Second
+	}
 	return &AIClient{
 		baseURL: baseURL,
 		apiKey:  apiKey,
 		model:   model,
 		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: timeout,
 		},
 	}
 }

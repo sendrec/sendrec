@@ -137,12 +137,19 @@ func main() {
 
 	var aiClient *video.AIClient
 	if aiEnabled {
+		aiTimeout := 60 * time.Second
+		if v := os.Getenv("AI_TIMEOUT"); v != "" {
+			if d, err := time.ParseDuration(v); err == nil {
+				aiTimeout = d
+			}
+		}
 		aiClient = video.NewAIClient(
 			os.Getenv("AI_BASE_URL"),
 			os.Getenv("AI_API_KEY"),
 			getEnv("AI_MODEL", "mistral-small-latest"),
+			aiTimeout,
 		)
-		log.Printf("AI summaries enabled (model: %s)", getEnv("AI_MODEL", "mistral-small-latest"))
+		log.Printf("AI summaries enabled (model: %s, timeout: %s)", getEnv("AI_MODEL", "mistral-small-latest"), aiTimeout)
 	}
 
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())

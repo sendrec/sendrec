@@ -272,13 +272,14 @@ Generate automatic summaries and chapter markers for transcribed videos using an
 | `AI_BASE_URL` | OpenAI-compatible API base URL | — |
 | `AI_API_KEY` | API key for the AI provider | — |
 | `AI_MODEL` | Model name to use | `mistral-small-latest` |
+| `AI_TIMEOUT` | HTTP timeout for AI API requests. Applies to all providers. Increase for slower endpoints like local Ollama. Uses Go duration format (`60s`, `5m`, `10m`) | `60s` |
 
 **Supported providers:** Any OpenAI-compatible API — Mistral AI, OpenAI, Ollama (local), and others.
 
 Examples:
 - **Mistral AI:** `AI_BASE_URL=https://api.mistral.ai`, `AI_API_KEY=your-key`, `AI_MODEL=mistral-small-latest`
 - **OpenAI:** `AI_BASE_URL=https://api.openai.com`, `AI_API_KEY=your-key`, `AI_MODEL=gpt-4o-mini`
-- **Ollama (local):** `AI_BASE_URL=http://ollama:11434`, `AI_API_KEY=` (empty), `AI_MODEL=llama3.2`
+- **Ollama (local):** `AI_BASE_URL=http://ollama:11434`, `AI_API_KEY=` (empty), `AI_MODEL=llama3.2`, `AI_TIMEOUT=5m`
 
 ### Webhooks (optional)
 
