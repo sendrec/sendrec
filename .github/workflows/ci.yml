@@ -112,3 +112,105 @@ jobs:
 
       - name: Build Go binary
         run: go build -o bin/sendrec ./cmd/sendrec
+
+  e2e:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Start e2e environment
+        run: docker compose -f docker-compose.e2e.yml up --build -d
+
+      - name: Wait for app to be healthy
+        run: |
+          echo "Waiting for sendrec to be healthy..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/api/health > /dev/null 2>&1; then
+              echo "App is healthy!"
+              docker compose -f docker-compose.e2e.yml logs garage-init
+              echo "Testing S3 connectivity on port 3900..."
+              curl -sv http://localhost:3900/ 2>&1 | head -20 || true
+              exit 0
+            fi
+            echo "Attempt $i/60 - waiting..."
+            sleep 3
+          done
+          echo "App failed to start"
+          docker compose -f docker-compose.e2e.yml logs
+          exit 1
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: cd web && pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: cd web && npx playwright install chromium --with-deps
+
+      - name: Run e2e tests
+        run: cd web && pnpm e2e
+        env:
+          BASE_URL: http://localhost:8080
+          DATABASE_URL: postgres://sendrec:sendrec@localhost:5433/sendrec
+
+      - name: E2E test summary
+        if: always()
+        run: |
+          node -e "
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('web/playwright-results.json', 'utf8'));
+            const suites = data.suites || [];
+            let passed = 0, failed = 0, skipped = 0;
+            const rows = [];
+            for (const suite of suites) {
+              const file = suite.title;
+              let sp = 0, sf = 0, ss = 0;
+              for (const spec of (suite.specs || [])) {
+                for (const test of (spec.tests || [])) {
+                  if (test.status === 'expected') { sp++; passed++; }
+                  else if (test.status === 'skipped') { ss++; skipped++; }
+                  else { sf++; failed++; }
+                }
+              }
+              const status = sf > 0 ? '❌' : '✅';
+              rows.push('| ' + status + ' ' + file + ' | ' + sp + ' | ' + sf + ' | ' + ss + ' |');
+            }
+            const total = passed + failed + skipped;
+            const duration = ((data.stats?.duration || 0) / 1000).toFixed(1);
+            const lines = [
+              '## E2E Tests (Playwright)',
+              '',
+              '| Suite | Passed | Failed | Skipped |',
+              '|-------|--------|--------|---------|',
+              ...rows,
+              '| **Total** | **' + passed + '** | **' + failed + '** | **' + skipped + '** |',
+              '',
+              '**' + total + ' tests** in ' + duration + 's — ' + (failed === 0 ? '✅ All passed' : '❌ ' + failed + ' failed'),
+            ];
+            console.log(lines.join('\n'));
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          "
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7
+
+      - name: Stop e2e environment
+        if: always()
+        run: docker compose -f docker-compose.e2e.yml down -v
