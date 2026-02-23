@@ -331,10 +331,10 @@ func TestGetPlaylist_Success(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	shareToken := "playlisttoken"
 
-	mock.ExpectQuery(`SELECT p\.id, p\.title, p\.description, p\.is_shared, p\.share_token, p\.require_email, p\.position, p\.created_at, p\.updated_at`).
+	mock.ExpectQuery(`SELECT p\.id, p\.title, p\.description, p\.is_shared, p\.share_token, p\.require_email, p\.share_password IS NOT NULL, p\.position, p\.created_at, p\.updated_at`).
 		WithArgs("playlist-1", testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "description", "is_shared", "share_token", "require_email", "position", "created_at", "updated_at"}).
-			AddRow("playlist-1", "My Playlist", (*string)(nil), true, &shareToken, false, 0, now, now))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "description", "is_shared", "share_token", "require_email", "has_password", "position", "created_at", "updated_at"}).
+			AddRow("playlist-1", "My Playlist", (*string)(nil), true, &shareToken, false, false, 0, now, now))
 
 	thumbKey := "recordings/user1/thumb.jpg"
 	mock.ExpectQuery(`SELECT v\.id, v\.title, v\.duration, v\.share_token, v\.status, v\.created_at`).
@@ -365,6 +365,9 @@ func TestGetPlaylist_Success(t *testing.T) {
 	}
 	if !resp.IsShared {
 		t.Errorf("expected isShared true")
+	}
+	if resp.HasPassword {
+		t.Errorf("expected hasPassword false")
 	}
 	if len(resp.Videos) != 2 {
 		t.Fatalf("expected 2 videos, got %d", len(resp.Videos))
@@ -401,9 +404,9 @@ func TestGetPlaylist_NotFound(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectQuery(`SELECT p\.id, p\.title, p\.description, p\.is_shared, p\.share_token, p\.require_email, p\.position, p\.created_at, p\.updated_at`).
+	mock.ExpectQuery(`SELECT p\.id, p\.title, p\.description, p\.is_shared, p\.share_token, p\.require_email, p\.share_password IS NOT NULL, p\.position, p\.created_at, p\.updated_at`).
 		WithArgs("nonexistent", testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "description", "is_shared", "share_token", "require_email", "position", "created_at", "updated_at"}))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "description", "is_shared", "share_token", "require_email", "has_password", "position", "created_at", "updated_at"}))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/playlists/{id}", handler.GetPlaylist)

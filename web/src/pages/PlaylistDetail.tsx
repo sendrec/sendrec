@@ -21,6 +21,7 @@ interface PlaylistData {
   isShared: boolean;
   shareToken?: string;
   shareUrl?: string;
+  hasPassword: boolean;
   requireEmail: boolean;
   position: number;
   videoCount: number;
@@ -172,6 +173,7 @@ export function PlaylistDetail() {
       body: JSON.stringify({ sharePassword: passwordInput }),
     });
     setPasswordInput("");
+    setPlaylist((prev) => (prev ? { ...prev, hasPassword: true } : prev));
     showToast("Password set");
   }
 
@@ -181,6 +183,7 @@ export function PlaylistDetail() {
       method: "PATCH",
       body: JSON.stringify({ sharePassword: "" }),
     });
+    setPlaylist((prev) => (prev ? { ...prev, hasPassword: false } : prev));
     showToast("Password removed");
   }
 
@@ -691,38 +694,50 @@ export function PlaylistDetail() {
 
             <div className="detail-setting-row">
               <span className="detail-setting-label">Password</span>
-              <div
-                style={{ display: "flex", gap: 8, alignItems: "center" }}
-              >
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Set a password"
-                  aria-label="Share password"
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: 13,
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 4,
-                    color: "var(--color-text)",
-                    width: 160,
-                  }}
-                />
-                <button
-                  onClick={setSharePassword}
-                  disabled={!passwordInput.trim()}
-                  className="detail-btn"
-                >
-                  Set
-                </button>
-                <button
-                  onClick={removeSharePassword}
-                  className="detail-btn"
-                >
-                  Remove
-                </button>
+              <div className="detail-setting-value">
+                <span>
+                  {playlist.hasPassword ? "Password set" : "No password"}
+                </span>
+                {playlist.hasPassword ? (
+                  <button
+                    onClick={removeSharePassword}
+                    className="detail-btn"
+                  >
+                    Remove password
+                  </button>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    <input
+                      type="password"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="Set a password"
+                      aria-label="Share password"
+                      style={{
+                        padding: "6px 10px",
+                        fontSize: 13,
+                        background: "var(--color-bg)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 4,
+                        color: "var(--color-text)",
+                        width: 160,
+                      }}
+                    />
+                    <button
+                      onClick={setSharePassword}
+                      disabled={!passwordInput.trim()}
+                      className="detail-btn"
+                    >
+                      Set password
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

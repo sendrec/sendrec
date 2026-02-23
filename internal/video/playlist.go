@@ -45,6 +45,7 @@ type playlistVideo struct {
 type playlistDetail struct {
 	playlistItem
 	RequireEmail bool            `json:"requireEmail"`
+	HasPassword  bool            `json:"hasPassword"`
 	Videos       []playlistVideo `json:"videos"`
 }
 
@@ -168,11 +169,11 @@ func (h *Handler) GetPlaylist(w http.ResponseWriter, r *http.Request) {
 	var createdAt, updatedAt time.Time
 	var shareToken *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT p.id, p.title, p.description, p.is_shared, p.share_token, p.require_email, p.position, p.created_at, p.updated_at
+		`SELECT p.id, p.title, p.description, p.is_shared, p.share_token, p.require_email, p.share_password IS NOT NULL, p.position, p.created_at, p.updated_at
 		 FROM playlists p
 		 WHERE p.id = $1 AND p.user_id = $2`,
 		playlistID, userID,
-	).Scan(&detail.ID, &detail.Title, &detail.Description, &detail.IsShared, &shareToken, &detail.RequireEmail, &detail.Position, &createdAt, &updatedAt)
+	).Scan(&detail.ID, &detail.Title, &detail.Description, &detail.IsShared, &shareToken, &detail.RequireEmail, &detail.HasPassword, &detail.Position, &createdAt, &updatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			httputil.WriteError(w, http.StatusNotFound, "playlist not found")
