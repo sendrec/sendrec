@@ -165,50 +165,6 @@ jobs:
           BASE_URL: http://localhost:8080
           DATABASE_URL: postgres://sendrec:sendrec@localhost:5433/sendrec
 
-      - name: E2E test summary
-        if: always()
-        run: |
-          if [ ! -f web/playwright-results.json ]; then
-            echo "## E2E Tests (Playwright)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ No test results found (tests may not have run)" >> $GITHUB_STEP_SUMMARY
-            exit 0
-          fi
-          node -e "
-            const fs = require('fs');
-            const data = JSON.parse(fs.readFileSync('web/playwright-results.json', 'utf8'));
-            const suites = data.suites || [];
-            let passed = 0, failed = 0, skipped = 0;
-            const rows = [];
-            for (const suite of suites) {
-              const file = suite.title;
-              let sp = 0, sf = 0, ss = 0;
-              for (const spec of (suite.specs || [])) {
-                for (const test of (spec.tests || [])) {
-                  if (test.status === 'expected') { sp++; passed++; }
-                  else if (test.status === 'skipped') { ss++; skipped++; }
-                  else { sf++; failed++; }
-                }
-              }
-              const status = sf > 0 ? '❌' : '✅';
-              rows.push('| ' + status + ' ' + file + ' | ' + sp + ' | ' + sf + ' | ' + ss + ' |');
-            }
-            const total = passed + failed + skipped;
-            const duration = ((data.stats?.duration || 0) / 1000).toFixed(1);
-            const lines = [
-              '## E2E Tests (Playwright)',
-              '',
-              '| Suite | Passed | Failed | Skipped |',
-              '|-------|--------|--------|---------|',
-              ...rows,
-              '| **Total** | **' + passed + '** | **' + failed + '** | **' + skipped + '** |',
-              '',
-              '**' + total + ' tests** in ' + duration + 's — ' + (failed === 0 ? '✅ All passed' : '❌ ' + failed + ' failed'),
-            ];
-            console.log(lines.join('\n'));
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
-          "
-
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v6

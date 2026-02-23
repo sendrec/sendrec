@@ -6,9 +6,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  reporter: process.env.CI
-    ? [["html"], ["github"], ["json", { outputFile: "../playwright-results.json" }]]
-    : [["html"]],
+  reporter: process.env.CI ? [["html"], ["github"]] : [["html"]],
   timeout: 30_000,
   use: {
     baseURL: process.env.BASE_URL || "http://localhost:8080",
