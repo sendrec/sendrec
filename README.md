@@ -54,7 +54,8 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 - **View notifications** — off, views only, comments only, both, or daily digest
 - **Embeddable player** — lightweight iframe with captions, CTA, and milestone tracking
 - **Custom branding** — logo, colors, footer text, custom CSS injection, per-user defaults with per-video overrides
-- **Library** — folders and tags, search by title and transcript, batch delete/move/tag, inline title editing
+- **Library** — folders, tags, and playlists; search by title and transcript; batch delete/move/tag; inline title editing
+- **Playlists** — curated video collections with custom ordering, shared watch pages with auto-advance, watched badges, password protection, and email gating
 - **Dark/light mode** — system preference detection, manual toggle, theme-aware charts
 - **Email gate** — require viewer email before watching, per-viewer analytics with email, completion tracking
 - **SEO** — OpenGraph tags, Twitter Cards, VideoObject JSON-LD, canonical URLs, robots.txt
