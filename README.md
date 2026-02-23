@@ -10,13 +10,13 @@ SendRec is an open-source alternative to Loom for teams that need their data to 
 
 ### Record
 
-Record your screen, camera, or both — directly in the browser. Pause and resume, draw annotations live, flip between front and back cameras on mobile. Upload existing MP4, WebM, and MOV files via drag-and-drop.
+Record your screen, camera, or both — directly in the browser. A 3-2-1 countdown gives you time to prepare. Pause and resume, draw annotations live, flip between front and back cameras on mobile.
 
 ![Recording](.github/screenshots/recording.png)
 
 ### Upload
 
-Drag-and-drop existing MP4, WebM, and MOV files. Set a title, upload directly to S3 via presigned URLs, and get a shareable link instantly.
+Drag and drop up to 10 videos at once — MP4, WebM, and MOV. Files upload directly to S3 via presigned URLs, and each gets a shareable link instantly.
 
 ![Upload](.github/screenshots/upload.png)
 
@@ -28,7 +28,7 @@ Every video gets a shareable link with password protection, expiry dates, and pe
 
 ### Watch
 
-Server-rendered watch pages with AI-generated summaries and chapters, a clickable transcript panel, closed captions, timestamped comments, and emoji reactions. Embed videos in docs and wikis with a lightweight iframe player.
+Server-rendered watch pages with AI-generated summaries and chapter markers in the seek bar, a clickable transcript panel, closed captions, timestamped comments, and emoji reactions. SEO-optimized with OpenGraph tags, Twitter Cards, and VideoObject JSON-LD. Embed videos in docs and wikis with a lightweight iframe player.
 
 ![Watch page](.github/screenshots/watch.png)
 
@@ -40,23 +40,24 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 
 ### Features
 
-- **Screen & camera recording** — pause/resume, webcam overlay, drawing annotations, mobile front/back camera
-- **Video upload** — drag-and-drop MP4, WebM, MOV
+- **Screen & camera recording** — 3-2-1 countdown, pause/resume, webcam overlay, drawing annotations, mobile front/back camera
+- **Video upload** — drag-and-drop up to 10 files at once, MP4/WebM/MOV, per-file progress
 - **Automatic transcription** — whisper.cpp, closed captions on watch and embed pages, full-text search
 - **Transcript editing** — trim by clicking transcript segments, filler word removal with preview, AI-generated title suggestions
 - **Sharing** — expiring or permanent links, password protection, per-video download toggle, custom thumbnails
 - **Comments & reactions** — timestamped comments, emoji reactions, configurable modes
 - **CTA buttons** — call-to-action overlay on video end with click tracking
-- **AI summaries** — AI-generated summaries and chapter markers via any OpenAI-compatible API
+- **AI summaries** — AI-generated summaries and chapter markers in the seek bar via any OpenAI-compatible API
 - **Viewer analytics** — daily view charts, completion funnel, CTA click-through rates
 - **Generic webhooks** — POST events (video created/ready/deleted, viewed, comment, milestone, CTA click) to any URL with HMAC-SHA256 signing, retries, and delivery log
 - **Slack notifications** — per-user Slack incoming webhook for view and comment alerts
 - **View notifications** — off, views only, comments only, both, or daily digest
 - **Embeddable player** — lightweight iframe with captions, CTA, and milestone tracking
 - **Custom branding** — logo, colors, footer text, custom CSS injection, per-user defaults with per-video overrides
-- **Library** — folders and tags, search by title and transcript, inline title editing, overflow menu with grouped actions
+- **Library** — folders and tags, search by title and transcript, batch delete/move/tag, inline title editing
 - **Dark/light mode** — system preference detection, manual toggle, theme-aware charts
 - **Email gate** — require viewer email before watching, per-viewer analytics with email, completion tracking
+- **SEO** — OpenGraph tags, Twitter Cards, VideoObject JSON-LD, canonical URLs, robots.txt
 - **Subscription billing** — optional Creem integration for free/Pro tiers, webhook-based plan activation, customer portal
 - **Integrations** — Nextcloud (oEmbed + API keys), per-user API keys, OpenAPI docs
 - **Self-hostable** — single Go binary, Docker Compose, PostgreSQL, S3-compatible storage
@@ -106,7 +107,7 @@ Single Go binary that:
 - Serves the React SPA (embedded at build time)
 - Handles REST API requests (`/api/*`)
 - Serves interactive API documentation (`/api/docs`)
-- Renders server-side watch pages with OpenGraph tags (`/watch/:token`)
+- Renders server-side watch pages with OpenGraph tags, Twitter Cards, and JSON-LD (`/watch/:token`)
 - Runs database migrations on startup
 
 Video recordings happen entirely in the browser using `getDisplayMedia` + `MediaRecorder`. Users can also upload existing video files (MP4, WebM, MOV) via drag-and-drop. Files upload directly to S3 via presigned URLs — the server never touches video bytes.
