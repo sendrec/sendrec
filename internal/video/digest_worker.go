@@ -2,7 +2,7 @@ package video
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/sendrec/sendrec/internal/database"
@@ -62,7 +62,7 @@ func processDigest(ctx context.Context, db database.DBTX, notifier ViewNotifier,
 		   )
 		 ORDER BY v.user_id, view_count DESC, comment_count DESC`)
 	if err != nil {
-		log.Printf("digest-worker: query failed: %v", err)
+		slog.Error("digest-worker: query failed", "error", err)
 		return
 	}
 	defer rows.Close()
@@ -72,7 +72,7 @@ func processDigest(ctx context.Context, db database.DBTX, notifier ViewNotifier,
 		var videoID, title, shareToken, userID, ownerEmail, name string
 		var viewCount, commentCount int64
 		if err := rows.Scan(&videoID, &title, &shareToken, &userID, &ownerEmail, &name, &viewCount, &commentCount); err != nil {
-			log.Printf("digest-worker: scan failed: %v", err)
+			slog.Error("digest-worker: scan failed", "error", err)
 			continue
 		}
 		d, ok := digests[userID]
@@ -88,21 +88,21 @@ func processDigest(ctx context.Context, db database.DBTX, notifier ViewNotifier,
 		})
 	}
 	if err := rows.Err(); err != nil {
-		log.Printf("digest-worker: row iteration error: %v", err)
+		slog.Error("digest-worker: row iteration error", "error", err)
 	}
 
 	sent := 0
 	totalVideos := 0
 	for userID, d := range digests {
 		if err := notifier.SendDigestNotification(ctx, d.email, d.name, d.videos); err != nil {
-			log.Printf("digest-worker: failed to send digest for user %s: %v", userID, err)
+			slog.Error("digest-worker: failed to send digest", "user_id", userID, "error", err)
 			continue
 		}
 		sent++
 		totalVideos += len(d.videos)
 	}
 	if sent > 0 {
-		log.Printf("digest-worker: sent %d digest emails covering %d videos", sent, totalVideos)
+		slog.Info("digest-worker: sent digest emails", "emails", sent, "videos", totalVideos)
 	}
 }
 
@@ -111,13 +111,13 @@ func StartDigestWorker(ctx context.Context, db database.DBTX, notifier ViewNotif
 		return
 	}
 	go func() {
-		log.Println("digest-worker: started")
+		slog.Info("digest-worker: started")
 		for {
 			d := durationUntilNextRun(time.Now().UTC())
-			log.Printf("digest-worker: next run in %v", d)
+			slog.Info("digest-worker: next run scheduled", "duration", d)
 			select {
 			case <-ctx.Done():
-				log.Println("digest-worker: shutting down")
+				slog.Info("digest-worker: shutting down")
 				return
 			case <-time.After(d):
 				processDigest(ctx, db, notifier, baseURL)

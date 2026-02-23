@@ -3,7 +3,7 @@ package video
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -238,7 +238,7 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 				videoID,
 			).Scan(&ownerEmail, &ownerName, &videoTitle)
 			if err != nil {
-				log.Printf("failed to fetch owner info for comment notification: %v", err)
+				slog.Error("comment: failed to fetch owner info for notification", "video_id", videoID, "error", err)
 				return
 			}
 			watchURL := h.baseURL + "/watch/" + shareToken
@@ -260,18 +260,18 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 							"body":     req.Body,
 						},
 					}); err != nil {
-						log.Printf("webhook dispatch failed for video.comment: %v", err)
+						slog.Error("webhook: dispatch failed for video.comment", "video_id", videoID, "error", err)
 					}
 				}
 			}
 			if shouldSlackComment {
 				if err := h.slackNotifier.SendCommentNotification(ctx, ownerEmail, ownerName, videoTitle, authorName, req.Body, watchURL); err != nil {
-					log.Printf("failed to send Slack comment notification: %v", err)
+					slog.Error("comment: failed to send Slack notification", "video_id", videoID, "error", err)
 				}
 			}
 			if shouldEmailComment {
 				if err := h.commentNotifier.SendCommentNotification(ctx, ownerEmail, ownerName, videoTitle, authorName, req.Body, watchURL); err != nil {
-					log.Printf("failed to send comment notification: %v", err)
+					slog.Error("comment: failed to send email notification", "video_id", videoID, "error", err)
 				}
 			}
 		}()

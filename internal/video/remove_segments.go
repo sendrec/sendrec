@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -169,21 +169,21 @@ func removeSegmentsFromVideo(inputPath, outputPath, contentType string, segments
 }
 
 func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, thumbnailKey, contentType string, segments []segmentRange, originalDuration int) {
-	log.Printf("remove-segments: starting for video %s (%d segments)", videoID, len(segments))
+	slog.Info("remove-segments: starting", "video_id", videoID, "segments", len(segments))
 
 	setReadyFallback := func() {
 		if _, err := db.Exec(ctx,
 			`UPDATE videos SET status = 'ready', updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
-			log.Printf("remove-segments: failed to set fallback ready status for %s: %v", videoID, err)
+			slog.Error("remove-segments: failed to set fallback ready status", "video_id", videoID, "error", err)
 		}
 	}
 
 	ext := extensionForContentType(contentType)
 	tmpInput, err := os.CreateTemp("", "sendrec-remseg-input-*"+ext)
 	if err != nil {
-		log.Printf("remove-segments: failed to create temp input file: %v", err)
+		slog.Error("remove-segments: failed to create temp input file", "error", err)
 		setReadyFallback()
 		return
 	}
@@ -192,7 +192,7 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 	defer func() { _ = os.Remove(tmpInputPath) }()
 
 	if err := storage.DownloadToFile(ctx, fileKey, tmpInputPath); err != nil {
-		log.Printf("remove-segments: failed to download video %s: %v", videoID, err)
+		slog.Error("remove-segments: failed to download video", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
@@ -201,7 +201,7 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 
 	tmpOutput, err := os.CreateTemp("", "sendrec-remseg-output-*"+ext)
 	if err != nil {
-		log.Printf("remove-segments: failed to create temp output file: %v", err)
+		slog.Error("remove-segments: failed to create temp output file", "error", err)
 		setReadyFallback()
 		return
 	}
@@ -210,13 +210,13 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
 	if err := removeSegmentsFromVideo(tmpInputPath, tmpOutputPath, contentType, segments, audioPresent); err != nil {
-		log.Printf("remove-segments: ffmpeg failed for %s: %v", videoID, err)
+		slog.Error("remove-segments: ffmpeg failed", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
 
 	if err := storage.UploadFile(ctx, fileKey, tmpOutputPath, contentType); err != nil {
-		log.Printf("remove-segments: failed to upload processed video %s: %v", videoID, err)
+		slog.Error("remove-segments: failed to upload processed video", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
@@ -231,13 +231,13 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 		`UPDATE videos SET status = 'ready', duration = $1, updated_at = now() WHERE id = $2`,
 		newDuration, videoID,
 	); err != nil {
-		log.Printf("remove-segments: failed to update status for %s: %v", videoID, err)
+		slog.Error("remove-segments: failed to update status", "video_id", videoID, "error", err)
 		return
 	}
 
 	GenerateThumbnail(ctx, db, storage, videoID, fileKey, thumbnailKey)
 	if err := EnqueueTranscription(ctx, db, videoID); err != nil {
-		log.Printf("remove-segments: failed to enqueue transcription for %s: %v", videoID, err)
+		slog.Error("remove-segments: failed to enqueue transcription", "video_id", videoID, "error", err)
 	}
-	log.Printf("remove-segments: completed for video %s", videoID)
+	slog.Info("remove-segments: completed", "video_id", videoID)
 }

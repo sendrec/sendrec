@@ -3,7 +3,7 @@ package video
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -26,7 +26,7 @@ func processNextTranscription(ctx context.Context, db database.DBTX, storage Obj
 		 WHERE transcript_status = 'processing'
 		   AND (transcript_started_at < now() - INTERVAL '10 minutes' OR transcript_started_at IS NULL)`,
 	); err != nil {
-		log.Printf("transcribe-worker: failed to reset stuck jobs: %v", err)
+		slog.Error("transcribe-worker: failed to reset stuck jobs", "error", err)
 	}
 
 	// Claim the next pending job
@@ -43,24 +43,24 @@ func processNextTranscription(ctx context.Context, db database.DBTX, storage Obj
 	).Scan(&videoID, &fileKey, &userID, &shareToken)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			log.Printf("transcribe-worker: failed to claim job: %v", err)
+			slog.Error("transcribe-worker: failed to claim job", "error", err)
 		}
 		return
 	}
 
-	log.Printf("transcribe-worker: claimed video %s", videoID)
+	slog.Info("transcribe-worker: claimed video", "video_id", videoID)
 	processTranscription(ctx, db, storage, videoID, fileKey, userID, shareToken, aiEnabled)
 }
 
 func StartTranscriptionWorker(ctx context.Context, db database.DBTX, storage ObjectStorage, interval time.Duration, aiEnabled bool) {
 	go func() {
-		log.Println("transcribe-worker: started")
+		slog.Info("transcribe-worker: started")
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
-				log.Println("transcribe-worker: shutting down")
+				slog.Info("transcribe-worker: shutting down")
 				return
 			case <-ticker.C:
 				processNextTranscription(ctx, db, storage, aiEnabled)

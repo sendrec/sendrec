@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strconv"
@@ -170,30 +170,30 @@ func parseWhisperJSON(jsonPath string) ([]TranscriptSegment, error) {
 
 func processTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, userID, shareToken string, aiEnabled bool) {
 	if !isTranscriptionAvailable() {
-		log.Printf("transcribe: transcription not available, marking video %s as failed", videoID)
+		slog.Warn("transcribe: transcription not available, marking as failed", "video_id", videoID)
 		if _, err := db.Exec(ctx,
 			`UPDATE videos SET transcript_status = 'failed', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
-			log.Printf("transcribe: failed to set failed status for %s: %v", videoID, err)
+			slog.Error("transcribe: failed to set failed status", "video_id", videoID, "error", err)
 		}
 		return
 	}
 
-	log.Printf("transcribe: starting for video %s", videoID)
+	slog.Info("transcribe: starting", "video_id", videoID)
 
 	setFailed := func() {
 		if _, err := db.Exec(ctx,
 			`UPDATE videos SET transcript_status = 'failed', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
-			log.Printf("transcribe: failed to set failed status for %s: %v", videoID, err)
+			slog.Error("transcribe: failed to set failed status", "video_id", videoID, "error", err)
 		}
 	}
 
 	tmpVideo, err := os.CreateTemp("", "sendrec-transcribe-*.webm")
 	if err != nil {
-		log.Printf("transcribe: failed to create temp video file: %v", err)
+		slog.Error("transcribe: failed to create temp video file", "error", err)
 		setFailed()
 		return
 	}
@@ -202,14 +202,14 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 	defer func() { _ = os.Remove(tmpVideoPath) }()
 
 	if err := storage.DownloadToFile(ctx, fileKey, tmpVideoPath); err != nil {
-		log.Printf("transcribe: failed to download video %s: %v", videoID, err)
+		slog.Error("transcribe: failed to download video", "video_id", videoID, "error", err)
 		setFailed()
 		return
 	}
 
 	tmpAudio, err := os.CreateTemp("", "sendrec-transcribe-*.wav")
 	if err != nil {
-		log.Printf("transcribe: failed to create temp audio file: %v", err)
+		slog.Error("transcribe: failed to create temp audio file", "error", err)
 		setFailed()
 		return
 	}
@@ -219,23 +219,23 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 
 	if err := extractAudio(tmpVideoPath, tmpAudioPath); err != nil {
 		if errors.Is(err, errNoAudio) {
-			log.Printf("transcribe: video %s has no audio stream", videoID)
+			slog.Info("transcribe: video has no audio stream", "video_id", videoID)
 			if _, dbErr := db.Exec(ctx,
 				`UPDATE videos SET transcript_status = 'no_audio', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
 				videoID,
 			); dbErr != nil {
-				log.Printf("transcribe: failed to set no_audio status for %s: %v", videoID, dbErr)
+				slog.Error("transcribe: failed to set no_audio status", "video_id", videoID, "error", dbErr)
 			}
 			return
 		}
-		log.Printf("transcribe: audio extraction failed for %s: %v", videoID, err)
+		slog.Error("transcribe: audio extraction failed", "video_id", videoID, "error", err)
 		setFailed()
 		return
 	}
 
 	tmpOutput, err := os.CreateTemp("", "sendrec-transcribe-out-*")
 	if err != nil {
-		log.Printf("transcribe: failed to create temp output file: %v", err)
+		slog.Error("transcribe: failed to create temp output file", "error", err)
 		setFailed()
 		return
 	}
@@ -249,14 +249,14 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 	}()
 
 	if err := runWhisper(tmpAudioPath, tmpOutputPrefix); err != nil {
-		log.Printf("transcribe: whisper failed for %s: %v", videoID, err)
+		slog.Error("transcribe: whisper failed", "video_id", videoID, "error", err)
 		setFailed()
 		return
 	}
 
 	segments, err := parseWhisperJSON(tmpOutputPrefix + ".json")
 	if err != nil {
-		log.Printf("transcribe: failed to parse whisper output for %s: %v", videoID, err)
+		slog.Error("transcribe: failed to parse whisper output", "video_id", videoID, "error", err)
 		setFailed()
 		return
 	}
@@ -264,14 +264,14 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 	transcriptKey := transcriptFileKey(userID, shareToken)
 	vttPath := tmpOutputPrefix + ".vtt"
 	if err := storage.UploadFile(ctx, transcriptKey, vttPath, "text/vtt"); err != nil {
-		log.Printf("transcribe: failed to upload VTT for %s: %v", videoID, err)
+		slog.Error("transcribe: failed to upload VTT", "video_id", videoID, "error", err)
 		setFailed()
 		return
 	}
 
 	segmentsJSON, err := json.Marshal(segments)
 	if err != nil {
-		log.Printf("transcribe: failed to marshal segments for %s: %v", videoID, err)
+		slog.Error("transcribe: failed to marshal segments", "video_id", videoID, "error", err)
 		setFailed()
 		return
 	}
@@ -280,19 +280,19 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 		`UPDATE videos SET transcript_key = $1, transcript_json = $2, transcript_status = 'ready', transcript_started_at = NULL, updated_at = now() WHERE id = $3`,
 		transcriptKey, string(segmentsJSON), videoID,
 	); err != nil {
-		log.Printf("transcribe: failed to update transcript data for %s: %v", videoID, err)
+		slog.Error("transcribe: failed to update transcript data", "video_id", videoID, "error", err)
 		setFailed()
 		return
 	}
 
-	log.Printf("transcribe: completed for video %s (%d segments)", videoID, len(segments))
+	slog.Info("transcribe: completed", "video_id", videoID, "segments", len(segments))
 
 	if aiEnabled {
 		if _, err := db.Exec(ctx,
 			`UPDATE videos SET summary_status = 'pending', updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
-			log.Printf("transcribe: failed to enqueue summary for %s: %v", videoID, err)
+			slog.Error("transcribe: failed to enqueue summary", "video_id", videoID, "error", err)
 		}
 	}
 }

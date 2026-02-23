@@ -3,7 +3,7 @@ package video
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 
@@ -29,21 +29,21 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) er
 }
 
 func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey, contentType string) {
-	log.Printf("composite: starting webcam overlay for video %s", videoID)
+	slog.Info("composite: starting webcam overlay", "video_id", videoID)
 
 	setReadyFallback := func() {
 		if _, err := db.Exec(ctx,
 			`UPDATE videos SET status = 'ready', webcam_key = NULL, updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
-			log.Printf("composite: failed to set fallback ready status for %s: %v", videoID, err)
+			slog.Error("composite: failed to set fallback ready status", "video_id", videoID, "error", err)
 		}
 	}
 
 	ext := extensionForContentType(contentType)
 	tmpScreen, err := os.CreateTemp("", "sendrec-composite-screen-*"+ext)
 	if err != nil {
-		log.Printf("composite: failed to create temp screen file: %v", err)
+		slog.Error("composite: failed to create temp screen file", "error", err)
 		setReadyFallback()
 		return
 	}
@@ -52,14 +52,14 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	defer func() { _ = os.Remove(tmpScreenPath) }()
 
 	if err := storage.DownloadToFile(ctx, screenKey, tmpScreenPath); err != nil {
-		log.Printf("composite: failed to download screen %s: %v", videoID, err)
+		slog.Error("composite: failed to download screen", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
 
 	tmpWebcam, err := os.CreateTemp("", "sendrec-composite-webcam-*"+ext)
 	if err != nil {
-		log.Printf("composite: failed to create temp webcam file: %v", err)
+		slog.Error("composite: failed to create temp webcam file", "error", err)
 		setReadyFallback()
 		return
 	}
@@ -68,14 +68,14 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	defer func() { _ = os.Remove(tmpWebcamPath) }()
 
 	if err := storage.DownloadToFile(ctx, webcamKey, tmpWebcamPath); err != nil {
-		log.Printf("composite: failed to download webcam %s: %v", videoID, err)
+		slog.Error("composite: failed to download webcam", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
 
 	tmpOutput, err := os.CreateTemp("", "sendrec-composite-output-*"+ext)
 	if err != nil {
-		log.Printf("composite: failed to create temp output file: %v", err)
+		slog.Error("composite: failed to create temp output file", "error", err)
 		setReadyFallback()
 		return
 	}
@@ -84,32 +84,32 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
 	if err := compositeOverlay(tmpScreenPath, tmpWebcamPath, tmpOutputPath, contentType); err != nil {
-		log.Printf("composite: ffmpeg failed for %s: %v", videoID, err)
+		slog.Error("composite: ffmpeg failed", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
 
 	if err := storage.UploadFile(ctx, screenKey, tmpOutputPath, contentType); err != nil {
-		log.Printf("composite: failed to upload composited video %s: %v", videoID, err)
+		slog.Error("composite: failed to upload composited video", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
 	}
 
 	if err := storage.DeleteObject(ctx, webcamKey); err != nil {
-		log.Printf("composite: failed to delete webcam file %s: %v", webcamKey, err)
+		slog.Error("composite: failed to delete webcam file", "key", webcamKey, "error", err)
 	}
 
 	if _, err := db.Exec(ctx,
 		`UPDATE videos SET status = 'ready', webcam_key = NULL, updated_at = now() WHERE id = $1`,
 		videoID,
 	); err != nil {
-		log.Printf("composite: failed to update status for %s: %v", videoID, err)
+		slog.Error("composite: failed to update status", "video_id", videoID, "error", err)
 		return
 	}
 
 	GenerateThumbnail(ctx, db, storage, videoID, screenKey, thumbnailKey)
 	if err := EnqueueTranscription(ctx, db, videoID); err != nil {
-		log.Printf("composite: failed to enqueue transcription for %s: %v", videoID, err)
+		slog.Error("composite: failed to enqueue transcription", "video_id", videoID, "error", err)
 	}
-	log.Printf("composite: completed for video %s", videoID)
+	slog.Info("composite: completed", "video_id", videoID)
 }

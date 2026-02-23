@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -1989,7 +1989,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusNotFound)
 		if err := notFoundPageTemplate.Execute(w, notFoundPageData{Nonce: nonce}); err != nil {
-			log.Printf("failed to render not found page: %v", err)
+			slog.Error("watch-page: failed to render not found page", "error", err)
 		}
 		return
 	}
@@ -2014,7 +2014,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusGone)
 		if err := expiredPageTemplate.Execute(w, expiredPageData{Nonce: nonce}); err != nil {
-			log.Printf("failed to render expired page: %v", err)
+			slog.Error("watch-page: failed to render expired page", "error", err)
 		}
 		return
 	}
@@ -2028,7 +2028,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 				Nonce:      nonce,
 				Branding:   branding,
 			}); err != nil {
-				log.Printf("failed to render password page: %v", err)
+				slog.Error("watch-page: failed to render password page", "error", err)
 			}
 			return
 		}
@@ -2042,7 +2042,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 				ShareToken: shareToken,
 				Nonce:      nonce,
 			}); err != nil {
-				log.Printf("failed to render email gate page: %v", err)
+				slog.Error("watch-page: failed to render email gate page", "error", err)
 			}
 			return
 		}
@@ -2059,7 +2059,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 			`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
 			videoID, hash,
 		); err != nil {
-			log.Printf("failed to record view for %s: %v", videoID, err)
+			slog.Error("watch-page: failed to record view", "video_id", videoID, "error", err)
 		}
 		h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 	}()
@@ -2149,7 +2149,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		JSONLD:             template.JS(jsonLD),
 		SubscriptionPlan:   subscriptionPlan,
 	}); err != nil {
-		log.Printf("failed to render watch page: %v", err)
+		slog.Error("watch-page: failed to render watch page", "error", err)
 	}
 }
 

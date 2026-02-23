@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -127,7 +127,7 @@ func extractFrame(inputPath, outputPath string) error {
 func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, thumbnailKey string) {
 	tmpVideo, err := os.CreateTemp("", "sendrec-thumb-*.webm")
 	if err != nil {
-		log.Printf("thumbnail: failed to create temp video file: %v", err)
+		slog.Error("thumbnail: failed to create temp video file", "error", err)
 		return
 	}
 	tmpVideoPath := tmpVideo.Name()
@@ -135,13 +135,13 @@ func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStor
 	defer func() { _ = os.Remove(tmpVideoPath) }()
 
 	if err := storage.DownloadToFile(ctx, fileKey, tmpVideoPath); err != nil {
-		log.Printf("thumbnail: failed to download video %s: %v", videoID, err)
+		slog.Error("thumbnail: failed to download video", "video_id", videoID, "error", err)
 		return
 	}
 
 	tmpThumb, err := os.CreateTemp("", "sendrec-thumb-*.jpg")
 	if err != nil {
-		log.Printf("thumbnail: failed to create temp thumbnail file: %v", err)
+		slog.Error("thumbnail: failed to create temp thumbnail file", "error", err)
 		return
 	}
 	tmpThumbPath := tmpThumb.Name()
@@ -149,27 +149,27 @@ func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStor
 	defer func() { _ = os.Remove(tmpThumbPath) }()
 
 	if err := extractFrame(tmpVideoPath, tmpThumbPath); err != nil {
-		log.Printf("thumbnail: ffmpeg failed for video %s: %v", videoID, err)
+		slog.Error("thumbnail: ffmpeg failed", "video_id", videoID, "error", err)
 		return
 	}
 
 	// If -ss 2 produced a 0-byte file (video shorter than 2s), retry at the start
 	if info, err := os.Stat(tmpThumbPath); err == nil && info.Size() == 0 {
-		log.Printf("thumbnail: video %s too short for seek=2, retrying at seek=0", videoID)
+		slog.Warn("thumbnail: video too short for seek=2, retrying at seek=0", "video_id", videoID)
 		if err := extractFrameAt(tmpVideoPath, tmpThumbPath, 0); err != nil {
-			log.Printf("thumbnail: ffmpeg retry failed for video %s: %v", videoID, err)
+			slog.Error("thumbnail: ffmpeg retry failed", "video_id", videoID, "error", err)
 			return
 		}
 	}
 
 	// Skip upload if thumbnail is still empty
 	if info, err := os.Stat(tmpThumbPath); err != nil || info.Size() == 0 {
-		log.Printf("thumbnail: no frame extracted for video %s, skipping", videoID)
+		slog.Warn("thumbnail: no frame extracted, skipping", "video_id", videoID)
 		return
 	}
 
 	if err := storage.UploadFile(ctx, thumbnailKey, tmpThumbPath, "image/jpeg"); err != nil {
-		log.Printf("thumbnail: failed to upload thumbnail for video %s: %v", videoID, err)
+		slog.Error("thumbnail: failed to upload", "video_id", videoID, "error", err)
 		return
 	}
 
@@ -177,6 +177,6 @@ func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStor
 		`UPDATE videos SET thumbnail_key = $1, updated_at = now() WHERE id = $2`,
 		thumbnailKey, videoID,
 	); err != nil {
-		log.Printf("thumbnail: failed to update thumbnail_key for video %s: %v", videoID, err)
+		slog.Error("thumbnail: failed to update thumbnail_key", "video_id", videoID, "error", err)
 	}
 }

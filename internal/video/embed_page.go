@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"html/template"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -468,7 +468,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusNotFound)
 		if err := notFoundPageTemplate.Execute(w, notFoundPageData{Nonce: nonce}); err != nil {
-			log.Printf("failed to render not found page: %v", err)
+			slog.Error("embed-page: failed to render not found page", "error", err)
 		}
 		return
 	}
@@ -479,7 +479,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusGone)
 		if err := expiredPageTemplate.Execute(w, expiredPageData{Nonce: nonce}); err != nil {
-			log.Printf("failed to render expired page: %v", err)
+			slog.Error("embed-page: failed to render expired page", "error", err)
 		}
 		return
 	}
@@ -492,7 +492,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 				ShareToken: shareToken,
 				Nonce:      nonce,
 			}); err != nil {
-				log.Printf("failed to render embed password page: %v", err)
+				slog.Error("embed-page: failed to render password page", "error", err)
 			}
 			return
 		}
@@ -506,7 +506,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 				ShareToken: shareToken,
 				Nonce:      nonce,
 			}); err != nil {
-				log.Printf("failed to render embed email gate page: %v", err)
+				slog.Error("embed-page: failed to render email gate page", "error", err)
 			}
 			return
 		}
@@ -523,7 +523,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 			`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
 			videoID, hash,
 		); err != nil {
-			log.Printf("failed to record embed view for %s: %v", videoID, err)
+			slog.Error("embed-page: failed to record view", "video_id", videoID, "error", err)
 		}
 		h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 	}()
@@ -569,6 +569,6 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		Chapters:     chapterList,
 		ChaptersJSON: template.JS(chaptersJSONBytes),
 	}); err != nil {
-		log.Printf("failed to render embed page: %v", err)
+		slog.Error("embed-page: failed to render embed page", "error", err)
 	}
 }
