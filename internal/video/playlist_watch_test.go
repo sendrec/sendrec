@@ -19,7 +19,7 @@ var playlistWatchColumns = []string{
 }
 
 var playlistVideosColumns = []string{
-	"id", "title", "duration", "share_token", "content_type", "user_id", "has_thumbnail",
+	"id", "title", "duration", "share_token", "content_type", "user_id", "thumbnail_key",
 }
 
 func playlistWatchRequest(shareToken string) *http.Request {
@@ -53,11 +53,12 @@ func TestPlaylistWatchPage_Success(t *testing.T) {
 			"playlist-1", "My Playlist", (*string)(nil), (*string)(nil), false,
 		))
 
+	thumbKey := "recordings/user-1/vtoken2abcde.jpg"
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id`).
 		WithArgs("playlist-1").
 		WillReturnRows(pgxmock.NewRows(playlistVideosColumns).
-			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", false).
-			AddRow("vid-2", "Second Video", 300, "vtoken2abcde", "video/mp4", "user-1", true),
+			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", (*string)(nil)).
+			AddRow("vid-2", "Second Video", 300, "vtoken2abcde", "video/mp4", "user-1", &thumbKey),
 		)
 
 	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))

@@ -65,6 +65,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         .gate-container h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
         .gate-container p { color: #94a3b8; margin-bottom: 1.5rem; }
         .gate-error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
+        .gate-error.visible { display: block; }
         .gate-container input[type="password"] {
             width: 100%;
             padding: 0.75rem 1rem;
@@ -102,6 +103,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         .gate-container h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
         .gate-container p { color: #94a3b8; margin-bottom: 1.5rem; }
         .gate-error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
+        .gate-error.visible { display: block; }
         .gate-container input[type="email"] {
             width: 100%;
             padding: 0.75rem 1rem;
@@ -282,6 +284,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             color: #ffffff;
             z-index: 10;
         }
+        .hidden { display: none; }
         .next-overlay.hidden { display: none; }
         .next-overlay .next-label {
             font-size: 0.875rem;
@@ -382,16 +385,16 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             var errEl = document.getElementById('error-msg');
             var pw = document.getElementById('password-input').value;
             btn.disabled = true;
-            errEl.style.display = 'none';
+            errEl.classList.remove('visible');
             fetch('/api/watch/playlist/{{.ShareToken}}/verify', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({password: pw})
             }).then(function(r) {
                 if (r.ok) { window.location.reload(); }
-                else { return r.json().then(function(d) { errEl.textContent = d.error || 'Incorrect password'; errEl.style.display = 'block'; btn.disabled = false; }); }
+                else { return r.json().then(function(d) { errEl.textContent = d.error || 'Incorrect password'; errEl.classList.add('visible'); btn.disabled = false; }); }
             }).catch(function() {
-                errEl.textContent = 'Something went wrong'; errEl.style.display = 'block'; btn.disabled = false;
+                errEl.textContent = 'Something went wrong'; errEl.classList.add('visible'); btn.disabled = false;
             });
         });
     </script>
@@ -412,16 +415,16 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             var errEl = document.getElementById('error-msg');
             var email = document.getElementById('email-input').value;
             btn.disabled = true;
-            errEl.style.display = 'none';
+            errEl.classList.remove('visible');
             fetch('/api/watch/playlist/{{.ShareToken}}/identify', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({email: email})
             }).then(function(r) {
                 if (r.ok) { window.location.reload(); }
-                else { return r.json().then(function(d) { errEl.textContent = d.error || 'Something went wrong'; errEl.style.display = 'block'; btn.disabled = false; }); }
+                else { return r.json().then(function(d) { errEl.textContent = d.error || 'Something went wrong'; errEl.classList.add('visible'); btn.disabled = false; }); }
             }).catch(function() {
-                errEl.textContent = 'Something went wrong'; errEl.style.display = 'block'; btn.disabled = false;
+                errEl.textContent = 'Something went wrong'; errEl.classList.add('visible'); btn.disabled = false;
             });
         });
     </script>
@@ -447,7 +450,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                         <div class="video-title" title="{{$v.Title}}">{{$v.Title}}</div>
                         <div class="video-duration">{{formatDuration $v.Duration}}</div>
                     </div>
-                    <span class="watched-badge" style="display:none;">&#10003;</span>
+                    <span class="watched-badge hidden">&#10003;</span>
                 </li>
                 {{end}}
             </ul>
@@ -507,7 +510,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                 var idx = parseInt(li.getAttribute('data-index'), 10);
                 var badge = li.querySelector('.watched-badge');
                 if (badge && videos[idx]) {
-                    badge.style.display = watched.has(videos[idx].id) ? 'inline' : 'none';
+                    if (watched.has(videos[idx].id)) { badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
                 }
             });
         }
@@ -651,7 +654,7 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(r.Context(),
 		`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id,
-		        v.thumbnail_key IS NOT NULL AS has_thumbnail
+		        v.thumbnail_key
 		 FROM playlist_videos pv
 		 JOIN videos v ON v.id = pv.video_id AND v.status IN ('ready', 'processing')
 		 WHERE pv.playlist_id = $1
@@ -668,9 +671,9 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id, videoTitle, videoShareToken, contentType, userID string
 		var duration int
-		var hasThumbnail bool
+		var thumbnailKey *string
 
-		if err := rows.Scan(&id, &videoTitle, &duration, &videoShareToken, &contentType, &userID, &hasThumbnail); err != nil {
+		if err := rows.Scan(&id, &videoTitle, &duration, &videoShareToken, &contentType, &userID, &thumbnailKey); err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -690,8 +693,8 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 			ContentType: contentType,
 		}
 
-		if hasThumbnail {
-			thumbURL, err := h.storage.GenerateDownloadURL(r.Context(), "thumbnails/"+userID+"/"+videoShareToken+".jpg", 1*time.Hour)
+		if thumbnailKey != nil {
+			thumbURL, err := h.storage.GenerateDownloadURL(r.Context(), *thumbnailKey, 1*time.Hour)
 			if err == nil {
 				item.ThumbnailURL = thumbURL
 			}
