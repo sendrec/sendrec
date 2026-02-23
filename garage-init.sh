@@ -51,12 +51,27 @@ if [ -n "${KEY_ID}" ]; then
 fi
 
 echo "Configuring CORS..."
-BUCKET_ID=$(garage json-api GetBucketInfo "{\"globalAlias\":\"${S3_BUCKET}\"}" 2>/dev/null | grep '"id"' | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')
-if [ -n "${BUCKET_ID}" ]; then
-  garage json-api UpdateBucket "{\"id\":\"${BUCKET_ID}\",\"body\":{\"corsConfig\":{\"set\":[{\"allowedOrigins\":[\"*\"],\"allowedMethods\":[\"GET\",\"PUT\",\"HEAD\"],\"allowedHeaders\":[\"*\"],\"exposeHeaders\":[\"ETag\"],\"maxAgeSeconds\":3600}]}}}" > /dev/null 2>&1 || true
-  echo "CORS configured."
+ADMIN_URL="http://localhost:3903"
+ADMIN_TOKEN="sendrec-dev-admin-token"
+
+BUCKET_ID=$(curl -sf -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+  "${ADMIN_URL}/v2/GetBucketInfo?globalAlias=${S3_BUCKET}" | jq -r '.id')
+
+if [ -n "${BUCKET_ID}" ] && [ "${BUCKET_ID}" != "null" ]; then
+  echo "Bucket ID: ${BUCKET_ID}"
+  CORS_BODY='{"corsConfig":{"set":[{"allowedOrigins":["*"],"allowedMethods":["GET","PUT","HEAD"],"allowedHeaders":["*"],"exposeHeaders":["ETag"],"maxAgeSeconds":3600}]}}'
+  if curl -sf -X POST "${ADMIN_URL}/v2/UpdateBucket?id=${BUCKET_ID}" \
+    -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "${CORS_BODY}" > /dev/null; then
+    echo "CORS configured for bucket '${S3_BUCKET}'."
+  else
+    echo "ERROR: Failed to configure CORS via admin API"
+    exit 1
+  fi
 else
-  echo "WARNING: Could not configure CORS (bucket ID not found)"
+  echo "ERROR: Could not get bucket ID for '${S3_BUCKET}'"
+  exit 1
 fi
 
 echo "Garage initialization complete."

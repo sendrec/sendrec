@@ -11,6 +11,8 @@ test.describe("Settings", () => {
     await expect(page.locator(`input[value="${TEST_USER.name}"]`)).toBeVisible({
       timeout: 5000,
     });
-    await expect(page.getByText(TEST_USER.email)).toBeVisible();
+    await expect(
+      page.locator(`input[value="${TEST_USER.email}"]`)
+    ).toBeVisible();
   });
 });
