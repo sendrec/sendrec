@@ -1,4 +1,4 @@
-.PHONY: run test build build-web dev-web docker-up docker-down
+.PHONY: run test build build-web dev-web docker-up docker-down e2e-up e2e-down e2e-test
 
 # Run Go server (requires DATABASE_URL, S3 env vars)
 run:
@@ -27,3 +27,15 @@ docker-up:
 # Stop full stack
 docker-down:
 	docker compose -f docker-compose.dev.yml down
+
+# Start e2e test environment
+e2e-up:
+	docker compose -f docker-compose.e2e.yml up --build -d
+
+# Stop e2e test environment
+e2e-down:
+	docker compose -f docker-compose.e2e.yml down -v
+
+# Run e2e tests (requires e2e environment running)
+e2e-test:
+	cd web && pnpm e2e
