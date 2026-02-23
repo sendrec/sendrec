@@ -456,6 +456,17 @@ input:focus-visible {
   display: none;
 }
 
+.dropdown-menu .action-link {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.dropdown-menu .action-link:hover {
+  background: var(--color-border);
+  border: none;
+}
+
 .video-detail-hero {
   display: flex;
   gap: 24px;

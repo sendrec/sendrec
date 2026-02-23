@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 
@@ -37,6 +37,13 @@ export function Upload() {
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
+  const [limits, setLimits] = useState<LimitsResponse | null>(null);
+
+  useEffect(() => {
+    apiFetch<LimitsResponse>("/api/videos/limits")
+      .then((result) => setLimits(result ?? null))
+      .catch(() => {});
+  }, []);
 
   function acceptFiles(selected: File[]) {
     const valid = selected.filter((f) => SUPPORTED_TYPES.includes(f.type));
@@ -417,6 +424,35 @@ export function Upload() {
       <h1 style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 600, marginBottom: 24, textAlign: "center" }}>
         Upload Video
       </h1>
+
+      {limits && limits.videosUsedThisMonth === 0 && (
+        <div style={{
+          maxWidth: 400,
+          margin: "0 auto 24px",
+          padding: "20px 24px",
+          background: "var(--color-surface)",
+          borderRadius: 12,
+          textAlign: "left",
+        }}>
+          <p style={{ color: "var(--color-text)", fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
+            Get started in 3 steps
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>1.</span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Record your screen or upload a video</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>2.</span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Share the link with anyone</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>3.</span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Track views and get feedback</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 16 }}>
         <input

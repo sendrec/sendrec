@@ -771,6 +771,7 @@ export function Library() {
                     </button>
                     {openMenuId === video.id && (
                       <div
+                        className="dropdown-menu"
                         style={{
                           position: "absolute",
                           top: "100%",
@@ -779,8 +780,8 @@ export function Library() {
                           background: "var(--color-surface)",
                           border: "1px solid var(--color-border)",
                           borderRadius: 8,
-                          padding: "8px 0",
-                          minWidth: 180,
+                          padding: "4px 0",
+                          minWidth: 160,
                           zIndex: 50,
                           boxShadow: "0 4px 16px var(--color-shadow)",
                         }}
