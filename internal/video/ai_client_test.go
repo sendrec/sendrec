@@ -35,7 +35,7 @@ func TestAIClient_GenerateSummary(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewAIClient(server.URL, "test-api-key", "gpt-4")
+	client := NewAIClient(server.URL, "test-api-key", "gpt-4", 0)
 	result, err := client.GenerateSummary(context.Background(), "00:00 Hello world 00:45 Testing patterns")
 
 	if err != nil {
@@ -85,7 +85,7 @@ func TestAIClient_GenerateSummary_MarkdownFence(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewAIClient(server.URL, "key", "model")
+	client := NewAIClient(server.URL, "key", "model", 0)
 	result, err := client.GenerateSummary(context.Background(), "transcript")
 
 	if err != nil {
@@ -117,7 +117,7 @@ func TestAIClient_GenerateSummary_InvalidJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewAIClient(server.URL, "key", "model")
+	client := NewAIClient(server.URL, "key", "model", 0)
 	_, err := client.GenerateSummary(context.Background(), "transcript")
 
 	if err == nil {
@@ -135,7 +135,7 @@ func TestAIClient_GenerateSummary_EmptyChoices(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewAIClient(server.URL, "key", "model")
+	client := NewAIClient(server.URL, "key", "model", 0)
 	_, err := client.GenerateSummary(context.Background(), "transcript")
 
 	if err == nil {
@@ -155,7 +155,7 @@ func TestAIClient_GenerateSummary_HTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewAIClient(server.URL, "bad-key", "model")
+	client := NewAIClient(server.URL, "bad-key", "model", 0)
 	_, err := client.GenerateSummary(context.Background(), "transcript")
 
 	if err == nil {
@@ -213,7 +213,7 @@ func TestGenerateTitle(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewAIClient(server.URL, "test-key", "gpt-4")
+	client := NewAIClient(server.URL, "test-key", "gpt-4", 0)
 	title, err := client.GenerateTitle(context.Background(), "[00:00] Hello world\n[00:45] Testing patterns")
 
 	if err != nil {
@@ -253,7 +253,7 @@ func TestGenerateTitleTrimsQuotes(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewAIClient(server.URL, "key", "model")
+	client := NewAIClient(server.URL, "key", "model", 0)
 	title, err := client.GenerateTitle(context.Background(), "transcript")
 
 	if err != nil {
@@ -282,7 +282,7 @@ func TestGenerateTitleTruncates(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewAIClient(server.URL, "key", "model")
+	client := NewAIClient(server.URL, "key", "model", 0)
 	title, err := client.GenerateTitle(context.Background(), "transcript")
 
 	if err != nil {

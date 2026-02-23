@@ -57,7 +57,7 @@ func TestProcessNextSummary_SkipsTrivialTranscript(t *testing.T) {
 	}
 	transcriptJSON, _ := json.Marshal(segments)
 
-	ai := NewAIClient("http://localhost", "key", "model")
+	ai := NewAIClient("http://localhost", "key", "model", 0)
 
 	mock.ExpectExec(`UPDATE videos SET summary_status = 'pending'`).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
@@ -113,7 +113,7 @@ func TestProcessNextSummary_ClaimsAndProcesses(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ai := NewAIClient(server.URL, "test-key", "test-model")
+	ai := NewAIClient(server.URL, "test-key", "test-model", 0)
 
 	// Stuck job reset
 	mock.ExpectExec(`UPDATE videos SET summary_status = 'pending'`).
@@ -181,7 +181,7 @@ func TestProcessNextSummary_SkipsTitleForCustomTitle(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ai := NewAIClient(server.URL, "test-key", "test-model")
+	ai := NewAIClient(server.URL, "test-key", "test-model", 0)
 
 	// Stuck job reset
 	mock.ExpectExec(`UPDATE videos SET summary_status = 'pending'`).
@@ -259,7 +259,7 @@ func TestProcessNextSummary_AIFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ai := NewAIClient(server.URL, "test-key", "test-model")
+	ai := NewAIClient(server.URL, "test-key", "test-model", 0)
 
 	// Stuck job reset
 	mock.ExpectExec(`UPDATE videos SET summary_status = 'pending'`).
