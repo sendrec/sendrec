@@ -93,7 +93,7 @@ export function Settings() {
   const [brandingError, setBrandingError] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [billing, setBilling] = useState<{ plan: string; subscriptionId: string | null; portalUrl: string | null } | null>(null);
+  const [billing, setBilling] = useState<{ plan: string; subscriptionId: string | null; subscriptionStatus: string | null; portalUrl: string | null } | null>(null);
   const [billingEnabled, setBillingEnabled] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [canceling, setCanceling] = useState(false);
@@ -141,7 +141,7 @@ export function Settings() {
       }
 
       try {
-        const billingData = await apiFetch<{ plan: string; subscriptionId: string | null; portalUrl: string | null }>("/api/settings/billing");
+        const billingData = await apiFetch<{ plan: string; subscriptionId: string | null; subscriptionStatus: string | null; portalUrl: string | null }>("/api/settings/billing");
         if (billingData) {
           setBilling(billingData);
           setBillingEnabled(true);
@@ -149,6 +149,12 @@ export function Settings() {
       } catch {
         // Billing not configured (self-hosted) — hide billing section
         setBillingEnabled(false);
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("billing") === "success") {
+        setBillingMessage("Subscription activated successfully!");
+        window.history.replaceState({}, "", window.location.pathname);
       }
     }
     fetchProfile();
@@ -462,7 +468,7 @@ export function Settings() {
     try {
       await apiFetch("/api/settings/billing/cancel", { method: "POST" });
       setBillingMessage("Subscription canceled. Access continues until end of billing period.");
-      setBilling((b) => b ? { ...b, plan: "free", subscriptionId: null, portalUrl: null } : b);
+      setBilling((b) => b ? { ...b, subscriptionStatus: "canceled" } : b);
     } catch (err: unknown) {
       setBillingMessage(err instanceof Error ? err.message : "Failed to cancel");
     } finally {
@@ -520,7 +526,7 @@ export function Settings() {
             </span>
           </div>
 
-          {billing.plan === "free" && (
+          {billing.plan === "free" && !billing.subscriptionStatus && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
                 Upgrade to Pro for unlimited videos and recording duration.
@@ -562,7 +568,13 @@ export function Settings() {
             </div>
           )}
 
-          {billing.plan === "pro" && (
+          {billing.subscriptionStatus === "canceled" && (
+            <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+              Your subscription has been canceled. You have access to Pro features until the end of your billing period.
+            </p>
+          )}
+
+          {billing.plan === "pro" && billing.subscriptionStatus !== "canceled" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {billing.portalUrl && (
                 <a

@@ -66,9 +66,10 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 }
 
 type billingResponse struct {
-	Plan           string  `json:"plan"`
-	SubscriptionID *string `json:"subscriptionId"`
-	PortalURL      *string `json:"portalUrl"`
+	Plan               string  `json:"plan"`
+	SubscriptionID     *string `json:"subscriptionId"`
+	SubscriptionStatus *string `json:"subscriptionStatus"`
+	PortalURL          *string `json:"portalUrl"`
 }
 
 func (h *Handlers) GetBilling(w http.ResponseWriter, r *http.Request) {
@@ -97,8 +98,13 @@ func (h *Handlers) GetBilling(w http.ResponseWriter, r *http.Request) {
 		info, err := h.creem.GetSubscription(r.Context(), *subscriptionID)
 		if err != nil {
 			slog.Error("failed to get subscription info", "error", err)
-		} else if info.Customer.PortalURL != "" {
-			resp.PortalURL = &info.Customer.PortalURL
+		} else {
+			if info.Customer.PortalURL != "" {
+				resp.PortalURL = &info.Customer.PortalURL
+			}
+			if info.Status != "" {
+				resp.SubscriptionStatus = &info.Status
+			}
 		}
 	}
 
