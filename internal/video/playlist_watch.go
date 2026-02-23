@@ -48,8 +48,8 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: #ffffff;
-            color: #1e293b;
+            background: #0f172a;
+            color: #e2e8f0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             min-height: 100vh;
         }
@@ -243,12 +243,12 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .player-header {
             padding: 1rem 1.5rem;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #1e293b;
         }
         .player-header h1 {
             font-size: 1.25rem;
             font-weight: 600;
-            color: #0f172a;
+            color: #f1f5f9;
         }
         .player-header .player-counter {
             font-size: 0.8125rem;
@@ -340,7 +340,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             text-align: center;
             font-size: 0.75rem;
             color: #94a3b8;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid #1e293b;
         }
         .branding-footer a {
             color: #00b67a;
