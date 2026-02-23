@@ -211,7 +211,6 @@ export function PlaylistDetail() {
       videos[targetIndex],
       videos[index],
     ];
-    const videoIds = videos.map((v) => v.id);
 
     setPlaylist((prev) =>
       prev
@@ -224,7 +223,9 @@ export function PlaylistDetail() {
 
     await apiFetch(`/api/playlists/${id}/videos/reorder`, {
       method: "PATCH",
-      body: JSON.stringify({ videoIds }),
+      body: JSON.stringify({
+        items: videos.map((v, i) => ({ videoId: v.id, position: i })),
+      }),
     });
   }
 
