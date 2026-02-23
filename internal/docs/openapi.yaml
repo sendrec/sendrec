@@ -421,7 +421,7 @@ components:
 
     VideoLimits:
       type: object
-      required: [maxVideosPerMonth, maxVideoDurationSeconds, videosUsedThisMonth, brandingEnabled]
+      required: [maxVideosPerMonth, maxVideoDurationSeconds, videosUsedThisMonth, maxPlaylists, playlistsUsed, brandingEnabled]
       properties:
         maxVideosPerMonth:
           type: integer
@@ -429,6 +429,12 @@ components:
           type: integer
         videosUsedThisMonth:
           type: integer
+        maxPlaylists:
+          type: integer
+          description: Maximum playlists for free tier (0 = unlimited)
+        playlistsUsed:
+          type: integer
+          description: Number of playlists the user currently has
         brandingEnabled:
           type: boolean
           description: Whether watch page branding customization is enabled

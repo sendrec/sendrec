@@ -228,6 +228,7 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 | `MAX_UPLOAD_BYTES` | Maximum upload size in bytes (applies to both recordings and file uploads) | `524288000` (500 MB) |
 | `MAX_VIDEOS_PER_MONTH` | Maximum videos a user can create per month (recordings + uploads). Set to `0` for unlimited | `25` |
 | `MAX_VIDEO_DURATION_SECONDS` | Maximum recording duration in seconds. Set to `0` for unlimited | `300` (5 min) |
+| `MAX_PLAYLISTS` | Maximum playlists a free-tier user can create. Set to `0` for unlimited | `3` |
 
 ### API Documentation
 
