@@ -34,11 +34,18 @@ interface Viewer {
   completion: number;
 }
 
+interface SegmentData {
+  segment: number;
+  watchCount: number;
+  intensity: number;
+}
+
 interface AnalyticsData {
   summary: AnalyticsSummary;
   daily: DailyViews[];
   milestones: Milestones;
   viewers: Viewer[];
+  heatmap: SegmentData[];
 }
 
 type Range = "7d" | "30d" | "all";
@@ -314,6 +321,44 @@ export function Analytics() {
           )}
         </div>
       </div>
+
+      {data.heatmap && data.heatmap.length > 0 && (
+        <div
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: 16,
+            marginTop: 16,
+          }}
+        >
+          <h3 style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>
+            Engagement
+          </h3>
+          <div style={{ display: "flex", gap: 1, height: 40, borderRadius: 4, overflow: "hidden" }}>
+            {Array.from({ length: 50 }, (_, i) => {
+              const seg = data.heatmap.find((s) => s.segment === i);
+              const intensity = seg ? seg.intensity : 0;
+              return (
+                <div
+                  key={i}
+                  title={`${i * 2}%-${(i + 1) * 2}%: ${seg ? seg.watchCount : 0} views`}
+                  style={{
+                    flex: 1,
+                    background: "var(--color-accent)",
+                    opacity: Math.max(intensity, 0.08),
+                  }}
+                />
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 11 }}>0%</span>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 11 }}>50%</span>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 11 }}>100%</span>
+          </div>
+        </div>
+      )}
 
       {data.summary.totalViews > 0 && (
         <div
