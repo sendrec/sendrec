@@ -40,7 +40,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG_NAME" \
-            --repo "${{ github.repository }}" \
-            --title "$TAG_NAME" \
-            --generate-notes
+          if gh release view "$TAG_NAME" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists, skipping"
+          else
+            gh release create "$TAG_NAME" \
+              --repo "${{ github.repository }}" \
+              --title "$TAG_NAME" \
+              --generate-notes
+          fi
