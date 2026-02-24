@@ -97,11 +97,13 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   }, [elapsedSeconds]);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      if (mediaRecorderRef.current.state === "paused") {
+    const hasActiveRecorder = mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive";
+
+    if (hasActiveRecorder) {
+      if (mediaRecorderRef.current!.state === "paused") {
         totalPausedRef.current += Date.now() - pauseStartRef.current;
       }
-      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current!.stop();
     }
     if (webcamRecorderRef.current && webcamRecorderRef.current.state !== "inactive") {
       if (webcamRecorderRef.current.state === "paused") {
@@ -114,7 +116,13 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
     }
-    stopAllStreams();
+    // When recording screenStream directly, we must NOT stop the stream tracks
+    // until after MediaRecorder fires its async onstop event and produces the
+    // final data. Stream cleanup happens in the recorder's onstop handler.
+    // Only clean up immediately if there's no active recorder (e.g. abort paths).
+    if (!hasActiveRecorder) {
+      stopAllStreams();
+    }
     setRecordingState("stopped");
   }, [stopAllStreams, stopCompositing]);
 
@@ -275,6 +283,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeType) });
         const elapsed = elapsedSeconds();
         const webcamBlob = webcamBlobPromiseRef.current ? await webcamBlobPromiseRef.current : undefined;
+        stopAllStreams();
         onRecordingComplete(blob, elapsed, webcamBlob);
       };
 
