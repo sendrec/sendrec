@@ -628,6 +628,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 					TranscodeWebMAsync(ctx, h.db, h.storage, videoID, fileKey)
 				}()
 			}
+			if expectedContentType == "video/mp4" || expectedContentType == "video/quicktime" {
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+					defer cancel()
+					NormalizeVideoAsync(ctx, h.db, h.storage, videoID, fileKey)
+				}()
+			}
 		}
 	}
 
