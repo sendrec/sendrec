@@ -68,6 +68,182 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             width: 100%;
             height: 100%;
             object-fit: contain;
+            display: block;
+        }
+        .player-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        .player-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 2;
+        }
+        .player-overlay.hidden { display: none; }
+        .play-overlay-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .play-overlay-btn:hover { background: rgba(0, 0, 0, 0.8); }
+        .player-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 20px 8px 6px;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+            z-index: 3;
+            transition: opacity 0.3s;
+        }
+        .player-controls.hidden { opacity: 0; pointer-events: none; }
+        .ctrl-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 2px;
+            line-height: 1;
+            opacity: 0.9;
+            flex-shrink: 0;
+        }
+        .ctrl-btn:hover { opacity: 1; }
+        .time-display {
+            font-size: 11px;
+            color: #fff;
+            font-family: monospace;
+            white-space: nowrap;
+            flex-shrink: 0;
+            opacity: 0.9;
+        }
+        .seek-bar {
+            position: relative;
+            flex: 1;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .seek-track {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            transition: height 0.15s;
+        }
+        .seek-bar:hover .seek-track { height: 5px; }
+        .seek-buffered {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .seek-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: #22c55e;
+        }
+        .seek-chapters {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 100%;
+        }
+        .seek-chapter {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.15);
+            cursor: pointer;
+        }
+        .seek-chapter:hover { background: rgba(255, 255, 255, 0.3); }
+        .seek-chapter-tooltip {
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .seek-chapter:hover .seek-chapter-tooltip { opacity: 1; }
+        .seek-thumb {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #22c55e;
+            border-radius: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .seek-bar:hover .seek-thumb { opacity: 1; }
+        .volume-group {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+        .volume-slider {
+            width: 50px;
+            height: 3px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            outline: none;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .volume-slider::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
         }
         .footer {
             display: flex;
@@ -96,52 +272,36 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .cta-overlay.visible { display: block; }
         .cta-overlay a { display: inline-block; padding: 8px 24px; background: #22c55e; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
         .cta-overlay a:hover { opacity: 0.9; color: #fff; }
-        .chapters-bar {
-            position: relative;
-            height: 4px;
-            display: none;
-            border-radius: 2px;
-            overflow: hidden;
-            background: #1e293b;
-        }
-        .chapter-segment {
-            position: absolute;
-            top: 0;
-            height: 100%;
-            cursor: pointer;
-            transition: opacity 0.2s;
-            background: #22c55e;
-            opacity: 0.3;
-        }
-        .chapter-segment:hover { opacity: 0.6; }
-        .chapter-segment.active { opacity: 0.7; }
-        .chapter-segment-tooltip {
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #e2e8f0;
-            color: #0f172a;
-            padding: 3px 6px;
-            border-radius: 3px;
-            font-size: 11px;
-            white-space: nowrap;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s;
-            margin-bottom: 2px;
-        }
-        .chapter-segment:hover .chapter-segment-tooltip { opacity: 1; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="video-wrapper">
-            <video controls playsinline webkit-playsinline crossorigin="anonymous" controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>{{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles">{{end}}</video>
+            <div class="player-container" id="player-container">
+                <video id="player" playsinline webkit-playsinline crossorigin="anonymous" controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>{{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles">{{end}}</video>
+                <div class="player-overlay" id="player-overlay">
+                    <button class="play-overlay-btn" id="play-overlay-btn" aria-label="Play">&#9654;</button>
+                </div>
+                <div class="player-controls" id="player-controls">
+                    <button class="ctrl-btn" id="play-btn" aria-label="Play">&#9654;</button>
+                    <span class="time-display" id="time-current">0:00</span>
+                    <div class="seek-bar" id="seek-bar">
+                        <div class="seek-track">
+                            <div class="seek-buffered" id="seek-buffered"></div>
+                            <div class="seek-progress" id="seek-progress"></div>
+                            <div class="seek-chapters" id="seek-chapters"></div>
+                        </div>
+                        <div class="seek-thumb" id="seek-thumb"></div>
+                    </div>
+                    <span class="time-display" id="time-duration">0:00</span>
+                    <div class="volume-group">
+                        <button class="ctrl-btn" id="mute-btn" aria-label="Mute">&#128266;</button>
+                        <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100">
+                    </div>
+                    <button class="ctrl-btn" id="fullscreen-btn" aria-label="Fullscreen">&#9974;</button>
+                </div>
+            </div>
         </div>
-        {{if .Chapters}}
-        <div class="chapters-bar" id="chapters-bar"></div>
-        {{end}}
         {{if and .CtaText .CtaUrl}}
         <div class="cta-overlay" id="cta-overlay">
             <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" id="cta-btn">{{.CtaText}}</a>
@@ -154,24 +314,130 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
     </div>
     <script nonce="{{.Nonce}}">
         (function() {
-            var v = document.querySelector('video');
-            if (v) {
-                v.muted = true;
-                v.play().catch(function() {});
+            var player = document.getElementById('player');
+            var container = document.getElementById('player-container');
+            var controls = document.getElementById('player-controls');
+            var overlay = document.getElementById('player-overlay');
+            var playBtn = document.getElementById('play-btn');
+            var overlayBtn = document.getElementById('play-overlay-btn');
+            var seekBar = document.getElementById('seek-bar');
+            var seekProgress = document.getElementById('seek-progress');
+            var seekBuffered = document.getElementById('seek-buffered');
+            var seekThumb = document.getElementById('seek-thumb');
+            var timeCurrent = document.getElementById('time-current');
+            var timeDuration = document.getElementById('time-duration');
+            var muteBtn = document.getElementById('mute-btn');
+            var volumeSlider = document.getElementById('volume-slider');
+            var fullscreenBtn = document.getElementById('fullscreen-btn');
+            var hideTimer = null;
+
+            player.muted = true;
+            player.play().catch(function() {});
+
+            function fmtTime(s) {
+                if (!isFinite(s) || isNaN(s)) return '0:00';
+                s = Math.floor(s);
+                if (s >= 3600) return Math.floor(s/3600) + ':' + ('0'+Math.floor((s%3600)/60)).slice(-2) + ':' + ('0'+(s%60)).slice(-2);
+                return Math.floor(s/60) + ':' + ('0'+(s%60)).slice(-2);
             }
+
+            function updatePlayBtn() {
+                var paused = player.paused;
+                playBtn.innerHTML = paused ? '&#9654;' : '&#9646;&#9646;';
+                overlay.classList.toggle('hidden', !paused);
+            }
+            function togglePlay() {
+                if (player.paused) player.play().catch(function(){});
+                else player.pause();
+            }
+            playBtn.addEventListener('click', togglePlay);
+            overlayBtn.addEventListener('click', togglePlay);
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) togglePlay(); });
+            player.addEventListener('play', function() { updatePlayBtn(); showControls(); });
+            player.addEventListener('pause', function() { updatePlayBtn(); showControls(); });
+            player.addEventListener('ended', updatePlayBtn);
+
+            function updateProgress() {
+                if (!player.duration || !isFinite(player.duration)) return;
+                var pct = (player.currentTime / player.duration) * 100;
+                seekProgress.style.width = pct + '%';
+                seekThumb.style.left = pct + '%';
+                timeCurrent.textContent = fmtTime(player.currentTime);
+            }
+            function updateBuffered() {
+                if (!player.duration || !isFinite(player.duration) || !player.buffered.length) return;
+                seekBuffered.style.width = (player.buffered.end(player.buffered.length - 1) / player.duration * 100) + '%';
+            }
+            function updateDurationDisplay() {
+                if (player.duration && isFinite(player.duration)) timeDuration.textContent = fmtTime(player.duration);
+            }
+            player.addEventListener('timeupdate', updateProgress);
+            player.addEventListener('progress', updateBuffered);
+            player.addEventListener('loadedmetadata', function() { updateDurationDisplay(); updateProgress(); });
+            player.addEventListener('durationchange', updateDurationDisplay);
+
+            var seeking = false;
+            function seekFromEvent(e) {
+                var rect = seekBar.getBoundingClientRect();
+                var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                if (player.duration && isFinite(player.duration)) {
+                    player.currentTime = pct * player.duration;
+                    updateProgress();
+                }
+            }
+            seekBar.addEventListener('mousedown', function(e) { seeking = true; seekFromEvent(e); });
+            document.addEventListener('mousemove', function(e) { if (seeking) seekFromEvent(e); });
+            document.addEventListener('mouseup', function() { seeking = false; });
+            seekBar.addEventListener('touchstart', function(e) { seeking = true; seekFromEvent(e.touches[0]); }, { passive: true });
+            seekBar.addEventListener('touchmove', function(e) { if (seeking) seekFromEvent(e.touches[0]); }, { passive: true });
+            seekBar.addEventListener('touchend', function() { seeking = false; });
+
+            muteBtn.addEventListener('click', function() { player.muted = !player.muted; updateMuteBtn(); });
+            function updateMuteBtn() {
+                if (player.muted || player.volume === 0) muteBtn.innerHTML = '&#128264;';
+                else if (player.volume < 0.5) muteBtn.innerHTML = '&#128265;';
+                else muteBtn.innerHTML = '&#128266;';
+                volumeSlider.value = player.muted ? 0 : player.volume * 100;
+            }
+            volumeSlider.addEventListener('input', function() {
+                player.volume = volumeSlider.value / 100;
+                player.muted = player.volume === 0;
+                updateMuteBtn();
+            });
+            player.addEventListener('volumechange', updateMuteBtn);
+
+            fullscreenBtn.addEventListener('click', function() {
+                if (document.fullscreenElement) document.exitFullscreen().catch(function(){});
+                else container.requestFullscreen().catch(function(){});
+            });
+            document.addEventListener('fullscreenchange', function() {
+                fullscreenBtn.innerHTML = document.fullscreenElement ? '&#9723;' : '&#9974;';
+            });
+
+            function showControls() {
+                controls.classList.remove('hidden');
+                clearTimeout(hideTimer);
+                if (!player.paused) {
+                    hideTimer = setTimeout(function() { controls.classList.add('hidden'); }, 3000);
+                }
+            }
+            container.addEventListener('mousemove', showControls);
+            container.addEventListener('touchstart', showControls, { passive: true });
+            container.addEventListener('mouseleave', function() {
+                if (!player.paused) hideTimer = setTimeout(function() { controls.classList.add('hidden'); }, 1000);
+            });
+
+            updatePlayBtn();
+            updateMuteBtn();
         })();
         {{if and .CtaText .CtaUrl}}
         (function() {
-            var v = document.querySelector('video');
+            var player = document.getElementById('player');
             var overlay = document.getElementById('cta-overlay');
             var btn = document.getElementById('cta-btn');
-            if (v && overlay) {
-                v.addEventListener('ended', function() {
-                    overlay.classList.add('visible');
-                });
-                v.addEventListener('play', function() {
-                    overlay.classList.remove('visible');
-                });
+            if (player && overlay) {
+                player.addEventListener('ended', function() { overlay.classList.add('visible'); });
+                player.addEventListener('play', function() { overlay.classList.remove('visible'); });
             }
             if (btn) {
                 btn.addEventListener('click', function() {
@@ -182,23 +448,22 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         {{end}}
         {{if .Chapters}}
         (function() {
-            var chaptersBar = document.getElementById('chapters-bar');
-            if (!chaptersBar) return;
-            var v = document.querySelector('video');
+            var chaptersLayer = document.getElementById('seek-chapters');
+            if (!chaptersLayer) return;
+            var player = document.getElementById('player');
             var chapters = {{.ChaptersJSON}};
 
             function renderChapters() {
-                var duration = v.duration;
+                var duration = player.duration;
                 if (!duration || !isFinite(duration) || chapters.length === 0) return;
-                chaptersBar.innerHTML = '';
-                chaptersBar.style.display = 'block';
+                chaptersLayer.innerHTML = '';
                 for (var i = 0; i < chapters.length; i++) {
                     var start = chapters[i].start;
                     var end = (i + 1 < chapters.length) ? chapters[i + 1].start : duration;
                     var leftPct = (start / duration) * 100;
                     var widthPct = ((end - start) / duration) * 100;
                     var seg = document.createElement('div');
-                    seg.className = 'chapter-segment';
+                    seg.className = 'seek-chapter';
                     seg.style.left = leftPct + '%';
                     seg.style.width = widthPct + '%';
                     seg.setAttribute('data-start', start);
@@ -208,49 +473,44 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
                         seg.style.width = (widthPct - 0.1) + '%';
                     }
                     var tooltip = document.createElement('div');
-                    tooltip.className = 'chapter-segment-tooltip';
+                    tooltip.className = 'seek-chapter-tooltip';
                     tooltip.textContent = chapters[i].title;
                     seg.appendChild(tooltip);
                     seg.addEventListener('click', (function(s) {
-                        return function() {
-                            v.currentTime = s;
-                            v.play().catch(function() {});
+                        return function(e) {
+                            e.stopPropagation();
+                            player.currentTime = s;
+                            player.play().catch(function() {});
                         };
                     })(start));
-                    chaptersBar.appendChild(seg);
+                    chaptersLayer.appendChild(seg);
                 }
             }
 
-            v.addEventListener('timeupdate', function() {
-                var segments = chaptersBar.querySelectorAll('.chapter-segment');
-                var currentTime = v.currentTime;
+            player.addEventListener('timeupdate', function() {
+                var segments = chaptersLayer.querySelectorAll('.seek-chapter');
+                var currentTime = player.currentTime;
                 segments.forEach(function(seg) {
                     var idx = parseInt(seg.getAttribute('data-index'));
                     var start = chapters[idx].start;
-                    var end = (idx + 1 < chapters.length) ? chapters[idx + 1].start : v.duration;
-                    if (currentTime >= start && currentTime < end) {
-                        seg.classList.add('active');
-                    } else {
-                        seg.classList.remove('active');
-                    }
+                    var end = (idx + 1 < chapters.length) ? chapters[idx + 1].start : player.duration;
+                    seg.classList.toggle('active', currentTime >= start && currentTime < end);
                 });
             });
 
-            v.addEventListener('loadedmetadata', renderChapters);
-            v.addEventListener('durationchange', renderChapters);
-            if (v.duration && isFinite(v.duration)) {
-                renderChapters();
-            }
+            player.addEventListener('loadedmetadata', renderChapters);
+            player.addEventListener('durationchange', renderChapters);
+            if (player.duration && isFinite(player.duration)) renderChapters();
         })();
         {{end}}
         (function() {
-            var v = document.querySelector('video');
-            if (!v) return;
+            var player = document.getElementById('player');
+            if (!player) return;
             var milestones = [25, 50, 75, 100];
             var reached = {};
-            v.addEventListener('timeupdate', function() {
-                if (!v.duration) return;
-                var pct = (v.currentTime / v.duration) * 100;
+            player.addEventListener('timeupdate', function() {
+                if (!player.duration) return;
+                var pct = (player.currentTime / player.duration) * 100;
                 for (var i = 0; i < milestones.length; i++) {
                     var m = milestones[i];
                     if (pct >= m && !reached[m]) {

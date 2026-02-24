@@ -136,7 +136,7 @@ func TestEmbedPage_Success_RendersVideoPlayer(t *testing.T) {
 
 	checks := map[string]string{
 		"video element": "<video",
-		"controls":      "controls",
+		"controls":      "player-controls",
 		"playsinline":   "playsinline",
 		"video source":  `src="https://s3.example.com/video.webm"`,
 		"watch link":    `/watch/` + shareToken,
@@ -647,11 +647,11 @@ func TestEmbedPage_ChaptersBar(t *testing.T) {
 	}
 	body := rec.Body.String()
 
-	if !strings.Contains(body, `id="chapters-bar"`) {
-		t.Error("expected chapters-bar element in response")
+	if !strings.Contains(body, `id="seek-chapters"`) {
+		t.Error("expected seek-chapters element in response")
 	}
-	if !strings.Contains(body, "chapter-segment") {
-		t.Error("expected chapter-segment CSS class in response")
+	if !strings.Contains(body, "seek-chapter") {
+		t.Error("expected seek-chapter CSS class in response")
 	}
 	if !strings.Contains(body, `"Intro"`) {
 		t.Error("expected chapter title 'Intro' in chapters JSON")
@@ -703,8 +703,8 @@ func TestEmbedPage_NoChaptersBar_WhenEmpty(t *testing.T) {
 	}
 	body := rec.Body.String()
 
-	if strings.Contains(body, `id="chapters-bar"`) {
-		t.Error("expected no chapters-bar element when chapters are empty")
+	if strings.Contains(body, "chaptersLayer") {
+		t.Error("expected no chapters JS when chapters are empty")
 	}
 
 	time.Sleep(100 * time.Millisecond)

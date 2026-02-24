@@ -234,11 +234,10 @@ func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
 			t.Errorf("expected speed button %q in response", s)
 		}
 	}
-	if !strings.Contains(body, "speed-controls") {
-		t.Error("expected speed-controls container in response")
+	if !strings.Contains(body, "speed-dropdown") {
+		t.Error("expected speed-dropdown container in response")
 	}
-	// 1x should be active by default
-	if !strings.Contains(body, `class="speed-btn active" data-speed="1"`) {
+	if !strings.Contains(body, `data-speed="1" class="active"`) {
 		t.Error("expected 1x speed button to have active class")
 	}
 	waitAndCheckExpectations(t, mock)
@@ -380,7 +379,7 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 		"comment-submit",
 		"comment-body",
 		"Post comment",
-		"markers-bar",
+		"seek-markers",
 		"emoji-trigger",
 	}
 	for _, check := range checks {
@@ -403,8 +402,8 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 	if !strings.Contains(body, `class="reaction-btn"`) || !strings.Contains(body, `aria-label="React with`) {
 		t.Error("expected reaction buttons to include accessibility labels")
 	}
-	if !strings.Contains(body, `dot.type = 'button';`) {
-		t.Error("expected marker dots to be keyboard-accessible buttons")
+	if !strings.Contains(body, `dot.className = 'seek-marker'`) {
+		t.Error("expected markers to render as seek-marker elements in the seek bar")
 	}
 	if !strings.Contains(body, `type="button" class="comment emoji-reaction"`) {
 		t.Error("expected emoji reactions to render as button elements for keyboard access")
@@ -458,8 +457,8 @@ func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
 	if strings.Contains(body, `id="comment-form"`) {
 		t.Error("expected no comment-form div when comments disabled")
 	}
-	if strings.Contains(body, `id="markers-bar"`) {
-		t.Error("expected no markers-bar div when comments disabled")
+	if strings.Contains(body, `id="reaction-bar"`) {
+		t.Error("expected no reaction-bar div when comments disabled")
 	}
 	waitAndCheckExpectations(t, mock)
 }
@@ -2058,14 +2057,14 @@ func TestWatchPage_ChaptersBar(t *testing.T) {
 	}
 	body := rec.Body.String()
 
-	if !strings.Contains(body, "chapters-bar") {
-		t.Error("expected chapters-bar element in response")
+	if !strings.Contains(body, "seek-chapters") {
+		t.Error("expected seek-chapters element in response")
 	}
-	if !strings.Contains(body, "chapter-segment") {
-		t.Error("expected chapter-segment CSS class in response")
+	if !strings.Contains(body, "seek-chapter") {
+		t.Error("expected seek-chapter CSS class in response")
 	}
-	if !strings.Contains(body, "chapter-segment-tooltip") {
-		t.Error("expected chapter-segment-tooltip CSS class in response")
+	if !strings.Contains(body, "seek-chapter-tooltip") {
+		t.Error("expected seek-chapter-tooltip CSS class in response")
 	}
 	if !strings.Contains(body, `"Intro"`) {
 		t.Error("expected chapter title 'Intro' in chapters JSON")
@@ -2113,8 +2112,8 @@ func TestWatchPage_NoChaptersBar_WhenEmpty(t *testing.T) {
 	}
 	body := rec.Body.String()
 
-	if strings.Contains(body, `id="chapters-bar"`) {
-		t.Error("expected no chapters-bar element when chapters are empty")
+	if strings.Contains(body, "chaptersLayer") {
+		t.Error("expected no chapters JS when chapters are empty")
 	}
 	waitAndCheckExpectations(t, mock)
 }
