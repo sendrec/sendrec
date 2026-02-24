@@ -1107,35 +1107,26 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 player.addEventListener('pause', function() { updatePlayBtn(); showControls(); });
                 player.addEventListener('ended', updatePlayBtn);
 
-                function getEffectiveDuration() {
-                    if (player.duration && isFinite(player.duration)) return player.duration;
-                    if (player.buffered.length) return player.buffered.end(player.buffered.length - 1);
-                    return 0;
-                }
-
                 function updateProgress() {
-                    var dur = getEffectiveDuration();
-                    if (!dur) return;
-                    var pct = (player.currentTime / dur) * 100;
+                    if (!player.duration) return;
+                    var pct = (player.currentTime / player.duration) * 100;
                     seekProgress.style.width = pct + '%';
                     seekThumb.style.left = pct + '%';
                     timeCurrent.textContent = fmtTime(player.currentTime);
                 }
 
                 function updateBuffered() {
-                    var dur = getEffectiveDuration();
-                    if (!dur || !player.buffered.length) return;
+                    if (!player.duration || !player.buffered.length) return;
                     var end = player.buffered.end(player.buffered.length - 1);
-                    seekBuffered.style.width = (end / dur * 100) + '%';
+                    seekBuffered.style.width = (end / player.duration * 100) + '%';
                 }
 
                 function updateDurationDisplay() {
-                    var dur = getEffectiveDuration();
-                    if (dur) timeDuration.textContent = fmtTime(dur);
+                    if (player.duration) timeDuration.textContent = fmtTime(player.duration);
                 }
 
                 player.addEventListener('timeupdate', updateProgress);
-                player.addEventListener('progress', function() { updateBuffered(); updateDurationDisplay(); });
+                player.addEventListener('progress', updateBuffered);
                 player.addEventListener('loadedmetadata', function() { updateDurationDisplay(); updateProgress(); });
                 player.addEventListener('durationchange', function() { updateDurationDisplay(); updateProgress(); });
 
@@ -1143,9 +1134,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 function seekFromEvent(e) {
                     var rect = seekBar.getBoundingClientRect();
                     var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                    var dur = getEffectiveDuration();
-                    if (dur) {
-                        player.currentTime = pct * dur;
+                    if (player.duration) {
+                        player.currentTime = pct * player.duration;
                         updateProgress();
                     }
                 }
