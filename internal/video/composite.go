@@ -10,6 +10,24 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 )
 
+func probeVideoFrames(path string) (int, error) {
+	cmd := exec.Command("ffprobe",
+		"-v", "error",
+		"-select_streams", "v:0",
+		"-count_frames",
+		"-show_entries", "stream=nb_read_frames",
+		"-of", "csv=p=0",
+		path,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe: %w: %s", err, string(output))
+	}
+	var count int
+	_, _ = fmt.Sscanf(string(output), "%d", &count)
+	return count, nil
+}
+
 func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) error {
 	pipFilter := "[1:v]scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[0:v][pip]overlay=W-w-20:H-h-20"
 
@@ -98,6 +116,33 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 		setReadyFallback()
 		return
 	}
+
+	// Log file sizes for debugging
+	screenInfo, _ := os.Stat(tmpScreenPath)
+	webcamInfo, _ := os.Stat(tmpWebcamPath)
+	screenSize := int64(0)
+	webcamSize := int64(0)
+	if screenInfo != nil {
+		screenSize = screenInfo.Size()
+	}
+	if webcamInfo != nil {
+		webcamSize = webcamInfo.Size()
+	}
+	slog.Info("composite: files downloaded", "video_id", videoID, "screen_bytes", screenSize, "webcam_bytes", webcamSize)
+
+	// Verify webcam has video frames before compositing
+	webcamFrames, probeErr := probeVideoFrames(tmpWebcamPath)
+	if probeErr != nil {
+		slog.Error("composite: webcam probe failed", "video_id", videoID, "error", probeErr)
+		setReadyFallback()
+		return
+	}
+	if webcamFrames == 0 {
+		slog.Warn("composite: webcam has no video frames, skipping overlay", "video_id", videoID, "webcam_bytes", webcamSize)
+		setReadyFallback()
+		return
+	}
+	slog.Info("composite: webcam validated", "video_id", videoID, "webcam_frames", webcamFrames)
 
 	tmpOutput, err := os.CreateTemp("", "sendrec-composite-output-*"+ext)
 	if err != nil {

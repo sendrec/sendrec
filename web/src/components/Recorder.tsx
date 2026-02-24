@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
 import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
-import { getSupportedMimeType, getSupportedVideoMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
+import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 
 type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 
@@ -240,10 +240,14 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       pauseStartRef.current = 0;
       totalPausedRef.current = 0;
 
-      // Set up webcam recorder if webcam is enabled (but don't start yet)
+      // Set up webcam recorder if webcam is enabled (but don't start yet).
+      // Always use WebM for webcam — it's only used temporarily for server-side compositing,
+      // and WebM is more reliable for video-only MediaRecorder streams across browsers.
       webcamBlobPromiseRef.current = null;
       if (webcamEnabled && webcamStreamRef.current) {
-        const webcamMimeType = getSupportedVideoMimeType();
+        const webcamMimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+          ? "video/webm;codecs=vp9"
+          : "video/webm";
         const webcamRecorder = new MediaRecorder(webcamStreamRef.current, {
           mimeType: webcamMimeType,
         });
@@ -258,7 +262,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
 
         webcamBlobPromiseRef.current = new Promise<Blob>((resolve) => {
           webcamRecorder.onstop = () => {
-            resolve(new Blob(webcamChunksRef.current, { type: blobTypeFromMimeType(webcamMimeType) }));
+            resolve(new Blob(webcamChunksRef.current, { type: "video/webm" }));
           };
         });
       }
