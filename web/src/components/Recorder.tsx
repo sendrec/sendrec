@@ -183,7 +183,8 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       setWebcamEnabled(true);
     } catch (err) {
       console.error("Webcam access failed", err);
-      alert("Could not access your camera. Please allow camera access and try again.");
+      const detail = err instanceof DOMException ? `${err.name}: ${err.message}` : String(err);
+      alert(`Could not access your camera: ${detail}`);
     }
   }
 

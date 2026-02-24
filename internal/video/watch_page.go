@@ -330,7 +330,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             cursor: pointer;
             pointer-events: auto;
         }
-        .seek-marker:hover { opacity: 1; transform: translateX(-50%) scaleY(1.4); }
+        .seek-marker:hover { opacity: 1; transform: translateX(-50%); }
         .seek-marker.private { background: #3b82f6; }
         .seek-marker-tooltip {
             position: absolute;
