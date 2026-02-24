@@ -542,20 +542,6 @@ describe("Recorder", () => {
     );
   });
 
-  it("shows alert when composited stream creation fails", async () => {
-    const alertSpy = vi.spyOn(globalThis, "alert").mockImplementation(() => {});
-    mockGetCompositedStream.mockReturnValueOnce(null);
-
-    const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Start recording" }));
-
-    expect(alertSpy).toHaveBeenCalledWith(
-      "Screen recording was blocked or failed. Please allow screen capture and try again.",
-    );
-    alertSpy.mockRestore();
-  });
-
   it("stops recording when screen share track ends", async () => {
     // Capture the "ended" event handler
     let endedCallback: (() => void) | undefined;

@@ -64,7 +64,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     handlePointerLeave,
   } = useDrawingCanvas({ canvasRef: drawingCanvasRef, captureWidth, captureHeight });
 
-  const { startCompositing, stopCompositing, getCompositedStream } =
+  const { startCompositing, stopCompositing } =
     useCanvasCompositing({
       compositingCanvasRef,
       screenVideoRef,
@@ -219,20 +219,18 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         drawingCanvasRef.current.height = height;
       }
 
-      // Start compositing loop
+      // Start compositing loop (for visual preview only)
       startCompositing();
 
-      // Record composited stream (screen + drawing annotations)
-      const audioTracks = screenStream.getAudioTracks();
-      const compositedStream = getCompositedStream(audioTracks);
-      if (!compositedStream) {
-        throw new Error("Failed to create composited stream");
-      }
-
+      // Record the original display stream directly — NOT through the canvas.
+      // Canvas compositing freezes when the tab goes to the background because
+      // requestAnimationFrame/setInterval are throttled and the video element
+      // stops decoding frames. The raw getDisplayMedia stream keeps capturing
+      // regardless of tab visibility.
       const mimeType = getSupportedMimeType();
       mimeTypeRef.current = mimeType;
 
-      const recorder = new MediaRecorder(compositedStream, {
+      const recorder = new MediaRecorder(screenStream, {
         mimeType,
       });
       mediaRecorderRef.current = recorder;
