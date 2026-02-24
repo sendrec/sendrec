@@ -1314,6 +1314,10 @@ type milestoneRequest struct {
 	Milestone int `json:"milestone"`
 }
 
+type segmentsRequest struct {
+	Segments []int `json:"segments"`
+}
+
 func (h *Handler) RecordMilestone(w http.ResponseWriter, r *http.Request) {
 	var req milestoneRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1369,6 +1373,52 @@ func (h *Handler) RecordMilestone(w http.ResponseWriter, r *http.Request) {
 						slog.Error("webhook: dispatch failed for video.milestone", "video_id", videoID, "error", err)
 					}
 				}
+			}
+		}
+	}()
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) RecordSegments(w http.ResponseWriter, r *http.Request) {
+	var req segmentsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if len(req.Segments) == 0 || len(req.Segments) > 50 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	shareToken := chi.URLParam(r, "shareToken")
+
+	var videoID string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
+		shareToken,
+	).Scan(&videoID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		for _, seg := range req.Segments {
+			if seg < 0 || seg >= 50 {
+				continue
+			}
+			if _, err := h.db.Exec(ctx,
+				`INSERT INTO segment_engagement (video_id, segment_index, watch_count)
+				 VALUES ($1, $2, 1)
+				 ON CONFLICT (video_id, segment_index)
+				 DO UPDATE SET watch_count = segment_engagement.watch_count + 1`,
+				videoID, seg,
+			); err != nil {
+				slog.Error("video: failed to record segment", "video_id", videoID, "segment", seg, "error", err)
 			}
 		}
 	}()
@@ -1612,11 +1662,18 @@ type viewerInfo struct {
 	Completion    int    `json:"completion"`
 }
 
+type segmentData struct {
+	Segment    int     `json:"segment"`
+	WatchCount int64   `json:"watchCount"`
+	Intensity  float64 `json:"intensity"`
+}
+
 type analyticsResponse struct {
 	Summary    analyticsSummary `json:"summary"`
 	Daily      []dailyViews     `json:"daily"`
 	Milestones milestoneCounts  `json:"milestones"`
 	Viewers    []viewerInfo     `json:"viewers"`
+	Heatmap    []segmentData    `json:"heatmap"`
 }
 
 func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
@@ -1777,11 +1834,39 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		summary.CtaClickRate = float64(totalCtaClicks) / float64(summary.TotalViews)
 	}
 
+	heatmap := make([]segmentData, 0, 50)
+	segRows, err := h.db.Query(r.Context(),
+		`SELECT segment_index, watch_count FROM segment_engagement
+		 WHERE video_id = $1 ORDER BY segment_index`,
+		videoID,
+	)
+	if err == nil {
+		defer segRows.Close()
+		var maxCount int64
+		var segments []segmentData
+		for segRows.Next() {
+			var sd segmentData
+			if err := segRows.Scan(&sd.Segment, &sd.WatchCount); err == nil {
+				segments = append(segments, sd)
+				if sd.WatchCount > maxCount {
+					maxCount = sd.WatchCount
+				}
+			}
+		}
+		for i := range segments {
+			if maxCount > 0 {
+				segments[i].Intensity = float64(segments[i].WatchCount) / float64(maxCount)
+			}
+		}
+		heatmap = segments
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, analyticsResponse{
 		Summary:    summary,
 		Daily:      daily,
 		Milestones: milestones,
 		Viewers:    viewers,
+		Heatmap:    heatmap,
 	})
 }
 

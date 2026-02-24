@@ -255,6 +255,48 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
                 }
             });
         })();
+        (function() {
+            var player = document.getElementById('player');
+            if (!player) return;
+            var SEGMENTS = 50;
+            var reported = {};
+            var pending = [];
+            var lastSeg = -1;
+            function flush() {
+                if (pending.length === 0) return;
+                var data = JSON.stringify({ segments: pending });
+                pending = [];
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon('/api/watch/{{.ShareToken}}/segments',
+                        new Blob([data], { type: 'application/json' }));
+                } else {
+                    fetch('/api/watch/{{.ShareToken}}/segments', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: data
+                    }).catch(function() {});
+                }
+            }
+            player.addEventListener('timeupdate', function() {
+                if (!player.duration || player.duration <= 0) return;
+                var seg = Math.min(Math.floor((player.currentTime / player.duration) * SEGMENTS), SEGMENTS - 1);
+                if (reported[seg]) return;
+                if (lastSeg >= 0 && Math.abs(seg - lastSeg) > 1) {
+                    lastSeg = seg;
+                    return;
+                }
+                reported[seg] = true;
+                pending.push(seg);
+                lastSeg = seg;
+            });
+            setInterval(flush, 5000);
+            player.addEventListener('pause', flush);
+            player.addEventListener('ended', flush);
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'hidden') flush();
+            });
+            window.addEventListener('beforeunload', flush);
+        })();
     </script>
 </body>
 </html>`))
