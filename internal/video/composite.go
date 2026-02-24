@@ -6,30 +6,35 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/sendrec/sendrec/internal/database"
 )
 
-func probeVideoFrames(path string) (int, error) {
+func probeVideoFrames(path string) (int, string, error) {
 	cmd := exec.Command("ffprobe",
 		"-v", "error",
 		"-select_streams", "v:0",
 		"-count_frames",
-		"-show_entries", "stream=nb_read_frames",
+		"-show_entries", "stream=nb_read_frames,start_time,codec_name,width,height",
 		"-of", "csv=p=0",
 		path,
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return 0, fmt.Errorf("ffprobe: %w: %s", err, string(output))
+		return 0, "", fmt.Errorf("ffprobe: %w: %s", err, string(output))
 	}
+	info := strings.TrimSpace(string(output))
 	var count int
-	_, _ = fmt.Sscanf(string(output), "%d", &count)
-	return count, nil
+	_, _ = fmt.Sscanf(info, "%d", &count)
+	return count, info, nil
 }
 
 func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) error {
-	pipFilter := "[1:v]scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[0:v][pip]overlay=W-w-20:H-h-20"
+	// setpts=PTS-STARTPTS normalizes webcam timestamps to start at 0.
+	// Chrome's MediaRecorder WebM may have non-zero start timestamps that
+	// prevent the overlay from aligning with the screen recording.
+	pipFilter := "[1:v]setpts=PTS-STARTPTS,scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[0:v][pip]overlay=W-w-20:H-h-20"
 
 	var args []string
 	if contentType == "video/mp4" || contentType == "video/quicktime" {
@@ -131,7 +136,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	slog.Info("composite: files downloaded", "video_id", videoID, "screen_bytes", screenSize, "webcam_bytes", webcamSize)
 
 	// Verify webcam has video frames before compositing
-	webcamFrames, probeErr := probeVideoFrames(tmpWebcamPath)
+	webcamFrames, webcamProbeInfo, probeErr := probeVideoFrames(tmpWebcamPath)
 	if probeErr != nil {
 		slog.Error("composite: webcam probe failed", "video_id", videoID, "error", probeErr)
 		setReadyFallback()
@@ -142,7 +147,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 		setReadyFallback()
 		return
 	}
-	slog.Info("composite: webcam validated", "video_id", videoID, "webcam_frames", webcamFrames)
+	slog.Info("composite: webcam validated", "video_id", videoID, "webcam_frames", webcamFrames, "webcam_info", webcamProbeInfo)
 
 	tmpOutput, err := os.CreateTemp("", "sendrec-composite-output-*"+ext)
 	if err != nil {
