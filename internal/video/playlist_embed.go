@@ -478,7 +478,7 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
             font-size: 11px;
         }
         .footer a:hover { color: #e2e8f0; }
-        @media (max-width: 640px) {
+        @media (max-width: 480px) {
             .playlist-layout {
                 flex-direction: column;
             }

@@ -701,7 +701,7 @@ export function PlaylistDetail() {
                 <input
                   type="text"
                   readOnly
-                  value={`<iframe src="${window.location.origin}/embed/playlist/${playlist.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`}
+                  value={`<iframe src="${window.location.origin}/embed/playlist/${playlist.shareToken}" width="800" height="450" frameborder="0" allowfullscreen></iframe>`}
                   aria-label="Embed code"
                   style={{
                     flex: 1,
@@ -717,7 +717,7 @@ export function PlaylistDetail() {
                 <button
                   onClick={() => {
                     copyToClipboard(
-                      `<iframe src="${window.location.origin}/embed/playlist/${playlist.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`,
+                      `<iframe src="${window.location.origin}/embed/playlist/${playlist.shareToken}" width="800" height="450" frameborder="0" allowfullscreen></iframe>`,
                     );
                     showToast("Embed code copied");
                   }}
