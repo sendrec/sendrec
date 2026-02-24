@@ -650,7 +650,6 @@ export function VideoDetail() {
             controls
             className="video-detail-thumbnail"
             poster={video.thumbnailUrl}
-            style={{ objectFit: "contain", background: "#000" }}
           />
         ) : video.thumbnailUrl ? (
           <img
