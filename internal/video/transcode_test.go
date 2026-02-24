@@ -8,7 +8,7 @@ import (
 	"github.com/pashagolub/pgxmock/v4"
 )
 
-func TestFixWebMCuesAsync_DownloadError(t *testing.T) {
+func TestTranscodeWebMAsync_DownloadError(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -17,14 +17,14 @@ func TestFixWebMCuesAsync_DownloadError(t *testing.T) {
 
 	s := &mockStorage{downloadToFileErr: fmt.Errorf("s3 down")}
 
-	FixWebMCuesAsync(context.Background(), mock, s, "video-123", "recordings/user/video.webm")
+	TranscodeWebMAsync(context.Background(), mock, s, "video-123", "recordings/user/video.webm")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
 
-func TestFixWebMCuesAsync_FFmpegFails(t *testing.T) {
+func TestTranscodeWebMAsync_FFmpegFails(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -33,14 +33,14 @@ func TestFixWebMCuesAsync_FFmpegFails(t *testing.T) {
 
 	s := &mockStorage{}
 
-	FixWebMCuesAsync(context.Background(), mock, s, "video-123", "recordings/user/video.webm")
+	TranscodeWebMAsync(context.Background(), mock, s, "video-123", "recordings/user/video.webm")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
 
-func TestFixWebMCuesAsync_UploadError(t *testing.T) {
+func TestTranscodeWebMAsync_UploadError(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func TestFixWebMCuesAsync_UploadError(t *testing.T) {
 
 	s := &mockStorage{uploadFileErr: fmt.Errorf("upload failed")}
 
-	FixWebMCuesAsync(context.Background(), mock, s, "video-123", "recordings/user/video.webm")
+	TranscodeWebMAsync(context.Background(), mock, s, "video-123", "recordings/user/video.webm")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)

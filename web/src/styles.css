@@ -469,18 +469,18 @@ input:focus-visible {
 
 .video-detail-hero {
   display: flex;
-  gap: 24px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 16px;
   margin-bottom: 8px;
 }
 
 .video-detail-thumbnail {
-  width: 240px;
-  height: 135px;
-  object-fit: cover;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
   border-radius: 8px;
-  background: var(--color-border);
-  flex-shrink: 0;
+  background: #000;
 }
 
 .video-detail-meta {
@@ -812,16 +812,6 @@ input:focus-visible {
 
   .auth-container {
     padding: 16px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
-  }
-
-  .video-detail-hero {
-    flex-direction: column;
-  }
-
-  .video-detail-thumbnail {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 16 / 9;
   }
 
   .detail-setting-row {

@@ -159,6 +159,51 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             transition: background 0.2s;
         }
         .play-overlay-btn:hover { background: rgba(0, 0, 0, 0.8); }
+        .player-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            z-index: 4;
+            display: none;
+        }
+        .player-spinner.visible { display: block; }
+        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+        .player-error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #e2e8f0;
+            font-size: 14px;
+            z-index: 4;
+            display: none;
+        }
+        .player-error.visible { display: block; }
+        .player-error-icon { font-size: 36px; margin-bottom: 8px; }
+        .seek-time-tooltip {
+            position: absolute;
+            bottom: 100%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 3px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: monospace;
+            white-space: nowrap;
+            pointer-events: none;
+            display: none;
+            margin-bottom: 6px;
+        }
+        .seek-bar:hover .seek-time-tooltip { display: block; }
         .player-controls {
             position: absolute;
             bottom: 0;
@@ -226,25 +271,30 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             left: 0;
             height: 100%;
             background: var(--brand-accent);
+            pointer-events: none;
         }
         .seek-chapters {
             position: absolute;
             left: 0;
             right: 0;
-            top: 0;
-            height: 100%;
+            top: 50%;
+            height: 4px;
+            transform: translateY(-50%);
+            pointer-events: none;
         }
+        .seek-bar:hover .seek-chapters { height: 6px; }
         .seek-chapter {
             position: absolute;
             top: 0;
             height: 100%;
             background: rgba(255, 255, 255, 0.15);
             cursor: pointer;
+            pointer-events: auto;
         }
         .seek-chapter:hover { background: rgba(255, 255, 255, 0.3); }
         .seek-chapter-tooltip {
             position: absolute;
-            bottom: calc(100% + 8px);
+            bottom: 36px;
             left: 50%;
             transform: translateX(-50%);
             background: #0f172a;
@@ -256,15 +306,19 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.15s;
+            z-index: 10;
         }
         .seek-chapter:hover .seek-chapter-tooltip { opacity: 1; }
         .seek-markers {
             position: absolute;
             left: 0;
             right: 0;
-            top: 0;
-            height: 100%;
+            top: 50%;
+            height: 4px;
+            transform: translateY(-50%);
+            pointer-events: none;
         }
+        .seek-bar:hover .seek-markers { height: 6px; }
         .seek-marker {
             position: absolute;
             width: 6px;
@@ -274,12 +328,13 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             transform: translateX(-50%);
             opacity: 0.8;
             cursor: pointer;
+            pointer-events: auto;
         }
-        .seek-marker:hover { opacity: 1; transform: translateX(-50%) scaleY(1.4); }
+        .seek-marker:hover { opacity: 1; transform: translateX(-50%); }
         .seek-marker.private { background: #3b82f6; }
         .seek-marker-tooltip {
             position: absolute;
-            bottom: calc(100% + 8px);
+            bottom: 36px;
             left: 50%;
             transform: translateX(-50%);
             background: #0f172a;
@@ -292,6 +347,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.15s;
+            z-index: 10;
         }
         .seek-marker:hover .seek-marker-tooltip { opacity: 1; }
         .seek-thumb {
@@ -920,6 +976,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             <div class="player-overlay" id="player-overlay">
                 <button class="play-overlay-btn" id="play-overlay-btn" aria-label="Play">&#9654;</button>
             </div>
+            <div class="player-spinner" id="player-spinner"></div>
+            <div class="player-error" id="player-error"><div class="player-error-icon">&#9888;</div>Video failed to load</div>
             <div class="player-controls" id="player-controls">
                 <button class="ctrl-btn" id="play-btn" aria-label="Play">&#9654;</button>
                 <span class="time-display" id="time-current">0:00</span>
@@ -927,10 +985,11 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     <div class="seek-track">
                         <div class="seek-buffered" id="seek-buffered"></div>
                         <div class="seek-progress" id="seek-progress"></div>
-                        <div class="seek-chapters" id="seek-chapters"></div>
-                        <div class="seek-markers" id="seek-markers"></div>
                     </div>
+                    <div class="seek-chapters" id="seek-chapters"></div>
+                    <div class="seek-markers" id="seek-markers"></div>
                     <div class="seek-thumb" id="seek-thumb"></div>
+                    <div class="seek-time-tooltip" id="seek-time-tooltip">0:00</div>
                 </div>
                 <span class="time-display" id="time-duration">0:00</span>
                 <div class="volume-group">
@@ -957,11 +1016,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </div>
         <script nonce="{{.Nonce}}">
             var v = document.getElementById('player');
-            v.muted = true;
-            v.play().then(function() {
-                v.muted = false;
-                v.play().catch(function() { v.muted = true; });
-            }).catch(function() {});
             (function() {
                 var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
                 var src = document.querySelector('#player source');
@@ -1015,6 +1069,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 var speedMenu = document.getElementById('speed-menu');
                 var pipBtn = document.getElementById('pip-btn');
                 var fullscreenBtn = document.getElementById('fullscreen-btn');
+                var spinner = document.getElementById('player-spinner');
+                var errorOverlay = document.getElementById('player-error');
+                var seekTooltip = document.getElementById('seek-time-tooltip');
                 var hideTimer = null;
 
                 function fmtTime(s) {
@@ -1047,37 +1104,49 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 player.addEventListener('pause', function() { updatePlayBtn(); showControls(); });
                 player.addEventListener('ended', updatePlayBtn);
 
+                function getEffectiveDuration() {
+                    if (player.duration && isFinite(player.duration)) return player.duration;
+                    var best = player.currentTime || 0;
+                    if (player.buffered.length) {
+                        var end = player.buffered.end(player.buffered.length - 1);
+                        if (end > best) best = end;
+                    }
+                    return best;
+                }
+
                 function updateProgress() {
-                    if (!player.duration || !isFinite(player.duration)) return;
-                    var pct = (player.currentTime / player.duration) * 100;
+                    var dur = getEffectiveDuration();
+                    if (!dur) return;
+                    var pct = Math.min((player.currentTime / dur) * 100, 100);
                     seekProgress.style.width = pct + '%';
                     seekThumb.style.left = pct + '%';
                     timeCurrent.textContent = fmtTime(player.currentTime);
                 }
 
                 function updateBuffered() {
-                    if (!player.duration || !isFinite(player.duration) || !player.buffered.length) return;
+                    var dur = getEffectiveDuration();
+                    if (!dur || !player.buffered.length) return;
                     var end = player.buffered.end(player.buffered.length - 1);
-                    seekBuffered.style.width = (end / player.duration * 100) + '%';
+                    seekBuffered.style.width = (end / dur * 100) + '%';
                 }
 
                 function updateDurationDisplay() {
-                    if (player.duration && isFinite(player.duration)) {
-                        timeDuration.textContent = fmtTime(player.duration);
-                    }
+                    var dur = getEffectiveDuration();
+                    if (dur) timeDuration.textContent = fmtTime(dur);
                 }
 
-                player.addEventListener('timeupdate', updateProgress);
-                player.addEventListener('progress', updateBuffered);
+                player.addEventListener('timeupdate', function() { updateProgress(); updateDurationDisplay(); });
+                player.addEventListener('progress', function() { updateBuffered(); updateDurationDisplay(); });
                 player.addEventListener('loadedmetadata', function() { updateDurationDisplay(); updateProgress(); });
-                player.addEventListener('durationchange', updateDurationDisplay);
+                player.addEventListener('durationchange', function() { updateDurationDisplay(); updateProgress(); });
 
                 var seeking = false;
                 function seekFromEvent(e) {
                     var rect = seekBar.getBoundingClientRect();
                     var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                    if (player.duration && isFinite(player.duration)) {
-                        player.currentTime = pct * player.duration;
+                    var dur = getEffectiveDuration();
+                    if (dur) {
+                        player.currentTime = pct * dur;
                         updateProgress();
                     }
                 }
@@ -1164,6 +1233,91 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     if (!player.paused) {
                         hideTimer = setTimeout(function() { controls.classList.add('hidden'); }, 1000);
                     }
+                });
+
+                // Loading spinner
+                player.addEventListener('waiting', function() { spinner.classList.add('visible'); });
+                player.addEventListener('playing', function() { spinner.classList.remove('visible'); });
+                player.addEventListener('canplay', function() { spinner.classList.remove('visible'); });
+
+                // Error overlay
+                player.addEventListener('error', function() {
+                    spinner.classList.remove('visible');
+                    errorOverlay.classList.add('visible');
+                    controls.classList.add('hidden');
+                });
+
+                // Seek bar time tooltip
+                seekBar.addEventListener('mousemove', function(e) {
+                    if (!player.duration || !isFinite(player.duration)) return;
+                    var rect = seekBar.getBoundingClientRect();
+                    var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    var time = pct * player.duration;
+                    var label = fmtTime(time);
+                    // Show chapter name if applicable
+                    var chapters = seekBar.querySelectorAll('.seek-chapter');
+                    for (var i = 0; i < chapters.length; i++) {
+                        var ch = chapters[i];
+                        var start = parseFloat(ch.dataset.start || 0);
+                        var end = parseFloat(ch.dataset.end || 0);
+                        if (time >= start && time < end && ch.dataset.title) {
+                            label = ch.dataset.title + ' \u2013 ' + label;
+                            break;
+                        }
+                    }
+                    seekTooltip.textContent = label;
+                    seekTooltip.style.left = (pct * 100) + '%';
+                });
+
+                // Keyboard shortcuts
+                document.addEventListener('keydown', function(e) {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+                    var handled = true;
+                    switch (e.key) {
+                        case ' ':
+                        case 'k':
+                        case 'K':
+                            togglePlay();
+                            break;
+                        case 'ArrowLeft':
+                            player.currentTime = Math.max(0, player.currentTime - 5);
+                            break;
+                        case 'ArrowRight':
+                            player.currentTime = Math.min(player.duration || 0, player.currentTime + 5);
+                            break;
+                        case 'j':
+                        case 'J':
+                            player.currentTime = Math.max(0, player.currentTime - 10);
+                            break;
+                        case 'l':
+                        case 'L':
+                            player.currentTime = Math.min(player.duration || 0, player.currentTime + 10);
+                            break;
+                        case 'm':
+                        case 'M':
+                            player.muted = !player.muted;
+                            break;
+                        case 'f':
+                        case 'F':
+                            if (document.fullscreenElement) document.exitFullscreen().catch(function(){});
+                            else container.requestFullscreen().catch(function(){});
+                            break;
+                        case '<':
+                            player.playbackRate = Math.max(0.25, player.playbackRate - 0.25);
+                            speedBtn.textContent = player.playbackRate + 'x';
+                            break;
+                        case '>':
+                            player.playbackRate = Math.min(4, player.playbackRate + 0.25);
+                            speedBtn.textContent = player.playbackRate + 'x';
+                            break;
+                        default:
+                            if (e.key >= '0' && e.key <= '9' && player.duration) {
+                                player.currentTime = (parseInt(e.key) / 10) * player.duration;
+                            } else {
+                                handled = false;
+                            }
+                    }
+                    if (handled) e.preventDefault();
                 });
 
                 updatePlayBtn();
@@ -1798,6 +1952,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     seg.style.left = leftPct + '%';
                     seg.style.width = widthPct + '%';
                     seg.setAttribute('data-start', start);
+                    seg.setAttribute('data-end', end);
+                    seg.setAttribute('data-title', chapters[i].title);
                     seg.setAttribute('data-index', i);
                     if (i > 0) {
                         seg.style.left = (leftPct + 0.1) + '%';

@@ -81,8 +81,9 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(() => {});
         }
-      } catch {
-        setCameraError("Could not access your camera. Please allow camera access and try again.");
+      } catch (err) {
+        const detail = err instanceof DOMException ? `${err.name}: ${err.message}` : String(err);
+        setCameraError(`Could not access your camera: ${detail}`);
       }
     }
     startPreview();

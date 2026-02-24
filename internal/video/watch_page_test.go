@@ -177,6 +177,9 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 		"date":            "Feb 5, 2026",
 		"download button": `id="download-btn"`,
 		"branding":        "SendRec",
+		"spinner":         "player-spinner",
+		"error overlay":   "player-error",
+		"seek tooltip":    "seek-time-tooltip",
 	}
 	for name, want := range checks {
 		if !strings.Contains(body, want) {
@@ -1158,12 +1161,9 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 	}
 	body := rec.Body.String()
 
-	// Should have autoplay with muted fallback
-	if !strings.Contains(body, "v.play()") {
-		t.Error("expected autoplay script")
-	}
-	if !strings.Contains(body, "v.muted = true") {
-		t.Error("expected muted fallback in autoplay script")
+	// Should not autoplay (user clicks play instead)
+	if strings.Contains(body, "v.muted = true") {
+		t.Error("watch page should not force muted autoplay")
 	}
 	waitAndCheckExpectations(t, mock)
 }
