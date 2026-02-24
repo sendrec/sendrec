@@ -223,6 +223,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             top: 50%;
             height: 3px;
             transform: translateY(-50%);
+            pointer-events: none;
         }
         .seek-bar:hover .seek-chapters { height: 5px; }
         .seek-chapter {
@@ -231,6 +232,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             height: 100%;
             background: rgba(255, 255, 255, 0.15);
             cursor: pointer;
+            pointer-events: auto;
         }
         .seek-chapter:hover { background: rgba(255, 255, 255, 0.3); }
         .seek-chapter-tooltip {
@@ -411,31 +413,40 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             player.addEventListener('pause', function() { updatePlayBtn(); showControls(); });
             player.addEventListener('ended', updatePlayBtn);
 
+            function getEffectiveDuration() {
+                if (player.duration && isFinite(player.duration)) return player.duration;
+                if (player.buffered.length) return player.buffered.end(player.buffered.length - 1);
+                return 0;
+            }
             function updateProgress() {
-                if (!player.duration || !isFinite(player.duration)) return;
-                var pct = (player.currentTime / player.duration) * 100;
+                var dur = getEffectiveDuration();
+                if (!dur) return;
+                var pct = (player.currentTime / dur) * 100;
                 seekProgress.style.width = pct + '%';
                 seekThumb.style.left = pct + '%';
                 timeCurrent.textContent = fmtTime(player.currentTime);
             }
             function updateBuffered() {
-                if (!player.duration || !isFinite(player.duration) || !player.buffered.length) return;
-                seekBuffered.style.width = (player.buffered.end(player.buffered.length - 1) / player.duration * 100) + '%';
+                var dur = getEffectiveDuration();
+                if (!dur || !player.buffered.length) return;
+                seekBuffered.style.width = (player.buffered.end(player.buffered.length - 1) / dur * 100) + '%';
             }
             function updateDurationDisplay() {
-                if (player.duration && isFinite(player.duration)) timeDuration.textContent = fmtTime(player.duration);
+                var dur = getEffectiveDuration();
+                if (dur) timeDuration.textContent = fmtTime(dur);
             }
             player.addEventListener('timeupdate', updateProgress);
-            player.addEventListener('progress', updateBuffered);
+            player.addEventListener('progress', function() { updateBuffered(); updateDurationDisplay(); });
             player.addEventListener('loadedmetadata', function() { updateDurationDisplay(); updateProgress(); });
-            player.addEventListener('durationchange', updateDurationDisplay);
+            player.addEventListener('durationchange', function() { updateDurationDisplay(); updateProgress(); });
 
             var seeking = false;
             function seekFromEvent(e) {
                 var rect = seekBar.getBoundingClientRect();
                 var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                if (player.duration && isFinite(player.duration)) {
-                    player.currentTime = pct * player.duration;
+                var dur = getEffectiveDuration();
+                if (dur) {
+                    player.currentTime = pct * dur;
                     updateProgress();
                 }
             }
