@@ -276,22 +276,48 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         });
       }
 
-      recorder.ondataavailable = (event) => {
+      const handleDataAvailable = (event: BlobEvent) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
 
-      recorder.onerror = (event) => {
-        console.error("MediaRecorder error:", event);
-      };
-
-      recorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeType) });
+      const handleStop = async () => {
+        const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeTypeRef.current) });
         const elapsed = elapsedSeconds();
         const webcamBlob = webcamBlobPromiseRef.current ? await webcamBlobPromiseRef.current : undefined;
         stopAllStreams();
         onRecordingComplete(blob, elapsed, webcamBlob);
+      };
+
+      // Track whether the encoder failed so the original onstop is skipped
+      // when a fallback recorder takes over.
+      let encoderFailed = false;
+
+      recorder.ondataavailable = handleDataAvailable;
+
+      recorder.onerror = () => {
+        // Chrome's H.264 encoder fails for high-resolution display captures
+        // (e.g., Retina screens exceeding encoder limits). Fall back to WebM.
+        if (!mimeTypeRef.current.startsWith("video/mp4")) return;
+        encoderFailed = true;
+
+        const webmMimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+          ? "video/webm;codecs=vp9,opus"
+          : "video/webm";
+        mimeTypeRef.current = webmMimeType;
+        chunksRef.current = [];
+
+        const fallback = new MediaRecorder(screenStream, { mimeType: webmMimeType });
+        mediaRecorderRef.current = fallback;
+        fallback.ondataavailable = handleDataAvailable;
+        fallback.onstop = handleStop;
+        fallback.start();
+      };
+
+      recorder.onstop = async () => {
+        if (encoderFailed) return;
+        await handleStop();
       };
 
       screenStream.getVideoTracks()[0].addEventListener("ended", () => {
