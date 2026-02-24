@@ -33,20 +33,21 @@ func probeVideoInfo(path string) (frames int, info string, err error) {
 	return frames, info, nil
 }
 
-func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) error {
+func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (string, error) {
 	// setpts=PTS-STARTPTS normalizes webcam timestamps to start at 0.
 	// Chrome's MediaRecorder WebM may have non-zero start timestamps that
 	// prevent the overlay from aligning with the screen recording.
-	pipFilter := "[1:v]setpts=PTS-STARTPTS,scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[0:v][pip]overlay=W-w-20:H-h-20"
+	pipFilter := "[1:v]setpts=PTS-STARTPTS,scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[0:v][pip]overlay=W-w-20:H-h-20[vout]"
 
 	var args []string
 	if contentType == "video/mp4" || contentType == "video/quicktime" {
 		// iOS-safe encoding: constrain resolution, set profile/level, transcode audio to AAC
-		filterComplex := pipFilter + ",scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2"
+		filterComplex := pipFilter[:len(pipFilter)-len("[vout]")] + ",scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[vout]"
 		args = []string{
 			"-i", screenPath,
 			"-i", webcamPath,
 			"-filter_complex", filterComplex,
+			"-map", "[vout]",
 			"-map", "0:a?",
 			"-c:v", "libx264",
 			"-profile:v", "high",
@@ -64,6 +65,7 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) er
 			"-i", screenPath,
 			"-i", webcamPath,
 			"-filter_complex", pipFilter,
+			"-map", "[vout]",
 			"-map", "0:a?",
 			"-c:a", "copy",
 			"-c:v", "libvpx-vp9",
@@ -75,9 +77,9 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) er
 	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("ffmpeg composite: %w: %s", err, string(output))
+		return string(output), fmt.Errorf("ffmpeg composite: %w: %s", err, string(output))
 	}
-	return nil
+	return string(output), nil
 }
 
 func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey, contentType string) {
@@ -162,11 +164,13 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	if err := compositeOverlay(tmpScreenPath, tmpWebcamPath, tmpOutputPath, contentType); err != nil {
-		slog.Error("composite: ffmpeg failed", "video_id", videoID, "error", err)
+	ffmpegOutput, err := compositeOverlay(tmpScreenPath, tmpWebcamPath, tmpOutputPath, contentType)
+	if err != nil {
+		slog.Error("composite: ffmpeg failed", "video_id", videoID, "error", err, "ffmpeg_output", ffmpegOutput)
 		setReadyFallback()
 		return
 	}
+	slog.Info("composite: ffmpeg succeeded", "video_id", videoID, "ffmpeg_output", ffmpegOutput)
 
 	if err := storage.UploadFile(ctx, screenKey, tmpOutputPath, contentType); err != nil {
 		slog.Error("composite: failed to upload composited video", "video_id", videoID, "error", err)
