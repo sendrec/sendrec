@@ -840,7 +840,7 @@ export function PlaylistDetail() {
               />
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto", padding: "0 24px" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "0 24px", minHeight: 0 }}>
               {availableVideos.length === 0 ? (
                 <p
                   style={{

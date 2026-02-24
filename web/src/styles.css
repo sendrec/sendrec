@@ -653,6 +653,7 @@ input:focus-visible {
   height: 18px;
   cursor: pointer;
   opacity: 0;
+  pointer-events: none;
   z-index: 2;
   accent-color: var(--color-accent);
 }
@@ -660,10 +661,12 @@ input:focus-visible {
 .video-card:hover .video-select-checkbox,
 .video-select-checkbox--visible {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .video-select-checkbox:checked {
   opacity: 1;
+  pointer-events: auto;
 }
 
 @media (max-width: 640px) {

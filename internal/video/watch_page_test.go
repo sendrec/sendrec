@@ -984,8 +984,8 @@ func TestWatchPage_CrossOriginAttribute(t *testing.T) {
 	}
 	body := rec.Body.String()
 
-	if !strings.Contains(body, `crossorigin="anonymous"`) {
-		t.Error("expected crossorigin=anonymous on video element for CORS subtitle loading")
+	if strings.Contains(body, `crossorigin="anonymous"`) {
+		t.Error("crossorigin should not be present when there is no transcript")
 	}
 	waitAndCheckExpectations(t, mock)
 }
