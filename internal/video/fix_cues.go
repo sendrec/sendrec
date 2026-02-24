@@ -15,7 +15,7 @@ func fixWebMCues(inputPath, outputPath string) error {
 	cmd := exec.Command("ffmpeg",
 		"-i", inputPath,
 		"-c", "copy",
-		"-dash", "1",
+		"-reserve_index_space", "200k",
 		"-y",
 		outputPath,
 	)
