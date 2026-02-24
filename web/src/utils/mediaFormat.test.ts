@@ -28,6 +28,22 @@ describe("getSupportedMimeType", () => {
     expect(getSupportedMimeType()).toBe("video/mp4");
   });
 
+  it("returns webm vp8+opus when only vp8 is supported (Firefox)", () => {
+    globalThis.MediaRecorder = {
+      isTypeSupported: vi.fn((type: string) =>
+        type === "video/webm;codecs=vp8,opus" || type === "video/webm"
+      ),
+    } as unknown as typeof MediaRecorder;
+    expect(getSupportedMimeType()).toBe("video/webm;codecs=vp8,opus");
+  });
+
+  it("returns plain webm when only plain webm is supported", () => {
+    globalThis.MediaRecorder = {
+      isTypeSupported: vi.fn((type: string) => type === "video/webm"),
+    } as unknown as typeof MediaRecorder;
+    expect(getSupportedMimeType()).toBe("video/webm");
+  });
+
   it("returns video/mp4 when nothing is supported", () => {
     globalThis.MediaRecorder = {
       isTypeSupported: vi.fn().mockReturnValue(false),
@@ -55,6 +71,22 @@ describe("getSupportedVideoMimeType", () => {
       isTypeSupported: vi.fn((type: string) => type === "video/webm;codecs=vp9"),
     } as unknown as typeof MediaRecorder;
     expect(getSupportedVideoMimeType()).toBe("video/webm;codecs=vp9");
+  });
+
+  it("returns webm vp8 when only vp8 is supported (Firefox)", () => {
+    globalThis.MediaRecorder = {
+      isTypeSupported: vi.fn((type: string) =>
+        type === "video/webm;codecs=vp8" || type === "video/webm"
+      ),
+    } as unknown as typeof MediaRecorder;
+    expect(getSupportedVideoMimeType()).toBe("video/webm;codecs=vp8");
+  });
+
+  it("returns plain webm when only plain webm is supported", () => {
+    globalThis.MediaRecorder = {
+      isTypeSupported: vi.fn((type: string) => type === "video/webm"),
+    } as unknown as typeof MediaRecorder;
+    expect(getSupportedVideoMimeType()).toBe("video/webm");
   });
 
   it("returns video/mp4 when MediaRecorder is undefined", () => {
