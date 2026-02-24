@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginViaUI } from "../helpers/auth";
+import { loginViaAPI } from "../helpers/auth";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
@@ -8,7 +8,7 @@ const __dirname = dirname(__filename);
 
 test.describe("Upload", () => {
   test.beforeEach(async ({ page }) => {
-    await loginViaUI(page);
+    await loginViaAPI(page);
   });
 
   test("upload page renders", async ({ page }) => {
