@@ -45,6 +45,7 @@ const playerCSS = `
             animation: spin 0.8s linear infinite;
             z-index: 4;
             display: none;
+            pointer-events: none;
         }
         .player-spinner.visible { display: block; }
         @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
@@ -58,6 +59,7 @@ const playerCSS = `
             font-size: 14px;
             z-index: 4;
             display: none;
+            pointer-events: none;
         }
         .player-error.visible { display: block; }
         .player-error-icon { font-size: 36px; margin-bottom: 8px; }
@@ -430,7 +432,7 @@ const playerJS = `
         }
 
         function togglePlay() {
-            if (player.paused) player.play().catch(function(err){ console.error('play failed:', err); });
+            if (player.paused) player.play().catch(function(){});
             else player.pause();
         }
 
@@ -561,14 +563,30 @@ const playerJS = `
             pipBtn.style.display = 'none';
         }
 
-        // Fullscreen
+        // Fullscreen (with webkit fallback for iOS Safari)
+        function enterFullscreen() {
+            if (container.requestFullscreen) container.requestFullscreen().catch(function(){});
+            else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
+            else if (player.webkitEnterFullscreen) player.webkitEnterFullscreen();
+        }
+        function exitFullscreen() {
+            if (document.exitFullscreen) document.exitFullscreen().catch(function(){});
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
+        function isFullscreen() {
+            return document.fullscreenElement || document.webkitFullscreenElement || false;
+        }
         fullscreenBtn.addEventListener('click', function() {
-            if (document.fullscreenElement) document.exitFullscreen().catch(function(){});
-            else container.requestFullscreen().catch(function(){});
+            if (isFullscreen()) exitFullscreen();
+            else enterFullscreen();
         });
         document.addEventListener('fullscreenchange', function() {
-            fullscreenBtn.innerHTML = document.fullscreenElement ? '&#9723;' : '&#9974;';
-            fullscreenBtn.setAttribute('aria-label', document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen');
+            fullscreenBtn.innerHTML = isFullscreen() ? '&#9723;' : '&#9974;';
+            fullscreenBtn.setAttribute('aria-label', isFullscreen() ? 'Exit fullscreen' : 'Fullscreen');
+        });
+        document.addEventListener('webkitfullscreenchange', function() {
+            fullscreenBtn.innerHTML = isFullscreen() ? '&#9723;' : '&#9974;';
+            fullscreenBtn.setAttribute('aria-label', isFullscreen() ? 'Exit fullscreen' : 'Fullscreen');
         });
 
         // Auto-hide controls
@@ -654,8 +672,8 @@ const playerJS = `
                     break;
                 case 'f':
                 case 'F':
-                    if (document.fullscreenElement) document.exitFullscreen().catch(function(){});
-                    else container.requestFullscreen().catch(function(){});
+                    if (isFullscreen()) exitFullscreen();
+                    else enterFullscreen();
                     break;
                 case '<':
                     player.playbackRate = Math.max(0.25, player.playbackRate - 0.25);
