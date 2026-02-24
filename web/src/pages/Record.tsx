@@ -19,6 +19,7 @@ interface LimitsResponse {
 
 export function Record() {
   const [uploading, setUploading] = useState(false);
+  const [uploadStep, setUploadStep] = useState("");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
@@ -44,6 +45,7 @@ export function Record() {
     let videoId: string | null = null;
 
     try {
+      setUploadStep("Creating video...");
       const now = new Date();
       const title = `Recording ${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB")}`;
 
@@ -65,6 +67,7 @@ export function Record() {
 
       videoId = result.id;
 
+      setUploadStep("Uploading recording...");
       const uploadResp = await fetch(result.uploadUrl, {
         method: "PUT",
         body: blob,
@@ -76,6 +79,7 @@ export function Record() {
       }
 
       if (webcamBlob && result.webcamUploadUrl) {
+        setUploadStep("Uploading camera...");
         const webcamResp = await fetch(result.webcamUploadUrl, {
           method: "PUT",
           body: webcamBlob,
@@ -87,6 +91,7 @@ export function Record() {
         }
       }
 
+      setUploadStep("Finalizing...");
       await apiFetch(`/api/videos/${result.id}`, {
         method: "PATCH",
         body: JSON.stringify({ status: "ready" }),
@@ -102,6 +107,15 @@ export function Record() {
       setUploading(false);
     }
   }
+
+  useEffect(() => {
+    if (!uploading) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [uploading]);
 
   const [copied, setCopied] = useState(false);
 
@@ -139,7 +153,14 @@ export function Record() {
   if (uploading) {
     return (
       <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Uploading...</p>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 16, marginBottom: 8 }}>
+            {uploadStep || "Uploading..."}
+          </p>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, opacity: 0.7 }}>
+            Please don't close this page
+          </p>
+        </div>
       </div>
     );
   }

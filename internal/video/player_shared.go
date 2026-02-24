@@ -698,6 +698,16 @@ const playerJS = `
 
         updatePlayBtn();
         updateMuteBtn();
+
+        // iOS Safari: fall back to native controls.
+        // Custom controls have touch/playback issues on iOS; native controls work reliably.
+        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (isIOS) {
+            player.setAttribute('controls', '');
+            controls.style.display = 'none';
+            overlay.style.display = 'none';
+        }
 `
 
 // safariWarningCSS contains the shared CSS for the Safari WebM warning banner.
@@ -717,18 +727,22 @@ const safariWarningCSS = `
 // safariWarningHTML contains the shared HTML for the Safari WebM warning div.
 const safariWarningHTML = `
         <div id="safari-webm-warning" class="hidden" role="alert">
-            <p>This video was recorded in WebM format, which is not supported by Safari. Please open this link in Chrome or Firefox to watch.</p>
+            <p id="safari-webm-warning-text">This video was recorded in WebM format, which is not supported by Safari. Please open this link in Chrome or Firefox to watch.</p>
         </div>
 `
 
 // safariWarningJS contains the shared JS snippet that detects Safari + WebM and shows the warning.
 // It checks <source type="video/webm">, src attributes ending in .webm, and for playlist pages,
 // the contentType field in the videos JSON data.
+// On iOS, it shows a gentler "processing" message and keeps the native player visible.
 const safariWarningJS = `
             var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
             if (isSafari) {
                 var warningEl = document.getElementById('safari-webm-warning');
+                var warningText = document.getElementById('safari-webm-warning-text');
                 var playerEl = document.getElementById('player');
+                var isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
                 function checkWebM() {
                     if (!warningEl || !playerEl) return;
                     var src = playerEl.querySelector('source');
@@ -736,7 +750,11 @@ const safariWarningJS = `
                                  (playerEl.src && playerEl.src.match(/\.webm(\?|$)/i));
                     if (isWebM) {
                         warningEl.className = 'browser-warning';
-                        playerEl.style.display = 'none';
+                        if (isIOSDevice) {
+                            warningText.textContent = 'This video is still being processed. Please check back in a moment.';
+                        } else {
+                            playerEl.style.display = 'none';
+                        }
                     } else {
                         warningEl.className = 'hidden';
                         playerEl.style.display = '';
