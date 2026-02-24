@@ -35,7 +35,7 @@ func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
 			w.Header().Set("Referrer-Policy", "no-referrer")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-			w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(), screen-wake-lock=(), display-capture=(self)")
+			w.Header().Set("Permissions-Policy", "camera=self, microphone=self, geolocation=(), screen-wake-lock=(), display-capture=self")
 
 			cspFrameAncestors := frameAncestors
 			if strings.HasPrefix(r.URL.Path, "/embed/") {
