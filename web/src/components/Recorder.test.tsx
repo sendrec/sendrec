@@ -651,4 +651,53 @@ describe("Recorder", () => {
     expect(screen.queryByRole("button", { name: "Stop recording" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /drawing/i })).not.toBeInTheDocument();
   });
+
+  it("shows Audio On button in idle state by default", () => {
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    expect(screen.getByText("Audio On")).toBeInTheDocument();
+  });
+
+  it("toggles system audio off when clicked", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Disable system audio" }));
+    expect(screen.getByText("Audio Off")).toBeInTheDocument();
+  });
+
+  it("toggles system audio back on when clicked again", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Disable system audio" }));
+    await user.click(screen.getByRole("button", { name: "Enable system audio" }));
+    expect(screen.getByText("Audio On")).toBeInTheDocument();
+  });
+
+  it("calls getDisplayMedia with system audio constraints by default", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(navigator.mediaDevices.getDisplayMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        video: true,
+        audio: true,
+        systemAudio: "include",
+        suppressLocalAudioPlayback: true,
+      }),
+    );
+  });
+
+  it("calls getDisplayMedia with audio disabled when system audio is off", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Disable system audio" }));
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(navigator.mediaDevices.getDisplayMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        video: true,
+        audio: false,
+      }),
+    );
+  });
 });
