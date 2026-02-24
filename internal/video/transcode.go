@@ -113,6 +113,8 @@ func transcodeExistingWebM(ctx context.Context, db database.DBTX, storage Object
 
 func StartTranscodeWorker(ctx context.Context, db database.DBTX, storage ObjectStorage, interval time.Duration) {
 	go func() {
+		transcodeExistingWebM(ctx, db, storage)
+
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
