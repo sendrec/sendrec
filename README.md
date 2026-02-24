@@ -10,7 +10,7 @@ SendRec is an open-source alternative to Loom for teams that need their data to 
 
 ### Record
 
-Record your screen, camera, or both — directly in the browser. A 3-2-1 countdown gives you time to prepare. Pause and resume, draw annotations live, flip between front and back cameras on mobile.
+Record your screen, camera, or both — directly in the browser. Works on Chrome, Safari, and Firefox. Records MP4 natively when supported, with automatic WebM fallback. A 3-2-1 countdown gives you time to prepare. Pause and resume, draw annotations live, flip between front and back cameras on mobile.
 
 ![Recording](.github/screenshots/recording.png)
 
@@ -28,7 +28,7 @@ Every video gets a shareable link with password protection, expiry dates, and pe
 
 ### Watch
 
-Server-rendered watch pages with AI-generated summaries and chapter markers in the seek bar, a clickable transcript panel, closed captions, timestamped comments, and emoji reactions. SEO-optimized with OpenGraph tags, Twitter Cards, and VideoObject JSON-LD. Embed videos in docs and wikis with a lightweight iframe player.
+Server-rendered watch pages with a custom video player (seek bar, speed control, keyboard shortcuts, picture-in-picture), AI-generated summaries and chapter markers, a clickable transcript panel, closed captions, timestamped comments, and emoji reactions. iOS Safari gets native controls for reliable playback. SEO-optimized with OpenGraph tags, Twitter Cards, and VideoObject JSON-LD. Embed videos and playlists in docs and wikis with a lightweight iframe player.
 
 ![Watch page](.github/screenshots/watch.png)
 
@@ -40,7 +40,7 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 
 ### Features
 
-- **Screen & camera recording** — 3-2-1 countdown, pause/resume, webcam overlay, drawing annotations, mobile front/back camera
+- **Screen & camera recording** — works on Chrome, Safari, and Firefox; prefers MP4 with WebM fallback; 3-2-1 countdown, pause/resume, webcam overlay, drawing annotations, mobile front/back camera
 - **Video upload** — drag-and-drop up to 10 files at once, MP4/WebM/MOV, per-file progress
 - **Automatic transcription** — whisper.cpp, closed captions on watch and embed pages, full-text search
 - **Transcript editing** — trim by clicking transcript segments, filler word removal with preview, AI-generated title suggestions
@@ -52,7 +52,7 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 - **Generic webhooks** — POST events (video created/ready/deleted, viewed, comment, milestone, CTA click) to any URL with HMAC-SHA256 signing, retries, and delivery log
 - **Slack notifications** — per-user Slack incoming webhook for view and comment alerts
 - **View notifications** — off, views only, comments only, both, or daily digest
-- **Embeddable player** — lightweight iframe with captions, CTA, and milestone tracking
+- **Embeddable player** — lightweight iframe for videos and playlists, with captions, CTA, and milestone tracking
 - **Custom branding** — logo, colors, footer text, custom CSS injection, per-user defaults with per-video overrides
 - **Library** — folders, tags, and playlists; search by title and transcript; batch delete/move/tag; inline title editing
 - **Playlists** — curated video collections with custom ordering, shared watch pages with auto-advance, watched badges, password protection, and email gating
@@ -111,9 +111,9 @@ Single Go binary that:
 - Renders server-side watch pages with OpenGraph tags, Twitter Cards, and JSON-LD (`/watch/:token`)
 - Runs database migrations on startup
 
-Video recordings happen entirely in the browser using `getDisplayMedia` + `MediaRecorder`. Users can also upload existing video files (MP4, WebM, MOV) via drag-and-drop. Files upload directly to S3 via presigned URLs — the server never touches video bytes.
+Video recordings happen entirely in the browser using `getDisplayMedia` + `MediaRecorder`. The recorder prefers MP4 (native in Chrome 130+ and Safari) with automatic fallback to WebM for Firefox and older browsers. Users can also upload existing video files (MP4, WebM, MOV) via drag-and-drop. Files upload directly to S3 via presigned URLs — the server never touches video bytes.
 
-After upload, the server generates a thumbnail with ffmpeg and enqueues the video for transcription with [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Transcripts are stored as VTT subtitles and a clickable segment panel on the watch page. Transcription is optional — if the whisper model is not available, it is silently skipped.
+After upload, the server generates a thumbnail with ffmpeg and enqueues the video for transcription with [whisper.cpp](https://github.com/ggerganov/whisper.cpp). WebM recordings are automatically transcoded to MP4 for universal playback. Uploaded MP4s are normalized with iOS-safe encoding flags when needed. Transcripts are stored as VTT subtitles and a clickable segment panel on the watch page. Transcription is optional — if the whisper model is not available, it is silently skipped.
 
 ## Self-Hosting
 

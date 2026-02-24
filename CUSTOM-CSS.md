@@ -48,16 +48,24 @@ body
   .container
     a.logo                    ← Company logo + name
       img                     ← Logo image (20x20)
-    video#player              ← Video player
-    .markers-bar              ← Comment timeline markers
-      .marker-dot             ← Individual marker dot
+    .player-container         ← Video player wrapper
+      video#player            ← Video element (native controls on iOS)
+      .player-overlay         ← Large center play button overlay
+      .player-spinner         ← Loading spinner
+      .player-error           ← Error state overlay
+      .player-controls        ← Custom controls bar (hidden on iOS)
+        .ctrl-btn#play-btn    ← Play/pause
+        .time-display         ← Current time / duration
+        .seek-bar             ← Seek bar with chapters, markers, tooltip
+        .volume-group         ← Volume button + slider
+        .speed-dropdown       ← Speed selector (0.5x–2x)
+        .ctrl-btn#pip-btn     ← Picture-in-picture
+        .shortcuts-wrapper    ← Keyboard shortcuts panel
+        .ctrl-btn#fullscreen-btn ← Fullscreen toggle
     h1                        ← Video title
     p.meta                    ← "Creator name · Feb 17, 2026"
     .actions                  ← Button row
       .download-btn           ← Download button
-      .speed-controls         ← Speed button group
-        .speed-btn            ← 0.5x, 1x, 1.5x, 2x
-        .speed-btn.active     ← Currently selected speed
     .cta-card                 ← CTA card (shown on video end)
       .cta-dismiss            ← CTA dismiss button
       .cta-btn                ← CTA action button
@@ -90,6 +98,8 @@ body
       a                       ← Footer link
 ```
 
+> **Note:** On iOS Safari, custom controls are hidden and the native `<video controls>` are used instead for reliable playback.
+
 ## Selector reference
 
 ### Layout
@@ -111,15 +121,32 @@ body
 | `.branding` | Footer text | `color: #64748b`, `font-size: 0.75rem` |
 | `.branding a` | Footer link | `color: var(--brand-accent)` |
 
+### Custom player controls
+
+The custom player controls bar is shown on desktop browsers. On iOS Safari, native `<video controls>` are used instead and these selectors have no effect.
+
+| Selector | Description | Default |
+|----------|-------------|---------|
+| `.player-controls` | Controls bar container | Gradient background, auto-hide after 3s |
+| `.player-controls.hidden` | Hidden state | `opacity: 0`, `pointer-events: none` |
+| `.ctrl-btn` | Control button (play, mute, PiP, fullscreen) | White, `18px` |
+| `.seek-bar` | Seek bar container | Flex, `height: 20px` |
+| `.seek-progress` | Seek progress fill | `var(--player-accent, #00b67a)` |
+| `.seek-thumb` | Seek thumb (shown on hover) | `14px` circle, accent color |
+| `.seek-chapter` | Chapter segment in seek bar | `rgba(255, 255, 255, 0.15)` |
+| `.seek-marker` | Comment marker in seek bar | `6px` wide, accent color |
+| `.speed-menu` | Speed dropdown menu | Dark background, `6px` radius |
+| `.volume-slider` | Volume slider | `60px` wide |
+| `.player-overlay` | Large center play button | Full-size overlay |
+| `.player-spinner` | Loading spinner | Animated border circle |
+| `.player-error` | Error state message | Centered text with icon |
+
 ### Action buttons
 
 | Selector | Description | Default |
 |----------|-------------|---------|
 | `.actions` | Button row container | `display: flex`, `gap: 1rem` |
 | `.download-btn` | Download button | Outlined, `var(--brand-accent)` border |
-| `.speed-controls` | Speed button group | `display: flex`, `gap: 0.25rem` |
-| `.speed-btn` | Speed button (inactive) | `color: #94a3b8`, `border: 1px solid #334155` |
-| `.speed-btn.active` | Currently selected speed | `color: var(--brand-accent)` |
 
 ### Call to action
 
@@ -153,12 +180,12 @@ The CTA card appears when the video finishes playing. Set it per video via Libra
 
 ### Comment markers
 
+Comment markers are displayed inside the seek bar (not as a separate bar).
+
 | Selector | Description | Default |
 |----------|-------------|---------|
-| `.markers-bar` | Timeline bar below video | `height: 8px`, `background: var(--brand-surface)` |
-| `.marker-dot` | Comment position marker | `background: var(--brand-accent)`, `6px` circle |
-| `.marker-dot.private` | Private comment marker | `background: #3b82f6` |
-| `.marker-tooltip` | Hover tooltip on marker | Dark tooltip with border |
+| `.seek-marker` | Comment position marker in seek bar | `background: var(--player-accent)`, `6px` wide |
+| `.seek-marker-tooltip` | Hover tooltip on marker | Dark tooltip with border |
 
 ### Emoji picker
 
@@ -186,7 +213,7 @@ The CTA card appears when the video finishes playing. Set it per video via Libra
 |----------|-------------|---------|
 | `.timestamp-toggle` | "Add timestamp" toggle | Pill shape, `color: #94a3b8` |
 | `.timestamp-toggle.active` | Active timestamp toggle | `color: var(--brand-accent)` |
-| `.browser-warning` | Safari WebM warning | Yellow border, `#fbbf24` text |
+| `.browser-warning` | Safari WebM warning (desktop: "use Chrome/Firefox"; iOS: "still being processed") | Yellow border, `#fbbf24` text |
 | `.hidden` | Hidden elements | `display: none` |
 
 ### Mobile breakpoint
@@ -214,8 +241,7 @@ body {
 
 ```css
 .download-btn,
-.comment-submit,
-.speed-btn {
+.comment-submit {
   border-radius: 20px;
 }
 ```
@@ -264,7 +290,6 @@ video {
 .comment-meta { color: #64748b; }
 .transcript-text { color: #334155; }
 .transcript-header { color: #1e293b; }
-.speed-btn { border-color: #cbd5e1; color: #64748b; }
 .comment-form input,
 .comment-form textarea { border-color: #cbd5e1; color: #1e293b; }
 .emoji-trigger { border-color: #cbd5e1; }
@@ -324,9 +349,6 @@ h1 {
 
 /* Hide footer */
 .branding { display: none; }
-
-/* Hide speed controls */
-.speed-controls { display: none; }
 
 /* Hide CTA card */
 .cta-card { display: none !important; }
