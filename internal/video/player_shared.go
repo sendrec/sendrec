@@ -430,7 +430,7 @@ const playerJS = `
         }
 
         function togglePlay() {
-            if (player.paused) player.play().catch(function(){});
+            if (player.paused) player.play().catch(function(err){ console.error('play failed:', err); });
             else player.pause();
         }
 
