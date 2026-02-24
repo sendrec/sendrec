@@ -1,0 +1,1 @@
+ALTER TABLE videos ADD COLUMN cues_fixed BOOLEAN NOT NULL DEFAULT false;

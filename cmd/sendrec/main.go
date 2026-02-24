@@ -162,6 +162,7 @@ func main() {
 	video.StartTranscriptionWorker(cleanupCtx, db.Pool, store, 5*time.Second, aiEnabled)
 	video.StartSummaryWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
 	video.StartDigestWorker(cleanupCtx, db.Pool, emailClient, baseURL)
+	video.StartCuesFixWorker(cleanupCtx, db.Pool, store, 2*time.Minute)
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),

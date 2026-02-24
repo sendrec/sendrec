@@ -621,6 +621,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 					probeDuration(ctx, h.db, h.storage, videoID, fileKey)
 				}()
 			}
+			if expectedContentType == "video/webm" {
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+					defer cancel()
+					FixWebMCuesAsync(ctx, h.db, h.storage, videoID, fileKey)
+				}()
+			}
 		}
 	}
 
