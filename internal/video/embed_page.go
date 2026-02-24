@@ -197,6 +197,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             height: 3px;
             background: rgba(255, 255, 255, 0.2);
             border-radius: 2px;
+            overflow: hidden;
             transition: height 0.15s;
         }
         .seek-bar:hover .seek-track { height: 5px; }
@@ -219,9 +220,11 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             position: absolute;
             left: 0;
             right: 0;
-            top: 0;
-            height: 100%;
+            top: 50%;
+            height: 3px;
+            transform: translateY(-50%);
         }
+        .seek-bar:hover .seek-chapters { height: 5px; }
         .seek-chapter {
             position: absolute;
             top: 0;
@@ -336,8 +339,8 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
                         <div class="seek-track">
                             <div class="seek-buffered" id="seek-buffered"></div>
                             <div class="seek-progress" id="seek-progress"></div>
-                            <div class="seek-chapters" id="seek-chapters"></div>
                         </div>
+                        <div class="seek-chapters" id="seek-chapters"></div>
                         <div class="seek-thumb" id="seek-thumb"></div>
                         <div class="seek-time-tooltip" id="seek-time-tooltip">0:00</div>
                     </div>

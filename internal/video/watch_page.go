@@ -254,6 +254,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             height: 4px;
             background: rgba(255, 255, 255, 0.2);
             border-radius: 2px;
+            overflow: hidden;
             transition: height 0.15s;
         }
         .seek-bar:hover .seek-track { height: 6px; }
@@ -276,9 +277,11 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             position: absolute;
             left: 0;
             right: 0;
-            top: 0;
-            height: 100%;
+            top: 50%;
+            height: 4px;
+            transform: translateY(-50%);
         }
+        .seek-bar:hover .seek-chapters { height: 6px; }
         .seek-chapter {
             position: absolute;
             top: 0;
@@ -307,9 +310,11 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             position: absolute;
             left: 0;
             right: 0;
-            top: 0;
-            height: 100%;
+            top: 50%;
+            height: 4px;
+            transform: translateY(-50%);
         }
+        .seek-bar:hover .seek-markers { height: 6px; }
         .seek-marker {
             position: absolute;
             width: 6px;
@@ -974,9 +979,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     <div class="seek-track">
                         <div class="seek-buffered" id="seek-buffered"></div>
                         <div class="seek-progress" id="seek-progress"></div>
-                        <div class="seek-chapters" id="seek-chapters"></div>
-                        <div class="seek-markers" id="seek-markers"></div>
                     </div>
+                    <div class="seek-chapters" id="seek-chapters"></div>
+                    <div class="seek-markers" id="seek-markers"></div>
                     <div class="seek-thumb" id="seek-thumb"></div>
                     <div class="seek-time-tooltip" id="seek-time-tooltip">0:00</div>
                 </div>
