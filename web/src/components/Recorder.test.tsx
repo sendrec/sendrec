@@ -406,7 +406,7 @@ describe("Recorder", () => {
     await user.click(screen.getByRole("button", { name: "Enable camera" }));
 
     expect(alertSpy).toHaveBeenCalledWith(
-      "Could not access your camera: Error: Permission denied",
+      "Could not access your camera. Please allow camera access and try again.",
     );
     alertSpy.mockRestore();
   });
