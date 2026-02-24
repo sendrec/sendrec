@@ -11,16 +11,42 @@ import (
 )
 
 func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) error {
-	cmd := exec.Command("ffmpeg",
-		"-i", screenPath,
-		"-i", webcamPath,
-		"-filter_complex", "[1:v]scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[0:v][pip]overlay=W-w-20:H-h-20",
-		"-map", "0:a?",
-		"-c:a", "copy",
-		"-c:v", videoCodecForContentType(contentType),
-		"-y",
-		outputPath,
-	)
+	pipFilter := "[1:v]scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[0:v][pip]overlay=W-w-20:H-h-20"
+
+	var args []string
+	if contentType == "video/mp4" || contentType == "video/quicktime" {
+		// iOS-safe encoding: constrain resolution, set profile/level, transcode audio to AAC
+		filterComplex := pipFilter + ",scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2"
+		args = []string{
+			"-i", screenPath,
+			"-i", webcamPath,
+			"-filter_complex", filterComplex,
+			"-map", "0:a?",
+			"-c:v", "libx264",
+			"-profile:v", "high",
+			"-level:v", "5.1",
+			"-preset", "fast",
+			"-crf", "23",
+			"-r", "60",
+			"-c:a", "aac",
+			"-movflags", "+faststart",
+			"-y",
+			outputPath,
+		}
+	} else {
+		args = []string{
+			"-i", screenPath,
+			"-i", webcamPath,
+			"-filter_complex", pipFilter,
+			"-map", "0:a?",
+			"-c:a", "copy",
+			"-c:v", "libvpx-vp9",
+			"-y",
+			outputPath,
+		}
+	}
+
+	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg composite: %w: %s", err, string(output))

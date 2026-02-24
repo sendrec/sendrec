@@ -103,6 +103,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .cta-overlay.visible { display: block; }
         .cta-overlay a { display: inline-block; padding: 8px 24px; background: #00b67a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
         .cta-overlay a:hover { opacity: 0.9; color: #fff; }
+` + safariWarningCSS + `
     </style>
 </head>
 <body>
@@ -122,8 +123,12 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             <span class="footer-title">{{.Title}}</span>
             <a href="{{.BaseURL}}/watch/{{.ShareToken}}" target="_blank" rel="noopener">Watch on SendRec</a>
         </div>
+` + safariWarningHTML + `
     </div>
     <script nonce="{{.Nonce}}">
+        (function() {
+` + safariWarningJS + `
+        })();
         (function() {
             var player = document.getElementById('player');
             var container = document.getElementById('player-container');

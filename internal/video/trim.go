@@ -20,15 +20,38 @@ func videoCodecForContentType(ct string) string {
 }
 
 func trimVideo(inputPath, outputPath, contentType string, startSeconds, endSeconds float64) error {
-	cmd := exec.Command("ffmpeg",
-		"-i", inputPath,
-		"-ss", fmt.Sprintf("%.3f", startSeconds),
-		"-to", fmt.Sprintf("%.3f", endSeconds),
-		"-c:v", videoCodecForContentType(contentType),
-		"-c:a", "copy",
-		"-y",
-		outputPath,
-	)
+	var args []string
+	if contentType == "video/mp4" || contentType == "video/quicktime" {
+		// iOS-safe encoding: constrain resolution, set profile/level, transcode audio to AAC
+		args = []string{
+			"-i", inputPath,
+			"-ss", fmt.Sprintf("%.3f", startSeconds),
+			"-to", fmt.Sprintf("%.3f", endSeconds),
+			"-c:v", "libx264",
+			"-profile:v", "high",
+			"-level:v", "5.1",
+			"-preset", "fast",
+			"-crf", "23",
+			"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+			"-r", "60",
+			"-c:a", "aac",
+			"-movflags", "+faststart",
+			"-y",
+			outputPath,
+		}
+	} else {
+		args = []string{
+			"-i", inputPath,
+			"-ss", fmt.Sprintf("%.3f", startSeconds),
+			"-to", fmt.Sprintf("%.3f", endSeconds),
+			"-c:v", "libvpx-vp9",
+			"-c:a", "copy",
+			"-y",
+			outputPath,
+		}
+	}
+
+	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg trim: %w: %s", err, string(output))

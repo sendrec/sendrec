@@ -9,8 +9,16 @@ import (
 )
 
 func TestWebcamFileKey(t *testing.T) {
-	key := webcamFileKey("user-123", "abc123defghi")
+	key := webcamFileKey("user-123", "abc123defghi", "video/webm")
 	expected := "recordings/user-123/abc123defghi_webcam.webm"
+	if key != expected {
+		t.Errorf("expected %q, got %q", expected, key)
+	}
+}
+
+func TestWebcamFileKey_MP4(t *testing.T) {
+	key := webcamFileKey("user-123", "abc123defghi", "video/mp4")
+	expected := "recordings/user-123/abc123defghi_webcam.mp4"
 	if key != expected {
 		t.Errorf("expected %q, got %q", expected, key)
 	}

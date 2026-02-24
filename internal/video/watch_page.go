@@ -647,16 +647,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             font-size: 0.875rem;
             font-style: italic;
         }
-        .browser-warning {
-            background: #1e293b;
-            border: 1px solid #f59e0b;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-top: 0.75rem;
-            color: #fbbf24;
-            font-size: 0.875rem;
-            line-height: 1.5;
-        }
+` + safariWarningCSS + `
         @media (max-width: 640px) {
             .container { padding: 1rem 0.75rem; }
             h1 { font-size: 1.25rem; }
@@ -682,18 +673,11 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             </video>
 ` + playerControlsHTML + `
         </div>
-        <div id="safari-webm-warning" class="hidden" role="alert">
-            <p>This video was recorded in WebM format, which is not supported by Safari. Please open this link in Chrome or Firefox to watch.</p>
-        </div>
+` + safariWarningHTML + `
         <script nonce="{{.Nonce}}">
             var v = document.getElementById('player');
             (function() {
-                var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-                var src = document.querySelector('#player source');
-                if (isSafari && src && src.getAttribute('type') === 'video/webm') {
-                    document.getElementById('safari-webm-warning').className = 'browser-warning';
-                    document.getElementById('player').style.display = 'none';
-                }
+` + safariWarningJS + `
             })();
         </script>
         {{if ne .CommentMode "disabled"}}

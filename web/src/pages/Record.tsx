@@ -51,6 +51,7 @@ export function Record() {
       const createBody: Record<string, unknown> = { title, duration, fileSize: blob.size, contentType };
       if (webcamBlob) {
         createBody.webcamFileSize = webcamBlob.size;
+        createBody.webcamContentType = webcamBlob.type || "video/webm";
       }
 
       const result = await apiFetch<CreateVideoResponse>("/api/videos", {
@@ -78,7 +79,7 @@ export function Record() {
         const webcamResp = await fetch(result.webcamUploadUrl, {
           method: "PUT",
           body: webcamBlob,
-          headers: { "Content-Type": "video/webm" },
+          headers: { "Content-Type": webcamBlob.type || "video/webm" },
         });
 
         if (!webcamResp.ok) {

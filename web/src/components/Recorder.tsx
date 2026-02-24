@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
 import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
+import { getSupportedMimeType, getSupportedVideoMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 
 type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 
@@ -37,6 +38,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const webcamRecorderRef = useRef<MediaRecorder | null>(null);
   const webcamChunksRef = useRef<Blob[]>([]);
   const webcamBlobPromiseRef = useRef<Promise<Blob> | null>(null);
+  const mimeTypeRef = useRef("");
   const webcamVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
     if (node && webcamStreamRef.current) {
       node.srcObject = webcamStreamRef.current;
@@ -227,8 +229,11 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         throw new Error("Failed to create composited stream");
       }
 
+      const mimeType = getSupportedMimeType();
+      mimeTypeRef.current = mimeType;
+
       const recorder = new MediaRecorder(compositedStream, {
-        mimeType: "video/webm;codecs=vp9,opus",
+        mimeType,
       });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
@@ -238,8 +243,9 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       // Set up webcam recorder if webcam is enabled (but don't start yet)
       webcamBlobPromiseRef.current = null;
       if (webcamEnabled && webcamStreamRef.current) {
+        const webcamMimeType = getSupportedVideoMimeType();
         const webcamRecorder = new MediaRecorder(webcamStreamRef.current, {
-          mimeType: "video/webm;codecs=vp9",
+          mimeType: webcamMimeType,
         });
         webcamRecorderRef.current = webcamRecorder;
         webcamChunksRef.current = [];
@@ -252,7 +258,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
 
         webcamBlobPromiseRef.current = new Promise<Blob>((resolve) => {
           webcamRecorder.onstop = () => {
-            resolve(new Blob(webcamChunksRef.current, { type: "video/webm" }));
+            resolve(new Blob(webcamChunksRef.current, { type: blobTypeFromMimeType(webcamMimeType) }));
           };
         });
       }
@@ -264,7 +270,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       };
 
       recorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
+        const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeType) });
         const elapsed = elapsedSeconds();
         const webcamBlob = webcamBlobPromiseRef.current ? await webcamBlobPromiseRef.current : undefined;
         onRecordingComplete(blob, elapsed, webcamBlob);

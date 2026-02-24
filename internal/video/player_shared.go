@@ -699,3 +699,50 @@ const playerJS = `
         updatePlayBtn();
         updateMuteBtn();
 `
+
+// safariWarningCSS contains the shared CSS for the Safari WebM warning banner.
+const safariWarningCSS = `
+        .browser-warning {
+            background: #1e293b;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 0.75rem;
+            color: #fbbf24;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+`
+
+// safariWarningHTML contains the shared HTML for the Safari WebM warning div.
+const safariWarningHTML = `
+        <div id="safari-webm-warning" class="hidden" role="alert">
+            <p>This video was recorded in WebM format, which is not supported by Safari. Please open this link in Chrome or Firefox to watch.</p>
+        </div>
+`
+
+// safariWarningJS contains the shared JS snippet that detects Safari + WebM and shows the warning.
+// It checks <source type="video/webm">, src attributes ending in .webm, and for playlist pages,
+// the contentType field in the videos JSON data.
+const safariWarningJS = `
+            var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            if (isSafari) {
+                var warningEl = document.getElementById('safari-webm-warning');
+                var playerEl = document.getElementById('player');
+                function checkWebM() {
+                    if (!warningEl || !playerEl) return;
+                    var src = playerEl.querySelector('source');
+                    var isWebM = (src && src.getAttribute('type') === 'video/webm') ||
+                                 (playerEl.src && playerEl.src.match(/\.webm(\?|$)/i));
+                    if (isWebM) {
+                        warningEl.className = 'browser-warning';
+                        playerEl.style.display = 'none';
+                    } else {
+                        warningEl.className = 'hidden';
+                        playerEl.style.display = '';
+                    }
+                }
+                checkWebM();
+                playerEl.addEventListener('loadstart', checkWebM);
+            }
+`

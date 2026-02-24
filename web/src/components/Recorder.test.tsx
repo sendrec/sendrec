@@ -61,6 +61,7 @@ const mockScreenStream = {
 };
 
 class MockMediaRecorder {
+  static isTypeSupported = vi.fn().mockReturnValue(true);
   state = "inactive";
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;

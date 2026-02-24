@@ -45,7 +45,7 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
             color: #e2e8f0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-` + playerCSS + `
+` + playerCSS + safariWarningCSS + `
         .playlist-layout {
             display: flex;
             height: 100vh;
@@ -323,9 +323,13 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
                 <span class="footer-title">{{.Title}}</span>
                 <a href="{{.BaseURL}}/watch/playlist/{{.ShareToken}}" target="_blank" rel="noopener">Watch on SendRec</a>
             </div>
+` + safariWarningHTML + `
         </main>
     </div>
     <script nonce="{{.Nonce}}">
+    (function() {
+` + safariWarningJS + `
+    })();
     (function() {
         var videos = {{.VideosJSON}};
         var currentIndex = 0;

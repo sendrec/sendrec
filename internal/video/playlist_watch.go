@@ -130,7 +130,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         .gate-container button:hover { opacity: 0.9; }
         .gate-container button:disabled { opacity: 0.5; cursor: not-allowed; }
         {{else}}
-` + playerCSS + `
+` + playerCSS + safariWarningCSS + `
         .playlist-layout {
             display: flex;
             min-height: 100vh;
@@ -479,9 +479,13 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             <div class="branding-footer">
                 Shared via <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a>
             </div>
+` + safariWarningHTML + `
         </main>
     </div>
     <script nonce="{{.Nonce}}">
+    (function() {
+` + safariWarningJS + `
+    })();
     (function() {
         var videos = {{.VideosJSON}};
         var currentIndex = 0;
