@@ -294,7 +294,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .seek-chapter:hover { background: rgba(255, 255, 255, 0.3); }
         .seek-chapter-tooltip {
             position: absolute;
-            bottom: calc(100% + 8px);
+            bottom: 16px;
             left: 50%;
             transform: translateX(-50%);
             background: #0f172a;
@@ -333,7 +333,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .seek-marker.private { background: #3b82f6; }
         .seek-marker-tooltip {
             position: absolute;
-            bottom: calc(100% + 8px);
+            bottom: 16px;
             left: 50%;
             transform: translateX(-50%);
             background: #0f172a;
