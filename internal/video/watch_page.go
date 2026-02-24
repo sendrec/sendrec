@@ -294,7 +294,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .seek-chapter:hover { background: rgba(255, 255, 255, 0.3); }
         .seek-chapter-tooltip {
             position: absolute;
-            bottom: 16px;
+            bottom: 36px;
             left: 50%;
             transform: translateX(-50%);
             background: #0f172a;
@@ -306,6 +306,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.15s;
+            z-index: 10;
         }
         .seek-chapter:hover .seek-chapter-tooltip { opacity: 1; }
         .seek-markers {
@@ -333,7 +334,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .seek-marker.private { background: #3b82f6; }
         .seek-marker-tooltip {
             position: absolute;
-            bottom: 16px;
+            bottom: 36px;
             left: 50%;
             transform: translateX(-50%);
             background: #0f172a;
@@ -346,6 +347,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.15s;
+            z-index: 10;
         }
         .seek-marker:hover .seek-marker-tooltip { opacity: 1; }
         .seek-thumb {
