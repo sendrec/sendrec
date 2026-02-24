@@ -121,9 +121,254 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         video {
             width: 100%;
-            border-radius: 8px;
+            display: block;
             background: #000;
         }
+        .player-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .player-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 2;
+        }
+        .player-overlay.hidden { display: none; }
+        .play-overlay-btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: #fff;
+            font-size: 28px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+            transition: background 0.2s;
+        }
+        .play-overlay-btn:hover { background: rgba(0, 0, 0, 0.8); }
+        .player-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 24px 12px 10px;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+            z-index: 3;
+            transition: opacity 0.3s;
+        }
+        .player-controls.hidden { opacity: 0; pointer-events: none; }
+        .ctrl-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+            opacity: 0.9;
+            flex-shrink: 0;
+        }
+        .ctrl-btn:hover { opacity: 1; }
+        .ctrl-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+        .time-display {
+            font-size: 12px;
+            color: #fff;
+            font-family: monospace;
+            white-space: nowrap;
+            flex-shrink: 0;
+            opacity: 0.9;
+        }
+        .seek-bar {
+            position: relative;
+            flex: 1;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .seek-track {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            transition: height 0.15s;
+        }
+        .seek-bar:hover .seek-track { height: 6px; }
+        .seek-buffered {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .seek-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: var(--brand-accent);
+        }
+        .seek-chapters {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 100%;
+        }
+        .seek-chapter {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.15);
+            cursor: pointer;
+        }
+        .seek-chapter:hover { background: rgba(255, 255, 255, 0.3); }
+        .seek-chapter-tooltip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .seek-chapter:hover .seek-chapter-tooltip { opacity: 1; }
+        .seek-markers {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 100%;
+        }
+        .seek-marker {
+            position: absolute;
+            width: 6px;
+            height: 100%;
+            background: var(--brand-accent);
+            border-radius: 1px;
+            transform: translateX(-50%);
+            opacity: 0.8;
+            cursor: pointer;
+        }
+        .seek-marker:hover { opacity: 1; transform: translateX(-50%) scaleY(1.4); }
+        .seek-marker.private { background: #3b82f6; }
+        .seek-marker-tooltip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            color: #e2e8f0;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .seek-marker:hover .seek-marker-tooltip { opacity: 1; }
+        .seek-thumb {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background: var(--brand-accent);
+            border-radius: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .seek-bar:hover .seek-thumb { opacity: 1; }
+        .volume-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .volume-slider {
+            width: 60px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            outline: none;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .volume-slider::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+        .speed-dropdown {
+            position: relative;
+            flex-shrink: 0;
+        }
+        .speed-menu {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 8px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 4px;
+            min-width: 56px;
+        }
+        .speed-menu.open { display: block; }
+        .speed-menu button {
+            display: block;
+            width: 100%;
+            background: none;
+            border: none;
+            color: #e2e8f0;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .speed-menu button:hover { background: rgba(255, 255, 255, 0.1); }
+        .speed-menu button.active { color: var(--brand-accent); font-weight: 600; }
         h1 {
             margin-top: 1rem;
             font-size: 1.5rem;
@@ -303,126 +548,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: #64748b;
             font-size: 0.875rem;
             margin-bottom: 1rem;
-        }
-        .markers-bar {
-            position: relative;
-            height: 8px;
-            background: var(--brand-surface);
-            border-radius: 4px;
-            margin-top: 0.75rem;
-            cursor: pointer;
-            display: none;
-        }
-        .marker-dot {
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            padding: 0;
-            border: none;
-            background: transparent;
-            border-radius: 50%;
-            top: -4px;
-            transform: translateX(-50%);
-            cursor: pointer;
-        }
-        .marker-dot::before {
-            content: "";
-            position: absolute;
-            left: 5px;
-            top: 5px;
-            width: 6px;
-            height: 6px;
-            background: var(--brand-accent);
-            border-radius: 50%;
-            transition: transform 0.15s;
-        }
-        .marker-dot:hover::before,
-        .marker-dot:focus-visible::before {
-            transform: scale(1.6);
-        }
-        .marker-dot:focus-visible {
-            outline: 2px solid var(--brand-accent);
-            outline-offset: 1px;
-        }
-        .marker-dot.private {
-            background: transparent;
-        }
-        .marker-dot.private::before {
-            background: #3b82f6;
-        }
-        .marker-dot.multi {
-            width: 18px;
-            height: 18px;
-            top: -5px;
-        }
-        .marker-dot.multi::before {
-            width: 8px;
-            height: 8px;
-            left: 5px;
-            top: 5px;
-        }
-        .marker-tooltip {
-            position: absolute;
-            bottom: 14px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 6px;
-            padding: 0.375rem 0.625rem;
-            font-size: 0.75rem;
-            color: #e2e8f0;
-            white-space: nowrap;
-            pointer-events: none;
-            display: none;
-            z-index: 10;
-        }
-        .marker-dot:hover .marker-tooltip,
-        .marker-dot:focus-visible .marker-tooltip {
-            display: block;
-        }
-        .chapters-bar {
-            position: relative;
-            height: 6px;
-            display: none;
-            margin-top: 4px;
-            border-radius: 3px;
-            overflow: hidden;
-            background: var(--brand-surface);
-        }
-        .chapter-segment {
-            position: absolute;
-            top: 0;
-            height: 100%;
-            cursor: pointer;
-            transition: opacity 0.2s;
-            background: var(--brand-accent);
-            opacity: 0.3;
-        }
-        .chapter-segment:hover {
-            opacity: 0.6;
-        }
-        .chapter-segment.active {
-            opacity: 0.7;
-        }
-        .chapter-segment-tooltip {
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--brand-text);
-            color: var(--brand-bg);
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            white-space: nowrap;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s;
-            margin-bottom: 4px;
-        }
-        .chapter-segment:hover .chapter-segment-tooltip {
-            opacity: 1;
         }
         .reaction-bar {
             display: flex;
@@ -709,31 +834,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: var(--brand-text);
             font-size: 14px;
         }
-        .speed-controls {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-        .speed-btn {
-            background: transparent;
-            border: 1px solid #334155;
-            color: #94a3b8;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.75rem;
-            font-weight: 600;
-            transition: all 0.15s;
-        }
-        .speed-btn:hover {
-            border-color: var(--brand-accent);
-            color: #f8fafc;
-        }
-        .speed-btn.active {
-            border-color: var(--brand-accent);
-            color: var(--brand-accent);
-            background: rgba(0, 182, 122, 0.1);
-        }
         .cta-card { display: none; margin: 1rem 0; padding: 1.25rem; background: var(--brand-surface); border: 1px solid var(--brand-accent); border-radius: 8px; text-align: center; position: relative; }
         .cta-card.visible { display: block; }
         .cta-dismiss { position: absolute; top: 8px; right: 12px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.25rem; line-height: 1; padding: 4px; }
@@ -799,8 +899,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             h1 { font-size: 1.25rem; }
             .actions { flex-wrap: wrap; }
             .form-row { flex-direction: column; }
-            .speed-btn { min-height: 44px; min-width: 44px; padding: 0.5rem; }
             .download-btn { min-height: 44px; }
+            .volume-slider { display: none; }
             .comment-submit { min-height: 44px; }
             .emoji-trigger { min-height: 44px; min-width: 44px; }
             .emoji-grid { width: min(260px, calc(100vw - 2rem)); right: auto; left: 0; }
@@ -811,11 +911,47 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 <body>
     <div class="container">
         <a href="{{.BaseURL}}" class="logo">{{if .Branding.LogoURL}}<img src="{{.Branding.LogoURL}}" alt="{{.Branding.CompanyName}}" width="20" height="20">{{end}}{{.Branding.CompanyName}}</a>
-        <video id="player" controls playsinline webkit-playsinline crossorigin="anonymous"{{if not .DownloadEnabled}} controlsList="nodownload" oncontextmenu="return false;"{{end}}{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
-            <source src="{{.VideoURL}}" type="{{.ContentType}}">
-            {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
-            Your browser does not support video playback.
-        </video>
+        <div class="player-container" id="player-container">
+            <video id="player" playsinline webkit-playsinline crossorigin="anonymous"{{if not .DownloadEnabled}} controlsList="nodownload" oncontextmenu="return false;"{{end}}{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
+                <source src="{{.VideoURL}}" type="{{.ContentType}}">
+                {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
+                Your browser does not support video playback.
+            </video>
+            <div class="player-overlay" id="player-overlay">
+                <button class="play-overlay-btn" id="play-overlay-btn" aria-label="Play">&#9654;</button>
+            </div>
+            <div class="player-controls" id="player-controls">
+                <button class="ctrl-btn" id="play-btn" aria-label="Play">&#9654;</button>
+                <span class="time-display" id="time-current">0:00</span>
+                <div class="seek-bar" id="seek-bar">
+                    <div class="seek-track">
+                        <div class="seek-buffered" id="seek-buffered"></div>
+                        <div class="seek-progress" id="seek-progress"></div>
+                        <div class="seek-chapters" id="seek-chapters"></div>
+                        <div class="seek-markers" id="seek-markers"></div>
+                    </div>
+                    <div class="seek-thumb" id="seek-thumb"></div>
+                </div>
+                <span class="time-display" id="time-duration">0:00</span>
+                <div class="volume-group">
+                    <button class="ctrl-btn" id="mute-btn" aria-label="Mute">&#128266;</button>
+                    <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100">
+                </div>
+                <div class="speed-dropdown" id="speed-dropdown">
+                    <button class="ctrl-btn" id="speed-btn" aria-label="Playback speed">1x</button>
+                    <div class="speed-menu" id="speed-menu">
+                        <button data-speed="0.5">0.5x</button>
+                        <button data-speed="0.75">0.75x</button>
+                        <button data-speed="1" class="active">1x</button>
+                        <button data-speed="1.25">1.25x</button>
+                        <button data-speed="1.5">1.5x</button>
+                        <button data-speed="2">2x</button>
+                    </div>
+                </div>
+                <button class="ctrl-btn" id="pip-btn" aria-label="Picture in Picture">&#9114;</button>
+                <button class="ctrl-btn" id="fullscreen-btn" aria-label="Fullscreen">&#9974;</button>
+            </div>
+        </div>
         <div id="safari-webm-warning" class="hidden" role="alert">
             <p>This video was recorded in WebM format, which is not supported by Safari. Please open this link in Chrome or Firefox to watch.</p>
         </div>
@@ -836,7 +972,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             })();
         </script>
         {{if ne .CommentMode "disabled"}}
-        <div class="markers-bar" id="markers-bar"></div>
         <div class="reaction-bar" id="reaction-bar">
             {{range .ReactionEmojis}}
             <button type="button" class="reaction-btn" data-emoji="{{.}}" title="React with {{.}}" aria-label="React with {{.}}">{{.}}</button>
@@ -844,20 +979,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </div>
         <p class="comment-error reaction-error" id="reaction-error" role="alert"></p>
         {{end}}
-        {{if .Chapters}}
-        <div class="chapters-bar" id="chapters-bar"></div>
-        {{end}}
         <h1>{{.Title}}</h1>
         <p class="meta">{{.Creator}} · {{.Date}}</p>
-        <div class="actions">
-            {{if .DownloadEnabled}}<button class="download-btn" id="download-btn">Download</button>{{end}}
-            <div class="speed-controls">
-                <button class="speed-btn" data-speed="0.5">0.5x</button>
-                <button class="speed-btn active" data-speed="1">1x</button>
-                <button class="speed-btn" data-speed="1.5">1.5x</button>
-                <button class="speed-btn" data-speed="2">2x</button>
-            </div>
-        </div>
+        {{if .DownloadEnabled}}<div class="actions"><button class="download-btn" id="download-btn">Download</button></div>{{end}}
         {{if and .CtaText .CtaUrl}}
         <div class="cta-card" id="cta-card">
             <button class="cta-dismiss" onclick="document.getElementById('cta-card').classList.remove('visible')" aria-label="Dismiss">&times;</button>
@@ -874,14 +998,176 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             {{end}}
             (function() {
                 var player = document.getElementById('player');
-                var buttons = document.querySelectorAll('.speed-btn');
-                buttons.forEach(function(btn) {
-                    btn.addEventListener('click', function() {
-                        player.playbackRate = parseFloat(btn.dataset.speed);
-                        buttons.forEach(function(b) { b.classList.remove('active'); });
-                        btn.classList.add('active');
-                    });
+                var container = document.getElementById('player-container');
+                var controls = document.getElementById('player-controls');
+                var overlay = document.getElementById('player-overlay');
+                var playBtn = document.getElementById('play-btn');
+                var overlayBtn = document.getElementById('play-overlay-btn');
+                var seekBar = document.getElementById('seek-bar');
+                var seekProgress = document.getElementById('seek-progress');
+                var seekBuffered = document.getElementById('seek-buffered');
+                var seekThumb = document.getElementById('seek-thumb');
+                var timeCurrent = document.getElementById('time-current');
+                var timeDuration = document.getElementById('time-duration');
+                var muteBtn = document.getElementById('mute-btn');
+                var volumeSlider = document.getElementById('volume-slider');
+                var speedBtn = document.getElementById('speed-btn');
+                var speedMenu = document.getElementById('speed-menu');
+                var pipBtn = document.getElementById('pip-btn');
+                var fullscreenBtn = document.getElementById('fullscreen-btn');
+                var hideTimer = null;
+
+                function fmtTime(s) {
+                    if (!isFinite(s) || isNaN(s)) return '0:00';
+                    s = Math.floor(s);
+                    if (s >= 3600) return Math.floor(s/3600) + ':' + ('0'+Math.floor((s%3600)/60)).slice(-2) + ':' + ('0'+(s%60)).slice(-2);
+                    return Math.floor(s/60) + ':' + ('0'+(s%60)).slice(-2);
+                }
+
+                function updatePlayBtn() {
+                    var paused = player.paused;
+                    playBtn.innerHTML = paused ? '&#9654;' : '&#9646;&#9646;';
+                    playBtn.setAttribute('aria-label', paused ? 'Play' : 'Pause');
+                    overlay.classList.toggle('hidden', !paused);
+                    overlayBtn.innerHTML = paused ? '&#9654;' : '';
+                }
+
+                function togglePlay() {
+                    if (player.paused) player.play().catch(function(){});
+                    else player.pause();
+                }
+
+                playBtn.addEventListener('click', togglePlay);
+                overlayBtn.addEventListener('click', togglePlay);
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay) togglePlay();
                 });
+
+                player.addEventListener('play', function() { updatePlayBtn(); showControls(); });
+                player.addEventListener('pause', function() { updatePlayBtn(); showControls(); });
+                player.addEventListener('ended', updatePlayBtn);
+
+                function updateProgress() {
+                    if (!player.duration || !isFinite(player.duration)) return;
+                    var pct = (player.currentTime / player.duration) * 100;
+                    seekProgress.style.width = pct + '%';
+                    seekThumb.style.left = pct + '%';
+                    timeCurrent.textContent = fmtTime(player.currentTime);
+                }
+
+                function updateBuffered() {
+                    if (!player.duration || !isFinite(player.duration) || !player.buffered.length) return;
+                    var end = player.buffered.end(player.buffered.length - 1);
+                    seekBuffered.style.width = (end / player.duration * 100) + '%';
+                }
+
+                function updateDurationDisplay() {
+                    if (player.duration && isFinite(player.duration)) {
+                        timeDuration.textContent = fmtTime(player.duration);
+                    }
+                }
+
+                player.addEventListener('timeupdate', updateProgress);
+                player.addEventListener('progress', updateBuffered);
+                player.addEventListener('loadedmetadata', function() { updateDurationDisplay(); updateProgress(); });
+                player.addEventListener('durationchange', updateDurationDisplay);
+
+                var seeking = false;
+                function seekFromEvent(e) {
+                    var rect = seekBar.getBoundingClientRect();
+                    var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    if (player.duration && isFinite(player.duration)) {
+                        player.currentTime = pct * player.duration;
+                        updateProgress();
+                    }
+                }
+                seekBar.addEventListener('mousedown', function(e) {
+                    seeking = true;
+                    seekFromEvent(e);
+                });
+                document.addEventListener('mousemove', function(e) {
+                    if (seeking) seekFromEvent(e);
+                });
+                document.addEventListener('mouseup', function() { seeking = false; });
+                seekBar.addEventListener('touchstart', function(e) {
+                    seeking = true;
+                    seekFromEvent(e.touches[0]);
+                }, { passive: true });
+                seekBar.addEventListener('touchmove', function(e) {
+                    if (seeking) seekFromEvent(e.touches[0]);
+                }, { passive: true });
+                seekBar.addEventListener('touchend', function() { seeking = false; });
+
+                muteBtn.addEventListener('click', function() {
+                    player.muted = !player.muted;
+                    updateMuteBtn();
+                });
+                function updateMuteBtn() {
+                    if (player.muted || player.volume === 0) muteBtn.innerHTML = '&#128264;';
+                    else if (player.volume < 0.5) muteBtn.innerHTML = '&#128265;';
+                    else muteBtn.innerHTML = '&#128266;';
+                    muteBtn.setAttribute('aria-label', player.muted ? 'Unmute' : 'Mute');
+                    volumeSlider.value = player.muted ? 0 : player.volume * 100;
+                }
+                volumeSlider.addEventListener('input', function() {
+                    player.volume = volumeSlider.value / 100;
+                    player.muted = player.volume === 0;
+                    updateMuteBtn();
+                });
+                player.addEventListener('volumechange', updateMuteBtn);
+
+                speedBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    speedMenu.classList.toggle('open');
+                });
+                speedMenu.addEventListener('click', function(e) {
+                    var btn = e.target.closest('button[data-speed]');
+                    if (!btn) return;
+                    player.playbackRate = parseFloat(btn.dataset.speed);
+                    speedBtn.textContent = btn.textContent;
+                    speedMenu.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+                    btn.classList.add('active');
+                    speedMenu.classList.remove('open');
+                });
+                document.addEventListener('click', function(e) {
+                    if (!e.target.closest('#speed-dropdown')) speedMenu.classList.remove('open');
+                });
+
+                if (document.pictureInPictureEnabled) {
+                    pipBtn.addEventListener('click', function() {
+                        if (document.pictureInPictureElement) document.exitPictureInPicture().catch(function(){});
+                        else player.requestPictureInPicture().catch(function(){});
+                    });
+                } else {
+                    pipBtn.style.display = 'none';
+                }
+
+                fullscreenBtn.addEventListener('click', function() {
+                    if (document.fullscreenElement) document.exitFullscreen().catch(function(){});
+                    else container.requestFullscreen().catch(function(){});
+                });
+                document.addEventListener('fullscreenchange', function() {
+                    fullscreenBtn.innerHTML = document.fullscreenElement ? '&#9723;' : '&#9974;';
+                    fullscreenBtn.setAttribute('aria-label', document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen');
+                });
+
+                function showControls() {
+                    controls.classList.remove('hidden');
+                    clearTimeout(hideTimer);
+                    if (!player.paused) {
+                        hideTimer = setTimeout(function() { controls.classList.add('hidden'); }, 3000);
+                    }
+                }
+                container.addEventListener('mousemove', showControls);
+                container.addEventListener('touchstart', showControls, { passive: true });
+                container.addEventListener('mouseleave', function() {
+                    if (!player.paused) {
+                        hideTimer = setTimeout(function() { controls.classList.add('hidden'); }, 1000);
+                    }
+                });
+
+                updatePlayBtn();
+                updateMuteBtn();
             })();
         </script>
         {{if ne .CommentMode "disabled"}}
@@ -929,7 +1215,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             var nameEl = document.getElementById('comment-name');
             var emailEl = document.getElementById('comment-email');
             var privateToggleEl = document.getElementById('private-toggle');
-            var markersBar = document.getElementById('markers-bar');
+            var markersBar = document.getElementById('seek-markers');
             var player = document.getElementById('player');
             var videoDuration = 0;
             var lastComments = null;
@@ -1018,21 +1304,13 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     bySecond[sec].push(c);
                 });
                 var keys = Object.keys(bySecond);
-                if (keys.length === 0) {
-                    markersBar.style.display = 'none';
-                    return;
-                }
+                if (keys.length === 0) return;
                 var timelineDuration = getTimelineDuration(comments);
-                if (!timelineDuration) {
-                    markersBar.style.display = 'none';
-                    return;
-                }
-                markersBar.style.display = 'block';
+                if (!timelineDuration) return;
                 keys.forEach(function(sec) {
                     var group = bySecond[sec];
-                    var dot = document.createElement('button');
-                    dot.type = 'button';
-                    dot.className = 'marker-dot' + (group.length > 1 ? ' multi' : '') + (group[0].isPrivate ? ' private' : '');
+                    var dot = document.createElement('div');
+                    dot.className = 'seek-marker' + (group[0].isPrivate ? ' private' : '');
                     var pct = Math.min(group[0].videoTimestamp / timelineDuration * 100, 99);
                     dot.style.left = pct + '%';
                     var tooltipText;
@@ -1045,12 +1323,11 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                         }).join(' ');
                     }
                     var tooltip = document.createElement('div');
-                    tooltip.className = 'marker-tooltip';
+                    tooltip.className = 'seek-marker-tooltip';
                     tooltip.textContent = tooltipText;
                     dot.appendChild(tooltip);
-                    dot.setAttribute('data-comment-id', group[0].id);
-                    dot.setAttribute('aria-label', 'Jump to ' + formatTimestamp(group[0].videoTimestamp) + (group.length > 1 ? ' (' + group.length + ' comments)' : ''));
-                    dot.addEventListener('click', function() {
+                    dot.addEventListener('click', function(e) {
+                        e.stopPropagation();
                         player.currentTime = group[0].videoTimestamp;
                         var commentEl = document.getElementById('comment-' + group[0].id);
                         if (commentEl) {
@@ -1502,23 +1779,22 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         })();
         {{if .Chapters}}
         (function() {
-            var chaptersBar = document.getElementById('chapters-bar');
-            if (!chaptersBar) return;
+            var chaptersLayer = document.getElementById('seek-chapters');
+            if (!chaptersLayer) return;
             var player = document.getElementById('player');
             var chapters = {{.ChaptersJSON}};
 
             function renderChapters() {
                 var duration = player.duration;
                 if (!duration || !isFinite(duration) || chapters.length === 0) return;
-                chaptersBar.innerHTML = '';
-                chaptersBar.style.display = 'block';
+                chaptersLayer.innerHTML = '';
                 for (var i = 0; i < chapters.length; i++) {
                     var start = chapters[i].start;
                     var end = (i + 1 < chapters.length) ? chapters[i + 1].start : duration;
                     var leftPct = (start / duration) * 100;
                     var widthPct = ((end - start) / duration) * 100;
                     var seg = document.createElement('div');
-                    seg.className = 'chapter-segment';
+                    seg.className = 'seek-chapter';
                     seg.style.left = leftPct + '%';
                     seg.style.width = widthPct + '%';
                     seg.setAttribute('data-start', start);
@@ -1528,21 +1804,22 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                         seg.style.width = (widthPct - 0.1) + '%';
                     }
                     var tooltip = document.createElement('div');
-                    tooltip.className = 'chapter-segment-tooltip';
+                    tooltip.className = 'seek-chapter-tooltip';
                     tooltip.textContent = chapters[i].title;
                     seg.appendChild(tooltip);
                     seg.addEventListener('click', (function(s) {
-                        return function() {
+                        return function(e) {
+                            e.stopPropagation();
                             player.currentTime = s;
                             player.play().catch(function() {});
                         };
                     })(start));
-                    chaptersBar.appendChild(seg);
+                    chaptersLayer.appendChild(seg);
                 }
             }
 
             player.addEventListener('timeupdate', function() {
-                var segments = chaptersBar.querySelectorAll('.chapter-segment');
+                var segments = chaptersLayer.querySelectorAll('.seek-chapter');
                 var currentTime = player.currentTime;
                 segments.forEach(function(seg) {
                     var idx = parseInt(seg.getAttribute('data-index'));
