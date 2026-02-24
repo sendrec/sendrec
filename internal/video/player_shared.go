@@ -297,6 +297,13 @@ const playerCSS = `
         }
         .speed-menu button:hover { background: rgba(255, 255, 255, 0.1); }
         .speed-menu button.active { color: var(--player-accent, #00b67a); font-weight: 600; }
+        .shortcuts-wrapper {
+            position: relative;
+        }
+        .shortcuts-wrapper > .ctrl-btn {
+            font-size: 14px;
+            font-weight: 700;
+        }
         .shortcuts-panel {
             display: none;
             position: absolute;
@@ -377,8 +384,8 @@ const playerControlsHTML = `
                         </div>
                     </div>
                     <button class="ctrl-btn" id="pip-btn" aria-label="Picture in Picture">&#9114;</button>
-                    <div style="position:relative">
-                        <button class="ctrl-btn" id="shortcuts-btn" aria-label="Keyboard shortcuts" style="font-size:14px;font-weight:700">?</button>
+                    <div class="shortcuts-wrapper">
+                        <button class="ctrl-btn" id="shortcuts-btn" aria-label="Keyboard shortcuts">?</button>
                         <div class="shortcuts-panel" id="shortcuts-panel">
                             <h4>Keyboard shortcuts</h4>
                             <table id="shortcuts-table">
