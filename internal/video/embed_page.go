@@ -413,22 +413,34 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             player.addEventListener('pause', function() { updatePlayBtn(); showControls(); });
             player.addEventListener('ended', updatePlayBtn);
 
+            function getEffectiveDuration() {
+                if (player.duration && isFinite(player.duration)) return player.duration;
+                var best = player.currentTime || 0;
+                if (player.buffered.length) {
+                    var end = player.buffered.end(player.buffered.length - 1);
+                    if (end > best) best = end;
+                }
+                return best;
+            }
             function updateProgress() {
-                if (!player.duration) return;
-                var pct = (player.currentTime / player.duration) * 100;
+                var dur = getEffectiveDuration();
+                if (!dur) return;
+                var pct = Math.min((player.currentTime / dur) * 100, 100);
                 seekProgress.style.width = pct + '%';
                 seekThumb.style.left = pct + '%';
                 timeCurrent.textContent = fmtTime(player.currentTime);
             }
             function updateBuffered() {
-                if (!player.duration || !player.buffered.length) return;
-                seekBuffered.style.width = (player.buffered.end(player.buffered.length - 1) / player.duration * 100) + '%';
+                var dur = getEffectiveDuration();
+                if (!dur || !player.buffered.length) return;
+                seekBuffered.style.width = (player.buffered.end(player.buffered.length - 1) / dur * 100) + '%';
             }
             function updateDurationDisplay() {
-                if (player.duration) timeDuration.textContent = fmtTime(player.duration);
+                var dur = getEffectiveDuration();
+                if (dur) timeDuration.textContent = fmtTime(dur);
             }
-            player.addEventListener('timeupdate', updateProgress);
-            player.addEventListener('progress', updateBuffered);
+            player.addEventListener('timeupdate', function() { updateProgress(); updateDurationDisplay(); });
+            player.addEventListener('progress', function() { updateBuffered(); updateDurationDisplay(); });
             player.addEventListener('loadedmetadata', function() { updateDurationDisplay(); updateProgress(); });
             player.addEventListener('durationchange', function() { updateDurationDisplay(); updateProgress(); });
 
@@ -436,8 +448,9 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             function seekFromEvent(e) {
                 var rect = seekBar.getBoundingClientRect();
                 var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                if (player.duration) {
-                    player.currentTime = pct * player.duration;
+                var dur = getEffectiveDuration();
+                if (dur) {
+                    player.currentTime = pct * dur;
                     updateProgress();
                 }
             }
