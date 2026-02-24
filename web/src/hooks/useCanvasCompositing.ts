@@ -54,11 +54,25 @@ export function useCanvasCompositing({
       const canvas = compositingCanvasRef.current;
       if (!canvas) return null;
 
-      const stream = canvas.captureStream();
+      // Draw an initial frame before capturing so the stream starts with video content.
+      // Without this, Chrome's MP4 MediaRecorder may fail to initialize the video track
+      // if captureStream() is called before requestAnimationFrame paints the first frame.
+      const video = screenVideoRef.current;
+      if (video) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+        }
+      }
+
+      // Use a fixed framerate to ensure consistent video frame production.
+      // captureStream() without args only captures on canvas changes, which can miss
+      // frames if the compositing loop hasn't started yet.
+      const stream = canvas.captureStream(30);
       audioTracks.forEach((track) => stream.addTrack(track));
       return stream;
     },
-    [compositingCanvasRef],
+    [compositingCanvasRef, screenVideoRef],
   );
 
   useEffect(() => {

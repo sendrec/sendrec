@@ -42,6 +42,13 @@ describe("useCanvasCompositing", () => {
 
     rafCallbacks = [];
     rafId = 0;
+    // Define rAF/cAF if not present (e.g. JSDOM without them)
+    if (!globalThis.requestAnimationFrame) {
+      (globalThis as Record<string, unknown>).requestAnimationFrame = () => 0;
+    }
+    if (!globalThis.cancelAnimationFrame) {
+      (globalThis as Record<string, unknown>).cancelAnimationFrame = () => {};
+    }
     vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
       rafCallbacks.push(cb);
       return ++rafId;
@@ -123,9 +130,12 @@ describe("useCanvasCompositing", () => {
     const stream = result.current.getCompositedStream([mockAudioTrack]);
 
     expect(stream).not.toBeNull();
+    // Draws an initial frame before capturing
+    expect(compositingCtx.drawImage).toHaveBeenCalledWith(screenVideo, 0, 0);
+    // Uses fixed 30fps for reliable frame capture
     expect(
       (compositingCanvas.captureStream as ReturnType<typeof vi.fn>),
-    ).toHaveBeenCalledWith();
+    ).toHaveBeenCalledWith(30);
     expect(stream!.addTrack).toHaveBeenCalledWith(mockAudioTrack);
   });
 

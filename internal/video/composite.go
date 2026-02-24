@@ -140,7 +140,15 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	}
 	slog.Info("composite: files downloaded", "video_id", videoID, "screen_bytes", screenSize, "webcam_bytes", webcamSize)
 
-	// Verify webcam has video frames before compositing
+	// Verify both inputs have video frames before compositing
+	screenFrames, screenProbeInfo, screenProbeErr := probeVideoInfo(tmpScreenPath)
+	if screenProbeErr != nil || screenFrames == 0 {
+		slog.Warn("composite: screen has no video frames, skipping overlay", "video_id", videoID, "screen_bytes", screenSize, "probe_error", screenProbeErr)
+		setReadyFallback()
+		return
+	}
+	slog.Info("composite: screen validated", "video_id", videoID, "screen_frames", screenFrames, "screen_info", screenProbeInfo)
+
 	webcamFrames, webcamProbeInfo, probeErr := probeVideoInfo(tmpWebcamPath)
 	if probeErr != nil {
 		slog.Error("composite: webcam probe failed", "video_id", videoID, "error", probeErr)
