@@ -46,12 +46,12 @@ type Range = "7d" | "30d" | "all";
 function formatPeakDate(isoDate: string): string {
   if (!isoDate) return "";
   const date = new Date(isoDate + "T00:00:00");
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 function formatChartDate(isoDate: string): string {
   const date = new Date(isoDate + "T00:00:00");
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 export function Analytics() {
@@ -386,7 +386,7 @@ export function Analytics() {
               {data.viewers.map((v) => (
                 <tr key={v.email}>
                   <td style={{ color: "var(--color-text)", fontSize: 13, padding: "4px 8px 4px 0" }}>{v.email}</td>
-                  <td style={{ color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 8px 4px 0" }}>{new Date(v.firstViewedAt).toLocaleDateString()}</td>
+                  <td style={{ color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 8px 4px 0" }}>{new Date(v.firstViewedAt).toLocaleDateString("en-GB")}</td>
                   <td style={{ textAlign: "right", color: "var(--color-text)", fontSize: 13, padding: "4px 0 4px 8px" }}>{v.viewCount}</td>
                   <td style={{ textAlign: "right", color: "var(--color-text)", fontSize: 13, padding: "4px 0 4px 8px" }}>{v.completion}%</td>
                 </tr>

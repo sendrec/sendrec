@@ -61,6 +61,7 @@ const mockScreenStream = {
 };
 
 class MockMediaRecorder {
+  static isTypeSupported = vi.fn().mockReturnValue(true);
   state = "inactive";
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
@@ -406,7 +407,7 @@ describe("Recorder", () => {
     await user.click(screen.getByRole("button", { name: "Enable camera" }));
 
     expect(alertSpy).toHaveBeenCalledWith(
-      "Could not access your camera: Error: Permission denied",
+      "Could not access your camera. Please allow camera access and try again.",
     );
     alertSpy.mockRestore();
   });
@@ -539,20 +540,6 @@ describe("Recorder", () => {
       expect.any(Number),
       expect.any(Blob),
     );
-  });
-
-  it("shows alert when composited stream creation fails", async () => {
-    const alertSpy = vi.spyOn(globalThis, "alert").mockImplementation(() => {});
-    mockGetCompositedStream.mockReturnValueOnce(null);
-
-    const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Start recording" }));
-
-    expect(alertSpy).toHaveBeenCalledWith(
-      "Screen recording was blocked or failed. Please allow screen capture and try again.",
-    );
-    alertSpy.mockRestore();
   });
 
   it("stops recording when screen share track ends", async () => {

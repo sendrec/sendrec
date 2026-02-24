@@ -18,7 +18,7 @@ export function useCanvasCompositing({
   screenVideoRef,
   drawingCanvasRef,
 }: UseCanvasCompositingOptions): UseCanvasCompositingResult {
-  const animFrameRef = useRef(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>);
   const isRunning = useRef(false);
 
   const compositeFrame = useCallback(() => {
@@ -35,18 +35,20 @@ export function useCanvasCompositing({
     if (drawing) {
       ctx.drawImage(drawing, 0, 0);
     }
-
-    animFrameRef.current = requestAnimationFrame(compositeFrame);
   }, [compositingCanvasRef, screenVideoRef, drawingCanvasRef]);
 
   const startCompositing = useCallback(() => {
     isRunning.current = true;
-    animFrameRef.current = requestAnimationFrame(compositeFrame);
+    // Use setInterval instead of requestAnimationFrame so compositing continues
+    // when the recording tab is in the background (user switches to the content
+    // they're recording). rAF stops in background tabs; setInterval is throttled
+    // to ~1Hz but still produces frames.
+    intervalRef.current = setInterval(compositeFrame, 1000 / 30);
   }, [compositeFrame]);
 
   const stopCompositing = useCallback(() => {
     isRunning.current = false;
-    cancelAnimationFrame(animFrameRef.current);
+    clearInterval(intervalRef.current);
   }, []);
 
   const getCompositedStream = useCallback(
@@ -54,17 +56,31 @@ export function useCanvasCompositing({
       const canvas = compositingCanvasRef.current;
       if (!canvas) return null;
 
-      const stream = canvas.captureStream();
+      // Draw an initial frame before capturing so the stream starts with video content.
+      // Without this, Chrome's MP4 MediaRecorder may fail to initialize the video track
+      // if captureStream() is called before the first frame is painted.
+      const video = screenVideoRef.current;
+      if (video) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+        }
+      }
+
+      // Use a fixed framerate to ensure consistent video frame production.
+      // captureStream() without args only captures on canvas changes, which can miss
+      // frames if the compositing loop hasn't started yet.
+      const stream = canvas.captureStream(30);
       audioTracks.forEach((track) => stream.addTrack(track));
       return stream;
     },
-    [compositingCanvasRef],
+    [compositingCanvasRef, screenVideoRef],
   );
 
   useEffect(() => {
     return () => {
       isRunning.current = false;
-      cancelAnimationFrame(animFrameRef.current);
+      clearInterval(intervalRef.current);
     };
   }, []);
 

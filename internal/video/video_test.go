@@ -2249,7 +2249,7 @@ func TestWatchPage_Success(t *testing.T) {
 		"title":        "Demo Recording",
 		"download URL": downloadURL,
 		"creator":      "Alex Neamtu",
-		"date":         "Feb 5, 2026",
+		"date":         "05/02/2026",
 		"branding":     "SendRec",
 		"og:title":     `og:title`,
 		"og:video":     `og:video`,

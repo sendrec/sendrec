@@ -17,10 +17,10 @@ describe("useCanvasCompositing", () => {
   let screenVideoRef: RefObject<HTMLVideoElement | null>;
   let drawingCanvas: HTMLCanvasElement;
   let drawingCanvasRef: RefObject<HTMLCanvasElement | null>;
-  let rafCallbacks: FrameRequestCallback[];
-  let rafId: number;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+
     compositingCtx = createMockContext();
     compositingCanvas = {
       getContext: vi.fn().mockReturnValue(compositingCtx),
@@ -39,21 +39,14 @@ describe("useCanvasCompositing", () => {
 
     drawingCanvas = { width: 1920, height: 1080 } as HTMLCanvasElement;
     drawingCanvasRef = { current: drawingCanvas };
-
-    rafCallbacks = [];
-    rafId = 0;
-    vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb) => {
-      rafCallbacks.push(cb);
-      return ++rafId;
-    });
-    vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation(vi.fn());
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it("starts rAF loop on startCompositing", () => {
+  it("starts interval loop on startCompositing", () => {
     const { result } = renderHook(() =>
       useCanvasCompositing({
         compositingCanvasRef,
@@ -64,7 +57,10 @@ describe("useCanvasCompositing", () => {
 
     act(() => result.current.startCompositing());
 
-    expect(requestAnimationFrame).toHaveBeenCalled();
+    // Advance one interval tick (~33ms for 30fps)
+    act(() => vi.advanceTimersByTime(34));
+
+    expect(compositingCtx.drawImage).toHaveBeenCalled();
   });
 
   it("draws video then drawing canvas each frame", () => {
@@ -77,8 +73,7 @@ describe("useCanvasCompositing", () => {
     );
 
     act(() => result.current.startCompositing());
-    // Execute the rAF callback
-    act(() => rafCallbacks[0](0));
+    act(() => vi.advanceTimersByTime(34));
 
     expect(compositingCtx.drawImage).toHaveBeenCalledTimes(2);
     expect(compositingCtx.drawImage).toHaveBeenNthCalledWith(
@@ -95,7 +90,7 @@ describe("useCanvasCompositing", () => {
     );
   });
 
-  it("cancels rAF on stopCompositing", () => {
+  it("clears interval on stopCompositing", () => {
     const { result } = renderHook(() =>
       useCanvasCompositing({
         compositingCanvasRef,
@@ -107,7 +102,11 @@ describe("useCanvasCompositing", () => {
     act(() => result.current.startCompositing());
     act(() => result.current.stopCompositing());
 
-    expect(cancelAnimationFrame).toHaveBeenCalled();
+    compositingCtx.drawImage.mockClear();
+    act(() => vi.advanceTimersByTime(100));
+
+    // No more draws after stop
+    expect(compositingCtx.drawImage).not.toHaveBeenCalled();
   });
 
   it("returns composited stream with audio tracks", () => {
@@ -123,13 +122,16 @@ describe("useCanvasCompositing", () => {
     const stream = result.current.getCompositedStream([mockAudioTrack]);
 
     expect(stream).not.toBeNull();
+    // Draws an initial frame before capturing
+    expect(compositingCtx.drawImage).toHaveBeenCalledWith(screenVideo, 0, 0);
+    // Uses fixed 30fps for reliable frame capture
     expect(
       (compositingCanvas.captureStream as ReturnType<typeof vi.fn>),
-    ).toHaveBeenCalledWith();
+    ).toHaveBeenCalledWith(30);
     expect(stream!.addTrack).toHaveBeenCalledWith(mockAudioTrack);
   });
 
-  it("cancels rAF on unmount", () => {
+  it("clears interval on unmount", () => {
     const { result, unmount } = renderHook(() =>
       useCanvasCompositing({
         compositingCanvasRef,
@@ -141,6 +143,9 @@ describe("useCanvasCompositing", () => {
     act(() => result.current.startCompositing());
     unmount();
 
-    expect(cancelAnimationFrame).toHaveBeenCalled();
+    compositingCtx.drawImage.mockClear();
+    act(() => vi.advanceTimersByTime(100));
+
+    expect(compositingCtx.drawImage).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
 import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
+import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 
 type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 
@@ -37,6 +38,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const webcamRecorderRef = useRef<MediaRecorder | null>(null);
   const webcamChunksRef = useRef<Blob[]>([]);
   const webcamBlobPromiseRef = useRef<Promise<Blob> | null>(null);
+  const mimeTypeRef = useRef("");
   const webcamVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
     if (node && webcamStreamRef.current) {
       node.srcObject = webcamStreamRef.current;
@@ -62,7 +64,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     handlePointerLeave,
   } = useDrawingCanvas({ canvasRef: drawingCanvasRef, captureWidth, captureHeight });
 
-  const { startCompositing, stopCompositing, getCompositedStream } =
+  const { startCompositing, stopCompositing } =
     useCanvasCompositing({
       compositingCanvasRef,
       screenVideoRef,
@@ -95,11 +97,13 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   }, [elapsedSeconds]);
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      if (mediaRecorderRef.current.state === "paused") {
+    const hasActiveRecorder = mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive";
+
+    if (hasActiveRecorder) {
+      if (mediaRecorderRef.current!.state === "paused") {
         totalPausedRef.current += Date.now() - pauseStartRef.current;
       }
-      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current!.stop();
     }
     if (webcamRecorderRef.current && webcamRecorderRef.current.state !== "inactive") {
       if (webcamRecorderRef.current.state === "paused") {
@@ -112,7 +116,13 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
     }
-    stopAllStreams();
+    // When recording screenStream directly, we must NOT stop the stream tracks
+    // until after MediaRecorder fires its async onstop event and produces the
+    // final data. Stream cleanup happens in the recorder's onstop handler.
+    // Only clean up immediately if there's no active recorder (e.g. abort paths).
+    if (!hasActiveRecorder) {
+      stopAllStreams();
+    }
     setRecordingState("stopped");
   }, [stopAllStreams, stopCompositing]);
 
@@ -143,7 +153,10 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const beginRecording = useCallback(() => {
     clearInterval(countdownTimerRef.current);
     if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.start(1000);
+      // No timeslice — Chrome's MP4 MediaRecorder may produce empty fragments
+      // with start(timeslice) on getDisplayMedia() streams. All data is buffered
+      // internally and flushed as a single blob on stop().
+      mediaRecorderRef.current.start();
     }
     if (webcamRecorderRef.current) {
       webcamRecorderRef.current.start(1000);
@@ -183,8 +196,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       setWebcamEnabled(true);
     } catch (err) {
       console.error("Webcam access failed", err);
-      const detail = err instanceof DOMException ? `${err.name}: ${err.message}` : String(err);
-      alert(`Could not access your camera: ${detail}`);
+      alert("Could not access your camera. Please allow camera access and try again.");
     }
   }
 
@@ -218,29 +230,35 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         drawingCanvasRef.current.height = height;
       }
 
-      // Start compositing loop
+      // Start compositing loop (for visual preview only)
       startCompositing();
 
-      // Record composited stream (screen + drawing annotations)
-      const audioTracks = screenStream.getAudioTracks();
-      const compositedStream = getCompositedStream(audioTracks);
-      if (!compositedStream) {
-        throw new Error("Failed to create composited stream");
-      }
+      // Record the original display stream directly — NOT through the canvas.
+      // Canvas compositing freezes when the tab goes to the background because
+      // requestAnimationFrame/setInterval are throttled and the video element
+      // stops decoding frames. The raw getDisplayMedia stream keeps capturing
+      // regardless of tab visibility.
+      const mimeType = getSupportedMimeType();
+      mimeTypeRef.current = mimeType;
 
-      const recorder = new MediaRecorder(compositedStream, {
-        mimeType: "video/webm;codecs=vp9,opus",
+      const recorder = new MediaRecorder(screenStream, {
+        mimeType,
       });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
       pauseStartRef.current = 0;
       totalPausedRef.current = 0;
 
-      // Set up webcam recorder if webcam is enabled (but don't start yet)
+      // Set up webcam recorder if webcam is enabled (but don't start yet).
+      // Always use WebM for webcam — it's only used temporarily for server-side compositing,
+      // and WebM is more reliable for video-only MediaRecorder streams across browsers.
       webcamBlobPromiseRef.current = null;
       if (webcamEnabled && webcamStreamRef.current) {
+        const webcamMimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+          ? "video/webm;codecs=vp9"
+          : "video/webm";
         const webcamRecorder = new MediaRecorder(webcamStreamRef.current, {
-          mimeType: "video/webm;codecs=vp9",
+          mimeType: webcamMimeType,
         });
         webcamRecorderRef.current = webcamRecorder;
         webcamChunksRef.current = [];
@@ -258,17 +276,48 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         });
       }
 
-      recorder.ondataavailable = (event) => {
+      const handleDataAvailable = (event: BlobEvent) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
 
-      recorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
+      const handleStop = async () => {
+        const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeTypeRef.current) });
         const elapsed = elapsedSeconds();
         const webcamBlob = webcamBlobPromiseRef.current ? await webcamBlobPromiseRef.current : undefined;
+        stopAllStreams();
         onRecordingComplete(blob, elapsed, webcamBlob);
+      };
+
+      // Track whether the encoder failed so the original onstop is skipped
+      // when a fallback recorder takes over.
+      let encoderFailed = false;
+
+      recorder.ondataavailable = handleDataAvailable;
+
+      recorder.onerror = () => {
+        // Chrome's H.264 encoder fails for high-resolution display captures
+        // (e.g., Retina screens exceeding encoder limits). Fall back to WebM.
+        if (!mimeTypeRef.current.startsWith("video/mp4")) return;
+        encoderFailed = true;
+
+        const webmMimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+          ? "video/webm;codecs=vp9,opus"
+          : "video/webm";
+        mimeTypeRef.current = webmMimeType;
+        chunksRef.current = [];
+
+        const fallback = new MediaRecorder(screenStream, { mimeType: webmMimeType });
+        mediaRecorderRef.current = fallback;
+        fallback.ondataavailable = handleDataAvailable;
+        fallback.onstop = handleStop;
+        fallback.start();
+      };
+
+      recorder.onstop = async () => {
+        if (encoderFailed) return;
+        await handleStop();
       };
 
       screenStream.getVideoTracks()[0].addEventListener("ended", () => {

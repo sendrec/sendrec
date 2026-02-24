@@ -266,7 +266,7 @@ describe("Record", () => {
       capturedOnRecordingComplete!(blob, 30);
     });
 
-    expect(screen.getByText("Uploading...")).toBeInTheDocument();
+    expect(screen.getByText("Creating video...")).toBeInTheDocument();
     expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
 
     // Clean up

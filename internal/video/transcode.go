@@ -16,8 +16,12 @@ func transcodeToMP4(inputPath, outputPath string) error {
 	cmd := exec.Command("ffmpeg",
 		"-i", inputPath,
 		"-c:v", "libx264",
+		"-profile:v", "high",
+		"-level:v", "5.1",
 		"-preset", "fast",
 		"-crf", "23",
+		"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+		"-r", "60",
 		"-c:a", "aac",
 		"-movflags", "+faststart",
 		"-y",
@@ -76,7 +80,7 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 	}
 
 	if _, err := db.Exec(ctx,
-		`UPDATE videos SET file_key = $2, content_type = 'video/mp4', file_size = $3, cues_fixed = true, updated_at = now() WHERE id = $1`,
+		`UPDATE videos SET file_key = $2, content_type = 'video/mp4', file_size = $3, cues_fixed = true, ios_normalized = true, updated_at = now() WHERE id = $1`,
 		videoID, newFileKey, newFileSize,
 	); err != nil {
 		slog.Error("transcode: failed to update db", "video_id", videoID, "error", err)
@@ -93,8 +97,8 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 func transcodeExistingWebM(ctx context.Context, db database.DBTX, storage ObjectStorage) {
 	rows, err := db.Query(ctx,
 		`SELECT id, file_key FROM videos
-		 WHERE content_type = 'video/webm' AND status = 'ready' AND NOT cues_fixed
-		 ORDER BY created_at DESC LIMIT 5`)
+		 WHERE content_type = 'video/webm' AND status = 'ready'
+		 ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		slog.Error("transcode-worker: failed to query", "error", err)
 		return
@@ -111,8 +115,33 @@ func transcodeExistingWebM(ctx context.Context, db database.DBTX, storage Object
 	}
 }
 
+func normalizeExistingVideos(ctx context.Context, db database.DBTX, storage ObjectStorage) {
+	rows, err := db.Query(ctx,
+		`SELECT id, file_key FROM videos
+		 WHERE content_type IN ('video/mp4', 'video/quicktime')
+		   AND status = 'ready' AND ios_normalized = false
+		 ORDER BY created_at DESC LIMIT 50`)
+	if err != nil {
+		slog.Error("normalize-worker: failed to query", "error", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var videoID, fileKey string
+		if err := rows.Scan(&videoID, &fileKey); err != nil {
+			slog.Error("normalize-worker: failed to scan", "error", err)
+			continue
+		}
+		NormalizeVideoAsync(ctx, db, storage, videoID, fileKey)
+	}
+}
+
 func StartTranscodeWorker(ctx context.Context, db database.DBTX, storage ObjectStorage, interval time.Duration) {
 	go func() {
+		transcodeExistingWebM(ctx, db, storage)
+		normalizeExistingVideos(ctx, db, storage)
+
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
@@ -122,6 +151,7 @@ func StartTranscodeWorker(ctx context.Context, db database.DBTX, storage ObjectS
 				return
 			case <-ticker.C:
 				transcodeExistingWebM(ctx, db, storage)
+				normalizeExistingVideos(ctx, db, storage)
 			}
 		}
 	}()

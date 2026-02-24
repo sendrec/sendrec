@@ -75,226 +75,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             width: 100%;
             height: 100%;
         }
-        .player-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 2;
-        }
-        .player-overlay.hidden { display: none; }
-        .play-overlay-btn {
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.6);
-            border: none;
-            color: #fff;
-            font-size: 24px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(4px);
-        }
-        .play-overlay-btn:hover { background: rgba(0, 0, 0, 0.8); }
-        .player-spinner {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            z-index: 4;
-            display: none;
-        }
-        .player-spinner.visible { display: block; }
-        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
-        .player-error {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            color: #e2e8f0;
-            font-size: 13px;
-            z-index: 4;
-            display: none;
-        }
-        .player-error.visible { display: block; }
-        .player-error-icon { font-size: 30px; margin-bottom: 6px; }
-        .seek-time-tooltip {
-            position: absolute;
-            bottom: 100%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85);
-            color: #fff;
-            padding: 2px 5px;
-            border-radius: 3px;
-            font-size: 10px;
-            font-family: monospace;
-            white-space: nowrap;
-            pointer-events: none;
-            display: none;
-            margin-bottom: 4px;
-        }
-        .seek-bar:hover .seek-time-tooltip { display: block; }
-        .player-controls {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 20px 8px 6px;
-            background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
-            z-index: 3;
-            transition: opacity 0.3s;
-        }
-        .player-controls.hidden { opacity: 0; pointer-events: none; }
-        .ctrl-btn {
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 2px;
-            line-height: 1;
-            opacity: 0.9;
-            flex-shrink: 0;
-        }
-        .ctrl-btn:hover { opacity: 1; }
-        .time-display {
-            font-size: 11px;
-            color: #fff;
-            font-family: monospace;
-            white-space: nowrap;
-            flex-shrink: 0;
-            opacity: 0.9;
-        }
-        .seek-bar {
-            position: relative;
-            flex: 1;
-            height: 16px;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-        .seek-track {
-            position: absolute;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 2px;
-            overflow: hidden;
-            transition: height 0.15s;
-        }
-        .seek-bar:hover .seek-track { height: 5px; }
-        .seek-buffered {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.3);
-        }
-        .seek-progress {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100%;
-            background: #22c55e;
-            pointer-events: none;
-        }
-        .seek-chapters {
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 50%;
-            height: 3px;
-            transform: translateY(-50%);
-            pointer-events: none;
-        }
-        .seek-bar:hover .seek-chapters { height: 5px; }
-        .seek-chapter {
-            position: absolute;
-            top: 0;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.15);
-            cursor: pointer;
-            pointer-events: auto;
-        }
-        .seek-chapter:hover { background: rgba(255, 255, 255, 0.3); }
-        .seek-chapter-tooltip {
-            position: absolute;
-            bottom: calc(100% + 6px);
-            left: 50%;
-            transform: translateX(-50%);
-            background: #0f172a;
-            color: #e2e8f0;
-            padding: 3px 6px;
-            border-radius: 3px;
-            font-size: 10px;
-            white-space: nowrap;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.15s;
-        }
-        .seek-chapter:hover .seek-chapter-tooltip { opacity: 1; }
-        .seek-thumb {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: #22c55e;
-            border-radius: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.15s;
-        }
-        .seek-bar:hover .seek-thumb { opacity: 1; }
-        .volume-group {
-            display: flex;
-            align-items: center;
-            gap: 2px;
-            flex-shrink: 0;
-        }
-        .volume-slider {
-            width: 50px;
-            height: 3px;
-            -webkit-appearance: none;
-            appearance: none;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 2px;
-            outline: none;
-        }
-        .volume-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 10px;
-            height: 10px;
-            background: #fff;
-            border-radius: 50%;
-            cursor: pointer;
-        }
-        .volume-slider::-moz-range-thumb {
-            width: 10px;
-            height: 10px;
-            background: #fff;
-            border-radius: 50%;
-            cursor: pointer;
-            border: none;
-        }
+` + playerCSS + `
         .footer {
             display: flex;
             align-items: center;
@@ -320,39 +101,17 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .footer a:hover { color: #e2e8f0; }
         .cta-overlay { display: none; position: absolute; bottom: 48px; left: 0; right: 0; padding: 12px; text-align: center; background: rgba(15, 23, 42, 0.9); }
         .cta-overlay.visible { display: block; }
-        .cta-overlay a { display: inline-block; padding: 8px 24px; background: #22c55e; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
+        .cta-overlay a { display: inline-block; padding: 8px 24px; background: #00b67a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
         .cta-overlay a:hover { opacity: 0.9; color: #fff; }
+` + safariWarningCSS + `
     </style>
 </head>
 <body>
     <div class="container">
         <div class="video-wrapper">
             <div class="player-container" id="player-container">
-                <video id="player" playsinline webkit-playsinline crossorigin="anonymous" controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>{{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles">{{end}}</video>
-                <div class="player-overlay" id="player-overlay">
-                    <button class="play-overlay-btn" id="play-overlay-btn" aria-label="Play">&#9654;</button>
-                </div>
-                <div class="player-spinner" id="player-spinner"></div>
-                <div class="player-error" id="player-error"><div class="player-error-icon">&#9888;</div>Video failed to load</div>
-                <div class="player-controls" id="player-controls">
-                    <button class="ctrl-btn" id="play-btn" aria-label="Play">&#9654;</button>
-                    <span class="time-display" id="time-current">0:00</span>
-                    <div class="seek-bar" id="seek-bar">
-                        <div class="seek-track">
-                            <div class="seek-buffered" id="seek-buffered"></div>
-                            <div class="seek-progress" id="seek-progress"></div>
-                        </div>
-                        <div class="seek-chapters" id="seek-chapters"></div>
-                        <div class="seek-thumb" id="seek-thumb"></div>
-                        <div class="seek-time-tooltip" id="seek-time-tooltip">0:00</div>
-                    </div>
-                    <span class="time-display" id="time-duration">0:00</span>
-                    <div class="volume-group">
-                        <button class="ctrl-btn" id="mute-btn" aria-label="Mute">&#128266;</button>
-                        <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100">
-                    </div>
-                    <button class="ctrl-btn" id="fullscreen-btn" aria-label="Fullscreen">&#9974;</button>
-                </div>
+                <video id="player" playsinline webkit-playsinline{{if .TranscriptURL}} crossorigin="anonymous"{{end}} controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>{{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles">{{end}}</video>
+` + playerControlsHTML + `
             </div>
         </div>
         {{if and .CtaText .CtaUrl}}
@@ -364,8 +123,12 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             <span class="footer-title">{{.Title}}</span>
             <a href="{{.BaseURL}}/watch/{{.ShareToken}}" target="_blank" rel="noopener">Watch on SendRec</a>
         </div>
+` + safariWarningHTML + `
     </div>
     <script nonce="{{.Nonce}}">
+        (function() {
+` + safariWarningJS + `
+        })();
         (function() {
             var player = document.getElementById('player');
             var container = document.getElementById('player-container');
@@ -381,191 +144,20 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             var timeDuration = document.getElementById('time-duration');
             var muteBtn = document.getElementById('mute-btn');
             var volumeSlider = document.getElementById('volume-slider');
+            var speedBtn = document.getElementById('speed-btn');
+            var speedMenu = document.getElementById('speed-menu');
+            var pipBtn = document.getElementById('pip-btn');
             var fullscreenBtn = document.getElementById('fullscreen-btn');
             var spinner = document.getElementById('player-spinner');
             var errorOverlay = document.getElementById('player-error');
             var seekTooltip = document.getElementById('seek-time-tooltip');
+            var shortcutsBtn = document.getElementById('shortcuts-btn');
+            var shortcutsPanel = document.getElementById('shortcuts-panel');
             var hideTimer = null;
 
             player.muted = true;
             player.play().catch(function() {});
-
-            function fmtTime(s) {
-                if (!isFinite(s) || isNaN(s)) return '0:00';
-                s = Math.floor(s);
-                if (s >= 3600) return Math.floor(s/3600) + ':' + ('0'+Math.floor((s%3600)/60)).slice(-2) + ':' + ('0'+(s%60)).slice(-2);
-                return Math.floor(s/60) + ':' + ('0'+(s%60)).slice(-2);
-            }
-
-            function updatePlayBtn() {
-                var paused = player.paused;
-                playBtn.innerHTML = paused ? '&#9654;' : '&#9646;&#9646;';
-                overlay.classList.toggle('hidden', !paused);
-            }
-            function togglePlay() {
-                if (player.paused) player.play().catch(function(){});
-                else player.pause();
-            }
-            playBtn.addEventListener('click', togglePlay);
-            overlayBtn.addEventListener('click', togglePlay);
-            overlay.addEventListener('click', function(e) { if (e.target === overlay) togglePlay(); });
-            player.addEventListener('play', function() { updatePlayBtn(); showControls(); });
-            player.addEventListener('pause', function() { updatePlayBtn(); showControls(); });
-            player.addEventListener('ended', updatePlayBtn);
-
-            function getEffectiveDuration() {
-                if (player.duration && isFinite(player.duration)) return player.duration;
-                var best = player.currentTime || 0;
-                if (player.buffered.length) {
-                    var end = player.buffered.end(player.buffered.length - 1);
-                    if (end > best) best = end;
-                }
-                return best;
-            }
-            function updateProgress() {
-                var dur = getEffectiveDuration();
-                if (!dur) return;
-                var pct = Math.min((player.currentTime / dur) * 100, 100);
-                seekProgress.style.width = pct + '%';
-                seekThumb.style.left = pct + '%';
-                timeCurrent.textContent = fmtTime(player.currentTime);
-            }
-            function updateBuffered() {
-                var dur = getEffectiveDuration();
-                if (!dur || !player.buffered.length) return;
-                seekBuffered.style.width = (player.buffered.end(player.buffered.length - 1) / dur * 100) + '%';
-            }
-            function updateDurationDisplay() {
-                var dur = getEffectiveDuration();
-                if (dur) timeDuration.textContent = fmtTime(dur);
-            }
-            player.addEventListener('timeupdate', function() { updateProgress(); updateDurationDisplay(); });
-            player.addEventListener('progress', function() { updateBuffered(); updateDurationDisplay(); });
-            player.addEventListener('loadedmetadata', function() { updateDurationDisplay(); updateProgress(); });
-            player.addEventListener('durationchange', function() { updateDurationDisplay(); updateProgress(); });
-
-            var seeking = false;
-            function seekFromEvent(e) {
-                var rect = seekBar.getBoundingClientRect();
-                var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                var dur = getEffectiveDuration();
-                if (dur) {
-                    player.currentTime = pct * dur;
-                    updateProgress();
-                }
-            }
-            seekBar.addEventListener('mousedown', function(e) { seeking = true; seekFromEvent(e); });
-            document.addEventListener('mousemove', function(e) { if (seeking) seekFromEvent(e); });
-            document.addEventListener('mouseup', function() { seeking = false; });
-            seekBar.addEventListener('touchstart', function(e) { seeking = true; seekFromEvent(e.touches[0]); }, { passive: true });
-            seekBar.addEventListener('touchmove', function(e) { if (seeking) seekFromEvent(e.touches[0]); }, { passive: true });
-            seekBar.addEventListener('touchend', function() { seeking = false; });
-
-            muteBtn.addEventListener('click', function() { player.muted = !player.muted; updateMuteBtn(); });
-            function updateMuteBtn() {
-                if (player.muted || player.volume === 0) muteBtn.innerHTML = '&#128264;';
-                else if (player.volume < 0.5) muteBtn.innerHTML = '&#128265;';
-                else muteBtn.innerHTML = '&#128266;';
-                volumeSlider.value = player.muted ? 0 : player.volume * 100;
-            }
-            volumeSlider.addEventListener('input', function() {
-                player.volume = volumeSlider.value / 100;
-                player.muted = player.volume === 0;
-                updateMuteBtn();
-            });
-            player.addEventListener('volumechange', updateMuteBtn);
-
-            fullscreenBtn.addEventListener('click', function() {
-                if (document.fullscreenElement) document.exitFullscreen().catch(function(){});
-                else container.requestFullscreen().catch(function(){});
-            });
-            document.addEventListener('fullscreenchange', function() {
-                fullscreenBtn.innerHTML = document.fullscreenElement ? '&#9723;' : '&#9974;';
-            });
-
-            function showControls() {
-                controls.classList.remove('hidden');
-                clearTimeout(hideTimer);
-                if (!player.paused) {
-                    hideTimer = setTimeout(function() { controls.classList.add('hidden'); }, 3000);
-                }
-            }
-            container.addEventListener('mousemove', showControls);
-            container.addEventListener('touchstart', showControls, { passive: true });
-            container.addEventListener('mouseleave', function() {
-                if (!player.paused) hideTimer = setTimeout(function() { controls.classList.add('hidden'); }, 1000);
-            });
-
-            // Loading spinner
-            player.addEventListener('waiting', function() { spinner.classList.add('visible'); });
-            player.addEventListener('playing', function() { spinner.classList.remove('visible'); });
-            player.addEventListener('canplay', function() { spinner.classList.remove('visible'); });
-
-            // Error overlay
-            player.addEventListener('error', function() {
-                spinner.classList.remove('visible');
-                errorOverlay.classList.add('visible');
-                controls.classList.add('hidden');
-            });
-
-            // Seek bar time tooltip
-            seekBar.addEventListener('mousemove', function(e) {
-                if (!player.duration || !isFinite(player.duration)) return;
-                var rect = seekBar.getBoundingClientRect();
-                var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                var time = pct * player.duration;
-                var label = fmtTime(time);
-                var chapters = seekBar.querySelectorAll('.seek-chapter');
-                for (var i = 0; i < chapters.length; i++) {
-                    var ch = chapters[i];
-                    var start = parseFloat(ch.dataset.start || 0);
-                    var end = parseFloat(ch.dataset.end || 0);
-                    if (time >= start && time < end && ch.dataset.title) {
-                        label = ch.dataset.title + ' \u2013 ' + label;
-                        break;
-                    }
-                }
-                seekTooltip.textContent = label;
-                seekTooltip.style.left = (pct * 100) + '%';
-            });
-
-            // Keyboard shortcuts
-            document.addEventListener('keydown', function(e) {
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-                var handled = true;
-                switch (e.key) {
-                    case ' ':
-                    case 'k':
-                    case 'K':
-                        togglePlay();
-                        break;
-                    case 'ArrowLeft':
-                        player.currentTime = Math.max(0, player.currentTime - 5);
-                        break;
-                    case 'ArrowRight':
-                        player.currentTime = Math.min(player.duration || 0, player.currentTime + 5);
-                        break;
-                    case 'm':
-                    case 'M':
-                        player.muted = !player.muted;
-                        break;
-                    case 'f':
-                    case 'F':
-                        if (document.fullscreenElement) document.exitFullscreen().catch(function(){});
-                        else container.requestFullscreen().catch(function(){});
-                        break;
-                    default:
-                        if (e.key >= '0' && e.key <= '9' && player.duration) {
-                            player.currentTime = (parseInt(e.key) / 10) * player.duration;
-                        } else {
-                            handled = false;
-                        }
-                }
-                if (handled) e.preventDefault();
-            });
-
-            updatePlayBtn();
-            updateMuteBtn();
+` + playerJS + `
         })();
         {{if and .CtaText .CtaUrl}}
         (function() {

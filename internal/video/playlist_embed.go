@@ -5,36 +5,28 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/httputil"
 )
 
-type playlistWatchData struct {
-	Title         string
-	Description   string
-	Nonce         string
-	BaseURL       string
-	ShareToken    string
-	Videos        []playlistWatchVideoItem
-	VideosJSON    template.JS
-	NeedsPassword bool
-	NeedsEmail    bool
+type playlistEmbedData struct {
+	Title      string
+	Nonce      string
+	BaseURL    string
+	ShareToken string
+	Videos     []playlistWatchVideoItem
+	VideosJSON template.JS
 }
 
-type playlistWatchVideoItem struct {
-	ID           string `json:"id"`
-	Title        string `json:"title"`
-	Duration     int    `json:"duration"`
-	ShareToken   string `json:"shareToken"`
-	VideoURL     string `json:"videoUrl"`
-	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
-	ContentType  string `json:"contentType"`
+type playlistEmbedGateData struct {
+	Title      string
+	ShareToken string
+	Nonce      string
 }
 
-var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(template.FuncMap{
+var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(template.FuncMap{
 	"formatDuration": func(seconds int) string {
 		return formatDuration(seconds)
 	},
@@ -44,100 +36,23 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{.Title}} — SendRec</title>
+    <title>{{.Title}}</title>
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
         body {
             background: #0f172a;
             color: #e2e8f0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            min-height: 100vh;
         }
-        {{if .NeedsPassword}}
-        body {
-            background: #0a1628;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .gate-container { text-align: center; padding: 2rem; max-width: 400px; width: 100%; }
-        .gate-container h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
-        .gate-container p { color: #94a3b8; margin-bottom: 1.5rem; }
-        .gate-error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
-        .gate-error.visible { display: block; }
-        .gate-container input[type="password"] {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            border: 1px solid #334155;
-            background: #1e293b;
-            color: #fff;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            outline: none;
-        }
-        .gate-container input[type="password"]:focus { border-color: #00b67a; }
-        .gate-container button {
-            width: 100%;
-            background: #00b67a;
-            color: #fff;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .gate-container button:hover { opacity: 0.9; }
-        .gate-container button:disabled { opacity: 0.5; cursor: not-allowed; }
-        {{else if .NeedsEmail}}
-        body {
-            background: #0a1628;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .gate-container { text-align: center; padding: 2rem; max-width: 400px; width: 100%; }
-        .gate-container h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
-        .gate-container p { color: #94a3b8; margin-bottom: 1.5rem; }
-        .gate-error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
-        .gate-error.visible { display: block; }
-        .gate-container input[type="email"] {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            border: 1px solid #334155;
-            background: #1e293b;
-            color: #fff;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            outline: none;
-        }
-        .gate-container input[type="email"]:focus { border-color: #00b67a; }
-        .gate-container button {
-            width: 100%;
-            background: #00b67a;
-            color: #fff;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .gate-container button:hover { opacity: 0.9; }
-        .gate-container button:disabled { opacity: 0.5; cursor: not-allowed; }
-        {{else}}
 ` + playerCSS + safariWarningCSS + `
         .playlist-layout {
             display: flex;
-            min-height: 100vh;
+            height: 100vh;
         }
         .playlist-sidebar {
-            width: 280px;
-            min-width: 280px;
+            width: 240px;
+            min-width: 240px;
             background: #0f172a;
             color: #e2e8f0;
             display: flex;
@@ -145,18 +60,21 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             overflow: hidden;
         }
         .sidebar-header {
-            padding: 1.25rem 1rem;
+            padding: 0.75rem 0.75rem;
             border-bottom: 1px solid #1e293b;
         }
         .sidebar-header h2 {
-            font-size: 1rem;
+            font-size: 0.875rem;
             font-weight: 600;
             color: #f1f5f9;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.125rem;
             word-break: break-word;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .sidebar-header .video-count {
-            font-size: 0.75rem;
+            font-size: 0.6875rem;
             color: #64748b;
         }
         .video-list {
@@ -167,8 +85,8 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         .video-list-item {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 0.625rem 1rem;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
             cursor: pointer;
             transition: background 0.15s;
             border-bottom: 1px solid #1e293b;
@@ -180,26 +98,26 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             background: #1e3a5f;
         }
         .video-list-item .position {
-            font-size: 0.75rem;
+            font-size: 0.6875rem;
             color: #64748b;
-            min-width: 1.25rem;
+            min-width: 1rem;
             text-align: center;
         }
         .video-list-item.active .position {
             color: #00b67a;
         }
         .video-thumb {
-            width: 80px;
-            height: 45px;
-            border-radius: 4px;
+            width: 64px;
+            height: 36px;
+            border-radius: 3px;
             object-fit: cover;
             background: #334155;
             flex-shrink: 0;
         }
         .video-thumb-placeholder {
-            width: 80px;
-            height: 45px;
-            border-radius: 4px;
+            width: 64px;
+            height: 36px;
+            border-radius: 3px;
             background: #334155;
             flex-shrink: 0;
             display: flex;
@@ -207,8 +125,8 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             justify-content: center;
         }
         .video-thumb-placeholder svg {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             fill: #64748b;
         }
         .video-info {
@@ -216,7 +134,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             min-width: 0;
         }
         .video-info .video-title {
-            font-size: 0.8125rem;
+            font-size: 0.75rem;
             font-weight: 500;
             color: #e2e8f0;
             overflow: hidden;
@@ -227,49 +145,35 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             color: #ffffff;
         }
         .video-info .video-duration {
-            font-size: 0.6875rem;
+            font-size: 0.625rem;
             color: #64748b;
-            margin-top: 0.125rem;
+            margin-top: 0.0625rem;
         }
         .video-list-item .watched-badge {
             color: #00b67a;
-            font-size: 0.75rem;
+            font-size: 0.6875rem;
             flex-shrink: 0;
         }
+        .hidden { display: none; }
         .playlist-player {
             flex: 1;
             display: flex;
             flex-direction: column;
             min-width: 0;
         }
-        .player-header {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid #1e293b;
-        }
-        .player-header h1 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #f1f5f9;
-        }
-        .player-header .player-counter {
-            font-size: 0.8125rem;
-            color: #64748b;
-            margin-top: 0.25rem;
-        }
         .player-container {
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 1.5rem;
             background: #000;
             position: relative;
             overflow: hidden;
         }
         .player-container video {
             width: 100%;
-            max-height: 70vh;
-            border-radius: 4px;
+            height: 100%;
+            object-fit: contain;
             background: #000;
         }
         .next-overlay {
@@ -286,26 +190,25 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             color: #ffffff;
             z-index: 10;
         }
-        .hidden { display: none; }
         .next-overlay.hidden { display: none; }
         .next-overlay .next-label {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: #94a3b8;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.375rem;
         }
         .next-overlay .next-title {
-            font-size: 1.25rem;
+            font-size: 1rem;
             font-weight: 600;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             text-align: center;
-            padding: 0 2rem;
+            padding: 0 1.5rem;
         }
         .next-progress-bar {
-            width: 200px;
-            height: 4px;
+            width: 160px;
+            height: 3px;
             background: #334155;
             border-radius: 2px;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
             overflow: hidden;
         }
         .next-progress-fill {
@@ -316,12 +219,12 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .next-actions {
             display: flex;
-            gap: 0.75rem;
+            gap: 0.5rem;
         }
         .next-actions button {
-            padding: 0.5rem 1.25rem;
-            border-radius: 6px;
-            font-size: 0.875rem;
+            padding: 0.375rem 1rem;
+            border-radius: 5px;
+            font-size: 0.8125rem;
             font-weight: 600;
             cursor: pointer;
             border: none;
@@ -337,105 +240,49 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             border: 1px solid #475569 !important;
         }
         .btn-cancel:hover { color: #e2e8f0; border-color: #94a3b8 !important; }
-        .branding-footer {
-            padding: 0.75rem 1.5rem;
-            text-align: center;
-            font-size: 0.75rem;
+        .footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: #1e293b;
+            font-size: 12px;
+        }
+        .footer-title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 8px;
+        }
+        .footer a {
             color: #94a3b8;
-            border-top: 1px solid #1e293b;
-        }
-        .branding-footer a {
-            color: #00b67a;
             text-decoration: none;
+            white-space: nowrap;
+            font-size: 11px;
         }
-        .branding-footer a:hover { text-decoration: underline; }
-        @media (max-width: 768px) {
+        .footer a:hover { color: #e2e8f0; }
+        @media (max-width: 480px) {
             .playlist-layout {
                 flex-direction: column;
             }
             .playlist-sidebar {
                 width: 100%;
                 min-width: 100%;
-                max-height: 40vh;
+                max-height: 35vh;
                 order: 2;
             }
             .playlist-player {
                 order: 1;
             }
-            .player-container video {
-                max-height: 40vh;
-            }
             .volume-slider { display: none; }
         }
-        {{end}}
     </style>
 </head>
 <body>
-    {{if .NeedsPassword}}
-    <div class="gate-container">
-        <h1>{{.Title}}</h1>
-        <p>This playlist is password protected</p>
-        <p class="gate-error" id="error-msg"></p>
-        <form id="password-form">
-            <input type="password" id="password-input" placeholder="Enter password" required maxlength="128" autofocus>
-            <button type="submit" id="submit-btn">Continue</button>
-        </form>
-    </div>
-    <script nonce="{{.Nonce}}">
-        document.getElementById('password-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            var btn = document.getElementById('submit-btn');
-            var errEl = document.getElementById('error-msg');
-            var pw = document.getElementById('password-input').value;
-            btn.disabled = true;
-            errEl.classList.remove('visible');
-            fetch('/api/watch/playlist/{{.ShareToken}}/verify', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({password: pw})
-            }).then(function(r) {
-                if (r.ok) { window.location.reload(); }
-                else { return r.json().then(function(d) { errEl.textContent = d.error || 'Incorrect password'; errEl.classList.add('visible'); btn.disabled = false; }); }
-            }).catch(function() {
-                errEl.textContent = 'Something went wrong'; errEl.classList.add('visible'); btn.disabled = false;
-            });
-        });
-    </script>
-    {{else if .NeedsEmail}}
-    <div class="gate-container">
-        <h1>{{.Title}}</h1>
-        <p>Enter your email to watch this playlist</p>
-        <p class="gate-error" id="error-msg"></p>
-        <form id="email-gate-form">
-            <input type="email" id="email-input" placeholder="you@example.com" required maxlength="320" autofocus>
-            <button type="submit" id="submit-btn">Watch Playlist</button>
-        </form>
-    </div>
-    <script nonce="{{.Nonce}}">
-        document.getElementById('email-gate-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            var btn = document.getElementById('submit-btn');
-            var errEl = document.getElementById('error-msg');
-            var email = document.getElementById('email-input').value;
-            btn.disabled = true;
-            errEl.classList.remove('visible');
-            fetch('/api/watch/playlist/{{.ShareToken}}/identify', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({email: email})
-            }).then(function(r) {
-                if (r.ok) { window.location.reload(); }
-                else { return r.json().then(function(d) { errEl.textContent = d.error || 'Something went wrong'; errEl.classList.add('visible'); btn.disabled = false; }); }
-            }).catch(function() {
-                errEl.textContent = 'Something went wrong'; errEl.classList.add('visible'); btn.disabled = false;
-            });
-        });
-    </script>
-    {{else}}
     <div class="playlist-layout">
         <aside class="playlist-sidebar">
             <div class="sidebar-header">
-                <h2>{{.Title}}</h2>
+                <h2 title="{{.Title}}">{{.Title}}</h2>
                 <div class="video-count">{{len .Videos}} videos</div>
             </div>
             <ul class="video-list" id="video-list">
@@ -459,10 +306,6 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             </ul>
         </aside>
         <main class="playlist-player">
-            <div class="player-header">
-                <h1 id="current-title">{{if .Videos}}{{(index .Videos 0).Title}}{{end}}</h1>
-                <div class="player-counter" id="player-counter">{{if .Videos}}1 of {{len .Videos}}{{end}}</div>
-            </div>
             <div class="player-container" id="player-container">
                 <video id="player" playsinline{{if .Videos}} src="{{(index .Videos 0).VideoURL}}"{{end}}></video>
 ` + playerControlsHTML + `
@@ -476,8 +319,9 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                     </div>
                 </div>
             </div>
-            <div class="branding-footer">
-                Shared via <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a>
+            <div class="footer">
+                <span class="footer-title">{{.Title}}</span>
+                <a href="{{.BaseURL}}/watch/playlist/{{.ShareToken}}" target="_blank" rel="noopener">Watch on SendRec</a>
             </div>
 ` + safariWarningHTML + `
         </main>
@@ -491,8 +335,6 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         var currentIndex = 0;
         var player = document.getElementById('player');
         var container = document.getElementById('player-container');
-        var titleEl = document.getElementById('current-title');
-        var counterEl = document.getElementById('player-counter');
         var nextOverlay = document.getElementById('next-overlay');
         var nextTitleEl = document.getElementById('next-title');
         var progressEl = document.getElementById('next-progress');
@@ -519,7 +361,6 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         var spinner = document.getElementById('player-spinner');
         var errorOverlay = document.getElementById('player-error');
         var seekTooltip = document.getElementById('seek-time-tooltip');
-        var markersBar = document.getElementById('seek-markers');
         var shortcutsBtn = document.getElementById('shortcuts-btn');
         var shortcutsPanel = document.getElementById('shortcuts-panel');
         var hideTimer = null;
@@ -566,8 +407,6 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                 markWatched(videos[currentIndex].id);
             }
         });
-        player.addEventListener('loadedmetadata', function() { renderCurrentMarkers(); });
-        player.addEventListener('durationchange', function() { renderCurrentMarkers(); });
 
         // Playlist N/P key override
         onPlayerKeyOverride = function(e) {
@@ -597,70 +436,6 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             shortcutsTable.appendChild(prevRow);
         }
 
-        // --- Comment markers ---
-        var currentComments = [];
-
-        function formatTimestamp(seconds) {
-            var m = Math.floor(seconds / 60);
-            var s = Math.floor(seconds % 60);
-            return m + ':' + (s < 10 ? '0' : '') + s;
-        }
-
-        function renderMarkers(comments) {
-            if (!markersBar) return;
-            markersBar.innerHTML = '';
-            var dur = getEffectiveDuration();
-            if (!dur) return;
-            var bySecond = {};
-            comments.forEach(function(c) {
-                if (c.videoTimestamp == null) return;
-                var sec = Math.floor(c.videoTimestamp);
-                if (!bySecond[sec]) bySecond[sec] = [];
-                bySecond[sec].push(c);
-            });
-            var keys = Object.keys(bySecond);
-            if (keys.length === 0) return;
-            keys.forEach(function(sec) {
-                var group = bySecond[sec];
-                var dot = document.createElement('div');
-                dot.className = 'seek-marker';
-                var pct = Math.min(group[0].videoTimestamp / dur * 100, 99);
-                dot.style.left = pct + '%';
-                var tooltipText;
-                if (group.length === 1) {
-                    var author = group[0].authorName || 'Anonymous';
-                    tooltipText = author + ' \u00b7 ' + formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + group[0].body.substring(0, 80);
-                } else {
-                    tooltipText = formatTimestamp(group[0].videoTimestamp) + ' \u2014 ' + group.length + ' comments';
-                }
-                var tooltip = document.createElement('div');
-                tooltip.className = 'seek-marker-tooltip';
-                tooltip.textContent = tooltipText;
-                dot.appendChild(tooltip);
-                dot.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    player.currentTime = group[0].videoTimestamp;
-                });
-                markersBar.appendChild(dot);
-            });
-        }
-
-        function renderCurrentMarkers() {
-            renderMarkers(currentComments);
-        }
-
-        function loadCommentsForVideo(shareToken) {
-            currentComments = [];
-            renderMarkers([]);
-            fetch('/api/watch/' + encodeURIComponent(shareToken) + '/comments')
-                .then(function(r) { return r.ok ? r.json() : []; })
-                .then(function(comments) {
-                    currentComments = comments || [];
-                    renderMarkers(currentComments);
-                })
-                .catch(function() {});
-        }
-
         // --- Switch video ---
         function switchVideo(index) {
             if (index < 0 || index >= videos.length) return;
@@ -668,7 +443,6 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             currentIndex = index;
             var v = videos[index];
 
-            // Reset UI state
             seekProgress.style.width = '0%';
             seekBuffered.style.width = '0%';
             seekThumb.style.left = '0%';
@@ -680,15 +454,11 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             player.src = v.videoUrl;
             player.load();
             player.play().catch(function() {});
-            titleEl.textContent = v.title;
-            counterEl.textContent = (index + 1) + ' of ' + videos.length;
             listItems.forEach(function(li) {
                 li.classList.toggle('active', parseInt(li.getAttribute('data-index'), 10) === index);
             });
             var li = listItems[index];
             if (li) { li.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-
-            loadCommentsForVideo(v.shareToken);
         }
 
         listItems.forEach(function(li) {
@@ -739,33 +509,185 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         document.getElementById('btn-cancel').addEventListener('click', function() {
             cancelCountdown();
         });
-
-        // Load comments for first video
-        if (videos.length > 0) {
-            loadCommentsForVideo(videos[0].shareToken);
-        }
     })();
     </script>
-    {{end}}
 </body>
 </html>`))
 
+var playlistEmbedPasswordTemplate = template.Must(template.New("playlist-embed-password").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}}</title>
+    <style nonce="{{.Nonce}}">
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; background: #0f172a; }
+        body {
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container { text-align: center; padding: 2rem; max-width: 360px; width: 100%; }
+        h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+        p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.875rem; }
+        .error { color: #ef4444; font-size: 0.8rem; margin-bottom: 0.75rem; display: none; }
+        input[type="password"] {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #fff;
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+            outline: none;
+        }
+        input[type="password"]:focus { border-color: #00b67a; }
+        button {
+            width: 100%;
+            background: #00b67a;
+            color: #fff;
+            padding: 0.625rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>This playlist is password protected</h1>
+        <p>Enter the password to watch.</p>
+        <p class="error" id="error-msg"></p>
+        <form id="password-form">
+            <input type="password" id="password-input" placeholder="Password" required maxlength="128" autofocus>
+            <button type="submit" id="submit-btn">Watch Playlist</button>
+        </form>
+    </div>
+    <script nonce="{{.Nonce}}">
+        document.getElementById('password-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var btn = document.getElementById('submit-btn');
+            var errEl = document.getElementById('error-msg');
+            var pw = document.getElementById('password-input').value;
+            btn.disabled = true;
+            errEl.style.display = 'none';
+            fetch('/api/watch/playlist/{{.ShareToken}}/verify', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password: pw})
+            }).then(function(r) {
+                if (r.ok) { window.location.reload(); }
+                else { errEl.textContent = 'Incorrect password'; errEl.style.display = 'block'; btn.disabled = false; }
+            }).catch(function() {
+                errEl.textContent = 'Something went wrong'; errEl.style.display = 'block'; btn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>`))
 
-func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
+var playlistEmbedEmailGateTemplate = template.Must(template.New("playlist-embed-emailgate").Parse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}}</title>
+    <style nonce="{{.Nonce}}">
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; background: #0f172a; }
+        body {
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container { text-align: center; padding: 2rem; max-width: 360px; width: 100%; }
+        h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+        p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.875rem; }
+        .error { color: #ef4444; font-size: 0.8rem; margin-bottom: 0.75rem; display: none; }
+        input[type="email"] {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #fff;
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+            outline: none;
+        }
+        input[type="email"]:focus { border-color: #00b67a; }
+        button {
+            width: 100%;
+            background: #00b67a;
+            color: #fff;
+            padding: 0.625rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enter your email to watch</h1>
+        <p>{{.Title}}</p>
+        <p class="error" id="error-msg"></p>
+        <form id="email-gate-form">
+            <input type="email" id="email-input" placeholder="you@example.com" required maxlength="320" autofocus>
+            <button type="submit" id="submit-btn">Watch Playlist</button>
+        </form>
+    </div>
+    <script nonce="{{.Nonce}}">
+        document.getElementById('email-gate-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var btn = document.getElementById('submit-btn');
+            var errEl = document.getElementById('error-msg');
+            var email = document.getElementById('email-input').value;
+            btn.disabled = true;
+            errEl.style.display = 'none';
+            fetch('/api/watch/playlist/{{.ShareToken}}/identify', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({email: email})
+            }).then(function(r) {
+                if (r.ok) { window.location.reload(); }
+                else { return r.json().then(function(d) { errEl.textContent = d.error || 'Something went wrong'; errEl.style.display = 'block'; btn.disabled = false; }); }
+            }).catch(function() {
+                errEl.textContent = 'Something went wrong'; errEl.style.display = 'block'; btn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>`))
+
+func (h *Handler) PlaylistEmbedPage(w http.ResponseWriter, r *http.Request) {
 	shareToken := chi.URLParam(r, "shareToken")
 	nonce := httputil.NonceFromContext(r.Context())
 
 	var playlistID, title string
-	var description *string
 	var sharePassword *string
 	var requireEmail bool
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT p.id, p.title, p.description, p.share_password, p.require_email
+		`SELECT p.id, p.title, p.share_password, p.require_email
 		 FROM playlists p
 		 WHERE p.share_token = $1 AND p.is_shared = true`,
 		shareToken,
-	).Scan(&playlistID, &title, &description, &sharePassword, &requireEmail)
+	).Scan(&playlistID, &title, &sharePassword, &requireEmail)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -774,14 +696,12 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 	if sharePassword != nil {
 		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			if err := playlistWatchTemplate.Execute(w, playlistWatchData{
-				Title:         title,
-				Nonce:         nonce,
-				BaseURL:       h.baseURL,
-				ShareToken:    shareToken,
-				NeedsPassword: true,
+			if err := playlistEmbedPasswordTemplate.Execute(w, playlistEmbedGateData{
+				Title:      title,
+				ShareToken: shareToken,
+				Nonce:      nonce,
 			}); err != nil {
-				slog.Error("playlist-watch: failed to render password page", "error", err)
+				slog.Error("playlist-embed: failed to render password page", "error", err)
 			}
 			return
 		}
@@ -790,14 +710,12 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 	if requireEmail {
 		if _, ok := hasValidEmailGateCookie(r, h.hmacSecret, shareToken); !ok {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			if err := playlistWatchTemplate.Execute(w, playlistWatchData{
+			if err := playlistEmbedEmailGateTemplate.Execute(w, playlistEmbedGateData{
 				Title:      title,
-				Nonce:      nonce,
-				BaseURL:    h.baseURL,
 				ShareToken: shareToken,
-				NeedsEmail: true,
+				Nonce:      nonce,
 			}); err != nil {
-				slog.Error("playlist-watch: failed to render email gate page", "error", err)
+				slog.Error("playlist-embed: failed to render email gate page", "error", err)
 			}
 			return
 		}
@@ -831,7 +749,7 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 
 		videoURL, err := h.storage.GenerateDownloadURL(r.Context(), videoFileKey(userID, videoShareToken, contentType), 1*time.Hour)
 		if err != nil {
-			slog.Error("playlist-watch: failed to generate video URL", "video_id", id, "error", err)
+			slog.Error("playlist-embed: failed to generate video URL", "video_id", id, "error", err)
 			continue
 		}
 
@@ -856,87 +774,15 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 
 	videosJSONBytes, _ := json.Marshal(videoItems)
 
-	descriptionText := derefString(description)
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := playlistWatchTemplate.Execute(w, playlistWatchData{
-		Title:       title,
-		Description: descriptionText,
-		Nonce:       nonce,
-		BaseURL:     h.baseURL,
-		ShareToken:  shareToken,
-		Videos:      videoItems,
-		VideosJSON:  template.JS(videosJSONBytes),
+	if err := playlistEmbedTemplate.Execute(w, playlistEmbedData{
+		Title:      title,
+		Nonce:      nonce,
+		BaseURL:    h.baseURL,
+		ShareToken: shareToken,
+		Videos:     videoItems,
+		VideosJSON: template.JS(videosJSONBytes),
 	}); err != nil {
-		slog.Error("playlist-watch: failed to render playlist watch page", "error", err)
+		slog.Error("playlist-embed: failed to render playlist embed page", "error", err)
 	}
-}
-
-func (h *Handler) VerifyPlaylistWatchPassword(w http.ResponseWriter, r *http.Request) {
-	shareToken := chi.URLParam(r, "shareToken")
-
-	var req verifyPasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	if len(req.Password) > 128 {
-		httputil.WriteError(w, http.StatusBadRequest, "password is too long")
-		return
-	}
-
-	var sharePassword *string
-	err := h.db.QueryRow(r.Context(),
-		`SELECT share_password FROM playlists WHERE share_token = $1 AND is_shared = true`,
-		shareToken,
-	).Scan(&sharePassword)
-	if err != nil {
-		httputil.WriteError(w, http.StatusNotFound, "playlist not found")
-		return
-	}
-
-	if sharePassword == nil {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if !checkSharePassword(*sharePassword, req.Password) {
-		httputil.WriteError(w, http.StatusForbidden, "incorrect password")
-		return
-	}
-
-	sig := signWatchCookie(h.hmacSecret, shareToken, *sharePassword)
-	setWatchCookie(w, shareToken, sig, h.secureCookies)
-	w.WriteHeader(http.StatusOK)
-}
-
-func (h *Handler) IdentifyPlaylistViewer(w http.ResponseWriter, r *http.Request) {
-	shareToken := chi.URLParam(r, "shareToken")
-
-	var req identifyViewerRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	req.Email = strings.TrimSpace(req.Email)
-	if req.Email == "" || len(req.Email) > 320 || !strings.Contains(req.Email, "@") {
-		httputil.WriteError(w, http.StatusBadRequest, "invalid email")
-		return
-	}
-
-	var playlistID string
-	err := h.db.QueryRow(r.Context(),
-		`SELECT id FROM playlists WHERE share_token = $1 AND is_shared = true`,
-		shareToken,
-	).Scan(&playlistID)
-	if err != nil {
-		httputil.WriteError(w, http.StatusNotFound, "playlist not found")
-		return
-	}
-
-	sig := signEmailGateCookie(h.hmacSecret, shareToken, req.Email)
-	setEmailGateCookie(w, shareToken, sig, h.secureCookies)
-	w.WriteHeader(http.StatusOK)
 }

@@ -1,0 +1,1 @@
+ALTER TABLE videos ADD COLUMN ios_normalized BOOLEAN NOT NULL DEFAULT false;

@@ -694,6 +694,41 @@ export function PlaylistDetail() {
             </div>
 
             <div className="detail-setting-row">
+              <span className="detail-setting-label">Embed</span>
+              <div
+                style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}
+              >
+                <input
+                  type="text"
+                  readOnly
+                  value={`<iframe src="${window.location.origin}/embed/playlist/${playlist.shareToken}" width="800" height="450" frameborder="0" allowfullscreen></iframe>`}
+                  aria-label="Embed code"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: "6px 10px",
+                    fontSize: 13,
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 4,
+                    color: "var(--color-text)",
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    copyToClipboard(
+                      `<iframe src="${window.location.origin}/embed/playlist/${playlist.shareToken}" width="800" height="450" frameborder="0" allowfullscreen></iframe>`,
+                    );
+                    showToast("Embed code copied");
+                  }}
+                  className="detail-btn"
+                >
+                  Copy embed
+                </button>
+              </div>
+            </div>
+
+            <div className="detail-setting-row">
               <span className="detail-setting-label">Password</span>
               <div className="detail-setting-value">
                 <span>
@@ -766,111 +801,119 @@ export function PlaylistDetail() {
             style={{
               background: "var(--color-surface)",
               borderRadius: 12,
-              padding: 24,
               width: "calc(100vw - 32px)",
               maxWidth: 500,
               maxHeight: "80vh",
-              overflow: "auto",
               border: "1px solid var(--color-border)",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
-            <h3
-              style={{
-                color: "var(--color-text)",
-                fontSize: 18,
-                margin: "0 0 16px",
-              }}
-            >
-              Add Videos
-            </h3>
-
-            <input
-              type="text"
-              value={videoSearch}
-              onChange={(e) => setVideoSearch(e.target.value)}
-              placeholder="Search videos..."
-              autoFocus
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                fontSize: 14,
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 6,
-                color: "var(--color-text)",
-                marginBottom: 12,
-                boxSizing: "border-box",
-              }}
-            />
-
-            {availableVideos.length === 0 ? (
-              <p
+            <div style={{ padding: "24px 24px 0" }}>
+              <h3
                 style={{
-                  color: "var(--color-text-secondary)",
+                  color: "var(--color-text)",
+                  fontSize: 18,
+                  margin: "0 0 16px",
+                }}
+              >
+                Add Videos
+              </h3>
+
+              <input
+                type="text"
+                value={videoSearch}
+                onChange={(e) => setVideoSearch(e.target.value)}
+                placeholder="Search videos..."
+                autoFocus
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
                   fontSize: 14,
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 6,
+                  color: "var(--color-text)",
+                  marginBottom: 12,
+                  boxSizing: "border-box",
                 }}
-              >
-                No available videos to add
-              </p>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                  marginBottom: 16,
-                }}
-              >
-                {availableVideos.map((video) => (
-                  <label
-                    key={video.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "8px 10px",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      background: selectedVideoIds.has(video.id)
-                        ? "var(--color-bg)"
-                        : "transparent",
-                      border: "1px solid var(--color-border)",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedVideoIds.has(video.id)}
-                      onChange={() => toggleVideoSelection(video.id)}
-                      style={{ accentColor: "var(--color-accent)" }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span
-                        style={{
-                          color: "var(--color-text)",
-                          fontSize: 14,
-                          display: "block",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {video.title}
-                      </span>
-                      <span
-                        style={{
-                          color: "var(--color-text-secondary)",
-                          fontSize: 12,
-                        }}
-                      >
-                        {formatDuration(video.duration)}
-                      </span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
+              />
+            </div>
 
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "0 24px", minHeight: 0 }}>
+              {availableVideos.length === 0 ? (
+                <p
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    fontSize: 14,
+                  }}
+                >
+                  No available videos to add
+                </p>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  {availableVideos.map((video) => (
+                    <label
+                      key={video.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 10px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        background: selectedVideoIds.has(video.id)
+                          ? "var(--color-bg)"
+                          : "transparent",
+                        border: "1px solid var(--color-border)",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedVideoIds.has(video.id)}
+                        onChange={() => toggleVideoSelection(video.id)}
+                        style={{ accentColor: "var(--color-accent)" }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span
+                          style={{
+                            color: "var(--color-text)",
+                            fontSize: 14,
+                            display: "block",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {video.title}
+                        </span>
+                        <span
+                          style={{
+                            color: "var(--color-text-secondary)",
+                            fontSize: 12,
+                          }}
+                        >
+                          {formatDuration(video.duration)}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              display: "flex",
+              gap: 8,
+              padding: "16px 24px",
+              borderTop: "1px solid var(--color-border)",
+            }}>
               <button
                 onClick={addSelectedVideos}
                 disabled={selectedVideoIds.size === 0 || addingVideos}

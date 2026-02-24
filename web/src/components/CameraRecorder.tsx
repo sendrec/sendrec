@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 
 type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 
@@ -11,14 +12,6 @@ function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remaining = seconds % 60;
   return `${minutes}:${String(remaining).padStart(2, "0")}`;
-}
-
-function getSupportedMimeType(): string {
-  if (typeof MediaRecorder === "undefined") return "video/mp4";
-  // Prefer MP4 for universal playback compatibility (Safari can record WebM but not play it back)
-  if (MediaRecorder.isTypeSupported("video/mp4")) return "video/mp4";
-  if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) return "video/webm;codecs=vp9,opus";
-  return "video/mp4";
 }
 
 export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: CameraRecorderProps) {
@@ -81,9 +74,8 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(() => {});
         }
-      } catch (err) {
-        const detail = err instanceof DOMException ? `${err.name}: ${err.message}` : String(err);
-        setCameraError(`Could not access your camera: ${detail}`);
+      } catch {
+        setCameraError("Could not access your camera. Please allow camera access and try again.");
       }
     }
     startPreview();
@@ -155,8 +147,7 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
     };
 
     recorder.onstop = () => {
-      const blobType = mimeType.startsWith("video/webm") ? "video/webm" : "video/mp4";
-      const blob = new Blob(chunksRef.current, { type: blobType });
+      const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeType) });
       const elapsed = elapsedSeconds();
       onRecordingComplete(blob, elapsed);
     };

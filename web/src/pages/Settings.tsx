@@ -1022,7 +1022,7 @@ export function Settings() {
                       {delivery.statusCode}
                     </span>
                     <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginLeft: "auto" }}>
-                      {new Date(delivery.createdAt).toLocaleString()}
+                      {new Date(delivery.createdAt).toLocaleString("en-GB")}
                     </span>
                   </button>
                   {isExpanded && (
@@ -1219,8 +1219,8 @@ export function Settings() {
                     {key.name || "Unnamed key"}
                   </span>
                   <div style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
-                    Created {new Date(key.createdAt).toLocaleDateString()}
-                    {key.lastUsedAt && ` · Last used ${new Date(key.lastUsedAt).toLocaleDateString()}`}
+                    Created {new Date(key.createdAt).toLocaleDateString("en-GB")}
+                    {key.lastUsedAt && ` · Last used ${new Date(key.lastUsedAt).toLocaleDateString("en-GB")}`}
                   </div>
                 </div>
                 <button

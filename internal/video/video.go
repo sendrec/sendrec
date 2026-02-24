@@ -128,8 +128,9 @@ func videoFileKey(userID, shareToken, contentType string) string {
 	return fmt.Sprintf("recordings/%s/%s%s", userID, shareToken, extensionForContentType(contentType))
 }
 
-func webcamFileKey(userID, shareToken string) string {
-	return fmt.Sprintf("recordings/%s/%s_webcam.webm", userID, shareToken)
+func webcamFileKey(userID, shareToken, contentType string) string {
+	ext := extensionForContentType(contentType)
+	return fmt.Sprintf("recordings/%s/%s_webcam%s", userID, shareToken, ext)
 }
 
 func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64, maxVideosPerMonth int, maxVideoDurationSeconds int, maxPlaylists int, hmacSecret string, secureCookies bool) *Handler {
@@ -147,11 +148,12 @@ func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadByte
 }
 
 type createRequest struct {
-	Title          string `json:"title"`
-	Duration       int    `json:"duration"`
-	FileSize       int64  `json:"fileSize"`
-	WebcamFileSize int64  `json:"webcamFileSize,omitempty"`
-	ContentType    string `json:"contentType,omitempty"`
+	Title              string `json:"title"`
+	Duration           int    `json:"duration"`
+	FileSize           int64  `json:"fileSize"`
+	WebcamFileSize     int64  `json:"webcamFileSize,omitempty"`
+	ContentType        string `json:"contentType,omitempty"`
+	WebcamContentType  string `json:"webcamContentType,omitempty"`
 }
 
 type createResponse struct {
@@ -302,9 +304,14 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	fileKey := videoFileKey(userID, shareToken, contentType)
 
+	webcamContentType := req.WebcamContentType
+	if webcamContentType == "" {
+		webcamContentType = "video/webm"
+	}
+
 	var webcamKey *string
 	if req.WebcamFileSize > 0 {
-		k := webcamFileKey(userID, shareToken)
+		k := webcamFileKey(userID, shareToken, webcamContentType)
 		webcamKey = &k
 	}
 
@@ -342,7 +349,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if webcamKey != nil {
-		webcamURL, err := h.storage.GenerateUploadURL(r.Context(), *webcamKey, "video/webm", req.WebcamFileSize, 30*time.Minute)
+		webcamURL, err := h.storage.GenerateUploadURL(r.Context(), *webcamKey, webcamContentType, req.WebcamFileSize, 30*time.Minute)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to generate webcam upload URL")
 			return
@@ -626,6 +633,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 					defer cancel()
 					TranscodeWebMAsync(ctx, h.db, h.storage, videoID, fileKey)
+				}()
+			}
+			if expectedContentType == "video/mp4" || expectedContentType == "video/quicktime" {
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+					defer cancel()
+					NormalizeVideoAsync(ctx, h.db, h.storage, videoID, fileKey)
 				}()
 			}
 		}
