@@ -11,23 +11,26 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 )
 
-func probeVideoFrames(path string) (int, string, error) {
+func probeVideoInfo(path string) (frames int, info string, err error) {
 	cmd := exec.Command("ffprobe",
 		"-v", "error",
 		"-select_streams", "v:0",
 		"-count_frames",
 		"-show_entries", "stream=nb_read_frames,start_time,codec_name,width,height",
-		"-of", "csv=p=0",
+		"-of", "default=noprint_wrappers=1",
 		path,
 	)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return 0, "", fmt.Errorf("ffprobe: %w: %s", err, string(output))
+	output, cmdErr := cmd.CombinedOutput()
+	if cmdErr != nil {
+		return 0, "", fmt.Errorf("ffprobe: %w: %s", cmdErr, string(output))
 	}
-	info := strings.TrimSpace(string(output))
-	var count int
-	_, _ = fmt.Sscanf(info, "%d", &count)
-	return count, info, nil
+	info = strings.TrimSpace(string(output))
+	for _, line := range strings.Split(info, "\n") {
+		if strings.HasPrefix(line, "nb_read_frames=") {
+			_, _ = fmt.Sscanf(strings.TrimPrefix(line, "nb_read_frames="), "%d", &frames)
+		}
+	}
+	return frames, info, nil
 }
 
 func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) error {
@@ -136,7 +139,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	slog.Info("composite: files downloaded", "video_id", videoID, "screen_bytes", screenSize, "webcam_bytes", webcamSize)
 
 	// Verify webcam has video frames before compositing
-	webcamFrames, webcamProbeInfo, probeErr := probeVideoFrames(tmpWebcamPath)
+	webcamFrames, webcamProbeInfo, probeErr := probeVideoInfo(tmpWebcamPath)
 	if probeErr != nil {
 		slog.Error("composite: webcam probe failed", "video_id", videoID, "error", probeErr)
 		setReadyFallback()
