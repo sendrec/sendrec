@@ -304,6 +304,7 @@ func (s *Server) routes() {
 		s.router.Get("/embed/{shareToken}", s.videoHandler.EmbedPage)
 
 		s.router.Get("/watch/playlist/{shareToken}", s.videoHandler.PlaylistWatchPage)
+		s.router.Get("/embed/playlist/{shareToken}", s.videoHandler.PlaylistEmbedPage)
 		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/playlist/{shareToken}/verify", s.videoHandler.VerifyPlaylistWatchPassword)
 		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/playlist/{shareToken}/identify", s.videoHandler.IdentifyPlaylistViewer)
 
