@@ -41,8 +41,8 @@ jobs:
           push: true
           build-args: VERSION=${{ github.ref_name }}
           tags: |
-            sendrec/sendrec:latest
-            sendrec/sendrec:${{ steps.version.outputs.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/sendrec:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/sendrec:${{ steps.version.outputs.version }}
             ghcr.io/sendrec/sendrec:latest
             ghcr.io/sendrec/sendrec:${{ steps.version.outputs.version }}
           cache-from: type=gha
