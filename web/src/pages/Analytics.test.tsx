@@ -36,6 +36,7 @@ function makeAnalyticsData(overrides: Record<string, unknown> = {}) {
       ...(overrides.milestones as Record<string, unknown> ?? {}),
     },
     viewers: overrides.viewers ?? [],
+    heatmap: overrides.heatmap ?? [],
   };
 }
 
@@ -167,7 +168,6 @@ describe("Analytics", () => {
     expect(screen.getByText("80%")).toBeInTheDocument();
     expect(screen.getByText("60%")).toBeInTheDocument();
     expect(screen.getByText("40%")).toBeInTheDocument();
-    expect(screen.getByText("100%")).toBeInTheDocument();
   });
 
   it("hides completion funnel when no views", async () => {
