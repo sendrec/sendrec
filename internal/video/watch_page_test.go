@@ -174,7 +174,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 		"video source":    `src="https://s3.example.com/video.webm"`,
 		"title":           "My Demo",
 		"creator":         "Bob Smith",
-		"date":            "Feb 5, 2026",
+		"date":            "05/02/2026",
 		"download button": `id="download-btn"`,
 		"branding":        "SendRec",
 		"spinner":         "player-spinner",

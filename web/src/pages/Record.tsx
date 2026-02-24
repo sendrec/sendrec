@@ -45,7 +45,7 @@ export function Record() {
 
     try {
       const now = new Date();
-      const title = `Recording ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+      const title = `Recording ${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB")}`;
 
       const contentType = blob.type || "video/webm";
       const createBody: Record<string, unknown> = { title, duration, fileSize: blob.size, contentType };

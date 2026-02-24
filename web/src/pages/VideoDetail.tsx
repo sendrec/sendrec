@@ -84,7 +84,7 @@ function formatDuration(seconds: number): string {
 }
 
 function formatDate(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString();
+  return new Date(isoDate).toLocaleDateString("en-GB");
 }
 
 function expiryLabel(shareExpiresAt: string | null): {

@@ -1978,7 +1978,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Title:              title,
 		VideoURL:           videoURL,
 		Creator:            creator,
-		Date:               createdAt.Format("Jan 2, 2006"),
+		Date:               createdAt.Format("02/01/2006"),
 		Nonce:              nonce,
 		ThumbnailURL:       thumbnailURL,
 		ShareToken:         shareToken,
