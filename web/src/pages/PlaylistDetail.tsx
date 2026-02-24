@@ -694,6 +694,41 @@ export function PlaylistDetail() {
             </div>
 
             <div className="detail-setting-row">
+              <span className="detail-setting-label">Embed</span>
+              <div
+                style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}
+              >
+                <input
+                  type="text"
+                  readOnly
+                  value={`<iframe src="${window.location.origin}/embed/playlist/${playlist.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`}
+                  aria-label="Embed code"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: "6px 10px",
+                    fontSize: 13,
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 4,
+                    color: "var(--color-text)",
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    copyToClipboard(
+                      `<iframe src="${window.location.origin}/embed/playlist/${playlist.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`,
+                    );
+                    showToast("Embed code copied");
+                  }}
+                  className="detail-btn"
+                >
+                  Copy embed
+                </button>
+              </div>
+            </div>
+
+            <div className="detail-setting-row">
               <span className="detail-setting-label">Password</span>
               <div className="detail-setting-value">
                 <span>
