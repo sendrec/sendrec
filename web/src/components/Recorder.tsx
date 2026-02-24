@@ -153,7 +153,10 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const beginRecording = useCallback(() => {
     clearInterval(countdownTimerRef.current);
     if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.start(1000);
+      // No timeslice — Chrome's MP4 MediaRecorder may produce empty fragments
+      // with start(timeslice) on getDisplayMedia() streams. All data is buffered
+      // internally and flushed as a single blob on stop().
+      mediaRecorderRef.current.start();
     }
     if (webcamRecorderRef.current) {
       webcamRecorderRef.current.start(1000);
@@ -277,6 +280,10 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
+      };
+
+      recorder.onerror = (event) => {
+        console.error("MediaRecorder error:", event);
       };
 
       recorder.onstop = async () => {
