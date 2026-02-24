@@ -94,7 +94,7 @@ func transcodeExistingWebM(ctx context.Context, db database.DBTX, storage Object
 	rows, err := db.Query(ctx,
 		`SELECT id, file_key FROM videos
 		 WHERE content_type = 'video/webm' AND status = 'ready'
-		 ORDER BY created_at DESC LIMIT 5`)
+		 ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		slog.Error("transcode-worker: failed to query", "error", err)
 		return
