@@ -34,15 +34,17 @@ func probeVideoInfo(path string) (frames int, info string, err error) {
 }
 
 func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (string, error) {
+	// PiP filter: scale webcam, add border, normalize timestamps.
 	// setpts=PTS-STARTPTS normalizes webcam timestamps to start at 0.
-	// Chrome's MediaRecorder WebM may have non-zero start timestamps that
-	// prevent the overlay from aligning with the screen recording.
-	pipFilter := "[1:v]setpts=PTS-STARTPTS,scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[0:v][pip]overlay=W-w-20:H-h-20[vout]"
+	pipSetup := "[1:v]setpts=PTS-STARTPTS,scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip]"
 
 	var args []string
 	if contentType == "video/mp4" || contentType == "video/quicktime" {
-		// iOS-safe encoding: constrain resolution, set profile/level, transcode audio to AAC
-		filterComplex := pipFilter[:len(pipFilter)-len("[vout]")] + ",scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[vout]"
+		// Scale the screen DOWN first, then overlay PiP on top.
+		// This ensures the PiP is sized relative to the output resolution,
+		// not the original (which may be high-DPI, e.g. 3242x2626).
+		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
+			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
 		args = []string{
 			"-i", screenPath,
 			"-i", webcamPath,
@@ -61,10 +63,13 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (s
 			outputPath,
 		}
 	} else {
+		// For WebM, also scale down high-DPI screens before overlay
+		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
+			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
 		args = []string{
 			"-i", screenPath,
 			"-i", webcamPath,
-			"-filter_complex", pipFilter,
+			"-filter_complex", filterComplex,
 			"-map", "[vout]",
 			"-map", "0:a?",
 			"-c:a", "copy",
