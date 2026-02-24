@@ -23,10 +23,10 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/health"]
-      interval: 5s
+      interval: 2s
       timeout: 5s
       retries: 10
-      start_period: 15s
+      start_period: 5s
 
   postgres:
     image: postgres:18-alpine

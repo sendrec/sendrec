@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { loginViaUI } from "../helpers/auth";
+import { loginViaAPI } from "../helpers/auth";
 
 test.describe("Library", () => {
   test.beforeEach(async ({ page }) => {
-    await loginViaUI(page);
+    await loginViaAPI(page);
   });
 
   test("library shows empty state for new user", async ({ page }) => {
@@ -12,6 +12,7 @@ test.describe("Library", () => {
   });
 
   test("library nav link is accessible", async ({ page }) => {
+    await page.goto("/");
     await page.getByRole("link", { name: /library/i }).click();
     await expect(page).toHaveURL("/library");
   });

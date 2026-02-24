@@ -32,3 +32,18 @@ export async function loginViaUI(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("/");
 }
+
+export async function loginViaAPI(page: Page): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await page.request.post("/api/auth/login", {
+      data: { email: TEST_USER.email, password: TEST_USER.password },
+    });
+    if (response.ok()) return;
+    if (response.status() === 429) {
+      await page.waitForTimeout(2000);
+      continue;
+    }
+    throw new Error(`Login API failed: ${response.status()}`);
+  }
+  throw new Error("Login API failed: exceeded retries (429)");
+}
