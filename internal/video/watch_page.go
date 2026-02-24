@@ -1014,11 +1014,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </div>
         <script nonce="{{.Nonce}}">
             var v = document.getElementById('player');
-            v.muted = true;
-            v.play().then(function() {
-                v.muted = false;
-                v.play().catch(function() { v.muted = true; });
-            }).catch(function() {});
             (function() {
                 var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
                 var src = document.querySelector('#player source');
