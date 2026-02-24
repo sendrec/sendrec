@@ -24,6 +24,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const [captureWidth, setCaptureWidth] = useState(1920);
   const [captureHeight, setCaptureHeight] = useState(1080);
   const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -202,10 +203,15 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
 
   async function startRecording() {
     try {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      const displayMediaOptions: DisplayMediaStreamOptions & Record<string, unknown> = {
         video: true,
-        audio: true,
-      });
+        audio: systemAudioEnabled,
+      };
+      if (systemAudioEnabled) {
+        displayMediaOptions.systemAudio = "include";
+        displayMediaOptions.suppressLocalAudioPlayback = true;
+      }
+      const screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
       screenStreamRef.current = screenStream;
 
       // Play screen stream on preview video first
@@ -494,6 +500,21 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
               }}
             >
               {webcamEnabled ? "Camera On" : "Camera Off"}
+            </button>
+            <button
+              onClick={() => setSystemAudioEnabled((prev) => !prev)}
+              aria-label={systemAudioEnabled ? "Disable system audio" : "Enable system audio"}
+              style={{
+                background: systemAudioEnabled ? "var(--color-accent)" : "transparent",
+                color: systemAudioEnabled ? "var(--color-text)" : "var(--color-text-secondary)",
+                border: systemAudioEnabled ? "none" : "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: "14px 24px",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {systemAudioEnabled ? "Audio On" : "Audio Off"}
             </button>
             <button
               onClick={startRecording}
