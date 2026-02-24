@@ -529,6 +529,46 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .speed-menu button:hover { background: rgba(255, 255, 255, 0.1); }
         .speed-menu button.active { color: #00b67a; font-weight: 600; }
+        .shortcuts-panel {
+            display: none;
+            position: absolute;
+            bottom: 52px;
+            right: 8px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 12px 16px;
+            z-index: 20;
+            color: #e2e8f0;
+            font-size: 12px;
+            min-width: 220px;
+        }
+        .shortcuts-panel.open { display: block; }
+        .shortcuts-panel h4 {
+            margin: 0 0 8px;
+            font-size: 13px;
+            color: #fff;
+        }
+        .shortcuts-panel table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .shortcuts-panel td {
+            padding: 2px 0;
+        }
+        .shortcuts-panel td:first-child {
+            color: #94a3b8;
+            padding-right: 12px;
+            white-space: nowrap;
+        }
+        .shortcuts-panel kbd {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #475569;
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-family: monospace;
+            font-size: 11px;
+        }
         .next-overlay {
             position: absolute;
             top: 0;
@@ -756,6 +796,25 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                         </div>
                     </div>
                     <button class="ctrl-btn" id="pip-btn" aria-label="Picture in Picture">&#9114;</button>
+                    <div style="position:relative">
+                        <button class="ctrl-btn" id="shortcuts-btn" aria-label="Keyboard shortcuts" style="font-size:14px;font-weight:700">?</button>
+                        <div class="shortcuts-panel" id="shortcuts-panel">
+                            <h4>Keyboard shortcuts</h4>
+                            <table>
+                                <tr><td>Play / Pause</td><td><kbd>Space</kbd> <kbd>K</kbd></td></tr>
+                                <tr><td>Rewind 5s</td><td><kbd>&#8592;</kbd></td></tr>
+                                <tr><td>Forward 5s</td><td><kbd>&#8594;</kbd></td></tr>
+                                <tr><td>Rewind 10s</td><td><kbd>J</kbd></td></tr>
+                                <tr><td>Forward 10s</td><td><kbd>L</kbd></td></tr>
+                                <tr><td>Mute</td><td><kbd>M</kbd></td></tr>
+                                <tr><td>Fullscreen</td><td><kbd>F</kbd></td></tr>
+                                <tr><td>Slower / Faster</td><td><kbd>&lt;</kbd> <kbd>&gt;</kbd></td></tr>
+                                <tr><td>Seek to %</td><td><kbd>0</kbd>-<kbd>9</kbd></td></tr>
+                                <tr><td>Next video</td><td><kbd>N</kbd></td></tr>
+                                <tr><td>Previous video</td><td><kbd>P</kbd></td></tr>
+                            </table>
+                        </div>
+                    </div>
                     <button class="ctrl-btn" id="fullscreen-btn" aria-label="Fullscreen">&#9974;</button>
                 </div>
                 <div class="next-overlay hidden" id="next-overlay">
@@ -809,6 +868,8 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         var errorOverlay = document.getElementById('player-error');
         var seekTooltip = document.getElementById('seek-time-tooltip');
         var markersBar = document.getElementById('seek-markers');
+        var shortcutsBtn = document.getElementById('shortcuts-btn');
+        var shortcutsPanel = document.getElementById('shortcuts-panel');
         var hideTimer = null;
 
         // --- Watched tracking ---
@@ -981,6 +1042,12 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         });
         document.addEventListener('click', function(e) {
             if (!e.target.closest('#speed-dropdown')) speedMenu.classList.remove('open');
+            if (!e.target.closest('#shortcuts-btn') && !e.target.closest('#shortcuts-panel')) shortcutsPanel.classList.remove('open');
+        });
+        shortcutsBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            shortcutsPanel.classList.toggle('open');
+            speedMenu.classList.remove('open');
         });
 
         // PiP
@@ -1089,6 +1156,9 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                 case 'p':
                 case 'P':
                     if (currentIndex > 0) switchVideo(currentIndex - 1);
+                    break;
+                case '?':
+                    shortcutsPanel.classList.toggle('open');
                     break;
                 default:
                     if (e.key >= '0' && e.key <= '9' && player.duration) {
