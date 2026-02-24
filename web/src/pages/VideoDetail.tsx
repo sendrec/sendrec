@@ -143,6 +143,7 @@ export function VideoDetail() {
   const [showTrimModal, setShowTrimModal] = useState(false);
   const [showFillerModal, setShowFillerModal] = useState(false);
 
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
 
   const [brandingOpen, setBrandingOpen] = useState(false);
@@ -187,6 +188,9 @@ export function VideoDetail() {
     }
 
     fetchData();
+    apiFetch<{ downloadUrl: string }>(`/api/videos/${id}/download`)
+      .then(resp => setVideoUrl(resp?.downloadUrl ?? null))
+      .catch(() => {});
   }, [id]);
 
   function showToast(message: string) {
@@ -640,13 +644,21 @@ export function VideoDetail() {
       </div>
 
       <div className="video-detail-hero">
-        {video.thumbnailUrl && (
+        {videoUrl ? (
+          <video
+            src={videoUrl}
+            controls
+            className="video-detail-thumbnail"
+            poster={video.thumbnailUrl}
+            style={{ objectFit: "contain", background: "#000" }}
+          />
+        ) : video.thumbnailUrl ? (
           <img
             src={video.thumbnailUrl}
             alt="Video thumbnail"
             className="video-detail-thumbnail"
           />
-        )}
+        ) : null}
 
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

@@ -197,7 +197,6 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             height: 3px;
             background: rgba(255, 255, 255, 0.2);
             border-radius: 2px;
-            overflow: hidden;
             transition: height 0.15s;
         }
         .seek-bar:hover .seek-track { height: 5px; }
@@ -214,6 +213,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             left: 0;
             height: 100%;
             background: #22c55e;
+            pointer-events: none;
         }
         .seek-chapters {
             position: absolute;

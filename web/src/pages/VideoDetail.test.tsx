@@ -141,7 +141,8 @@ function setupDefaultMocks(
     .mockResolvedValueOnce(overrides.limits ?? defaultLimits)
     .mockResolvedValueOnce(overrides.folders ?? defaultFolders)
     .mockResolvedValueOnce(overrides.tags ?? defaultTags)
-    .mockResolvedValueOnce(overrides.playlists ?? defaultPlaylists);
+    .mockResolvedValueOnce(overrides.playlists ?? defaultPlaylists)
+    .mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" });
 }
 
 function renderVideoDetail(videoId = "v1") {
@@ -191,7 +192,9 @@ describe("VideoDetail", () => {
       .mockResolvedValueOnce([video, makeVideo({ id: "v2", title: "Other" })])
       .mockResolvedValueOnce(defaultLimits)
       .mockResolvedValueOnce(defaultFolders)
-      .mockResolvedValueOnce(defaultTags);
+      .mockResolvedValueOnce(defaultTags)
+      .mockResolvedValueOnce(defaultPlaylists)
+      .mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" });
 
     renderVideoDetail("v1");
 
@@ -237,7 +240,9 @@ describe("VideoDetail", () => {
       .mockResolvedValueOnce([makeVideo({ id: "v1" })])
       .mockResolvedValueOnce(defaultLimits)
       .mockResolvedValueOnce(defaultFolders)
-      .mockResolvedValueOnce(defaultTags);
+      .mockResolvedValueOnce(defaultTags)
+      .mockResolvedValueOnce(defaultPlaylists)
+      .mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" });
 
     renderVideoDetail("nonexistent");
 
@@ -257,23 +262,21 @@ describe("VideoDetail", () => {
     expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
 
-  it("displays thumbnail when available", async () => {
-    const video = makeVideo({
-      thumbnailUrl: "https://storage.sendrec.eu/thumb.jpg",
-    });
+  it("displays video player when download URL is available", async () => {
     setupDefaultMocks();
 
-    renderVideoDetail("v1");
+    const { container } = renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     });
 
-    const thumbnail = screen.getByAltText("Video thumbnail");
-    expect(thumbnail).toHaveAttribute(
-      "src",
-      "https://storage.sendrec.eu/thumb.jpg",
-    );
+    await waitFor(() => {
+      const video = container.querySelector("video");
+      expect(video).not.toBeNull();
+      expect(video?.getAttribute("src")).toBe("https://s3.example.com/video.webm");
+      expect(video?.getAttribute("poster")).toBe("https://storage.sendrec.eu/thumb.jpg");
+    });
   });
 
   it("displays tag chips", async () => {
@@ -1212,7 +1215,7 @@ describe("VideoDetail", () => {
     fireEvent.click(screen.getByText("Delete video"));
 
     // Should not have called delete API (only the initial 5 setup calls)
-    expect(mockApiFetch).toHaveBeenCalledTimes(5);
+    expect(mockApiFetch).toHaveBeenCalledTimes(6);
   });
 
   // ─── Toast ────────────────────────────────────────────────────

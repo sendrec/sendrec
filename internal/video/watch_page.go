@@ -254,7 +254,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             height: 4px;
             background: rgba(255, 255, 255, 0.2);
             border-radius: 2px;
-            overflow: hidden;
             transition: height 0.15s;
         }
         .seek-bar:hover .seek-track { height: 6px; }
@@ -271,6 +270,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             left: 0;
             height: 100%;
             background: var(--brand-accent);
+            pointer-events: none;
         }
         .seek-chapters {
             position: absolute;
