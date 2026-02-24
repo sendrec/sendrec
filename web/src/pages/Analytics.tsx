@@ -322,7 +322,7 @@ export function Analytics() {
         </div>
       </div>
 
-      {data.heatmap && data.heatmap.length > 0 && (
+      {data.summary.totalViews > 0 && (
         <div
           style={{
             background: "var(--color-surface)",
