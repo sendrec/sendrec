@@ -159,6 +159,51 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             transition: background 0.2s;
         }
         .play-overlay-btn:hover { background: rgba(0, 0, 0, 0.8); }
+        .player-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            z-index: 4;
+            display: none;
+        }
+        .player-spinner.visible { display: block; }
+        @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+        .player-error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #e2e8f0;
+            font-size: 14px;
+            z-index: 4;
+            display: none;
+        }
+        .player-error.visible { display: block; }
+        .player-error-icon { font-size: 36px; margin-bottom: 8px; }
+        .seek-time-tooltip {
+            position: absolute;
+            bottom: 100%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 3px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: monospace;
+            white-space: nowrap;
+            pointer-events: none;
+            display: none;
+            margin-bottom: 6px;
+        }
+        .seek-bar:hover .seek-time-tooltip { display: block; }
         .player-controls {
             position: absolute;
             bottom: 0;
@@ -920,6 +965,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             <div class="player-overlay" id="player-overlay">
                 <button class="play-overlay-btn" id="play-overlay-btn" aria-label="Play">&#9654;</button>
             </div>
+            <div class="player-spinner" id="player-spinner"></div>
+            <div class="player-error" id="player-error"><div class="player-error-icon">&#9888;</div>Video failed to load</div>
             <div class="player-controls" id="player-controls">
                 <button class="ctrl-btn" id="play-btn" aria-label="Play">&#9654;</button>
                 <span class="time-display" id="time-current">0:00</span>
@@ -931,6 +978,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                         <div class="seek-markers" id="seek-markers"></div>
                     </div>
                     <div class="seek-thumb" id="seek-thumb"></div>
+                    <div class="seek-time-tooltip" id="seek-time-tooltip">0:00</div>
                 </div>
                 <span class="time-display" id="time-duration">0:00</span>
                 <div class="volume-group">
@@ -1015,6 +1063,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 var speedMenu = document.getElementById('speed-menu');
                 var pipBtn = document.getElementById('pip-btn');
                 var fullscreenBtn = document.getElementById('fullscreen-btn');
+                var spinner = document.getElementById('player-spinner');
+                var errorOverlay = document.getElementById('player-error');
+                var seekTooltip = document.getElementById('seek-time-tooltip');
                 var hideTimer = null;
 
                 function fmtTime(s) {
@@ -1164,6 +1215,91 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     if (!player.paused) {
                         hideTimer = setTimeout(function() { controls.classList.add('hidden'); }, 1000);
                     }
+                });
+
+                // Loading spinner
+                player.addEventListener('waiting', function() { spinner.classList.add('visible'); });
+                player.addEventListener('playing', function() { spinner.classList.remove('visible'); });
+                player.addEventListener('canplay', function() { spinner.classList.remove('visible'); });
+
+                // Error overlay
+                player.addEventListener('error', function() {
+                    spinner.classList.remove('visible');
+                    errorOverlay.classList.add('visible');
+                    controls.classList.add('hidden');
+                });
+
+                // Seek bar time tooltip
+                seekBar.addEventListener('mousemove', function(e) {
+                    if (!player.duration || !isFinite(player.duration)) return;
+                    var rect = seekBar.getBoundingClientRect();
+                    var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    var time = pct * player.duration;
+                    var label = fmtTime(time);
+                    // Show chapter name if applicable
+                    var chapters = seekBar.querySelectorAll('.seek-chapter');
+                    for (var i = 0; i < chapters.length; i++) {
+                        var ch = chapters[i];
+                        var start = parseFloat(ch.dataset.start || 0);
+                        var end = parseFloat(ch.dataset.end || 0);
+                        if (time >= start && time < end && ch.dataset.title) {
+                            label = ch.dataset.title + ' \u2013 ' + label;
+                            break;
+                        }
+                    }
+                    seekTooltip.textContent = label;
+                    seekTooltip.style.left = (pct * 100) + '%';
+                });
+
+                // Keyboard shortcuts
+                document.addEventListener('keydown', function(e) {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+                    var handled = true;
+                    switch (e.key) {
+                        case ' ':
+                        case 'k':
+                        case 'K':
+                            togglePlay();
+                            break;
+                        case 'ArrowLeft':
+                            player.currentTime = Math.max(0, player.currentTime - 5);
+                            break;
+                        case 'ArrowRight':
+                            player.currentTime = Math.min(player.duration || 0, player.currentTime + 5);
+                            break;
+                        case 'j':
+                        case 'J':
+                            player.currentTime = Math.max(0, player.currentTime - 10);
+                            break;
+                        case 'l':
+                        case 'L':
+                            player.currentTime = Math.min(player.duration || 0, player.currentTime + 10);
+                            break;
+                        case 'm':
+                        case 'M':
+                            player.muted = !player.muted;
+                            break;
+                        case 'f':
+                        case 'F':
+                            if (document.fullscreenElement) document.exitFullscreen().catch(function(){});
+                            else container.requestFullscreen().catch(function(){});
+                            break;
+                        case '<':
+                            player.playbackRate = Math.max(0.25, player.playbackRate - 0.25);
+                            speedBtn.textContent = player.playbackRate + 'x';
+                            break;
+                        case '>':
+                            player.playbackRate = Math.min(4, player.playbackRate + 0.25);
+                            speedBtn.textContent = player.playbackRate + 'x';
+                            break;
+                        default:
+                            if (e.key >= '0' && e.key <= '9' && player.duration) {
+                                player.currentTime = (parseInt(e.key) / 10) * player.duration;
+                            } else {
+                                handled = false;
+                            }
+                    }
+                    if (handled) e.preventDefault();
                 });
 
                 updatePlayBtn();
@@ -1798,6 +1934,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     seg.style.left = leftPct + '%';
                     seg.style.width = widthPct + '%';
                     seg.setAttribute('data-start', start);
+                    seg.setAttribute('data-end', end);
+                    seg.setAttribute('data-title', chapters[i].title);
                     seg.setAttribute('data-index', i);
                     if (i > 0) {
                         seg.style.left = (leftPct + 0.1) + '%';

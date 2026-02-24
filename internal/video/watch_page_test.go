@@ -177,6 +177,9 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 		"date":            "Feb 5, 2026",
 		"download button": `id="download-btn"`,
 		"branding":        "SendRec",
+		"spinner":         "player-spinner",
+		"error overlay":   "player-error",
+		"seek tooltip":    "seek-time-tooltip",
 	}
 	for name, want := range checks {
 		if !strings.Contains(body, want) {

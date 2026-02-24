@@ -137,6 +137,9 @@ func TestEmbedPage_Success_RendersVideoPlayer(t *testing.T) {
 	checks := map[string]string{
 		"video element": "<video",
 		"controls":      "player-controls",
+		"spinner":       "player-spinner",
+		"error overlay": "player-error",
+		"seek tooltip":  "seek-time-tooltip",
 		"playsinline":   "playsinline",
 		"video source":  `src="https://s3.example.com/video.webm"`,
 		"watch link":    `/watch/` + shareToken,
