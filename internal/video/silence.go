@@ -94,7 +94,22 @@ func (h *Handler) DetectSilence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := detectSilenceResponse{Segments: segments}
+	// Clamp segments to video duration so remove-segments won't reject them
+	maxEnd := float64(duration)
+	clamped := make([]segmentRange, 0, len(segments))
+	for _, seg := range segments {
+		if seg.Start >= maxEnd {
+			continue
+		}
+		if seg.End > maxEnd {
+			seg.End = maxEnd
+		}
+		if seg.End-seg.Start >= 0.1 {
+			clamped = append(clamped, seg)
+		}
+	}
+
+	resp := detectSilenceResponse{Segments: clamped}
 	if resp.Segments == nil {
 		resp.Segments = []segmentRange{}
 	}
