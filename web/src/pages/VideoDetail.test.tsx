@@ -64,6 +64,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     suggestedTitle: null,
     summaryStatus: "none",
     folderId: null,
+    transcriptionLanguage: null,
     tags: [],
     playlists: [],
     ...overrides,
@@ -1307,5 +1308,29 @@ describe("VideoDetail", () => {
         { method: "POST" },
       );
     });
+  });
+
+  it("pre-selects video transcription language in dropdown", async () => {
+    const video = makeVideo({ transcriptStatus: "ready", transcriptionLanguage: "de" });
+    setupDefaultMocks({ video, limits: { ...defaultLimits, transcriptionEnabled: true } });
+
+    renderVideoDetail();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Transcription language")).toHaveValue("de");
+    });
+  });
+
+  it("disables summarize button when transcript is not ready", async () => {
+    const video = makeVideo({ transcriptStatus: "pending", summaryStatus: "none" });
+    setupDefaultMocks({ video, limits: { ...defaultLimits, aiEnabled: true } });
+
+    renderVideoDetail("v1");
+
+    await waitFor(() => {
+      expect(screen.getByText("Summarize")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Summarize")).toBeDisabled();
   });
 });

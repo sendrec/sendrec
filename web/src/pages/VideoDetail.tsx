@@ -35,6 +35,7 @@ interface Video {
   suggestedTitle: string | null;
   summaryStatus: string;
   folderId: string | null;
+  transcriptionLanguage: string | null;
   tags: VideoTag[];
   playlists: { id: string; title: string }[];
 }
@@ -174,6 +175,9 @@ export function VideoDetail() {
           ]);
         const found = videos?.find((v) => v.id === id) ?? null;
         setVideo(found);
+        if (found?.transcriptionLanguage) {
+          setRetranscribeLanguage(found.transcriptionLanguage);
+        }
         setLimits(limitsData ?? null);
         setFolders(foldersData ?? []);
         setTags(tagsData ?? []);
@@ -1065,12 +1069,14 @@ export function VideoDetail() {
               <button
                 onClick={summarize}
                 disabled={
+                  video.transcriptStatus !== "ready" ||
                   video.summaryStatus === "pending" ||
                   video.summaryStatus === "processing"
                 }
                 className="detail-btn"
                 style={{
                   opacity:
+                    video.transcriptStatus !== "ready" ||
                     video.summaryStatus === "pending" ||
                     video.summaryStatus === "processing"
                       ? 0.5
