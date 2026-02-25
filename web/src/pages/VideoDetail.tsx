@@ -424,6 +424,7 @@ export function VideoDetail() {
       method: "PATCH",
       body: JSON.stringify({ title: video.suggestedTitle }),
     });
+    await apiFetch(`/api/videos/${video.id}/dismiss-title`, { method: "PUT" });
     setVideo((prev) =>
       prev
         ? { ...prev, title: prev.suggestedTitle!, suggestedTitle: null }
