@@ -9,21 +9,13 @@ import (
 type JobType string
 
 const (
-	JobTypeThumbnail   JobType = "thumbnail"
-	JobTypeTranscode   JobType = "transcode"
-	JobTypeTranscribe  JobType = "transcribe"
-	JobTypeNormalize   JobType = "normalize"
-	JobTypeProbe       JobType = "probe"
-	JobTypeComposite   JobType = "composite"
+	JobTypeThumbnail  JobType = "thumbnail"
+	JobTypeTranscode  JobType = "transcode"
+	JobTypeTranscribe JobType = "transcribe"
+	JobTypeNormalize  JobType = "normalize"
+	JobTypeProbe      JobType = "probe"
+	JobTypeComposite  JobType = "composite"
 )
-
-type Job struct {
-	ID        string
-	Type      JobType
-	VideoID   string
-	Payload   map[string]any
-	CreatedAt time.Time
-}
 
 func (h *Handler) EnqueueJob(ctx context.Context, jobType JobType, videoID string, payload map[string]any) {
 	// For now, this is a wrapper around the existing async patterns.
@@ -47,7 +39,9 @@ func (h *Handler) EnqueueJob(ctx context.Context, jobType JobType, videoID strin
 			TranscodeWebMAsync(ctx, h.db, h.storage, videoID, fileKey)
 		}()
 	case JobTypeTranscribe:
-		_ = EnqueueTranscription(ctx, h.db, videoID)
+		if err := EnqueueTranscription(ctx, h.db, videoID); err != nil {
+			slog.Error("job: transcribe enqueue failed", "video_id", videoID, "error", err)
+		}
 	case JobTypeNormalize:
 		fileKey, _ := payload["fileKey"].(string)
 		go func() {

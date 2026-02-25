@@ -19,6 +19,9 @@ import (
 	"github.com/sendrec/sendrec/internal/httputil"
 )
 
+const defaultPageSize = 50
+const maxPageSize = 100
+
 type listItem struct {
 	ID                    string             `json:"id"`
 	Title                 string             `json:"title"`
@@ -467,4 +470,76 @@ func sortDailyViews(daily []dailyViews) {
 	sort.Slice(daily, func(i, j int) bool {
 		return daily[i].Date < daily[j].Date
 	})
+}
+
+func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var title string
+	var fileKey string
+	var contentType string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT title, file_key, content_type FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
+		videoID, userID,
+	).Scan(&title, &fileKey, &contentType)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	filename := title + extensionForContentType(contentType)
+	downloadURL, err := h.storage.GenerateDownloadURLWithDisposition(r.Context(), fileKey, filename, 1*time.Hour)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate download URL")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"downloadUrl": downloadURL})
+}
+
+func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
+	shareToken := chi.URLParam(r, "shareToken")
+
+	var title string
+	var fileKey string
+	var shareExpiresAt *time.Time
+	var sharePassword *string
+	var contentType string
+	var downloadEnabled bool
+
+	err := h.db.QueryRow(r.Context(),
+		`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
+		shareToken,
+	).Scan(&title, &fileKey, &shareExpiresAt, &sharePassword, &contentType, &downloadEnabled)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	if !downloadEnabled {
+		httputil.WriteError(w, http.StatusForbidden, "downloads are disabled for this video")
+		return
+	}
+
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
+		httputil.WriteError(w, http.StatusGone, "link expired")
+		return
+	}
+
+	if sharePassword != nil {
+		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
+			httputil.WriteError(w, http.StatusForbidden, "password required")
+			return
+		}
+	}
+
+	filename := title + extensionForContentType(contentType)
+	downloadURL, err := h.storage.GenerateDownloadURLWithDisposition(r.Context(), fileKey, filename, 1*time.Hour)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate download URL")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"downloadUrl": downloadURL})
 }

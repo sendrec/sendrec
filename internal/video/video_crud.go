@@ -448,12 +448,6 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.EnqueueJob(r.Context(), JobTypeThumbnail, videoID, map[string]any{
-		"fileKey":      fileKey,
-		"thumbnailKey": thumbnailFileKey(userID, shareToken),
-	})
-	h.EnqueueJob(r.Context(), JobTypeTranscribe, videoID, nil)
-
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()

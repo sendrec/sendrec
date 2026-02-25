@@ -12,54 +12,6 @@ import (
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
-const defaultPageSize = 50
-const maxPageSize = 100
-
-type analyticsSummary struct {
-	TotalViews        int64   `json:"totalViews"`
-	UniqueViews       int64   `json:"uniqueViews"`
-	ViewsToday        int64   `json:"viewsToday"`
-	AverageDailyViews float64 `json:"averageDailyViews"`
-	PeakDay           string  `json:"peakDay"`
-	PeakDayViews      int64   `json:"peakDayViews"`
-	TotalCtaClicks    int64   `json:"totalCtaClicks"`
-	CtaClickRate      float64 `json:"ctaClickRate"`
-}
-
-type dailyViews struct {
-	Date        string `json:"date"`
-	Views       int64  `json:"views"`
-	UniqueViews int64  `json:"uniqueViews"`
-}
-
-type milestoneCounts struct {
-	Reached25  int64 `json:"reached25"`
-	Reached50  int64 `json:"reached50"`
-	Reached75  int64 `json:"reached75"`
-	Reached100 int64 `json:"reached100"`
-}
-
-type viewerInfo struct {
-	Email         string `json:"email"`
-	FirstViewedAt string `json:"firstViewedAt"`
-	ViewCount     int64  `json:"viewCount"`
-	Completion    int    `json:"completion"`
-}
-
-type segmentData struct {
-	Segment    int     `json:"segment"`
-	WatchCount int64   `json:"watchCount"`
-	Intensity  float64 `json:"intensity"`
-}
-
-type analyticsResponse struct {
-	Summary    analyticsSummary `json:"summary"`
-	Daily      []dailyViews     `json:"daily"`
-	Milestones milestoneCounts  `json:"milestones"`
-	Viewers    []viewerInfo     `json:"viewers"`
-	Heatmap    []segmentData    `json:"heatmap"`
-}
-
 func (h *Handler) dispatchWebhook(userID string, event webhook.Event) {
 	if h.webhookClient == nil {
 		return

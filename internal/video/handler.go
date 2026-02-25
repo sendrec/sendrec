@@ -29,6 +29,7 @@ type ViewNotifier interface {
 	SendDigestNotification(ctx context.Context, toEmail, toName string, videos []email.DigestVideoSummary) error
 }
 
+// SlackNotifier sends Slack webhook notifications independently of the email notification mode.
 type SlackNotifier interface {
 	SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int) error
 	SendCommentNotification(ctx context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error

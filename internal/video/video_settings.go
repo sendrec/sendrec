@@ -294,3 +294,73 @@ func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *Handler) Summarize(w http.ResponseWriter, r *http.Request) {
+	if !h.aiEnabled {
+		httputil.WriteError(w, http.StatusForbidden, "AI summaries not enabled")
+		return
+	}
+
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET summary_status = 'pending', summary = NULL, chapters = NULL, updated_at = now()
+		 WHERE id = $1 AND user_id = $2 AND status != 'deleted' AND transcript_status = 'ready'`,
+		videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not enqueue summary")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found or transcript not ready")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) GenerateDocument(w http.ResponseWriter, r *http.Request) {
+	if !h.aiEnabled {
+		httputil.WriteError(w, http.StatusForbidden, "AI features not enabled")
+		return
+	}
+
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET document_status = 'pending', document = NULL, updated_at = now()
+		 WHERE id = $1 AND user_id = $2 AND status != 'deleted' AND transcript_status = 'ready'`,
+		videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not enqueue document generation")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found or transcript not ready")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) DismissTitle(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET suggested_title = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to dismiss title")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
