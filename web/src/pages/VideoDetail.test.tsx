@@ -76,6 +76,7 @@ const defaultLimits = {
   videosUsedThisMonth: 0,
   brandingEnabled: false,
   aiEnabled: false,
+  transcriptionEnabled: false,
 };
 
 const defaultFolders = [
@@ -1234,6 +1235,77 @@ describe("VideoDetail", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Link copied")).toBeInTheDocument();
+    });
+  });
+
+  // ─── Language selector ──────────────────────────────────────
+
+  it("shows language selector next to retranscribe when transcription enabled", async () => {
+    const video = makeVideo({ transcriptStatus: "ready" });
+    setupDefaultMocks({ video, limits: { ...defaultLimits, transcriptionEnabled: true } });
+
+    renderVideoDetail();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Transcription language")).toBeInTheDocument();
+    });
+  });
+
+  it("hides language selector when transcription disabled", async () => {
+    const video = makeVideo({ transcriptStatus: "ready" });
+    setupDefaultMocks({ video });
+
+    renderVideoDetail();
+
+    await waitFor(() => {
+      expect(screen.getByText("Ready")).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText("Transcription language")).not.toBeInTheDocument();
+  });
+
+  it("sends language when retranscribing with specific language", async () => {
+    const video = makeVideo({ transcriptStatus: "ready" });
+    setupDefaultMocks({ video, limits: { ...defaultLimits, transcriptionEnabled: true } });
+    mockApiFetch.mockResolvedValueOnce(undefined); // retranscribe response
+
+    renderVideoDetail();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Transcription language")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("Transcription language"), { target: { value: "de" } });
+    fireEvent.click(screen.getByText("Redo transcript"));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/videos/v1/retranscribe",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ language: "de" }),
+        }),
+      );
+    });
+  });
+
+  it("does not send language body when auto is selected", async () => {
+    const video = makeVideo({ transcriptStatus: "ready" });
+    setupDefaultMocks({ video, limits: { ...defaultLimits, transcriptionEnabled: true } });
+    mockApiFetch.mockResolvedValueOnce(undefined); // retranscribe response
+
+    renderVideoDetail();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Transcription language")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Redo transcript"));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/videos/v1/retranscribe",
+        { method: "POST" },
+      );
     });
   });
 });
