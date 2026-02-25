@@ -9,6 +9,7 @@ concurrency:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   deploy:
@@ -35,33 +36,6 @@ jobs:
           ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "/opt/sendrec/deploy.sh production ${TAG_NAME}"
 
-      - name: Update publiccode.yml version
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
-          VERSION="${TAG_NAME#v}"
-          DATE="$(date -u +%Y-%m-%d)"
-
-          # Fetch current file to get its SHA and content
-          RESPONSE=$(gh api repos/${{ github.repository }}/contents/publiccode.yml --jq '{sha: .sha, content: .content}')
-          FILE_SHA=$(echo "$RESPONSE" | jq -r '.sha')
-          CURRENT=$(echo "$RESPONSE" | jq -r '.content' | base64 -d)
-
-          # Apply version and date updates
-          UPDATED=$(echo "$CURRENT" | sed "s/^softwareVersion: .*/softwareVersion: \"${VERSION}\"/" | sed "s/^releaseDate: .*/releaseDate: \"${DATE}\"/")
-
-          if [ "$CURRENT" = "$UPDATED" ]; then
-            echo "publiccode.yml already up to date"
-          else
-            NEW_CONTENT=$(echo "$UPDATED" | base64 -w 0)
-            gh api --method PUT repos/${{ github.repository }}/contents/publiccode.yml \
-              -f message="chore: update publiccode.yml to ${VERSION}" \
-              -f content="$NEW_CONTENT" \
-              -f sha="$FILE_SHA" \
-              -f branch="main"
-          fi
-
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,3 +49,43 @@ jobs:
               --title "$TAG_NAME" \
               --generate-notes
           fi
+
+  publish:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: VERSION=${{ github.ref_name }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/sendrec:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/sendrec:${{ steps.version.outputs.version }}
+            ghcr.io/sendrec/sendrec:latest
+            ghcr.io/sendrec/sendrec:${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
