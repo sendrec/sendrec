@@ -1489,9 +1489,9 @@ func TestList_SuccessWithVideos(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]").
-				AddRow("video-2", "Second Video", "uploading", 60, "xyz789uvwklm", createdAt.Add(-time.Hour), &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]").
+				AddRow("video-2", "Second Video", "uploading", 60, "xyz789uvwklm", createdAt.Add(-time.Hour), &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -1564,8 +1564,8 @@ func TestList_ShareURLIncludesBaseURL(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "My Video", "ready", 90, shareToken, createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "My Video", "ready", 90, shareToken, createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -1606,7 +1606,7 @@ func TestList_EmptyList(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}),
 		)
 
 	r := chi.NewRouter()
@@ -1688,8 +1688,8 @@ func TestList_IncludesViewCounts(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(15), int64(8), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(15), int64(8), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -1740,8 +1740,8 @@ func TestList_IncludesThumbnailURL(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(5), int64(3), &thumbKey, (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(5), int64(3), &thumbKey, (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -1787,9 +1787,9 @@ func TestList_IncludesCommentModeAndCount(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(5), int64(3), (*string)(nil), (*string)(nil), "anonymous", int64(7), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]").
-				AddRow("video-2", "Second Video", "ready", 60, "xyz789uvwklm", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(5), int64(3), (*string)(nil), (*string)(nil), "anonymous", int64(7), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]").
+				AddRow("video-2", "Second Video", "ready", 60, "xyz789uvwklm", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -1930,8 +1930,8 @@ func TestWatch_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none"),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none"),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -2038,8 +2038,8 @@ func TestWatch_StorageError(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none"),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none"),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -2089,8 +2089,8 @@ func TestWatch_ExpiredLink(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none"),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none"),
 		)
 
 	r := chi.NewRouter()
@@ -2397,8 +2397,8 @@ func TestWatch_RecordsView(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none"),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none"),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -2446,8 +2446,8 @@ func TestWatch_IncludesThumbnailURL(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, &thumbKey, (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none"),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, &thumbKey, (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none"),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -4239,8 +4239,8 @@ func TestWatch_IncludesTranscriptWhenReady(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), &transcriptKey, &transcriptJSON, "ready", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none"),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), &transcriptKey, &transcriptJSON, "ready", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none"),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -4305,8 +4305,8 @@ func TestWatch_OmitsTranscriptWhenNone(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none"),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none"),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -4365,8 +4365,8 @@ func TestWatch_TranscriptPoll_SkipsViewRecording(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "processing", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none"),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "processing", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none"),
 		)
 
 	// No INSERT INTO video_views expected — poll should skip view recording
@@ -4474,9 +4474,9 @@ func TestList_IncludesTranscriptStatus(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.status, v.duration, v.share_token, v.created_at, v.share_expires_at`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "ready", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]").
-				AddRow("video-2", "Second Video", "ready", 60, "xyz789uvwklm", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "processing", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "First Video", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "ready", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]").
+				AddRow("video-2", "Second Video", "ready", 60, "xyz789uvwklm", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "processing", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4525,8 +4525,8 @@ func TestList_SearchByQuery(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, "%deploy%", 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "Deploy walkthrough", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Deploy walkthrough", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4570,7 +4570,7 @@ func TestList_EmptyQueryIgnored(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}),
 		)
 
 	r := chi.NewRouter()
@@ -4602,8 +4602,8 @@ func TestList_NeverExpiresVideo(t *testing.T) {
 	mock.ExpectQuery("SELECT v.id").
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("v1", "Test Video", "ready", 60, "tok123", createdAt, (*time.Time)(nil), int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("v1", "Test Video", "ready", 60, "tok123", createdAt, (*time.Time)(nil), int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4646,8 +4646,8 @@ func TestList_FilterByFolderId(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, folderID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "In Folder", "ready", 60, "tok123", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), &folderID, (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "In Folder", "ready", 60, "tok123", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), &folderID, (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4693,8 +4693,8 @@ func TestList_FilterByUnfiled(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "Unfiled Video", "ready", 60, "tok456", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Unfiled Video", "ready", 60, "tok456", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4741,8 +4741,8 @@ func TestList_FilterByTagId(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, tagID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "Tagged Video", "ready", 60, "tok789", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), (*string)(nil), (*string)(nil), `[{"id":"tag-xyz-789","name":"Important","color":null}]`, "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Tagged Video", "ready", 60, "tok789", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), `[{"id":"tag-xyz-789","name":"Important","color":null}]`, "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -4790,8 +4790,8 @@ func TestList_IncludesFolderIdAndTags(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "Organized Video", "ready", 90, "tok-org", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", (*string)(nil), &folderID, (*string)(nil), `[{"id":"tag-1","name":"Bug","color":"#ff0000"},{"id":"tag-2","name":"Feature","color":null}]`, "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Organized Video", "ready", 90, "tok-org", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), &folderID, (*string)(nil), `[{"id":"tag-1","name":"Bug","color":"#ff0000"},{"id":"tag-2","name":"Feature","color":null}]`, "[]"),
 		)
 
 	r := chi.NewRouter()
@@ -6335,8 +6335,8 @@ func TestList_IncludesSuggestedTitle(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title`).
 		WithArgs(testUserID, 50, 0).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
-				AddRow("video-1", "Recording 2026-02-05", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", &suggestedTitle, (*string)(nil), (*string)(nil), "[]", "[]"),
+			pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "tags_json", "playlists_json"}).
+				AddRow("video-1", "Recording 2026-02-05", "ready", 120, "abc123defghi", createdAt, &shareExpiresAt, int64(0), int64(0), (*string)(nil), (*string)(nil), "disabled", int64(0), "none", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", &suggestedTitle, (*string)(nil), (*string)(nil), "[]", "[]"),
 		)
 
 	r := chi.NewRouter()

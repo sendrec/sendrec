@@ -254,6 +254,7 @@ func (s *Server) routes() {
 				r.Put("/{id}/cta", s.videoHandler.SetCTA)
 				r.Put("/{id}/email-gate", s.videoHandler.SetEmailGate)
 				r.Post("/{id}/summarize", s.videoHandler.Summarize)
+				r.Post("/{id}/generate-document", s.videoHandler.GenerateDocument)
 				r.Put("/{id}/folder", s.videoHandler.SetVideoFolder)
 				r.Put("/{id}/tags", s.videoHandler.SetVideoTags)
 			r.Post("/{id}/remove-segments", s.videoHandler.RemoveSegments)

@@ -162,6 +162,7 @@ func main() {
 	video.StartCleanupLoop(cleanupCtx, db.Pool, store, 10*time.Minute)
 	video.StartTranscriptionWorker(cleanupCtx, db.Pool, store, 5*time.Second, aiEnabled)
 	video.StartSummaryWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
+	video.StartDocumentWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
 	video.StartDigestWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 	video.StartTranscodeWorker(cleanupCtx, db.Pool, store, 2*time.Minute)
 
