@@ -201,6 +201,18 @@ describe("Analytics", () => {
     expect(screen.getByText("41%")).toBeInTheDocument();
   });
 
+  it("does not crash when heatmap is null", async () => {
+    mockApiFetch.mockResolvedValueOnce(makeAnalyticsData({
+      heatmap: null,
+    }));
+    renderAnalytics();
+
+    await waitFor(() => {
+      expect(screen.getByText("142")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Engagement")).not.toBeInTheDocument();
+  });
+
   it("hides viewers table when viewers array is empty", async () => {
     mockApiFetch.mockResolvedValueOnce(makeAnalyticsData({
       viewers: [],
