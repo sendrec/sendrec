@@ -191,6 +191,7 @@ type listItem struct {
 	CtaUrl            *string `json:"ctaUrl"`
 	EmailGateEnabled  bool          `json:"emailGateEnabled"`
 	SummaryStatus     string        `json:"summaryStatus"`
+	DocumentStatus    string        `json:"documentStatus"`
 	SuggestedTitle         *string       `json:"suggestedTitle"`
 	FolderID               *string            `json:"folderId"`
 	TranscriptionLanguage  *string            `json:"transcriptionLanguage"`
@@ -231,6 +232,8 @@ type watchResponse struct {
 	Summary          string              `json:"summary,omitempty"`
 	Chapters         []Chapter           `json:"chapters,omitempty"`
 	SummaryStatus    string              `json:"summaryStatus"`
+	Document         string              `json:"document,omitempty"`
+	DocumentStatus   string              `json:"documentStatus"`
 }
 
 func generateShareToken() (string, error) {
@@ -703,7 +706,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    (SELECT COUNT(DISTINCT vv.viewer_hash) FROM video_views vv WHERE vv.video_id = v.id) AS unique_view_count,
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
-		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled, v.summary_status,
+		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled, v.summary_status, v.document_status,
 		    v.suggested_title, v.folder_id, v.transcription_language,
 		    COALESCE((SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY t.name)
 		      FROM video_tags vt JOIN tags t ON t.id = vt.tag_id
@@ -766,7 +769,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var sharePassword *string
 		var tagsJSON string
 		var playlistsJSON string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.SuggestedTitle, &item.FolderID, &item.TranscriptionLanguage, &tagsJSON, &playlistsJSON); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.DocumentStatus, &item.SuggestedTitle, &item.FolderID, &item.TranscriptionLanguage, &tagsJSON, &playlistsJSON); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -906,6 +909,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var summaryText *string
 	var chaptersJSON *string
 	var summaryStatus string
+	var documentText *string
+	var documentStatus string
 	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
 
@@ -916,7 +921,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
 		        v.cta_text, v.cta_url,
-		        v.summary, v.chapters, v.summary_status
+		        v.summary, v.chapters, v.summary_status,
+		        v.document, v.document_status
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
@@ -928,7 +934,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
 		&ctaText, &ctaUrl,
-		&summaryText, &chaptersJSON, &summaryStatus)
+		&summaryText, &chaptersJSON, &summaryStatus,
+		&documentText, &documentStatus)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -1011,6 +1018,11 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal([]byte(*chaptersJSON), &chapters)
 	}
 
+	var document string
+	if documentText != nil {
+		document = *documentText
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, watchResponse{
 		Title:            title,
 		VideoURL:         videoURL,
@@ -1028,6 +1040,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		Summary:          summary,
 		Chapters:         chapters,
 		SummaryStatus:    summaryStatus,
+		Document:         document,
+		DocumentStatus:   documentStatus,
 	})
 }
 
@@ -1179,6 +1193,32 @@ func (h *Handler) Summarize(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not enqueue summary")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		httputil.WriteError(w, http.StatusNotFound, "video not found or transcript not ready")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) GenerateDocument(w http.ResponseWriter, r *http.Request) {
+	if !h.aiEnabled {
+		httputil.WriteError(w, http.StatusForbidden, "AI features not enabled")
+		return
+	}
+
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET document_status = 'pending', document = NULL, updated_at = now()
+		 WHERE id = $1 AND user_id = $2 AND status != 'deleted' AND transcript_status = 'ready'`,
+		videoID, userID,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not enqueue document generation")
 		return
 	}
 	if tag.RowsAffected() == 0 {
