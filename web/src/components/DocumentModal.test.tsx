@@ -45,7 +45,9 @@ describe("DocumentModal", () => {
     });
 
     render(<DocumentModal document="## Doc content" onClose={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Copy to clipboard/ }));
+    const btn = screen.getByRole("button", { name: /Copy to clipboard/ });
+    await user.click(btn);
     expect(writeText).toHaveBeenCalledWith("## Doc content");
+    expect(btn).toHaveTextContent("Copied!");
   });
 });

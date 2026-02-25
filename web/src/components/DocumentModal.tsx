@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 interface DocumentModalProps {
@@ -7,6 +7,8 @@ interface DocumentModalProps {
 }
 
 export function DocumentModal({ document, onClose }: DocumentModalProps) {
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -17,6 +19,8 @@ export function DocumentModal({ document, onClose }: DocumentModalProps) {
 
   async function copyToClipboard() {
     await navigator.clipboard.writeText(document);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -43,7 +47,7 @@ export function DocumentModal({ document, onClose }: DocumentModalProps) {
               padding: "8px 16px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
             }}
           >
-            Copy to clipboard
+            {copied ? "Copied!" : "Copy to clipboard"}
           </button>
           <button
             onClick={onClose}
