@@ -66,6 +66,7 @@ type Handler struct {
 	brandingEnabled         bool
 	analyticsScript         string
 	aiEnabled               bool
+	transcriptionEnabled    bool
 	webhookClient           *webhook.Client
 }
 
@@ -91,6 +92,10 @@ func (h *Handler) SetAnalyticsScript(script string) {
 
 func (h *Handler) SetAIEnabled(enabled bool) {
 	h.aiEnabled = enabled
+}
+
+func (h *Handler) SetTranscriptionEnabled(enabled bool) {
+	h.transcriptionEnabled = enabled
 }
 
 func (h *Handler) SetWebhookClient(c *webhook.Client) {
@@ -474,6 +479,7 @@ type limitsResponse struct {
 	VideosUsedThisMonth     int  `json:"videosUsedThisMonth"`
 	BrandingEnabled         bool `json:"brandingEnabled"`
 	AiEnabled               bool `json:"aiEnabled"`
+	TranscriptionEnabled    bool `json:"transcriptionEnabled"`
 	MaxPlaylists            int  `json:"maxPlaylists"`
 	PlaylistsUsed           int  `json:"playlistsUsed"`
 }
@@ -517,6 +523,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		VideosUsedThisMonth:     videosUsed,
 		BrandingEnabled:         h.brandingEnabled,
 		AiEnabled:               h.aiEnabled,
+		TranscriptionEnabled:    h.transcriptionEnabled,
 		MaxPlaylists:            maxPlaylists,
 		PlaylistsUsed:           playlistsUsed,
 	})

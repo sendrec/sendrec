@@ -39,6 +39,7 @@ type Config struct {
 	EnableDocs              bool
 	BrandingEnabled         bool
 	AiEnabled               bool
+	TranscriptionEnabled    bool
 	AllowedFrameAncestors   string
 	AnalyticsScript         string
 	EmailSender             auth.EmailSender
@@ -106,6 +107,9 @@ func New(cfg Config) *Server {
 		}
 		if cfg.AiEnabled {
 			s.videoHandler.SetAIEnabled(true)
+		}
+		if cfg.TranscriptionEnabled {
+			s.videoHandler.SetTranscriptionEnabled(true)
 		}
 		if cfg.SlackNotifier != nil {
 			s.videoHandler.SetSlackNotifier(cfg.SlackNotifier)
