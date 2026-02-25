@@ -39,6 +39,21 @@ vi.mock("../components/FillerRemovalModal", () => ({
   ),
 }));
 
+vi.mock("../components/SilenceRemovalModal", () => ({
+  SilenceRemovalModal: ({
+    onClose,
+    onRemovalStarted,
+  }: {
+    onClose: () => void;
+    onRemovalStarted: () => void;
+  }) => (
+    <div data-testid="silence-modal">
+      <button onClick={onClose}>Close silence</button>
+      <button onClick={onRemovalStarted}>Start silence removal</button>
+    </div>
+  ),
+}));
+
 function makeVideo(overrides: Record<string, unknown> = {}) {
   return {
     id: "v1",
@@ -934,6 +949,21 @@ describe("VideoDetail", () => {
     fireEvent.click(screen.getByText("Remove fillers"));
 
     expect(screen.getByTestId("filler-modal")).toBeInTheDocument();
+  });
+
+  it("opens silence removal modal when remove silence clicked", async () => {
+    const video = makeVideo({ status: "ready" });
+    setupDefaultMocks({ video });
+
+    renderVideoDetail("v1");
+
+    await waitFor(() => {
+      expect(screen.getByText("Remove silence")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Remove silence"));
+
+    expect(screen.getByTestId("silence-modal")).toBeInTheDocument();
   });
 
   // ─── Customization section ────────────────────────────────────
