@@ -1,4 +1,4 @@
-package video
+package languages
 
 type Language struct {
 	Code string `json:"code"`
