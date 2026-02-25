@@ -1127,6 +1127,7 @@ export function VideoDetail() {
                 {video.documentStatus === "pending" && "Pending..."}
                 {video.documentStatus === "processing" && "Generating..."}
                 {video.documentStatus === "ready" && "Ready"}
+                {video.documentStatus === "too_short" && "Transcript too short"}
                 {video.documentStatus === "failed" && "Failed"}
               </span>
               {video.documentStatus === "ready" ? (

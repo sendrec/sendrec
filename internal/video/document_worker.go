@@ -48,7 +48,7 @@ func processNextDocument(ctx context.Context, db database.DBTX, ai *AIClient) {
 
 	if len(segments) < 2 {
 		slog.Warn("document-worker: skipping video, insufficient segments", "video_id", videoID, "segments", len(segments))
-		markDocumentStatus(ctx, db, videoID, "failed")
+		markDocumentStatus(ctx, db, videoID, "too_short")
 		return
 	}
 
