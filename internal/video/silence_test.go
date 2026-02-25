@@ -74,7 +74,7 @@ func TestDetectSilence_VideoNotFound(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
-	mock.ExpectQuery(`SELECT duration, file_key, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
+	mock.ExpectQuery(`SELECT duration, file_key, status FROM videos WHERE id = \$1 AND user_id = \$2`).
 		WithArgs(videoID, testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -105,10 +105,10 @@ func TestDetectSilence_VideoNotReady(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
+	mock.ExpectQuery(`SELECT duration, file_key, status FROM videos WHERE id = \$1 AND user_id = \$2`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "status", "content_type"}).
-			AddRow(120, "recordings/user/video.webm", "processing", "video/webm"))
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "status"}).
+			AddRow(120, "recordings/user/video.webm", "processing"))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/detect-silence", handler.DetectSilence)

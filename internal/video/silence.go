@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
@@ -56,11 +56,10 @@ func (h *Handler) DetectSilence(w http.ResponseWriter, r *http.Request) {
 	var duration int
 	var fileKey string
 	var status string
-	var contentType string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT duration, file_key, status, content_type FROM videos WHERE id = $1 AND user_id = $2`,
+		`SELECT duration, file_key, status FROM videos WHERE id = $1 AND user_id = $2`,
 		videoID, userID,
-	).Scan(&duration, &fileKey, &status, &contentType)
+	).Scan(&duration, &fileKey, &status)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -70,24 +69,14 @@ func (h *Handler) DetectSilence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ext := extensionForContentType(contentType)
-	tmpFile, err := os.CreateTemp("", "sendrec-silence-*"+ext)
+	downloadURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 15*time.Minute)
 	if err != nil {
-		slog.Error("detect-silence: failed to create temp file", "error", err)
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to detect silence")
-		return
-	}
-	tmpPath := tmpFile.Name()
-	_ = tmpFile.Close()
-	defer func() { _ = os.Remove(tmpPath) }()
-
-	if err := h.storage.DownloadToFile(r.Context(), fileKey, tmpPath); err != nil {
-		slog.Error("detect-silence: failed to download video", "video_id", videoID, "error", err)
+		slog.Error("detect-silence: failed to generate download URL", "video_id", videoID, "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to detect silence")
 		return
 	}
 
-	segments, err := detectSilence(tmpPath, noiseDB, minDuration)
+	segments, err := detectSilence(downloadURL, noiseDB, minDuration)
 	if err != nil {
 		slog.Error("detect-silence: ffmpeg failed", "video_id", videoID, "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to detect silence")
@@ -156,6 +145,7 @@ func detectSilence(inputPath string, noiseDB int, minDuration float64) ([]segmen
 	filterValue := fmt.Sprintf("silencedetect=noise=%ddB:d=%.2f", noiseDB, minDuration)
 	cmd := exec.Command("ffmpeg",
 		"-i", inputPath,
+		"-vn",
 		"-af", filterValue,
 		"-f", "null",
 		"-",
