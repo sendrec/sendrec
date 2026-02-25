@@ -80,7 +80,7 @@ func extractAudio(inputPath, outputPath string) error {
 	return nil
 }
 
-func runWhisper(audioPath, outputPrefix string) error {
+func runWhisper(audioPath, outputPrefix, language string) error {
 	cmd := exec.Command("whisper-cli",
 		"-m", whisperModelPath(),
 		"-f", audioPath,
@@ -88,7 +88,7 @@ func runWhisper(audioPath, outputPrefix string) error {
 		"--output-json",
 		"-of", outputPrefix,
 		"-t", "2",
-		"-l", "auto",
+		"-l", language,
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -168,7 +168,7 @@ func parseWhisperJSON(jsonPath string) ([]TranscriptSegment, error) {
 	return segments, nil
 }
 
-func processTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, userID, shareToken string, aiEnabled bool) {
+func processTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, userID, shareToken, language string, aiEnabled bool) {
 	if !isTranscriptionAvailable() {
 		slog.Warn("transcribe: transcription not available, marking as failed", "video_id", videoID)
 		if _, err := db.Exec(ctx,
@@ -180,7 +180,7 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 		return
 	}
 
-	slog.Info("transcribe: starting", "video_id", videoID)
+	slog.Info("transcribe: starting", "video_id", videoID, "language", language)
 
 	setFailed := func() {
 		if _, err := db.Exec(ctx,
@@ -248,7 +248,7 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 		_ = os.Remove(tmpOutputPrefix)
 	}()
 
-	if err := runWhisper(tmpAudioPath, tmpOutputPrefix); err != nil {
+	if err := runWhisper(tmpAudioPath, tmpOutputPrefix, language); err != nil {
 		slog.Error("transcribe: whisper failed", "video_id", videoID, "error", err)
 		setFailed()
 		return

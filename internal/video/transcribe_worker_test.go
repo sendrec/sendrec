@@ -39,7 +39,7 @@ func TestProcessNextTranscription_NoJobs(t *testing.T) {
 
 	// Claim query returns no rows
 	mock.ExpectQuery(`UPDATE videos SET transcript_status = 'processing'`).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token"}))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token", "language"}))
 
 	storage := &mockStorage{}
 	processNextTranscription(context.Background(), mock, storage, false)
@@ -62,7 +62,7 @@ func TestProcessNextTranscription_ResetsStuckJobs(t *testing.T) {
 
 	// Claim query returns no rows (the reset job will be picked up next tick)
 	mock.ExpectQuery(`UPDATE videos SET transcript_status = 'processing'`).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token"}))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token", "language"}))
 
 	storage := &mockStorage{}
 	processNextTranscription(context.Background(), mock, storage, false)
