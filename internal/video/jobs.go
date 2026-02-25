@@ -2,11 +2,8 @@ package video
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
-
-	"github.com/sendrec/sendrec/internal/database"
 )
 
 type JobType string
