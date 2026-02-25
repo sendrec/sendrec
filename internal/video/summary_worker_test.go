@@ -68,8 +68,8 @@ func TestProcessNextSummary_SkipsTrivialTranscript(t *testing.T) {
 				AddRow("vid-1", transcriptJSON),
 		)
 
-	mock.ExpectExec(`UPDATE videos SET summary_status = 'failed'`).
-		WithArgs("vid-1").
+	mock.ExpectExec(`UPDATE videos SET summary_status =`).
+		WithArgs("too_short", "vid-1").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	processNextSummary(context.Background(), mock, ai)
@@ -273,8 +273,8 @@ func TestProcessNextSummary_AIFailure(t *testing.T) {
 		)
 
 	// Mark as failed
-	mock.ExpectExec(`UPDATE videos SET summary_status = 'failed'`).
-		WithArgs("vid-1").
+	mock.ExpectExec(`UPDATE videos SET summary_status =`).
+		WithArgs("failed", "vid-1").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	processNextSummary(context.Background(), mock, ai)

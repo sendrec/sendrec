@@ -1064,6 +1064,7 @@ export function VideoDetail() {
                 {video.summaryStatus === "pending" && "Pending..."}
                 {video.summaryStatus === "processing" && "Summarizing..."}
                 {video.summaryStatus === "ready" && "Ready"}
+                {video.summaryStatus === "too_short" && "Transcript too short"}
                 {video.summaryStatus === "failed" && "Failed"}
               </span>
               <button
