@@ -60,13 +60,13 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 	var segments []TranscriptSegment
 	if err := json.Unmarshal(transcriptJSON, &segments); err != nil {
 		slog.Error("summary-worker: failed to parse transcript", "video_id", videoID, "error", err)
-		markSummaryFailed(ctx, db, videoID)
+		markSummaryStatus(ctx, db, videoID, "failed")
 		return
 	}
 
 	if len(segments) < 2 {
 		slog.Warn("summary-worker: skipping video, insufficient segments", "video_id", videoID, "segments", len(segments))
-		markSummaryFailed(ctx, db, videoID)
+		markSummaryStatus(ctx, db, videoID, "too_short")
 		return
 	}
 
@@ -74,14 +74,14 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 	result, err := ai.GenerateSummary(ctx, transcript)
 	if err != nil {
 		slog.Error("summary-worker: AI generation failed", "video_id", videoID, "error", err)
-		markSummaryFailed(ctx, db, videoID)
+		markSummaryStatus(ctx, db, videoID, "failed")
 		return
 	}
 
 	chaptersJSON, err := json.Marshal(result.Chapters)
 	if err != nil {
 		slog.Error("summary-worker: failed to marshal chapters", "video_id", videoID, "error", err)
-		markSummaryFailed(ctx, db, videoID)
+		markSummaryStatus(ctx, db, videoID, "failed")
 		return
 	}
 
@@ -108,13 +108,13 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 	}
 }
 
-func markSummaryFailed(ctx context.Context, db database.DBTX, videoID string) {
+func markSummaryStatus(ctx context.Context, db database.DBTX, videoID, status string) {
 	if _, err := db.Exec(ctx,
-		`UPDATE videos SET summary_status = 'failed', summary_started_at = NULL, updated_at = now()
-		 WHERE id = $1`,
-		videoID,
+		`UPDATE videos SET summary_status = $1, summary_started_at = NULL, updated_at = now()
+		 WHERE id = $2`,
+		status, videoID,
 	); err != nil {
-		slog.Error("summary-worker: failed to mark video as failed", "video_id", videoID, "error", err)
+		slog.Error("summary-worker: failed to update summary status", "video_id", videoID, "status", status, "error", err)
 	}
 }
 
