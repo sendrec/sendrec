@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -291,6 +292,86 @@ func TestGenerateTitleTruncates(t *testing.T) {
 
 	if len(title) != 200 {
 		t.Errorf("title length = %d, want 200", len(title))
+	}
+}
+
+func TestGenerateDocument(t *testing.T) {
+	documentContent := "## Introduction\n\nThis video covers Go testing patterns.\n\n## Key Takeaways\n\n- Use table-driven tests\n- Mock external dependencies"
+
+	var receivedMessages []chatMessage
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var req chatRequest
+		_ = json.Unmarshal(body, &req)
+		receivedMessages = req.Messages
+
+		resp := chatResponse{
+			Choices: []chatChoice{
+				{Message: chatMessage{Role: "assistant", Content: documentContent}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewAIClient(server.URL, "test-key", "gpt-4", 0)
+	result, err := client.GenerateDocument(context.Background(), "[00:00] Hello world\n[00:45] Testing patterns")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != documentContent {
+		t.Errorf("document = %q, want %q", result, documentContent)
+	}
+
+	if len(receivedMessages) != 2 {
+		t.Fatalf("message count = %d, want 2", len(receivedMessages))
+	}
+
+	if receivedMessages[0].Role != "system" {
+		t.Errorf("messages[0].role = %q, want %q", receivedMessages[0].Role, "system")
+	}
+
+	if receivedMessages[0].Content != documentSystemPrompt {
+		t.Errorf("messages[0].content does not match documentSystemPrompt")
+	}
+
+	if receivedMessages[1].Content != "[00:00] Hello world\n[00:45] Testing patterns" {
+		t.Errorf("messages[1].content = %q, want transcript", receivedMessages[1].Content)
+	}
+}
+
+func TestGenerateDocument_StripsFences(t *testing.T) {
+	innerContent := "## Introduction\n\nThis is a document.\n\n## Key Takeaways\n\n- Point one"
+	fencedContent := "```markdown\n" + innerContent + "\n```"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := chatResponse{
+			Choices: []chatChoice{
+				{Message: chatMessage{Role: "assistant", Content: fencedContent}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewAIClient(server.URL, "key", "model", 0)
+	result, err := client.GenerateDocument(context.Background(), "transcript")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != innerContent {
+		t.Errorf("document = %q, want %q", result, innerContent)
+	}
+
+	if strings.Contains(result, "```") {
+		t.Errorf("result still contains markdown fences")
 	}
 }
 
