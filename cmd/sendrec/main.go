@@ -123,6 +123,7 @@ func main() {
 		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
 		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",
 		AiEnabled:               aiEnabled,
+		TranscriptionEnabled:    getEnv("TRANSCRIPTION_ENABLED", "false") == "true",
 		AllowedFrameAncestors:   os.Getenv("ALLOWED_FRAME_ANCESTORS"),
 		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
 		EmailSender:             emailClient,

@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { TrimModal } from "../components/TrimModal";
 import { FillerRemovalModal } from "../components/FillerRemovalModal";
+import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
 
 interface VideoTag {
   id: string;
@@ -34,6 +35,7 @@ interface Video {
   suggestedTitle: string | null;
   summaryStatus: string;
   folderId: string | null;
+  transcriptionLanguage: string | null;
   tags: VideoTag[];
   playlists: { id: string; title: string }[];
 }
@@ -66,6 +68,7 @@ interface LimitsResponse {
   videosUsedThisMonth: number;
   brandingEnabled: boolean;
   aiEnabled: boolean;
+  transcriptionEnabled: boolean;
 }
 
 interface VideoBranding {
@@ -125,6 +128,7 @@ export function VideoDetail() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
+  const [retranscribeLanguage, setRetranscribeLanguage] = useState("auto");
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
@@ -171,6 +175,9 @@ export function VideoDetail() {
           ]);
         const found = videos?.find((v) => v.id === id) ?? null;
         setVideo(found);
+        if (found?.transcriptionLanguage) {
+          setRetranscribeLanguage(found.transcriptionLanguage);
+        }
         setLimits(limitsData ?? null);
         setFolders(foldersData ?? []);
         setTags(tagsData ?? []);
@@ -356,7 +363,11 @@ export function VideoDetail() {
 
   async function retranscribe() {
     if (!video) return;
-    await apiFetch(`/api/videos/${video.id}/retranscribe`, { method: "POST" });
+    const body = retranscribeLanguage !== "auto" ? { language: retranscribeLanguage } : undefined;
+    await apiFetch(`/api/videos/${video.id}/retranscribe`, {
+      method: "POST",
+      ...(body && { body: JSON.stringify(body) }),
+    });
     setVideo((prev) =>
       prev ? { ...prev, transcriptStatus: "pending" } : prev,
     );
@@ -1021,20 +1032,25 @@ export function VideoDetail() {
               {video.transcriptStatus === "ready" && "Ready"}
               {video.transcriptStatus === "failed" && "Failed"}
             </span>
-            {video.transcriptStatus === "none" && (
-              <button onClick={retranscribe} className="detail-btn">
-                Transcribe
-              </button>
-            )}
-            {video.transcriptStatus === "ready" && (
-              <button onClick={retranscribe} className="detail-btn">
-                Redo transcript
-              </button>
-            )}
-            {video.transcriptStatus === "failed" && (
-              <button onClick={retranscribe} className="detail-btn">
-                Retry transcript
-              </button>
+            {(video.transcriptStatus === "none" || video.transcriptStatus === "ready" || video.transcriptStatus === "failed") && (
+              <>
+                {limits?.transcriptionEnabled && (
+                  <select
+                    aria-label="Transcription language"
+                    value={retranscribeLanguage}
+                    onChange={(e) => setRetranscribeLanguage(e.target.value)}
+                    className="detail-select"
+                  >
+                    {TRANSCRIPTION_LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>{lang.name}</option>
+                    ))}
+                  </select>
+                )}
+                <button onClick={retranscribe} className="detail-btn">
+                  {video.transcriptStatus === "none" ? "Transcribe" :
+                   video.transcriptStatus === "ready" ? "Redo transcript" : "Retry transcript"}
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -1053,12 +1069,14 @@ export function VideoDetail() {
               <button
                 onClick={summarize}
                 disabled={
+                  video.transcriptStatus !== "ready" ||
                   video.summaryStatus === "pending" ||
                   video.summaryStatus === "processing"
                 }
                 className="detail-btn"
                 style={{
                   opacity:
+                    video.transcriptStatus !== "ready" ||
                     video.summaryStatus === "pending" ||
                     video.summaryStatus === "processing"
                       ? 0.5

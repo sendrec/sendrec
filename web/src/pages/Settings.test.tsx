@@ -1070,4 +1070,58 @@ describe("Settings", () => {
       });
     });
   });
+
+  it("shows transcription language dropdown when transcription is enabled", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", transcriptionLanguage: "auto" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: true })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")); // billing
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Default transcription language")).toBeInTheDocument();
+    });
+  });
+
+  it("hides transcription section when transcription is disabled", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", transcriptionLanguage: "auto" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")); // billing
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Default transcription language")).not.toBeInTheDocument();
+  });
+
+  it("saves transcription language preference", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", transcriptionLanguage: "auto" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: true })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce({ message: "Settings updated" }); // PATCH /api/user
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Default transcription language")).toBeInTheDocument();
+    });
+
+    const select = screen.getByRole("combobox", { name: /default transcription language/i });
+    await userEvent.selectOptions(select, "de");
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/user", expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ transcriptionLanguage: "de" }),
+      }));
+    });
+  });
 });

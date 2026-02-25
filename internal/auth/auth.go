@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/languages"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -526,8 +527,9 @@ func (h *Handler) ResendConfirmation(w http.ResponseWriter, r *http.Request) {
 }
 
 type userResponse struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name                  string `json:"name"`
+	Email                 string `json:"email"`
+	TranscriptionLanguage string `json:"transcriptionLanguage"`
 }
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
@@ -535,8 +537,8 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	var resp userResponse
 	err := h.db.QueryRow(r.Context(),
-		"SELECT name, email FROM users WHERE id = $1", userID,
-	).Scan(&resp.Name, &resp.Email)
+		"SELECT name, email, transcription_language FROM users WHERE id = $1", userID,
+	).Scan(&resp.Name, &resp.Email, &resp.TranscriptionLanguage)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "user not found")
 		return
@@ -546,9 +548,10 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateUserRequest struct {
-	Name            string `json:"name"`
-	CurrentPassword string `json:"currentPassword"`
-	NewPassword     string `json:"newPassword"`
+	Name                  string `json:"name"`
+	CurrentPassword       string `json:"currentPassword"`
+	NewPassword           string `json:"newPassword"`
+	TranscriptionLanguage string `json:"transcriptionLanguage"`
 }
 
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -561,10 +564,25 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	userID := UserIDFromContext(r.Context())
 	hasNameChange := req.Name != ""
 	hasPasswordChange := req.NewPassword != ""
+	hasLanguageChange := req.TranscriptionLanguage != ""
 
-	if !hasNameChange && !hasPasswordChange {
+	if !hasNameChange && !hasPasswordChange && !hasLanguageChange {
 		httputil.WriteError(w, http.StatusBadRequest, "nothing to update")
 		return
+	}
+
+	if hasLanguageChange {
+		if !languages.IsValidTranscriptionLanguage(req.TranscriptionLanguage) {
+			httputil.WriteError(w, http.StatusBadRequest, "invalid transcription language")
+			return
+		}
+		if _, err := h.db.Exec(r.Context(),
+			"UPDATE users SET transcription_language = $1, updated_at = now() WHERE id = $2",
+			req.TranscriptionLanguage, userID,
+		); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update transcription language")
+			return
+		}
 	}
 
 	if hasPasswordChange {

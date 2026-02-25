@@ -20,6 +20,7 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/email"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/languages"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
@@ -65,6 +66,7 @@ type Handler struct {
 	brandingEnabled         bool
 	analyticsScript         string
 	aiEnabled               bool
+	transcriptionEnabled    bool
 	webhookClient           *webhook.Client
 }
 
@@ -90,6 +92,10 @@ func (h *Handler) SetAnalyticsScript(script string) {
 
 func (h *Handler) SetAIEnabled(enabled bool) {
 	h.aiEnabled = enabled
+}
+
+func (h *Handler) SetTranscriptionEnabled(enabled bool) {
+	h.transcriptionEnabled = enabled
 }
 
 func (h *Handler) SetWebhookClient(c *webhook.Client) {
@@ -185,10 +191,11 @@ type listItem struct {
 	CtaUrl            *string `json:"ctaUrl"`
 	EmailGateEnabled  bool          `json:"emailGateEnabled"`
 	SummaryStatus     string        `json:"summaryStatus"`
-	SuggestedTitle    *string       `json:"suggestedTitle"`
-	FolderID          *string            `json:"folderId"`
-	Tags              []listItemTag      `json:"tags"`
-	Playlists         []listItemPlaylist `json:"playlists"`
+	SuggestedTitle         *string       `json:"suggestedTitle"`
+	FolderID               *string            `json:"folderId"`
+	TranscriptionLanguage  *string            `json:"transcriptionLanguage"`
+	Tags                   []listItemTag      `json:"tags"`
+	Playlists              []listItemPlaylist `json:"playlists"`
 }
 
 type listItemTag struct {
@@ -473,6 +480,7 @@ type limitsResponse struct {
 	VideosUsedThisMonth     int  `json:"videosUsedThisMonth"`
 	BrandingEnabled         bool `json:"brandingEnabled"`
 	AiEnabled               bool `json:"aiEnabled"`
+	TranscriptionEnabled    bool `json:"transcriptionEnabled"`
 	MaxPlaylists            int  `json:"maxPlaylists"`
 	PlaylistsUsed           int  `json:"playlistsUsed"`
 }
@@ -516,6 +524,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		VideosUsedThisMonth:     videosUsed,
 		BrandingEnabled:         h.brandingEnabled,
 		AiEnabled:               h.aiEnabled,
+		TranscriptionEnabled:    h.transcriptionEnabled,
 		MaxPlaylists:            maxPlaylists,
 		PlaylistsUsed:           playlistsUsed,
 	})
@@ -695,7 +704,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
 		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled, v.summary_status,
-		    v.suggested_title, v.folder_id,
+		    v.suggested_title, v.folder_id, v.transcription_language,
 		    COALESCE((SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY t.name)
 		      FROM video_tags vt JOIN tags t ON t.id = vt.tag_id
 		      WHERE vt.video_id = v.id), '[]'::json) AS tags_json,
@@ -757,7 +766,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var sharePassword *string
 		var tagsJSON string
 		var playlistsJSON string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.SuggestedTitle, &item.FolderID, &tagsJSON, &playlistsJSON); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.SuggestedTitle, &item.FolderID, &item.TranscriptionLanguage, &tagsJSON, &playlistsJSON); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}
@@ -1572,9 +1581,21 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+type retranscribeRequest struct {
+	Language string `json:"language"`
+}
+
 func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
+
+	var req retranscribeRequest
+	if r.Body != nil && r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+	}
 
 	var exists bool
 	err := h.db.QueryRow(r.Context(),
@@ -1585,6 +1606,20 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
+	}
+
+	if req.Language != "" {
+		if !languages.IsValidTranscriptionLanguage(req.Language) {
+			httputil.WriteError(w, http.StatusBadRequest, "invalid transcription language")
+			return
+		}
+		if _, err := h.db.Exec(r.Context(),
+			`UPDATE videos SET transcription_language = $1, updated_at = now() WHERE id = $2 AND user_id = $3`,
+			req.Language, videoID, userID,
+		); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to set language")
+			return
+		}
 	}
 
 	if err := EnqueueTranscription(r.Context(), h.db, videoID); err != nil {

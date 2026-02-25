@@ -1337,9 +1337,9 @@ func TestGetUser_Success(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT name, email FROM users WHERE id = \$1`).
+	mock.ExpectQuery(`SELECT name, email, transcription_language FROM users WHERE id = \$1`).
 		WithArgs("user-uuid-1").
-		WillReturnRows(pgxmock.NewRows([]string{"name", "email"}).AddRow("Alice", "alice@example.com"))
+		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language"}).AddRow("Alice", "alice@example.com", "auto"))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/user", nil)
 	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
@@ -1374,7 +1374,7 @@ func TestGetUser_NotFound(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT name, email FROM users WHERE id = \$1`).
+	mock.ExpectQuery(`SELECT name, email, transcription_language FROM users WHERE id = \$1`).
 		WithArgs("missing-id").
 		WillReturnError(pgx.ErrNoRows)
 
@@ -1509,6 +1509,76 @@ func TestUpdateUser_EmptyBody(t *testing.T) {
 	defer mock.Close()
 
 	body := `{}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/user", strings.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
+	rec := httptest.NewRecorder()
+
+	handler.UpdateUser(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestGetUser_IncludesTranscriptionLanguage(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT name, email, transcription_language FROM users WHERE id = \$1`).
+		WithArgs("user-uuid-1").
+		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language"}).
+			AddRow("Alice", "alice@example.com", "de"))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/user", nil)
+	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
+	rec := httptest.NewRecorder()
+
+	handler.GetUser(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		TranscriptionLanguage string `json:"transcriptionLanguage"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.TranscriptionLanguage != "de" {
+		t.Errorf("expected transcriptionLanguage %q, got %q", "de", resp.TranscriptionLanguage)
+	}
+}
+
+func TestUpdateUser_ChangeTranscriptionLanguage(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectExec(`UPDATE users SET transcription_language = \$1, updated_at = now\(\) WHERE id = \$2`).
+		WithArgs("fr", "user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := `{"transcriptionLanguage":"fr"}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/user", strings.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
+	rec := httptest.NewRecorder()
+
+	handler.UpdateUser(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+func TestUpdateUser_InvalidTranscriptionLanguage(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	body := `{"transcriptionLanguage":"invalid"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/user", strings.NewReader(body))
 	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
 	rec := httptest.NewRecorder()
