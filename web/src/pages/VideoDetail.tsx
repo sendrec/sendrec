@@ -152,6 +152,7 @@ export function VideoDetail() {
   const [showFillerModal, setShowFillerModal] = useState(false);
   const [showSilenceModal, setShowSilenceModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [documentContent, setDocumentContent] = useState<string | null>(null);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
@@ -387,6 +388,15 @@ export function VideoDetail() {
       prev ? { ...prev, summaryStatus: "pending" } : prev,
     );
     showToast("Summary queued");
+  }
+
+  async function viewDocument() {
+    if (!video) return;
+    const data = await apiFetch<{ document?: string }>(`/api/watch/${video.shareToken}`);
+    if (data?.document) {
+      setDocumentContent(data.document);
+      setShowDocumentModal(true);
+    }
   }
 
   async function generateDocument() {
@@ -1133,7 +1143,7 @@ export function VideoDetail() {
               {video.documentStatus === "ready" ? (
                 <>
                   <button
-                    onClick={() => setShowDocumentModal(true)}
+                    onClick={viewDocument}
                     className="detail-btn detail-btn--accent"
                   >
                     View
@@ -1715,10 +1725,10 @@ export function VideoDetail() {
       )}
 
       {/* Document Modal */}
-      {showDocumentModal && video.document && (
+      {showDocumentModal && documentContent && (
         <DocumentModal
-          document={video.document}
-          onClose={() => setShowDocumentModal(false)}
+          document={documentContent}
+          onClose={() => { setShowDocumentModal(false); setDocumentContent(null); }}
         />
       )}
 
