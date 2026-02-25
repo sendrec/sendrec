@@ -4,7 +4,7 @@ name: SendRec
 applicationSuite: SendRec
 url: "https://github.com/sendrec/sendrec"
 landingURL: "https://sendrec.eu"
-softwareVersion: "1.65.2"
+softwareVersion: "1.65.4"
 releaseDate: "2026-02-25"
 logo: ".github/screenshots/landing-hero.png"
 platforms:
@@ -45,6 +45,7 @@ description:
       - Screen and camera recording in the browser (Chrome, Safari, Firefox)
       - Automatic transcription in 99 languages via whisper.cpp
       - AI-generated summaries and chapter markers
+      - Automatic silence and filler word removal
       - Shareable links with password protection and expiry dates
       - Timestamped comments and emoji reactions
       - Video playlists with auto-advance and shared watch pages
