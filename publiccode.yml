@@ -1,0 +1,86 @@
+publiccodeYmlVersion: "0.4"
+
+name: SendRec
+applicationSuite: SendRec
+url: "https://github.com/sendrec/sendrec"
+landingURL: "https://sendrec.eu"
+softwareVersion: "1.65.2"
+releaseDate: "2026-02-25"
+logo: ".github/screenshots/landing-hero.png"
+platforms:
+  - web
+
+categories:
+  - collaboration
+  - communications
+  - content-management
+  - knowledge-management
+
+developmentStatus: stable
+
+softwareType: standalone/web
+
+description:
+  en:
+    localisedName: SendRec
+    shortDescription: >-
+      Open-source async video messaging platform built for Europe. GDPR native, EU hosted.
+    longDescription: >-
+      SendRec is an open-source alternative to Loom for teams that need their
+      data to stay in the EU. Record your screen, camera, or both directly in
+      the browser. Upload videos via drag and drop. Share with expiring links,
+      password protection, and download controls.
+
+
+      Every video gets automatic transcription via whisper.cpp with support for
+      99 languages, AI-generated summaries and chapter markers, timestamped
+      comments, emoji reactions, and per-video analytics with viewer engagement
+      heatmaps.
+
+
+      Self-host with a single Go binary, Docker Compose, PostgreSQL, and any
+      S3-compatible storage. No vendor lock-in, no third-party tracking, full
+      data sovereignty.
+    features:
+      - Screen and camera recording in the browser (Chrome, Safari, Firefox)
+      - Automatic transcription in 99 languages via whisper.cpp
+      - AI-generated summaries and chapter markers
+      - Shareable links with password protection and expiry dates
+      - Timestamped comments and emoji reactions
+      - Video playlists with auto-advance and shared watch pages
+      - Per-video analytics with viewer engagement heatmaps
+      - Custom branding with logo, colors, and CSS injection
+      - Embeddable player for docs and wikis
+      - Folders, tags, and full-text transcript search
+      - Generic webhooks and Slack notifications
+      - Self-hostable with Docker Compose
+    screenshots:
+      - ".github/screenshots/recording.png"
+      - ".github/screenshots/library.png"
+      - ".github/screenshots/watch.png"
+      - ".github/screenshots/analytics.png"
+
+legal:
+  license: AGPL-3.0-only
+  repoOwner: SendRec
+
+maintenance:
+  type: internal
+  contacts:
+    - name: Alex Neamtu
+      email: alex@sendrec.eu
+
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
+
+dependsOn:
+  open:
+    - name: PostgreSQL
+      versionMin: "15"
+    - name: Go
+      versionMin: "1.25"
+    - name: Node.js
+      versionMin: "22"
+  proprietary: []
