@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { TrimModal } from "../components/TrimModal";
 import { FillerRemovalModal } from "../components/FillerRemovalModal";
+import { SilenceRemovalModal } from "../components/SilenceRemovalModal";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
 
 interface VideoTag {
@@ -146,6 +147,7 @@ export function VideoDetail() {
 
   const [showTrimModal, setShowTrimModal] = useState(false);
   const [showFillerModal, setShowFillerModal] = useState(false);
+  const [showSilenceModal, setShowSilenceModal] = useState(false);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
@@ -1141,6 +1143,18 @@ export function VideoDetail() {
             </button>
           </div>
         )}
+
+        {video.status === "ready" && (
+          <div className="detail-setting-row">
+            <span className="detail-setting-label">Silence</span>
+            <button
+              onClick={() => setShowSilenceModal(true)}
+              className="detail-btn"
+            >
+              Remove silence
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Section 3: Customization */}
@@ -1604,6 +1618,23 @@ export function VideoDetail() {
             );
             setShowFillerModal(false);
             showToast("Removing filler words...");
+          }}
+        />
+      )}
+
+      {/* Silence Removal Modal */}
+      {showSilenceModal && (
+        <SilenceRemovalModal
+          videoId={video.id}
+          shareToken={video.shareToken}
+          duration={video.duration}
+          onClose={() => setShowSilenceModal(false)}
+          onRemovalStarted={() => {
+            setVideo((prev) =>
+              prev ? { ...prev, status: "processing" } : prev,
+            );
+            setShowSilenceModal(false);
+            showToast("Removing silent pauses...");
           }}
         />
       )}
