@@ -4,8 +4,8 @@ name: SendRec
 applicationSuite: SendRec
 url: "https://github.com/sendrec/sendrec"
 landingURL: "https://sendrec.eu"
-softwareVersion: "1.65.4"
-releaseDate: "2026-02-25"
+softwareVersion: "1.65.7"
+releaseDate: "2026-02-26"
 logo: ".github/screenshots/landing-hero.png"
 platforms:
   - web
