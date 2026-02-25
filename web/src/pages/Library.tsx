@@ -698,6 +698,11 @@ export function Library() {
                   }}
                 >
                   {formatDuration(video.duration)} &middot; {formatDate(video.createdAt)}
+                  {video.transcriptStatus === "no_audio" && (
+                    <span style={{ color: "var(--color-text-secondary)", marginLeft: 8, opacity: 0.7 }}>
+                      &middot; No audio
+                    </span>
+                  )}
                   {video.status === "uploading" && (
                     <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
                       uploading...
