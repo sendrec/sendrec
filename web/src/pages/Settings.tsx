@@ -1,10 +1,12 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
+import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
 
 interface UserProfile {
   name: string;
   email: string;
+  transcriptionLanguage?: string;
 }
 
 interface APIKeyItem {
@@ -98,6 +100,8 @@ export function Settings() {
   const [upgrading, setUpgrading] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [billingMessage, setBillingMessage] = useState("");
+  const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
+  const [transcriptionLanguage, setTranscriptionLanguage] = useState("auto");
 
   useEffect(() => {
     async function fetchProfile() {
@@ -105,12 +109,15 @@ export function Settings() {
         const [result, notifPrefs, limits, keys] = await Promise.all([
           apiFetch<UserProfile>("/api/user"),
           apiFetch<{ notificationMode: string; slackWebhookUrl: string | null; webhookUrl: string | null; webhookSecret: string | null }>("/api/settings/notifications"),
-          apiFetch<{ brandingEnabled: boolean }>("/api/videos/limits"),
+          apiFetch<{ brandingEnabled: boolean; transcriptionEnabled: boolean }>("/api/videos/limits"),
           apiFetch<APIKeyItem[]>("/api/settings/api-keys"),
         ]);
         if (result) {
           setProfile(result);
           setName(result.name);
+          if (result.transcriptionLanguage) {
+            setTranscriptionLanguage(result.transcriptionLanguage);
+          }
         }
         if (notifPrefs) {
           setNotificationMode(notifPrefs.notificationMode);
@@ -128,6 +135,9 @@ export function Settings() {
         }
         if (keys) {
           setApiKeys(keys);
+        }
+        if (limits?.transcriptionEnabled) {
+          setTranscriptionEnabled(true);
         }
         if (limits?.brandingEnabled) {
           setBrandingEnabled(true);
@@ -494,6 +504,19 @@ export function Settings() {
     width: "100%",
   };
 
+  async function handleTranscriptionLanguageChange(value: string) {
+    const previous = transcriptionLanguage;
+    setTranscriptionLanguage(value);
+    try {
+      await apiFetch("/api/user", {
+        method: "PATCH",
+        body: JSON.stringify({ transcriptionLanguage: value }),
+      });
+    } catch {
+      setTranscriptionLanguage(previous);
+    }
+  }
+
   return (
     <div className="page-container">
       <h1 style={{ color: "var(--color-text)", fontSize: 24, marginBottom: 24 }}>
@@ -730,6 +753,39 @@ export function Settings() {
           })}
         </fieldset>
       </div>
+
+      {transcriptionEnabled && (
+        <div
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            padding: 24,
+            marginBottom: 24,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Transcription</h2>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+            Choose the default language for video transcription.
+          </p>
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Default transcription language</span>
+            <select
+              id="transcription-language"
+              value={transcriptionLanguage}
+              onChange={(e) => handleTranscriptionLanguageChange(e.target.value)}
+              style={inputStyle}
+            >
+              {TRANSCRIPTION_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>{lang.name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       <div
         style={{
