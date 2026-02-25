@@ -45,8 +45,8 @@ func TestProcessNextDocument_Success(t *testing.T) {
 	// Claim next pending job
 	mock.ExpectQuery(`UPDATE videos SET document_status = 'processing'`).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "transcript_json"}).
-				AddRow("vid-1", transcriptJSON),
+			pgxmock.NewRows([]string{"id", "transcript_json", "transcription_language"}).
+				AddRow("vid-1", transcriptJSON, nil),
 		)
 
 	// Save document result
@@ -74,7 +74,7 @@ func TestProcessNextDocument_NoPendingJobs(t *testing.T) {
 
 	// Claim query returns no rows
 	mock.ExpectQuery(`UPDATE videos SET document_status = 'processing'`).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "transcript_json"}))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "transcript_json", "transcription_language"}))
 
 	processNextDocument(context.Background(), mock, nil)
 

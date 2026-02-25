@@ -317,7 +317,7 @@ func TestGenerateDocument(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "test-key", "gpt-4", 0)
-	result, err := client.GenerateDocument(context.Background(), "[00:00] Hello world\n[00:45] Testing patterns")
+	result, err := client.GenerateDocument(context.Background(), "[00:00] Hello world\n[00:45] Testing patterns", "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -336,7 +336,7 @@ func TestGenerateDocument(t *testing.T) {
 	}
 
 	if receivedMessages[0].Content != documentSystemPrompt {
-		t.Errorf("messages[0].content does not match documentSystemPrompt")
+		t.Errorf("system prompt should be unmodified when no language specified")
 	}
 
 	if receivedMessages[1].Content != "[00:00] Hello world\n[00:45] Testing patterns" {
@@ -360,7 +360,7 @@ func TestGenerateDocument_StripsFences(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "key", "model", 0)
-	result, err := client.GenerateDocument(context.Background(), "transcript")
+	result, err := client.GenerateDocument(context.Background(), "transcript", "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -372,6 +372,35 @@ func TestGenerateDocument_StripsFences(t *testing.T) {
 
 	if strings.Contains(result, "```") {
 		t.Errorf("result still contains markdown fences")
+	}
+}
+
+func TestGenerateDocument_WithLanguage(t *testing.T) {
+	var receivedPrompt string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req chatRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		receivedPrompt = req.Messages[0].Content
+
+		resp := chatResponse{
+			Choices: []chatChoice{
+				{Message: chatMessage{Role: "assistant", Content: "## Document"}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewAIClient(server.URL, "key", "model", 0)
+	_, err := client.GenerateDocument(context.Background(), "transcript", "Romanian")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(receivedPrompt, "Romanian") {
+		t.Errorf("system prompt should contain language name, got: %s", receivedPrompt)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/languages"
 )
 
 func processNextDocument(ctx context.Context, db database.DBTX, ai *AIClient) {
@@ -22,6 +23,7 @@ func processNextDocument(ctx context.Context, db database.DBTX, ai *AIClient) {
 
 	var videoID string
 	var transcriptJSON []byte
+	var language *string
 	err := db.QueryRow(ctx,
 		`UPDATE videos SET document_status = 'processing', document_started_at = now(), updated_at = now()
 		 WHERE id = (
@@ -30,8 +32,8 @@ func processNextDocument(ctx context.Context, db database.DBTX, ai *AIClient) {
 		     ORDER BY updated_at ASC LIMIT 1
 		     FOR UPDATE SKIP LOCKED
 		 )
-		 RETURNING id, transcript_json`,
-	).Scan(&videoID, &transcriptJSON)
+		 RETURNING id, transcript_json, transcription_language`,
+	).Scan(&videoID, &transcriptJSON, &language)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			slog.Error("document-worker: failed to claim job", "error", err)
@@ -53,7 +55,13 @@ func processNextDocument(ctx context.Context, db database.DBTX, ai *AIClient) {
 	}
 
 	transcript := formatTranscriptForLLM(segments)
-	document, err := ai.GenerateDocument(ctx, transcript)
+
+	var langName string
+	if language != nil && *language != "" && *language != "auto" {
+		langName = languages.LanguageName(*language)
+	}
+
+	document, err := ai.GenerateDocument(ctx, transcript, langName)
 	if err != nil {
 		slog.Error("document-worker: AI generation failed", "video_id", videoID, "error", err)
 		markDocumentStatus(ctx, db, videoID, "failed")

@@ -206,11 +206,16 @@ Guidelines:
 - Write EVERYTHING in the same language as the transcript, including ALL headings, section titles, and bullet points — do not use any English words if the transcript is not in English
 - Return ONLY markdown, no explanations or meta-commentary`
 
-func (c *AIClient) GenerateDocument(ctx context.Context, transcript string) (string, error) {
+func (c *AIClient) GenerateDocument(ctx context.Context, transcript, language string) (string, error) {
+	prompt := documentSystemPrompt
+	if language != "" {
+		prompt += fmt.Sprintf("\n- The transcript language is %s. Write the entire document in %s.", language, language)
+	}
+
 	reqBody := chatRequest{
 		Model: c.model,
 		Messages: []chatMessage{
-			{Role: "system", Content: documentSystemPrompt},
+			{Role: "system", Content: prompt},
 			{Role: "user", Content: transcript},
 		},
 	}

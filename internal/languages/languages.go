@@ -109,6 +109,13 @@ var transcriptionLanguageMap = map[string]string{
 	"zh":   "Chinese",
 }
 
+func LanguageName(code string) string {
+	if name, ok := transcriptionLanguageMap[code]; ok {
+		return name
+	}
+	return ""
+}
+
 func IsValidTranscriptionLanguage(code string) bool {
 	_, ok := transcriptionLanguageMap[code]
 	return ok
