@@ -1030,9 +1030,10 @@ export function VideoDetail() {
               {video.transcriptStatus === "pending" && "Pending..."}
               {video.transcriptStatus === "processing" && "Transcribing..."}
               {video.transcriptStatus === "ready" && "Ready"}
+              {video.transcriptStatus === "no_audio" && "No audio"}
               {video.transcriptStatus === "failed" && "Failed"}
             </span>
-            {(video.transcriptStatus === "none" || video.transcriptStatus === "ready" || video.transcriptStatus === "failed") && (
+            {(video.transcriptStatus === "none" || video.transcriptStatus === "ready" || video.transcriptStatus === "failed" || video.transcriptStatus === "no_audio") && (
               <>
                 {limits?.transcriptionEnabled && (
                   <select
