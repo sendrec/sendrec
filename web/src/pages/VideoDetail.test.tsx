@@ -54,6 +54,19 @@ vi.mock("../components/SilenceRemovalModal", () => ({
   ),
 }));
 
+vi.mock("../components/DocumentModal", () => ({
+  DocumentModal: ({
+    onClose,
+  }: {
+    document: string;
+    onClose: () => void;
+  }) => (
+    <div data-testid="document-modal">
+      <button onClick={onClose}>Close document modal</button>
+    </div>
+  ),
+}));
+
 function makeVideo(overrides: Record<string, unknown> = {}) {
   return {
     id: "v1",
@@ -78,6 +91,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     ctaUrl: null,
     suggestedTitle: null,
     summaryStatus: "none",
+    documentStatus: "none",
     folderId: null,
     transcriptionLanguage: null,
     tags: [],
@@ -1362,5 +1376,30 @@ describe("VideoDetail", () => {
     });
 
     expect(screen.getByText("Summarize")).toBeDisabled();
+  });
+
+  it("shows generate document button when AI enabled and transcript ready", async () => {
+    setupDefaultMocks({
+      video: makeVideo({ transcriptStatus: "ready", documentStatus: "none" }),
+      limits: { ...defaultLimits, aiEnabled: true },
+    });
+    renderVideoDetail();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Generate" })).toBeInTheDocument();
+    });
+  });
+
+  it("shows view and regenerate buttons when document is ready", async () => {
+    setupDefaultMocks({
+      video: makeVideo({ transcriptStatus: "ready", documentStatus: "ready", document: "## Doc" }),
+      limits: { ...defaultLimits, aiEnabled: true },
+    });
+    renderVideoDetail();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "View" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Regenerate" })).toBeInTheDocument();
+    });
   });
 });

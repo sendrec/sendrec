@@ -4,6 +4,7 @@ import { apiFetch } from "../api/client";
 import { TrimModal } from "../components/TrimModal";
 import { FillerRemovalModal } from "../components/FillerRemovalModal";
 import { SilenceRemovalModal } from "../components/SilenceRemovalModal";
+import { DocumentModal } from "../components/DocumentModal";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
 
 interface VideoTag {
@@ -35,6 +36,8 @@ interface Video {
   ctaUrl: string | null;
   suggestedTitle: string | null;
   summaryStatus: string;
+  document?: string;
+  documentStatus: string;
   folderId: string | null;
   transcriptionLanguage: string | null;
   tags: VideoTag[];
@@ -148,6 +151,7 @@ export function VideoDetail() {
   const [showTrimModal, setShowTrimModal] = useState(false);
   const [showFillerModal, setShowFillerModal] = useState(false);
   const [showSilenceModal, setShowSilenceModal] = useState(false);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
@@ -384,6 +388,25 @@ export function VideoDetail() {
     );
     showToast("Summary queued");
   }
+
+  async function generateDocument() {
+    if (!video) return;
+    await apiFetch(`/api/videos/${video.id}/generate-document`, { method: "POST" });
+    setVideo((prev) =>
+      prev ? { ...prev, documentStatus: "pending" } : prev,
+    );
+    showToast("Document generation queued");
+  }
+
+  useEffect(() => {
+    if (
+      video?.documentStatus === "pending" ||
+      video?.documentStatus === "processing"
+    ) {
+      const interval = setInterval(() => refetchVideo(), 3000);
+      return () => clearInterval(interval);
+    }
+  }, [video?.documentStatus]);
 
   async function acceptSuggestedTitle() {
     if (!video || !video.suggestedTitle) return;
@@ -1095,6 +1118,57 @@ export function VideoDetail() {
           </div>
         )}
 
+        {limits?.aiEnabled && (
+          <div className="detail-setting-row">
+            <span className="detail-setting-label">Document</span>
+            <div className="detail-setting-value">
+              <span>
+                {video.documentStatus === "none" && "Not generated"}
+                {video.documentStatus === "pending" && "Pending..."}
+                {video.documentStatus === "processing" && "Generating..."}
+                {video.documentStatus === "ready" && "Ready"}
+                {video.documentStatus === "failed" && "Failed"}
+              </span>
+              {video.documentStatus === "ready" ? (
+                <>
+                  <button
+                    onClick={() => setShowDocumentModal(true)}
+                    className="detail-btn detail-btn--accent"
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={generateDocument}
+                    className="detail-btn"
+                  >
+                    Regenerate
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={generateDocument}
+                  disabled={
+                    video.transcriptStatus !== "ready" ||
+                    video.documentStatus === "pending" ||
+                    video.documentStatus === "processing"
+                  }
+                  className="detail-btn"
+                  style={{
+                    opacity:
+                      video.transcriptStatus !== "ready" ||
+                      video.documentStatus === "pending" ||
+                      video.documentStatus === "processing"
+                        ? 0.5
+                        : undefined,
+                  }}
+                >
+                  Generate
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {video.suggestedTitle && (
           <div className="detail-setting-row">
             <span className="detail-setting-label">Suggested title</span>
@@ -1636,6 +1710,14 @@ export function VideoDetail() {
             setShowSilenceModal(false);
             showToast("Removing silent pauses...");
           }}
+        />
+      )}
+
+      {/* Document Modal */}
+      {showDocumentModal && video.document && (
+        <DocumentModal
+          document={video.document}
+          onClose={() => setShowDocumentModal(false)}
         />
       )}
 
