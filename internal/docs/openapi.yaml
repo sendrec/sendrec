@@ -3567,6 +3567,79 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/videos/{id}/detect-silence:
+    post:
+      tags: [Videos]
+      summary: Detect silence in video
+      description: Runs ffmpeg silencedetect on the video and returns detected silent segments. The video must be in "ready" status.
+      operationId: detectSilence
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                noiseDB:
+                  type: integer
+                  description: Noise threshold in dB (negative, e.g. -30). Default -30.
+                  default: -30
+                minDuration:
+                  type: number
+                  description: Minimum silence duration in seconds. Default 1.0.
+                  default: 1.0
+      responses:
+        "200":
+          description: Detected silence segments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  segments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        start:
+                          type: number
+                          description: Silence start time in seconds
+                        end:
+                          type: number
+                          description: Silence end time in seconds
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Video is currently being processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/videos/{id}/dismiss-title:
     put:
       tags: [Videos]
