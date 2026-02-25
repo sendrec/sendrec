@@ -20,6 +20,7 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/email"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/languages"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
@@ -1572,9 +1573,21 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+type retranscribeRequest struct {
+	Language string `json:"language"`
+}
+
 func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
+
+	var req retranscribeRequest
+	if r.Body != nil && r.ContentLength > 0 {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+	}
 
 	var exists bool
 	err := h.db.QueryRow(r.Context(),
@@ -1585,6 +1598,20 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
+	}
+
+	if req.Language != "" {
+		if !languages.IsValidTranscriptionLanguage(req.Language) {
+			httputil.WriteError(w, http.StatusBadRequest, "invalid transcription language")
+			return
+		}
+		if _, err := h.db.Exec(r.Context(),
+			`UPDATE videos SET transcription_language = $1, updated_at = now() WHERE id = $2 AND user_id = $3`,
+			req.Language, videoID, userID,
+		); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to set language")
+			return
+		}
 	}
 
 	if err := EnqueueTranscription(r.Context(), h.db, videoID); err != nil {
