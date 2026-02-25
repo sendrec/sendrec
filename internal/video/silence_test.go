@@ -1,7 +1,13 @@
 package video
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/pashagolub/pgxmock/v4"
 )
 
 func TestParseSilenceDetectOutput(t *testing.T) {
@@ -54,5 +60,68 @@ func TestParseSilenceDetectOutput_OnlyUnpairedStart(t *testing.T) {
 	segments := parseSilenceDetectOutput(stderr)
 	if len(segments) != 0 {
 		t.Fatalf("expected 0 segments (orphan start discarded), got %d", len(segments))
+	}
+}
+
+func TestDetectSilence_VideoNotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	videoID := "nonexistent-id"
+
+	mock.ExpectQuery(`SELECT duration, file_key, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
+		WithArgs(videoID, testUserID).
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/detect-silence", handler.DetectSilence)
+
+	body := []byte(`{}`)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos/"+videoID+"/detect-silence", body))
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestDetectSilence_VideoNotReady(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-123"
+
+	mock.ExpectQuery(`SELECT duration, file_key, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "status", "content_type"}).
+			AddRow(120, "recordings/user/video.webm", "processing", "video/webm"))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/detect-silence", handler.DetectSilence)
+
+	body := []byte(`{}`)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos/"+videoID+"/detect-silence", body))
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("expected status %d, got %d: %s", http.StatusConflict, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
 }
