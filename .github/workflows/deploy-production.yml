@@ -42,18 +42,24 @@ jobs:
         run: |
           VERSION="${TAG_NAME#v}"
           DATE="$(date -u +%Y-%m-%d)"
-          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" repo
-          cd repo
-          sed -i "s/^softwareVersion: .*/softwareVersion: \"${VERSION}\"/" publiccode.yml
-          sed -i "s/^releaseDate: .*/releaseDate: \"${DATE}\"/" publiccode.yml
-          if git diff --quiet publiccode.yml; then
+
+          # Fetch current file to get its SHA and content
+          RESPONSE=$(gh api repos/${{ github.repository }}/contents/publiccode.yml --jq '{sha: .sha, content: .content}')
+          FILE_SHA=$(echo "$RESPONSE" | jq -r '.sha')
+          CURRENT=$(echo "$RESPONSE" | jq -r '.content' | base64 -d)
+
+          # Apply version and date updates
+          UPDATED=$(echo "$CURRENT" | sed "s/^softwareVersion: .*/softwareVersion: \"${VERSION}\"/" | sed "s/^releaseDate: .*/releaseDate: \"${DATE}\"/")
+
+          if [ "$CURRENT" = "$UPDATED" ]; then
             echo "publiccode.yml already up to date"
           else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add publiccode.yml
-            git commit -m "chore: update publiccode.yml to ${VERSION}"
-            git push origin main
+            NEW_CONTENT=$(echo "$UPDATED" | base64 -w 0)
+            gh api --method PUT repos/${{ github.repository }}/contents/publiccode.yml \
+              -f message="chore: update publiccode.yml to ${VERSION}" \
+              -f content="$NEW_CONTENT" \
+              -f sha="$FILE_SHA" \
+              -f branch="main"
           fi
 
       - name: Create GitHub Release
