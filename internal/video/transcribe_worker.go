@@ -40,7 +40,7 @@ func processNextTranscription(ctx context.Context, db database.DBTX, storage Obj
 		     FOR UPDATE SKIP LOCKED
 		 )
 		 RETURNING id, file_key, user_id, share_token,
-		     COALESCE(transcription_language, (SELECT transcription_language FROM users WHERE id = videos.user_id))`,
+		     COALESCE(transcription_language, (SELECT transcription_language FROM users WHERE id = videos.user_id), 'auto')`,
 	).Scan(&videoID, &fileKey, &userID, &shareToken, &language)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {

@@ -6368,3 +6368,101 @@ func TestList_IncludesSuggestedTitle(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+// --- Retranscribe Tests ---
+
+func TestRetranscribe_WithLanguage(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT true FROM videos`).
+		WithArgs("video-123", testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+
+	mock.ExpectExec(`UPDATE videos SET transcription_language = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3`).
+		WithArgs("de", "video-123", testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	mock.ExpectExec(`UPDATE videos SET transcript_status = 'pending'`).
+		WithArgs("video-123").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := []byte(`{"language":"de"}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/retranscribe", handler.Retranscribe)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos/video-123/retranscribe", body))
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusAccepted, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestRetranscribe_NoBody(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT true FROM videos`).
+		WithArgs("video-123", testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+
+	mock.ExpectExec(`UPDATE videos SET transcript_status = 'pending'`).
+		WithArgs("video-123").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/retranscribe", handler.Retranscribe)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos/video-123/retranscribe", nil))
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusAccepted, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestRetranscribe_InvalidLanguage(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+
+	mock.ExpectQuery(`SELECT true FROM videos`).
+		WithArgs("video-123", testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+
+	body := []byte(`{"language":"invalid"}`)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/retranscribe", handler.Retranscribe)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos/video-123/retranscribe", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+}
