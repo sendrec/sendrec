@@ -202,8 +202,8 @@ Guidelines:
 - Include a brief introduction summarizing the video's purpose
 - Group related content under clear headings
 - Include timestamps as references where helpful (e.g., "at 2:30")
-- End with a summary section listing 3-5 key takeaways
-- Write EVERYTHING in the same language as the transcript, including all headings and section titles
+- End with a conclusions section listing 3-5 main points
+- Write EVERYTHING in the same language as the transcript, including ALL headings, section titles, and bullet points — do not use any English words if the transcript is not in English
 - Return ONLY markdown, no explanations or meta-commentary`
 
 func (c *AIClient) GenerateDocument(ctx context.Context, transcript string) (string, error) {
