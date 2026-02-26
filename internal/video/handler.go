@@ -35,6 +35,10 @@ type SlackNotifier interface {
 	SendCommentNotification(ctx context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error
 }
 
+type GeoResolver interface {
+	Lookup(ip string) (country, city string)
+}
+
 type Handler struct {
 	db                      database.DBTX
 	storage                 ObjectStorage
@@ -53,6 +57,7 @@ type Handler struct {
 	aiEnabled               bool
 	transcriptionEnabled    bool
 	webhookClient           *webhook.Client
+	geoResolver             GeoResolver
 }
 
 func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadBytes int64, maxVideosPerMonth int, maxVideoDurationSeconds int, maxPlaylists int, hmacSecret string, secureCookies bool) *Handler {
@@ -99,6 +104,10 @@ func (h *Handler) SetTranscriptionEnabled(enabled bool) {
 
 func (h *Handler) SetWebhookClient(c *webhook.Client) {
 	h.webhookClient = c
+}
+
+func (h *Handler) SetGeoResolver(r GeoResolver) {
+	h.geoResolver = r
 }
 
 func extensionForContentType(ct string) string {

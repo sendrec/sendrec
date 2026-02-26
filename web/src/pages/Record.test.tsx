@@ -40,6 +40,10 @@ vi.mock("../components/CameraRecorder", () => ({
   },
 }));
 
+vi.mock("./Upload", () => ({
+  Upload: () => <div data-testid="upload-component">Mock Upload</div>,
+}));
+
 function renderRecord() {
   return render(
     <MemoryRouter>
@@ -1102,6 +1106,27 @@ describe("Record", () => {
       });
       expect(screen.queryByText(/get started in 3 steps/i)).not.toBeInTheDocument();
     });
+  });
+
+  it("renders Record and Upload tabs", async () => {
+    mockApiFetch.mockResolvedValueOnce({ maxVideosPerMonth: 0, maxVideoDurationSeconds: 0, videosUsedThisMonth: 0 });
+    renderRecord();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Record" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Upload" })).toBeInTheDocument();
+    });
+  });
+
+  it("shows Upload component when Upload tab is clicked", async () => {
+    const user = userEvent.setup();
+    mockApiFetch.mockResolvedValueOnce({ maxVideosPerMonth: 0, maxVideoDurationSeconds: 0, videosUsedThisMonth: 0 });
+    renderRecord();
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: "Upload" }));
+    expect(screen.getByTestId("upload-component")).toBeInTheDocument();
+    expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
   });
 
   it("falls back to execCommand copy when clipboard API fails", async () => {

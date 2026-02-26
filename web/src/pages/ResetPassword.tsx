@@ -14,39 +14,20 @@ export function ResetPassword() {
   if (!token) {
     return (
       <main className="auth-container">
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 24,
-            textAlign: "center",
-          }}
-        >
-          <h1
-            style={{
-              color: "var(--color-text)",
-              fontSize: 24,
-              marginBottom: 16,
-            }}
-          >
-            Invalid reset link
-          </h1>
-          <p
-            style={{
-              color: "var(--color-text-secondary)",
-              fontSize: 14,
-              marginBottom: 24,
-            }}
-          >
+        <div className="auth-brand">
+          <span className="auth-logo">
+            <span className="auth-logo-send">Send</span>
+            <span className="auth-logo-rec">Rec</span>
+          </span>
+        </div>
+        <div className="auth-card auth-centered">
+          <h1>Invalid reset link</h1>
+          <p className="auth-subtitle">
             This password reset link is invalid. Please request a new one.
           </p>
-          <Link
-            to="/forgot-password"
-            style={{ color: "var(--color-accent)", fontSize: 14 }}
-          >
-            Request new reset link
-          </Link>
+          <div className="auth-footer">
+            <Link to="/forgot-password">Request new reset link</Link>
+          </div>
         </div>
       </main>
     );
@@ -55,39 +36,20 @@ export function ResetPassword() {
   if (success) {
     return (
       <main className="auth-container">
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 24,
-            textAlign: "center",
-          }}
-        >
-          <h1
-            style={{
-              color: "var(--color-text)",
-              fontSize: 24,
-              marginBottom: 16,
-            }}
-          >
-            Password updated
-          </h1>
-          <p
-            style={{
-              color: "var(--color-text-secondary)",
-              fontSize: 14,
-              marginBottom: 24,
-            }}
-          >
+        <div className="auth-brand">
+          <span className="auth-logo">
+            <span className="auth-logo-send">Send</span>
+            <span className="auth-logo-rec">Rec</span>
+          </span>
+        </div>
+        <div className="auth-card auth-centered">
+          <h1>Password updated</h1>
+          <p className="auth-subtitle">
             Your password has been reset successfully.
           </p>
-          <Link
-            to="/login"
-            style={{ color: "var(--color-accent)", fontSize: 14 }}
-          >
-            Sign in
-          </Link>
+          <div className="auth-footer">
+            <Link to="/login">Sign in</Link>
+          </div>
         </div>
       </main>
     );
@@ -130,112 +92,51 @@ export function ResetPassword() {
   }
 
   return (
-    <main style={{ maxWidth: 400, margin: "80px auto", padding: 24 }}>
-      <h1
-        style={{
-          color: "var(--color-text)",
-          fontSize: 24,
-          marginBottom: 24,
-          textAlign: "center",
-        }}
-      >
-        Set new password
-      </h1>
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span
-            style={{ color: "var(--color-text-secondary)", fontSize: 14 }}
-          >
-            New password
-          </span>
+    <main className="auth-container">
+      <div className="auth-brand">
+        <span className="auth-logo">
+          <span className="auth-logo-send">Send</span>
+          <span className="auth-logo-rec">Rec</span>
+        </span>
+      </div>
+      <form onSubmit={handleSubmit} className="auth-card">
+        <h1>Set new password</h1>
+
+        <label>
+          <span>New password</span>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            style={{
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              color: "var(--color-text)",
-              padding: "8px 12px",
-              fontSize: 14,
-            }}
           />
         </label>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span
-            style={{ color: "var(--color-text-secondary)", fontSize: 14 }}
-          >
-            Confirm password
-          </span>
+        <label>
+          <span>Confirm password</span>
           <input
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
             minLength={8}
-            style={{
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              color: "var(--color-text)",
-              padding: "8px 12px",
-              fontSize: 14,
-            }}
           />
         </label>
 
         {error && (
-          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>
+          <div className="auth-error-banner">
             {error}
-          </p>
+          </div>
         )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 4,
-            padding: "10px 16px",
-            fontSize: 14,
-            fontWeight: 600,
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
+        <button type="submit" disabled={loading}>
           {loading ? "Updating..." : "Reset password"}
         </button>
 
-        <p
-          style={{
-            color: "var(--color-text-secondary)",
-            fontSize: 14,
-            textAlign: "center",
-            margin: 0,
-          }}
-        >
-          <Link
-            to="/forgot-password"
-            style={{ color: "var(--color-accent)" }}
-          >
-            Request new reset link
-          </Link>
-        </p>
+        <div className="auth-footer">
+          <Link to="/forgot-password">Request new reset link</Link>
+        </div>
       </form>
     </main>
   );

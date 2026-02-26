@@ -1,0 +1,6 @@
+ALTER TABLE video_views
+  DROP COLUMN IF EXISTS referrer,
+  DROP COLUMN IF EXISTS browser,
+  DROP COLUMN IF EXISTS device,
+  DROP COLUMN IF EXISTS country,
+  DROP COLUMN IF EXISTS city;

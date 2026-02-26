@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { CameraRecorder } from "../components/CameraRecorder";
 import { Recorder } from "../components/Recorder";
+import { Upload } from "./Upload";
 
 interface CreateVideoResponse {
   id: string;
@@ -18,6 +19,10 @@ interface LimitsResponse {
 }
 
 export function Record() {
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<"record" | "upload">(() =>
+    searchParams.get("tab") === "upload" ? "upload" : "record"
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState("");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -145,7 +150,7 @@ export function Record() {
   if (loadingLimits) {
     return (
       <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Loading...</p>
+        <p className="max-duration-label">Loading...</p>
       </div>
     );
   }
@@ -154,12 +159,8 @@ export function Record() {
     return (
       <div className="page-container page-container--centered">
         <div style={{ textAlign: "center" }}>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 16, marginBottom: 8 }}>
-            {uploadStep || "Uploading..."}
-          </p>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, opacity: 0.7 }}>
-            Please don't close this page
-          </p>
+          <p className="max-duration-label" style={{ marginBottom: 8 }}>{uploadStep || "Uploading..."}</p>
+          <p className="max-duration-label" style={{ opacity: 0.7 }}>Please don't close this page</p>
         </div>
       </div>
     );
@@ -168,20 +169,8 @@ export function Record() {
   if (error) {
     return (
       <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-error)", fontSize: 16, marginBottom: 16 }}>{error}</p>
-        <button
-          onClick={recordAnother}
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 8,
-            padding: "10px 24px",
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          Try again
-        </button>
+        <p className="error-message">{error}</p>
+        <button className="btn-record" onClick={recordAnother}>Try again</button>
       </div>
     );
   }
@@ -190,6 +179,8 @@ export function Record() {
     typeof navigator.mediaDevices?.getDisplayMedia === "function";
   const cameraSupported =
     typeof navigator.mediaDevices?.getUserMedia === "function";
+  const preferredMode = localStorage.getItem("recording-mode") || "screen";
+  const useCameraOnly = preferredMode === "camera" && cameraSupported;
 
   const quotaReached =
     limits !== null &&
@@ -199,34 +190,12 @@ export function Record() {
   if (!screenRecordingSupported && !cameraSupported) {
     return (
       <div className="page-container page-container--centered">
-        <h1
-          style={{
-            color: "var(--color-text)",
-            fontSize: 24,
-            marginBottom: 16,
-            textAlign: "center",
-          }}
-        >
-          Recording is not available
-        </h1>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginBottom: 24, maxWidth: 400, margin: "0 auto 24px" }}>
+        <h1 className="page-heading">Recording is not available</h1>
+        <p className="quota-submessage">
           Recording is not supported on this device. Please use a modern browser, or{" "}
-          <Link to="/upload" style={{ color: "var(--color-accent)" }}>upload a video</Link> instead.
+          <button onClick={() => setTab("upload")} style={{ color: "var(--color-accent)", background: "none", border: "none", cursor: "pointer", font: "inherit", textDecoration: "underline", padding: 0 }}>upload a video</button> instead.
         </p>
-        <Link
-          to="/upload"
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 8,
-            padding: "10px 24px",
-            fontSize: 14,
-            fontWeight: 600,
-            textDecoration: "none",
-          }}
-        >
-          Go to Upload
-        </Link>
+        <button className="btn-record" onClick={() => setTab("upload")}>Go to Upload</button>
       </div>
     );
   }
@@ -234,40 +203,13 @@ export function Record() {
   if (quotaReached) {
     return (
       <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-error)", fontSize: 16, marginBottom: 16 }}>
+        <p className="quota-message">
           You've reached your limit of {limits!.maxVideosPerMonth} videos this month.
-          Delete unused recordings or wait until next month.
         </p>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-          <Link
-            to="/library"
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-text)",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            Go to Library
-          </Link>
-          <Link
-            to="/settings"
-            style={{
-              background: "transparent",
-              color: "var(--color-accent)",
-              border: "1px solid var(--color-accent)",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            Upgrade to Pro
-          </Link>
+        <p className="quota-submessage">Delete unused recordings or wait until next month.</p>
+        <div className="quota-actions">
+          <Link to="/library" className="btn-primary">Go to Library</Link>
+          <Link to="/settings" className="btn-outline">Upgrade to Pro</Link>
         </div>
       </div>
     );
@@ -276,102 +218,21 @@ export function Record() {
   if (shareUrl) {
     return (
       <div className="page-container page-container--centered">
-        <h2
-          style={{
-            color: "var(--color-text)",
-            fontSize: 20,
-            marginBottom: 16,
-          }}
-        >
-          Recording complete
-        </h2>
-
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
-          }}
-        >
-          <span
-            style={{
-              color: "var(--color-text-secondary)",
-              fontSize: 14,
-              wordBreak: "break-all",
-            }}
-          >
-            {shareUrl}
-          </span>
-          <button
-            onClick={copyShareUrl}
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-text)",
-              borderRadius: 4,
-              padding: "6px 16px",
-              fontSize: 14,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {copied ? "Copied!" : "Copy link"}
-          </button>
-        </div>
-
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-          <a
-            href={shareUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-text)",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            Watch video
-          </a>
-
-          <button
-            onClick={recordAnother}
-            style={{
-              background: "transparent",
-              color: "var(--color-accent)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-          >
-            Record another
-          </button>
-
-          <Link
-            to="/library"
-            style={{
-              background: "transparent",
-              color: "var(--color-text-secondary)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            Go to Library
-          </Link>
+        <div className="share-container">
+          <h2 className="share-heading">Recording complete</h2>
+          <div className="share-link-row">
+            <span className="share-link-input">{shareUrl}</span>
+            <button className="btn-copy" onClick={copyShareUrl}>
+              {copied ? "Copied!" : "Copy link"}
+            </button>
+          </div>
+          <div className="share-actions">
+            <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
+              Watch video
+            </a>
+            <button className="btn-outline" onClick={recordAnother}>Record another</button>
+            <Link to="/library" className="btn-ghost">Go to Library</Link>
+          </div>
         </div>
       </div>
     );
@@ -384,19 +245,24 @@ export function Record() {
 
   return (
     <div className="page-container page-container--centered">
-      <h1
-        style={{
-          color: "var(--color-text)",
-          fontSize: 24,
-          marginBottom: 24,
-          textAlign: "center",
-        }}
-      >
-        New Recording
-      </h1>
+      <h1 className="page-heading">New Recording</h1>
+      <div className="record-tabs">
+        <button
+          className={`record-tab${tab === "record" ? " record-tab--active" : ""}`}
+          onClick={() => setTab("record")}
+        >
+          Record
+        </button>
+        <button
+          className={`record-tab${tab === "upload" ? " record-tab--active" : ""}`}
+          onClick={() => setTab("upload")}
+        >
+          Upload
+        </button>
+      </div>
       {hasLimits && (
-        <div style={{ marginBottom: 16, maxWidth: 300, margin: "0 auto 16px" }}>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 6 }}>
+        <div className="usage-section">
+          <p className="usage-label">
             {limits.videosUsedThisMonth} / {limits.maxVideosPerMonth} videos this month
           </p>
           <div
@@ -413,44 +279,39 @@ export function Record() {
           </div>
         </div>
       )}
-      {limits && limits.videosUsedThisMonth === 0 && (
-        <div style={{
-          maxWidth: 400,
-          margin: "0 auto 24px",
-          padding: "20px 24px",
-          background: "var(--color-surface)",
-          borderRadius: 12,
-          textAlign: "left",
-        }}>
-          <p style={{ color: "var(--color-text)", fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
-            Get started in 3 steps
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>1.</span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Record your screen or upload a video</span>
+      {tab === "record" && limits && limits.videosUsedThisMonth === 0 && (
+        <div className="onboarding-card">
+          <p className="onboarding-title">Get started in 3 steps</p>
+          <div className="onboarding-steps">
+            <div className="onboarding-step">
+              <span className="onboarding-step-num">1.</span>
+              <span className="onboarding-step-text">Record your screen or upload a video</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>2.</span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Share the link with anyone</span>
+            <div className="onboarding-step">
+              <span className="onboarding-step-num">2.</span>
+              <span className="onboarding-step-text">Share the link with anyone</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>3.</span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Track views and get feedback</span>
+            <div className="onboarding-step">
+              <span className="onboarding-step-num">3.</span>
+              <span className="onboarding-step-text">Track views and get feedback</span>
             </div>
           </div>
         </div>
       )}
-      {screenRecordingSupported ? (
-        <Recorder
-          onRecordingComplete={handleRecordingComplete}
-          maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
-        />
+      {tab === "record" ? (
+        screenRecordingSupported && !useCameraOnly ? (
+          <Recorder
+            onRecordingComplete={handleRecordingComplete}
+            maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
+          />
+        ) : (
+          <CameraRecorder
+            onRecordingComplete={handleRecordingComplete}
+            maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
+          />
+        )
       ) : (
-        <CameraRecorder
-          onRecordingComplete={handleRecordingComplete}
-          maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
-        />
+        <Upload />
       )}
     </div>
   );

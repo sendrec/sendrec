@@ -358,9 +358,17 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 			defer cancel()
 			ip := clientIP(r)
 			hash := viewerHash(ip, r.UserAgent())
+			ref := categorizeReferrer(r.Header.Get("Referer"))
+			browser := parseBrowser(r.UserAgent())
+			device := parseDevice(r.UserAgent())
+			var country, city string
+			if h.geoResolver != nil {
+				country, city = h.geoResolver.Lookup(ip)
+			}
 			if _, err := h.db.Exec(ctx,
-				`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
-				videoID, hash,
+				`INSERT INTO video_views (video_id, viewer_hash, referrer, browser, device, country, city)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+				videoID, hash, ref, browser, device, country, city,
 			); err != nil {
 				slog.Error("video: failed to record view", "video_id", videoID, "error", err)
 			}
@@ -496,6 +504,32 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, map[string]string{"downloadUrl": downloadURL})
+}
+
+func (h *Handler) GetTranscript(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var status string
+	var segmentsJSON *string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT transcript_status, transcript_json FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	).Scan(&status, &segmentsJSON)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	segments := make([]TranscriptSegment, 0)
+	if segmentsJSON != nil {
+		_ = json.Unmarshal([]byte(*segmentsJSON), &segments)
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]any{
+		"status":   status,
+		"segments": segments,
+	})
 }
 
 func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {

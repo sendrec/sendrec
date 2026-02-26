@@ -14,6 +14,7 @@ import (
 	"github.com/sendrec/sendrec/internal/billing"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/docs"
+	"github.com/sendrec/sendrec/internal/geoip"
 	"github.com/sendrec/sendrec/internal/ratelimit"
 	"github.com/sendrec/sendrec/internal/video"
 	"github.com/sendrec/sendrec/internal/webhook"
@@ -50,6 +51,7 @@ type Config struct {
 	CreemAPIKey             string
 	CreemWebhookSecret      string
 	CreemProProductID       string
+	GeoIPDBPath             string
 }
 
 type Server struct {
@@ -116,6 +118,12 @@ func New(cfg Config) *Server {
 		}
 		if cfg.WebhookClient != nil {
 			s.videoHandler.SetWebhookClient(cfg.WebhookClient)
+		}
+		if cfg.GeoIPDBPath != "" {
+			geoResolver, err := geoip.New(cfg.GeoIPDBPath)
+			if err == nil {
+				s.videoHandler.SetGeoResolver(geoResolver)
+			}
 		}
 
 		if cfg.CreemAPIKey != "" {
@@ -244,10 +252,12 @@ func (s *Server) routes() {
 				r.Get("/{id}/comments", s.videoHandler.ListOwnerComments)
 				r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
 				r.Get("/{id}/analytics", s.videoHandler.Analytics)
+				r.Get("/{id}/analytics/export", s.videoHandler.AnalyticsExport)
 				r.Put("/{id}/notifications", s.videoHandler.SetVideoNotification)
 				r.Put("/{id}/download-enabled", s.videoHandler.SetDownloadEnabled)
 				r.Put("/{id}/link-expiry", s.videoHandler.SetLinkExpiry)
 				r.Get("/{id}/branding", s.videoHandler.GetVideoBranding)
+				r.Get("/{id}/transcript", s.videoHandler.GetTranscript)
 				r.Put("/{id}/branding", s.videoHandler.SetVideoBranding)
 				r.Post("/{id}/thumbnail", s.videoHandler.UploadThumbnail)
 				r.Delete("/{id}/thumbnail", s.videoHandler.ResetThumbnail)
@@ -261,6 +271,12 @@ func (s *Server) routes() {
 			r.Post("/{id}/detect-silence", s.videoHandler.DetectSilence)
 			r.Put("/{id}/dismiss-title", s.videoHandler.DismissTitle)
 			})
+		})
+
+		s.router.Route("/api/analytics", func(r chi.Router) {
+			r.Use(s.authHandler.Middleware)
+			r.Get("/dashboard", s.videoHandler.AnalyticsDashboard)
+			r.Get("/dashboard/export", s.videoHandler.DashboardExport)
 		})
 
 		s.router.Route("/api/folders", func(r chi.Router) {

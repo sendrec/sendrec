@@ -381,7 +381,7 @@ func TestWatch_PasswordProtected_ValidCookie(t *testing.T) {
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs(videoID, pgxmock.AnyArg()).
+		WithArgs(videoID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	sig := signWatchCookie(testHMACSecret, shareToken, passwordHash)

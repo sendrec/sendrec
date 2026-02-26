@@ -80,23 +80,27 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 12px;
-            background: #1e293b;
+            padding: 6px 10px;
+            background: #111d32;
             color: #e2e8f0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 13px;
+            font-size: 12px;
+            flex-shrink: 0;
+            border-top: 1px solid #1e2d45;
         }
         .footer-title {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            margin-right: 12px;
+            margin-right: 8px;
+            font-weight: 500;
         }
         .footer a {
-            color: #94a3b8;
+            color: #8892a4;
             text-decoration: none;
             white-space: nowrap;
-            font-size: 12px;
+            font-size: 11px;
+            transition: color 0.15s;
         }
         .footer a:hover { color: #e2e8f0; }
         .cta-overlay { display: none; position: absolute; bottom: 48px; left: 0; right: 0; padding: 12px; text-align: center; background: rgba(15, 23, 42, 0.9); }
@@ -104,6 +108,14 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .cta-overlay a { display: inline-block; padding: 8px 24px; background: #00b67a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
         .cta-overlay a:hover { opacity: 0.9; color: #fff; }
 ` + safariWarningCSS + `
+        .browser-warning {
+            position: absolute;
+            bottom: 40px;
+            left: 12px;
+            right: 12px;
+            z-index: 5;
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
@@ -332,10 +344,10 @@ var embedPasswordPageTemplate = template.Must(template.New("embed-password").Par
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="password"]:focus { border-color: #22c55e; }
+        input[type="password"]:focus { border-color: #00b67a; }
         button {
             width: 100%;
-            background: #22c55e;
+            background: #00b67a;
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;
@@ -412,10 +424,10 @@ var embedEmailGatePageTemplate = template.Must(template.New("embed-emailgate").P
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="email"]:focus { border-color: #22c55e; }
+        input[type="email"]:focus { border-color: #00b67a; }
         button {
             width: 100%;
-            background: #22c55e;
+            background: #00b67a;
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;
@@ -552,9 +564,17 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		ip := clientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
+		ref := categorizeReferrer(r.Header.Get("Referer"))
+		browser := parseBrowser(r.UserAgent())
+		device := parseDevice(r.UserAgent())
+		var country, city string
+		if h.geoResolver != nil {
+			country, city = h.geoResolver.Lookup(ip)
+		}
 		if _, err := h.db.Exec(ctx,
-			`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
-			videoID, hash,
+			`INSERT INTO video_views (video_id, viewer_hash, referrer, browser, device, country, city)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			videoID, hash, ref, browser, device, country, city,
 		); err != nil {
 			slog.Error("embed-page: failed to record view", "video_id", videoID, "error", err)
 		}

@@ -162,14 +162,15 @@ const playerCSS = `
             position: absolute;
             top: 0;
             height: 100%;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.08);
+            border-right: 1px solid rgba(0, 0, 0, 0.4);
             cursor: pointer;
             pointer-events: auto;
         }
-        .seek-chapter:hover { background: rgba(255, 255, 255, 0.3); }
+        .seek-chapter:hover { background: rgba(255, 255, 255, 0.2); }
         .seek-chapter-tooltip {
             position: absolute;
-            bottom: 36px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             background: #0f172a;
@@ -208,7 +209,7 @@ const playerCSS = `
         .seek-marker:hover { opacity: 1; transform: translateX(-50%); }
         .seek-marker-tooltip {
             position: absolute;
-            bottom: 36px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             background: #0f172a;
@@ -309,7 +310,7 @@ const playerCSS = `
         .shortcuts-panel {
             display: none;
             position: absolute;
-            bottom: 52px;
+            bottom: 40px;
             right: 8px;
             background: rgba(15, 23, 42, 0.95);
             border: 1px solid #334155;
