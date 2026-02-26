@@ -505,7 +505,7 @@ func (h *Handler) GetTranscript(w http.ResponseWriter, r *http.Request) {
 	var status string
 	var segmentsJSON *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT transcript_status, transcript_json FROM videos WHERE id = $1 AND user_id = $2`,
+		`SELECT transcript_status, transcript_json FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
 		videoID, userID,
 	).Scan(&status, &segmentsJSON)
 	if err != nil {

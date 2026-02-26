@@ -1151,6 +1151,16 @@ input:focus-visible {
   gap: 8px;
 }
 
+.detail-select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
 .detail-share-input {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
