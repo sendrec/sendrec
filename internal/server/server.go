@@ -248,6 +248,7 @@ func (s *Server) routes() {
 				r.Put("/{id}/download-enabled", s.videoHandler.SetDownloadEnabled)
 				r.Put("/{id}/link-expiry", s.videoHandler.SetLinkExpiry)
 				r.Get("/{id}/branding", s.videoHandler.GetVideoBranding)
+				r.Get("/{id}/transcript", s.videoHandler.GetTranscript)
 				r.Put("/{id}/branding", s.videoHandler.SetVideoBranding)
 				r.Post("/{id}/thumbnail", s.videoHandler.UploadThumbnail)
 				r.Delete("/{id}/thumbnail", s.videoHandler.ResetThumbnail)

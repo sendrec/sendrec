@@ -498,6 +498,32 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, map[string]string{"downloadUrl": downloadURL})
 }
 
+func (h *Handler) GetTranscript(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var status string
+	var segmentsJSON *string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT transcript_status, transcript_json FROM videos WHERE id = $1 AND user_id = $2`,
+		videoID, userID,
+	).Scan(&status, &segmentsJSON)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	segments := make([]TranscriptSegment, 0)
+	if segmentsJSON != nil {
+		_ = json.Unmarshal([]byte(*segmentsJSON), &segments)
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]any{
+		"status":   status,
+		"segments": segments,
+	})
+}
+
 func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 	shareToken := chi.URLParam(r, "shareToken")
 
