@@ -12,11 +12,12 @@ import (
 )
 
 type dashboardSummary struct {
-	TotalViews           int64   `json:"totalViews"`
-	UniqueViews          int64   `json:"uniqueViews"`
-	AvgDailyViews        float64 `json:"avgDailyViews"`
-	TotalVideos          int64   `json:"totalVideos"`
-	TotalWatchTimeSeconds int64  `json:"totalWatchTimeSeconds"`
+	TotalViews            int64   `json:"totalViews"`
+	UniqueViews           int64   `json:"uniqueViews"`
+	AvgDailyViews         float64 `json:"avgDailyViews"`
+	TotalVideos           int64   `json:"totalVideos"`
+	TotalWatchTimeSeconds int64   `json:"totalWatchTimeSeconds"`
+	AvgCompletion         float64 `json:"avgCompletion"`
 }
 
 type dashboardDaily struct {
@@ -31,6 +32,7 @@ type dashboardTopVideo struct {
 	Views        int64  `json:"views"`
 	UniqueViews  int64  `json:"uniqueViews"`
 	ThumbnailURL string `json:"thumbnailUrl"`
+	Completion   int    `json:"completion"`
 }
 
 type dashboardResponse struct {
@@ -105,6 +107,21 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 		totalWatchTimeSeconds = 0
 	}
 
+	var avgCompletion float64
+	_ = h.db.QueryRow(r.Context(),
+		`SELECT COALESCE(AVG(
+			CASE WHEN m.max_milestone IS NOT NULL THEN m.max_milestone ELSE 0 END
+		), 0)
+		 FROM videos v
+		 LEFT JOIN (
+			 SELECT video_id, MAX(milestone) AS max_milestone
+			 FROM view_milestones
+			 GROUP BY video_id
+		 ) m ON m.video_id = v.id
+		 WHERE v.user_id = $1 AND v.status != 'deleted'`,
+		userID,
+	).Scan(&avgCompletion)
+
 	daysInRange := days
 	if daysInRange == 0 {
 		daysInRange = int(now.Sub(since).Hours()/24) + 1
@@ -172,9 +189,11 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 		`SELECT v.id, v.title, COUNT(vv.id) AS views,
 		        COUNT(DISTINCT vv.viewer_hash) AS unique_views,
 		        v.share_token,
-		        CASE WHEN v.thumbnail_key IS NOT NULL AND v.thumbnail_key != '' THEN true ELSE false END AS has_thumbnail
+		        CASE WHEN v.thumbnail_key IS NOT NULL AND v.thumbnail_key != '' THEN true ELSE false END AS has_thumbnail,
+		        COALESCE(MAX(vm.milestone), 0) AS completion
 		 FROM videos v
 		 LEFT JOIN video_views vv ON vv.video_id = v.id AND vv.created_at >= $2
+		 LEFT JOIN view_milestones vm ON vm.video_id = v.id
 		 WHERE v.user_id = $1 AND v.status != 'deleted'
 		 GROUP BY v.id, v.title, v.share_token, v.thumbnail_key
 		 ORDER BY views DESC
@@ -192,7 +211,8 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 		var id, title, shareToken string
 		var views, uv int64
 		var hasThumbnail bool
-		if err := topRows.Scan(&id, &title, &views, &uv, &shareToken, &hasThumbnail); err != nil {
+		var completion int
+		if err := topRows.Scan(&id, &title, &views, &uv, &shareToken, &hasThumbnail, &completion); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan top videos")
 			return
 		}
@@ -206,6 +226,7 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 			Views:        views,
 			UniqueViews:  uv,
 			ThumbnailURL: thumbnailURL,
+			Completion:   completion,
 		})
 	}
 	if err := topRows.Err(); err != nil {
@@ -220,6 +241,7 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 			AvgDailyViews:         avgDailyViews,
 			TotalVideos:           totalVideos,
 			TotalWatchTimeSeconds: totalWatchTimeSeconds,
+			AvgCompletion:         avgCompletion,
 		},
 		Daily:     daily,
 		TopVideos: topVideos,
@@ -230,4 +252,62 @@ func sortDashboardDaily(daily []dashboardDaily) {
 	sort.Slice(daily, func(i, j int) bool {
 		return daily[i].Date < daily[j].Date
 	})
+}
+
+func (h *Handler) DashboardExport(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "7d"
+	}
+	var days int
+	switch rangeParam {
+	case "7d":
+		days = 7
+	case "30d":
+		days = 30
+	case "90d":
+		days = 90
+	case "all":
+		days = 0
+	default:
+		httputil.WriteError(w, http.StatusBadRequest, "invalid range")
+		return
+	}
+
+	now := time.Now().UTC().Truncate(24 * time.Hour)
+	var since time.Time
+	if days > 0 {
+		since = now.AddDate(0, 0, -(days - 1))
+	} else {
+		since = time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+
+	rows, err := h.db.Query(r.Context(),
+		`SELECT date_trunc('day', vv.created_at)::date AS day,
+		        COUNT(*) AS views,
+		        COUNT(DISTINCT vv.viewer_hash) AS unique_views
+		 FROM video_views vv
+		 JOIN videos v ON v.id = vv.video_id
+		 WHERE v.user_id = $1 AND vv.created_at >= $2
+		 GROUP BY day ORDER BY day`,
+		userID, since,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to query")
+		return
+	}
+	defer rows.Close()
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=analytics-dashboard.csv")
+	fmt.Fprintln(w, "Date,Views,Unique Views")
+	for rows.Next() {
+		var day time.Time
+		var views, uv int64
+		if err := rows.Scan(&day, &views, &uv); err == nil {
+			fmt.Fprintf(w, "%s,%d,%d\n", day.Format("2006-01-02"), views, uv)
+		}
+	}
 }

@@ -3,6 +3,7 @@ package video
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"math"
 	"net/http"
@@ -573,4 +574,69 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		Browsers:   browsers,
 		Devices:    devices,
 	})
+}
+
+func (h *Handler) AnalyticsExport(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var id string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	).Scan(&id)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "7d"
+	}
+	var days int
+	switch rangeParam {
+	case "7d":
+		days = 7
+	case "30d":
+		days = 30
+	case "90d":
+		days = 90
+	case "all":
+		days = 0
+	default:
+		httputil.WriteError(w, http.StatusBadRequest, "invalid range")
+		return
+	}
+
+	now := time.Now().UTC().Truncate(24 * time.Hour)
+	var since time.Time
+	if days > 0 {
+		since = now.AddDate(0, 0, -(days - 1))
+	} else {
+		since = time.Time{}
+	}
+
+	rows, err := h.db.Query(r.Context(),
+		`SELECT date_trunc('day', created_at)::date AS day, COUNT(*) AS views, COUNT(DISTINCT viewer_hash) AS unique_views
+		 FROM video_views WHERE video_id = $1 AND created_at >= $2
+		 GROUP BY day ORDER BY day`,
+		videoID, since,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to query")
+		return
+	}
+	defer rows.Close()
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=analytics.csv")
+	fmt.Fprintln(w, "Date,Views,Unique Views")
+	for rows.Next() {
+		var day time.Time
+		var views, uv int64
+		if err := rows.Scan(&day, &views, &uv); err == nil {
+			fmt.Fprintf(w, "%s,%d,%d\n", day.Format("2006-01-02"), views, uv)
+		}
+	}
 }
