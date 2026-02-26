@@ -155,9 +155,50 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             margin-bottom: 0.25rem;
             word-break: break-word;
         }
-        .sidebar-header .video-count {
+        .sidebar-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0.375rem;
+        }
+        .now-playing-label {
             font-size: 0.75rem;
             color: #64748b;
+        }
+        .auto-advance-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #64748b;
+            cursor: pointer;
+            user-select: none;
+        }
+        .aa-toggle-track {
+            width: 32px;
+            height: 18px;
+            background: #1a2740;
+            border-radius: 9px;
+            position: relative;
+            transition: background 0.2s;
+            border: 1px solid #1e2d45;
+        }
+        .aa-toggle-track.active {
+            background: #00b67a;
+            border-color: #00b67a;
+        }
+        .aa-toggle-knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            transition: left 0.2s;
+        }
+        .aa-toggle-track.active .aa-toggle-knob {
+            left: 16px;
         }
         .video-list {
             flex: 1;
@@ -436,7 +477,15 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         <aside class="playlist-sidebar">
             <div class="sidebar-header">
                 <h2>{{.Title}}</h2>
-                <div class="video-count">{{len .Videos}} videos</div>
+                <div class="sidebar-meta">
+                    <span class="now-playing-label">Now playing <strong id="now-playing-num">1</strong> of {{len .Videos}}</span>
+                    <div class="auto-advance-toggle" id="auto-advance-toggle" role="switch" aria-checked="true" aria-label="Auto-advance to next video" tabindex="0">
+                        <span>Autoplay</span>
+                        <div class="aa-toggle-track active" id="aa-toggle-track">
+                            <div class="aa-toggle-knob"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <ul class="video-list" id="video-list">
                 {{range $i, $v := .Videos}}
@@ -498,7 +547,18 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         var progressEl = document.getElementById('next-progress');
         var listItems = document.querySelectorAll('.video-list-item');
         var countdownTimer = null;
+        var autoAdvance = true;
         var storageKey = 'playlist_progress_{{.ShareToken}}';
+        var nowPlayingNum = document.getElementById('now-playing-num');
+        var aaToggle = document.getElementById('auto-advance-toggle');
+        var aaTrack = document.getElementById('aa-toggle-track');
+        if (aaToggle) {
+            aaToggle.addEventListener('click', function() {
+                autoAdvance = !autoAdvance;
+                aaTrack.classList.toggle('active', autoAdvance);
+                aaToggle.setAttribute('aria-checked', autoAdvance ? 'true' : 'false');
+            });
+        }
 
         var controls = document.getElementById('player-controls');
         var overlay = document.getElementById('player-overlay');
@@ -682,6 +742,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             player.play().catch(function() {});
             titleEl.textContent = v.title;
             counterEl.textContent = (index + 1) + ' of ' + videos.length;
+            if (nowPlayingNum) nowPlayingNum.textContent = (index + 1);
             listItems.forEach(function(li) {
                 li.classList.toggle('active', parseInt(li.getAttribute('data-index'), 10) === index);
             });
@@ -701,7 +762,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         player.addEventListener('ended', function() {
             markWatched(videos[currentIndex].id);
             updatePlayBtn();
-            if (currentIndex < videos.length - 1) {
+            if (autoAdvance && currentIndex < videos.length - 1) {
                 startCountdown(currentIndex + 1);
             }
         });

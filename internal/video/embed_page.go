@@ -332,10 +332,10 @@ var embedPasswordPageTemplate = template.Must(template.New("embed-password").Par
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="password"]:focus { border-color: #22c55e; }
+        input[type="password"]:focus { border-color: #00b67a; }
         button {
             width: 100%;
-            background: #22c55e;
+            background: #00b67a;
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;
@@ -412,10 +412,10 @@ var embedEmailGatePageTemplate = template.Must(template.New("embed-emailgate").P
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="email"]:focus { border-color: #22c55e; }
+        input[type="email"]:focus { border-color: #00b67a; }
         button {
             width: 100%;
-            background: #22c55e;
+            background: #00b67a;
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;
