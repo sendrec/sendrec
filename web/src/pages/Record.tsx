@@ -179,7 +179,7 @@ export function Record() {
     typeof navigator.mediaDevices?.getDisplayMedia === "function";
   const cameraSupported =
     typeof navigator.mediaDevices?.getUserMedia === "function";
-  const preferredMode = localStorage.getItem("recording-mode") || "screen-camera";
+  const preferredMode = localStorage.getItem("recording-mode") || "screen";
   const useCameraOnly = preferredMode === "camera" && cameraSupported;
 
   const quotaReached =

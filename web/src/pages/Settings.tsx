@@ -1386,7 +1386,7 @@ function RecordingDefaults() {
   const [mode, setModeState] = useState<RecordingMode>(() => {
     const stored = localStorage.getItem("recording-mode");
     if (stored === "camera" || stored === "screen" || stored === "screen-camera") return stored;
-    return "screen-camera";
+    return "screen";
   });
   const [countdown, setCountdownState] = useState(() => localStorage.getItem("recording-countdown") !== "false");
   const [systemAudio, setSystemAudioState] = useState(() => localStorage.getItem("recording-audio") !== "false");
