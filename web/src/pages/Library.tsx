@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 
@@ -119,6 +119,19 @@ export function Library() {
   const [sidebarMenuId, setSidebarMenuId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "most-viewed" | "title">("newest");
+
+  const sortedVideos = useMemo(() => {
+    const sorted = [...videos];
+    switch (sortBy) {
+      case "newest": sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt)); break;
+      case "oldest": sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt)); break;
+      case "most-viewed": sorted.sort((a, b) => b.viewCount - a.viewCount); break;
+      case "title": sorted.sort((a, b) => a.title.localeCompare(b.title)); break;
+    }
+    return sorted;
+  }, [videos, sortBy]);
 
   const fetchVideosAndLimits = useCallback(async (query = "", filter = "all") => {
     const params = new URLSearchParams();
@@ -371,8 +384,24 @@ export function Library() {
 
   if (loading) {
     return (
-      <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Loading...</p>
+      <div className="page-container page-container--wide">
+        <div className="library-header">
+          <div>
+            <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>Library</h1>
+          </div>
+        </div>
+        <div className="video-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="skeleton-card">
+              <div className="skeleton-thumb skeleton" />
+              <div className="skeleton-body">
+                <div className="skeleton-title skeleton" />
+                <div className="skeleton-meta skeleton" />
+                <div className="skeleton-meta-short skeleton" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -448,7 +477,7 @@ export function Library() {
   }
 
   return (
-    <div className="page-container">
+    <div className="page-container page-container--wide">
       <div className="library-layout">
         <nav className="library-sidebar">
           <button
@@ -637,6 +666,36 @@ export function Library() {
         </Link>
       </div>
 
+      <div className="view-controls">
+        <select
+          className="sort-select"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          aria-label="Sort videos"
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="most-viewed">Most viewed</option>
+          <option value="title">Title A-Z</option>
+        </select>
+        <div className="view-toggle">
+          <button
+            className={`view-toggle-btn${viewMode === "grid" ? " view-toggle-btn--active" : ""}`}
+            onClick={() => setViewMode("grid")}
+            aria-label="Grid view"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/></svg>
+          </button>
+          <button
+            className={`view-toggle-btn${viewMode === "list" ? " view-toggle-btn--active" : ""}`}
+            onClick={() => setViewMode("list")}
+            aria-label="List view"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="3" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="1" y="7" width="14" height="3" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="1" y="12" width="14" height="3" rx="1" stroke="currentColor" strokeWidth="1.5"/></svg>
+          </button>
+        </div>
+      </div>
+
       {selectedIds.size > 0 && (
         <div className="batch-toolbar">
           <span style={{ fontWeight: 600, fontSize: 14 }}>
@@ -664,190 +723,151 @@ export function Library() {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {videos.map((video) => (
-          <div
-            key={video.id}
-            className="video-card"
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              padding: 16,
-            }}
-          >
+      <div className={viewMode === "grid" ? "video-grid" : "video-list"}>
+        {sortedVideos.map((video) => (
+          <div key={video.id} className="video-card">
+            <Link to={`/videos/${video.id}`} state={{ video }} style={{ textDecoration: "none" }}>
+              <div className="video-card-thumbnail">
+                {video.thumbnailUrl && (
+                  <img src={video.thumbnailUrl} alt="" />
+                )}
+                <div className="video-card-play" />
+                {video.status === "ready" && (
+                  <span className="video-card-duration">{formatDuration(video.duration)}</span>
+                )}
+                {(video.status === "uploading" || video.status === "processing") && (
+                  <span className="video-card-status">
+                    <span className="status-dot" />
+                    {video.status === "uploading" ? "uploading..." : "processing..."}
+                  </span>
+                )}
+              </div>
+            </Link>
             <input
               type="checkbox"
               checked={selectedIds.has(video.id)}
               onChange={() => toggleSelect(video.id)}
               className={`video-select-checkbox${selectedIds.size > 0 ? " video-select-checkbox--visible" : ""}`}
               aria-label={`Select ${video.title}`}
+              onClick={(e) => e.stopPropagation()}
             />
-            <div className="video-card-top">
-              {video.thumbnailUrl && (
-                <Link to={`/videos/${video.id}`} state={{ video }} style={{ flexShrink: 0 }}>
-                  <img
-                    src={video.thumbnailUrl}
-                    alt=""
-                    style={{
-                      width: 120,
-                      height: 68,
-                      objectFit: "cover",
-                      borderRadius: 4,
-                      background: "var(--color-border)",
-                      display: "block",
-                    }}
-                  />
-                </Link>
-              )}
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <Link
-                  to={`/videos/${video.id}`}
-                  state={{ video }}
-                  style={{
-                    fontWeight: 600,
-                    fontSize: 15,
-                    color: "var(--color-text)",
-                    margin: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    display: "block",
-                    textDecoration: "none",
-                  }}
-                >
-                  {video.title}
-                </Link>
-                <p
-                  style={{
-                    color: "var(--color-text-secondary)",
-                    fontSize: 13,
-                    margin: "4px 0 0",
-                  }}
-                >
-                  {formatDuration(video.duration)} &middot; {formatDate(video.createdAt)}
-                  {video.transcriptStatus === "no_audio" && (
-                    <span style={{ color: "var(--color-text-secondary)", marginLeft: 8, opacity: 0.7 }}>
-                      &middot; No audio
-                    </span>
-                  )}
-                  {video.status === "uploading" && (
-                    <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
-                      uploading...
-                    </span>
-                  )}
-                  {video.status === "processing" && (
-                    <span style={{ color: "var(--color-accent)", marginLeft: 8 }}>
-                      processing...
-                    </span>
-                  )}
-                  {video.status === "ready" && video.viewCount > 0 && (
-                    <span style={{ marginLeft: 8 }}>
-                      &middot; {video.viewCount === video.uniqueViewCount
+            <div className="video-card-body">
+              <Link
+                to={`/videos/${video.id}`}
+                state={{ video }}
+                className="video-card-title"
+              >
+                {video.title}
+              </Link>
+              <div className="video-card-meta">
+                <span>{formatDate(video.createdAt)}</span>
+                {video.status === "ready" && video.viewCount > 0 && (
+                  <>
+                    <span className="video-card-meta-dot" />
+                    <span>
+                      {video.viewCount === video.uniqueViewCount
                         ? `${video.viewCount} view${video.viewCount !== 1 ? "s" : ""}`
                         : `${video.viewCount} views (${video.uniqueViewCount} unique)`}
                     </span>
-                  )}
-                  {video.status === "ready" && video.viewCount === 0 && (
-                    <span style={{ color: "var(--color-text-secondary)", marginLeft: 8, opacity: 0.6 }}>
-                      &middot; No views yet
-                    </span>
-                  )}
-                  {video.status === "ready" && (() => {
-                    const expiry = expiryLabel(video.shareExpiresAt);
-                    return (
-                      <span style={{ color: video.shareExpiresAt === null ? "var(--color-accent)" : expiry.expired ? "var(--color-error)" : "var(--color-text-secondary)", marginLeft: 8 }}>
-                        &middot; {expiry.text}
+                  </>
+                )}
+                {video.status === "ready" && video.viewCount === 0 && (
+                  <>
+                    <span className="video-card-meta-dot" />
+                    <span style={{ opacity: 0.6 }}>No views yet</span>
+                  </>
+                )}
+                {video.transcriptStatus === "no_audio" && (
+                  <>
+                    <span className="video-card-meta-dot" />
+                    <span style={{ opacity: 0.7 }}>No audio</span>
+                  </>
+                )}
+                {video.status === "ready" && (() => {
+                  const expiry = expiryLabel(video.shareExpiresAt);
+                  return (
+                    <>
+                      <span className="video-card-meta-dot" />
+                      <span style={{ color: video.shareExpiresAt === null ? "var(--color-accent)" : expiry.expired ? "var(--color-error)" : undefined }}>
+                        {expiry.text}
                       </span>
-                    );
-                  })()}
-                </p>
+                    </>
+                  );
+                })()}
               </div>
+              {video.tags.length > 0 && (
+                <div className="video-card-tags">
+                  {video.tags.map((tag) => (
+                    <span key={tag.id} className="video-tag">
+                      <span className="video-tag-dot" style={{ background: tag.color ?? "var(--color-text-secondary)" }} />
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-
-            {video.tags.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                {video.tags.map((tag) => (
-                  <span
-                    key={tag.id}
-                    style={{
-                      display: "inline-flex", alignItems: "center", gap: 4,
-                      padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 500,
-                      background: "var(--color-background)", border: "1px solid var(--color-border)",
-                      color: "var(--color-text-secondary)",
-                    }}
-                  >
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: tag.color ?? "var(--color-text-secondary)" }} />
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-            )}
-
             {video.status === "ready" && (
-              <div className="video-card-actions" style={{ borderTop: "1px solid var(--color-border)", marginTop: 12, paddingTop: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <div className="video-card-actions">
+                <button
+                  onClick={() => copyLink(video.shareUrl)}
+                  className="card-action-btn"
+                >
+                  Copy link
+                </button>
+                <span className="card-action-spacer" />
+                <div style={{ position: "relative" }} ref={openMenuId === video.id ? menuRef : undefined}>
                   <button
-                    onClick={() => copyLink(video.shareUrl)}
-                    className="action-link"
+                    onClick={() => setOpenMenuId(openMenuId === video.id ? null : video.id)}
+                    className="card-action-btn"
+                    aria-label="More actions"
+                    aria-expanded={openMenuId === video.id}
                   >
-                    Copy link
+                    &middot;&middot;&middot;
                   </button>
-                  <span className="action-sep">&middot;</span>
-                  <div style={{ position: "relative" }} ref={openMenuId === video.id ? menuRef : undefined}>
-                    <button
-                      onClick={() => setOpenMenuId(openMenuId === video.id ? null : video.id)}
-                      className="action-link"
-                      aria-label="More actions"
-                      aria-expanded={openMenuId === video.id}
+                  {openMenuId === video.id && (
+                    <div
+                      className="dropdown-menu"
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        right: 0,
+                        marginTop: 4,
+                        background: "var(--color-surface)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 8,
+                        padding: "4px 0",
+                        minWidth: 160,
+                        zIndex: 50,
+                        boxShadow: "0 4px 16px var(--color-shadow)",
+                      }}
                     >
-                      &middot;&middot;&middot;
-                    </button>
-                    {openMenuId === video.id && (
-                      <div
-                        className="dropdown-menu"
-                        style={{
-                          position: "absolute",
-                          top: "100%",
-                          right: 0,
-                          marginTop: 4,
-                          background: "var(--color-surface)",
-                          border: "1px solid var(--color-border)",
-                          borderRadius: 8,
-                          padding: "4px 0",
-                          minWidth: 160,
-                          zIndex: 50,
-                          boxShadow: "0 4px 16px var(--color-shadow)",
-                        }}
+                      <Link
+                        to={`/videos/${video.id}/analytics`}
+                        className="action-link"
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", textDecoration: "none" }}
+                        onClick={() => setOpenMenuId(null)}
                       >
-                        <Link
-                          to={`/videos/${video.id}/analytics`}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", textDecoration: "none" }}
-                          onClick={() => setOpenMenuId(null)}
-                        >
-                          Analytics
-                        </Link>
-                        <button
-                          onClick={() => { downloadVideo(video.id); setOpenMenuId(null); }}
-                          disabled={downloadingId === video.id}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", opacity: downloadingId === video.id ? 0.5 : undefined }}
-                        >
-                          {downloadingId === video.id ? "Downloading..." : "Download"}
-                        </button>
-                        <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
-                        <button
-                          onClick={() => { deleteVideo(video.id); setOpenMenuId(null); }}
-                          disabled={deletingId === video.id}
-                          className="action-link"
-                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: "var(--color-error)", opacity: deletingId === video.id ? 0.5 : undefined }}
-                        >
-                          {deletingId === video.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                        Analytics
+                      </Link>
+                      <button
+                        onClick={() => { downloadVideo(video.id); setOpenMenuId(null); }}
+                        disabled={downloadingId === video.id}
+                        className="action-link"
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", opacity: downloadingId === video.id ? 0.5 : undefined }}
+                      >
+                        {downloadingId === video.id ? "Downloading..." : "Download"}
+                      </button>
+                      <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
+                      <button
+                        onClick={() => { deleteVideo(video.id); setOpenMenuId(null); }}
+                        disabled={deletingId === video.id}
+                        className="action-link"
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: "var(--color-error)", opacity: deletingId === video.id ? 0.5 : undefined }}
+                      >
+                        {deletingId === video.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
