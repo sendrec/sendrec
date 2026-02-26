@@ -45,7 +45,7 @@ func serveWatchPage(handler *Handler, req *http.Request) *httptest.ResponseRecor
 
 func expectViewRecording(mock pgxmock.PgxPoolIface, videoID string) {
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs(videoID, pgxmock.AnyArg()).
+		WithArgs(videoID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 }
 

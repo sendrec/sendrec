@@ -358,9 +358,17 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 			defer cancel()
 			ip := clientIP(r)
 			hash := viewerHash(ip, r.UserAgent())
+			ref := categorizeReferrer(r.Header.Get("Referer"))
+			browser := parseBrowser(r.UserAgent())
+			device := parseDevice(r.UserAgent())
+			var country, city string
+			if h.geoResolver != nil {
+				country, city = h.geoResolver.Lookup(ip)
+			}
 			if _, err := h.db.Exec(ctx,
-				`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
-				videoID, hash,
+				`INSERT INTO video_views (video_id, viewer_hash, referrer, browser, device, country, city)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+				videoID, hash, ref, browser, device, country, city,
 			); err != nil {
 				slog.Error("video: failed to record view", "video_id", videoID, "error", err)
 			}

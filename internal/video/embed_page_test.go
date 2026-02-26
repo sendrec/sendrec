@@ -263,7 +263,7 @@ func TestEmbedPage_RecordsView(t *testing.T) {
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("vid-1", pgxmock.AnyArg()).
+		WithArgs("vid-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -345,7 +345,7 @@ func TestEmbedPage_NeverExpires(t *testing.T) {
 		)
 
 	mock.ExpectExec("INSERT INTO video_views").
-		WithArgs("vid-1", pgxmock.AnyArg()).
+		WithArgs("vid-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	req := embedPageRequest("token-never")
@@ -437,7 +437,7 @@ func TestEmbedPage_RendersCtaOverlay(t *testing.T) {
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("vid-1", pgxmock.AnyArg()).
+		WithArgs("vid-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -491,7 +491,7 @@ func TestEmbedPage_RendersSubtitleTrack(t *testing.T) {
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("vid-1", pgxmock.AnyArg()).
+		WithArgs("vid-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -544,7 +544,7 @@ func TestEmbedPage_MilestoneTrackingScript(t *testing.T) {
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("vid-1", pgxmock.AnyArg()).
+		WithArgs("vid-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -640,7 +640,7 @@ func TestEmbedPage_ChaptersBar(t *testing.T) {
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("vid-1", pgxmock.AnyArg()).
+		WithArgs("vid-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -696,7 +696,7 @@ func TestEmbedPage_NoChaptersBar_WhenEmpty(t *testing.T) {
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs("vid-1", pgxmock.AnyArg()).
+		WithArgs("vid-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))

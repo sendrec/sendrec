@@ -1935,7 +1935,7 @@ func TestWatch_Success(t *testing.T) {
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs(videoID, pgxmock.AnyArg()).
+		WithArgs(videoID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	r := chi.NewRouter()
@@ -2043,7 +2043,7 @@ func TestWatch_StorageError(t *testing.T) {
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs(videoID, pgxmock.AnyArg()).
+		WithArgs(videoID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	r := chi.NewRouter()
@@ -2402,7 +2402,7 @@ func TestWatch_RecordsView(t *testing.T) {
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs(videoID, pgxmock.AnyArg()).
+		WithArgs(videoID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	r := chi.NewRouter()
@@ -2451,7 +2451,7 @@ func TestWatch_IncludesThumbnailURL(t *testing.T) {
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs(videoID, pgxmock.AnyArg()).
+		WithArgs(videoID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	r := chi.NewRouter()
@@ -4244,7 +4244,7 @@ func TestWatch_IncludesTranscriptWhenReady(t *testing.T) {
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs(videoID, pgxmock.AnyArg()).
+		WithArgs(videoID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	r := chi.NewRouter()
@@ -4310,7 +4310,7 @@ func TestWatch_OmitsTranscriptWhenNone(t *testing.T) {
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
-		WithArgs(videoID, pgxmock.AnyArg()).
+		WithArgs(videoID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	r := chi.NewRouter()

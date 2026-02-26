@@ -14,6 +14,7 @@ import (
 	"github.com/sendrec/sendrec/internal/billing"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/docs"
+	"github.com/sendrec/sendrec/internal/geoip"
 	"github.com/sendrec/sendrec/internal/ratelimit"
 	"github.com/sendrec/sendrec/internal/video"
 	"github.com/sendrec/sendrec/internal/webhook"
@@ -50,6 +51,7 @@ type Config struct {
 	CreemAPIKey             string
 	CreemWebhookSecret      string
 	CreemProProductID       string
+	GeoIPDBPath             string
 }
 
 type Server struct {
@@ -116,6 +118,12 @@ func New(cfg Config) *Server {
 		}
 		if cfg.WebhookClient != nil {
 			s.videoHandler.SetWebhookClient(cfg.WebhookClient)
+		}
+		if cfg.GeoIPDBPath != "" {
+			geoResolver, err := geoip.New(cfg.GeoIPDBPath)
+			if err == nil {
+				s.videoHandler.SetGeoResolver(geoResolver)
+			}
 		}
 
 		if cfg.CreemAPIKey != "" {
