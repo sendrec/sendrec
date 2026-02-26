@@ -2211,6 +2211,14 @@ textarea.form-input {
 .auth-brand {
   text-align: center;
   margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-logo-img {
+  display: block;
 }
 
 .auth-logo {

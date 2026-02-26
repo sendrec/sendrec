@@ -51,6 +51,7 @@ export function AuthForm({
   return (
     <main className="auth-container">
       <div className="auth-brand">
+        <img src="/images/logo.png" alt="" width="48" height="48" className="auth-logo-img" />
         <span className="auth-logo">
           <span className="auth-logo-send">Send</span>
           <span className="auth-logo-rec">Rec</span>
