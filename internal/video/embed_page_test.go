@@ -18,7 +18,7 @@ var embedPageColumns = []string{
 	"thumbnail_key", "share_password", "content_type",
 	"user_id", "email", "view_notification",
 	"cta_text", "cta_url", "transcript_key",
-	"email_gate_enabled", "chapters",
+	"email_gate_enabled", "chapters", "status",
 }
 
 func embedPageRequest(shareToken string) *http.Request {
@@ -87,6 +87,7 @@ func TestEmbedPage_Expired_Returns410(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -125,6 +126,7 @@ func TestEmbedPage_Success_RendersVideoPlayer(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -178,6 +180,7 @@ func TestEmbedPage_WithThumbnail_RendersPoster(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -218,6 +221,7 @@ func TestEmbedPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -260,6 +264,7 @@ func TestEmbedPage_RecordsView(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -302,6 +307,7 @@ func TestEmbedPage_CSPNonce(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -341,6 +347,7 @@ func TestEmbedPage_NeverExpires(t *testing.T) {
 				(*string)(nil), (*string)(nil), (*string)(nil),
 				false,
 				(*string)(nil),
+				"ready",
 			),
 		)
 
@@ -389,6 +396,7 @@ func TestEmbedPage_ResponsiveLayout(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -434,6 +442,7 @@ func TestEmbedPage_RendersCtaOverlay(t *testing.T) {
 			&ctaText, &ctaUrl, (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -488,6 +497,7 @@ func TestEmbedPage_RendersSubtitleTrack(t *testing.T) {
 			(*string)(nil), (*string)(nil), &transcriptKey,
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -541,6 +551,7 @@ func TestEmbedPage_MilestoneTrackingScript(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -590,6 +601,7 @@ func TestEmbedPage_EmailGate_ShowsForm(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			true,
 			(*string)(nil),
+			"ready",
 		))
 
 	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
@@ -637,6 +649,7 @@ func TestEmbedPage_ChaptersBar(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			&chaptersJSON,
+			"ready",
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -693,6 +706,7 @@ func TestEmbedPage_NoChaptersBar_WhenEmpty(t *testing.T) {
 			(*string)(nil), (*string)(nil), (*string)(nil),
 			false,
 			(*string)(nil),
+			"ready",
 		))
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -711,6 +725,53 @@ func TestEmbedPage_NoChaptersBar_WhenEmpty(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestEmbedPage_ProcessingStatus_ShowsProcessingOverlay(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{downloadURL: "https://s3.example.com/video.webm"}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "procembed123"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(embedPageColumns).AddRow(
+			"vid-1", "Processing Video", "recordings/u1/abc.webm", "Bob", createdAt, (*time.Time)(nil),
+			(*string)(nil), (*string)(nil), "video/webm",
+			"owner-user-id", "owner@example.com", (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil),
+			false,
+			(*string)(nil),
+			"processing",
+		))
+
+	mock.ExpectExec(`INSERT INTO video_views`).
+		WithArgs("vid-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	rec := serveEmbedPage(handler, embedPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Video is being processed") {
+		t.Error("expected processing message in response")
+	}
+	if strings.Contains(body, "<video") {
+		t.Error("should NOT render video element when processing")
+	}
+
+	time.Sleep(50 * time.Millisecond)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
