@@ -281,6 +281,10 @@ export function Analytics() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [visibleViewerCount, setVisibleViewerCount] = useState(7);
 
+  useEffect(() => {
+    setView(id ? "video" : "dashboard");
+  }, [id]);
+
   const fetchData = useCallback(
     async (currentView: View, currentRange: Range) => {
       setLoading(true);

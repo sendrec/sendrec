@@ -1718,6 +1718,11 @@ input:focus-visible {
   transition: background 0.15s ease, color 0.15s ease;
 }
 
+.analytics-toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .analytics-toggle-btn--active {
   background: var(--color-surface);
   color: var(--color-text);
@@ -2026,6 +2031,10 @@ input:focus-visible {
   text-decoration: none;
   color: inherit;
   border-bottom: 1px solid var(--color-border);
+}
+
+.top-video-row:hover {
+  background: var(--color-bg-tertiary);
 }
 
 .top-video-row:last-child {
