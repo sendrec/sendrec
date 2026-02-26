@@ -15,6 +15,7 @@ import { Settings } from "./pages/Settings";
 import { Analytics } from "./pages/Analytics";
 import { AnalyticsDashboard } from "./pages/AnalyticsDashboard";
 import { VideoDetail } from "./pages/VideoDetail";
+import { Playlists } from "./pages/Playlists";
 import { PlaylistDetail } from "./pages/PlaylistDetail";
 import { useTheme } from "./hooks/useTheme";
 
@@ -80,7 +81,7 @@ export function App() {
         path="/playlists"
         element={
           <ProtectedRoute>
-            <Navigate to="/library" replace />
+            <Playlists />
           </ProtectedRoute>
         }
       />

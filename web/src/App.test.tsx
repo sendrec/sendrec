@@ -47,6 +47,10 @@ vi.mock("./pages/Settings", () => ({
   Settings: () => <div>Settings Page</div>,
 }));
 
+vi.mock("./pages/Playlists", () => ({
+  Playlists: () => <div>Playlists Page</div>,
+}));
+
 vi.mock("./pages/Analytics", () => ({
   Analytics: () => <div>Analytics Page</div>,
 }));
@@ -141,12 +145,12 @@ describe("App", () => {
     expect(screen.getByText("Record Page")).toBeInTheDocument();
   });
 
-  it("redirects /playlists to Library page", () => {
+  it("renders Playlists page at /playlists", () => {
     mockGetAccessToken.mockReturnValue("valid-token");
 
     renderApp("/playlists");
 
     expect(screen.getByTestId("layout")).toBeInTheDocument();
-    expect(screen.getByText("Library Page")).toBeInTheDocument();
+    expect(screen.getByText("Playlists Page")).toBeInTheDocument();
   });
 });
