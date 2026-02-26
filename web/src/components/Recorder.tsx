@@ -20,11 +20,12 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [duration, setDuration] = useState(0);
   const [countdownValue, setCountdownValue] = useState(3);
-  const [webcamEnabled, setWebcamEnabled] = useState(false);
+  const [webcamEnabled, setWebcamEnabled] = useState(() => localStorage.getItem("recording-mode") === "screen-camera");
   const [captureWidth, setCaptureWidth] = useState(1920);
   const [captureHeight, setCaptureHeight] = useState(1080);
   const [previewExpanded, setPreviewExpanded] = useState(false);
-  const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
+  const [systemAudioEnabled, setSystemAudioEnabled] = useState(() => localStorage.getItem("recording-audio") !== "false");
+  const countdownEnabled = useRef(localStorage.getItem("recording-countdown") !== "false");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -334,8 +335,12 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         }
       });
 
-      setCountdownValue(3);
-      setRecordingState("countdown");
+      if (countdownEnabled.current) {
+        setCountdownValue(3);
+        setRecordingState("countdown");
+      } else {
+        beginRecording();
+      }
     } catch (err) {
       console.error("Screen capture failed", err);
       alert("Screen recording was blocked or failed. Please allow screen capture and try again.");

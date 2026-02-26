@@ -18,6 +18,7 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [duration, setDuration] = useState(0);
   const [countdownValue, setCountdownValue] = useState(3);
+  const countdownEnabled = useRef(localStorage.getItem("recording-countdown") !== "false");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [cameraError, setCameraError] = useState<string | null>(null);
 
@@ -152,8 +153,12 @@ export function CameraRecorder({ onRecordingComplete, maxDurationSeconds = 0 }: 
       onRecordingComplete(blob, elapsed);
     };
 
-    setCountdownValue(3);
-    setRecordingState("countdown");
+    if (countdownEnabled.current) {
+      setCountdownValue(3);
+      setRecordingState("countdown");
+    } else {
+      beginRecording();
+    }
   }
 
   function pauseRecording() {

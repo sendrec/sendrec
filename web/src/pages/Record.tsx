@@ -179,6 +179,8 @@ export function Record() {
     typeof navigator.mediaDevices?.getDisplayMedia === "function";
   const cameraSupported =
     typeof navigator.mediaDevices?.getUserMedia === "function";
+  const preferredMode = localStorage.getItem("recording-mode") || "screen-camera";
+  const useCameraOnly = preferredMode === "camera" && cameraSupported;
 
   const quotaReached =
     limits !== null &&
@@ -297,7 +299,7 @@ export function Record() {
         </div>
       )}
       {tab === "record" ? (
-        screenRecordingSupported ? (
+        screenRecordingSupported && !useCameraOnly ? (
           <Recorder
             onRecordingComplete={handleRecordingComplete}
             maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
