@@ -10,6 +10,7 @@ interface Playlist {
   shareToken?: string;
   shareUrl?: string;
   videoCount: number;
+  thumbnailUrl?: string | null;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -296,7 +297,11 @@ export function Playlists() {
                 <div className="playlist-thumb playlist-thumb--back2" />
                 <div className="playlist-thumb playlist-thumb--back1" />
                 <div className="playlist-thumb playlist-thumb--front">
-                  <span className="playlist-thumb-play" />
+                  {playlist.thumbnailUrl ? (
+                    <img src={playlist.thumbnailUrl} alt="" className="playlist-thumb-img" />
+                  ) : (
+                    <span className="playlist-thumb-play" />
+                  )}
                   <span className="playlist-thumb-count">
                     {playlist.videoCount}{" "}
                     {playlist.videoCount === 1 ? "video" : "videos"}
