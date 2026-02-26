@@ -640,6 +640,458 @@ input:focus-visible {
   border-color: var(--color-accent);
 }
 
+/* Record page — Onboarding card */
+.onboarding-card {
+  max-width: 400px;
+  width: 100%;
+  padding: 20px 24px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  text-align: left;
+  margin-bottom: 24px;
+}
+
+.onboarding-title {
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.onboarding-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.onboarding-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.onboarding-step-num {
+  color: var(--color-accent);
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.onboarding-step-text {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+/* Record page — Usage section */
+.usage-section {
+  width: 100%;
+  max-width: 300px;
+  margin-bottom: 24px;
+}
+
+.usage-label {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+/* Record page — Page heading */
+.page-heading {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 24px;
+  letter-spacing: -0.01em;
+}
+
+/* Record page — Idle control buttons */
+.record-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 14px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+}
+
+.btn-secondary--active {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
+.btn-secondary--active:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.btn-record {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: 8px;
+  padding: 14px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.btn-record:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn-record:active {
+  transform: scale(0.97);
+}
+
+.max-duration-label {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  margin: 0;
+}
+
+.upload-link {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.upload-link a, .upload-link button {
+  color: var(--color-text-secondary);
+  text-decoration: underline;
+  transition: color 0.15s ease;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.upload-link a:hover, .upload-link button:hover {
+  color: var(--color-accent);
+}
+
+/* Record page — Recording state */
+.recording-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  order: -1;
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.recording-indicator--active {
+  color: var(--color-error);
+}
+
+.recording-indicator--paused {
+  color: var(--color-text-secondary);
+}
+
+.recording-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.recording-dot--active {
+  background: var(--color-error);
+  animation: pulse 1.5s infinite;
+}
+
+.recording-dot--paused {
+  background: var(--color-text-secondary);
+  animation: none;
+}
+
+.recording-remaining {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+.recording-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn-pause {
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-pause:hover {
+  border-color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+}
+
+.btn-resume {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-resume:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn-draw {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-draw:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+}
+
+.btn-draw--active {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
+.btn-draw--active:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.btn-stop {
+  background: var(--color-error);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-stop:hover {
+  background: #dc2626;
+}
+
+.btn-stop:active {
+  transform: scale(0.97);
+}
+
+/* Record page — Share state */
+.share-container {
+  width: 100%;
+  max-width: 520px;
+}
+
+.share-heading {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 20px;
+}
+
+.share-link-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  width: 100%;
+}
+
+.share-link-input {
+  flex: 1;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  outline: none;
+  font-family: inherit;
+  min-width: 0;
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+}
+
+.btn-copy {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  min-width: 100px;
+}
+
+.btn-copy:hover {
+  background: var(--color-accent-hover);
+}
+
+.share-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--color-accent);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-outline:hover {
+  border-color: var(--color-accent);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-ghost:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+}
+
+/* Record page — Quota state */
+.quota-message {
+  font-size: 16px;
+  color: var(--color-error);
+  margin-bottom: 8px;
+  max-width: 400px;
+}
+
+.quota-submessage {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin-bottom: 24px;
+  max-width: 400px;
+}
+
+.quota-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Record page — Error state */
+.error-message {
+  color: var(--color-error);
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+
+/* Record page — Recorder container */
+.recorder-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
+}
+
 /* Responsive layout */
 .page-container {
   max-width: 800px;
@@ -2275,4 +2727,26 @@ input:focus-visible {
   .detail-actions { flex-direction: column; }
   .detail-actions .detail-btn { justify-content: center; }
   .comment-delete { opacity: 1; }
+
+  .record-controls {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .record-controls .btn-record {
+    width: 100%;
+  }
+
+  .recording-controls {
+    gap: 8px;
+  }
+
+  .share-link-row {
+    flex-direction: column;
+  }
+
+  .share-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
