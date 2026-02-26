@@ -302,12 +302,12 @@ func (h *Handler) DashboardExport(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=analytics-dashboard.csv")
-	fmt.Fprintln(w, "Date,Views,Unique Views")
+	_, _ = fmt.Fprintln(w, "Date,Views,Unique Views")
 	for rows.Next() {
 		var day time.Time
 		var views, uv int64
 		if err := rows.Scan(&day, &views, &uv); err == nil {
-			fmt.Fprintf(w, "%s,%d,%d\n", day.Format("2006-01-02"), views, uv)
+			_, _ = fmt.Fprintf(w, "%s,%d,%d\n", day.Format("2006-01-02"), views, uv)
 		}
 	}
 }
