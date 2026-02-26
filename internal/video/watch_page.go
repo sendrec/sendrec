@@ -808,6 +808,56 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 ` + playerJS + `
             })();
         </script>
+        {{if ne .TranscriptStatus "no_audio"}}
+        <div class="transcript-section">
+            {{if and (eq .TranscriptStatus "ready") (eq .SummaryStatus "ready")}}
+            <div class="panel-tabs">
+                <button class="panel-tab panel-tab--active" data-tab="summary">Summary</button>
+                <button class="panel-tab" data-tab="transcript">Transcript</button>
+            </div>
+            <div class="panel-content" id="summary-panel">
+                <p class="summary-text">{{.Summary}}</p>
+                {{if .Chapters}}
+                <div class="chapter-list">
+                    <h3 class="chapter-list-title">Chapters</h3>
+                    {{range .Chapters}}
+                    <div class="chapter-item" data-start="{{.Start}}">
+                        <span class="chapter-timestamp">{{formatTimestamp .Start}}</span>
+                        <span class="chapter-title">{{.Title}}</span>
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+            <div class="panel-content hidden" id="transcript-panel">
+                {{range .Segments}}
+                <div class="transcript-segment" data-start="{{.Start}}" data-end="{{.End}}">
+                    <span class="transcript-timestamp">{{formatTimestamp .Start}}</span>
+                    <span class="transcript-text">{{.Text}}</span>
+                </div>
+                {{end}}
+            </div>
+            {{else}}
+            <h2 class="transcript-header">Transcript <button class="download-btn transcribe-btn hidden" id="transcribe-btn">Transcribe</button></h2>
+            {{if eq .TranscriptStatus "pending"}}
+            <p class="transcript-processing">Transcription queued...</p>
+            {{else if eq .TranscriptStatus "processing"}}
+            <p class="transcript-processing">Transcription in progress...</p>
+            {{else if eq .TranscriptStatus "ready"}}
+            <div id="transcript-panel">
+                {{range .Segments}}
+                <div class="transcript-segment" data-start="{{.Start}}" data-end="{{.End}}">
+                    <span class="transcript-timestamp">{{formatTimestamp .Start}}</span>
+                    <span class="transcript-text">{{.Text}}</span>
+                </div>
+                {{end}}
+            </div>
+            {{else if eq .TranscriptStatus "failed"}}
+            <p class="transcript-processing hidden" id="transcript-failed">Transcription failed.</p>
+            {{end}}
+            {{end}}
+        </div>
+        {{end}}
         {{if ne .CommentMode "disabled"}}
         <div class="comments-section" id="comments-section">
             <h2 class="comments-header" id="comments-header">Comments</h2>
@@ -1287,56 +1337,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             });
         })();
         </script>
-        {{end}}
-        {{if ne .TranscriptStatus "no_audio"}}
-        <div class="transcript-section">
-            {{if and (eq .TranscriptStatus "ready") (eq .SummaryStatus "ready")}}
-            <div class="panel-tabs">
-                <button class="panel-tab panel-tab--active" data-tab="summary">Summary</button>
-                <button class="panel-tab" data-tab="transcript">Transcript</button>
-            </div>
-            <div class="panel-content" id="summary-panel">
-                <p class="summary-text">{{.Summary}}</p>
-                {{if .Chapters}}
-                <div class="chapter-list">
-                    <h3 class="chapter-list-title">Chapters</h3>
-                    {{range .Chapters}}
-                    <div class="chapter-item" data-start="{{.Start}}">
-                        <span class="chapter-timestamp">{{formatTimestamp .Start}}</span>
-                        <span class="chapter-title">{{.Title}}</span>
-                    </div>
-                    {{end}}
-                </div>
-                {{end}}
-            </div>
-            <div class="panel-content hidden" id="transcript-panel">
-                {{range .Segments}}
-                <div class="transcript-segment" data-start="{{.Start}}" data-end="{{.End}}">
-                    <span class="transcript-timestamp">{{formatTimestamp .Start}}</span>
-                    <span class="transcript-text">{{.Text}}</span>
-                </div>
-                {{end}}
-            </div>
-            {{else}}
-            <h2 class="transcript-header">Transcript <button class="download-btn transcribe-btn hidden" id="transcribe-btn">Transcribe</button></h2>
-            {{if eq .TranscriptStatus "pending"}}
-            <p class="transcript-processing">Transcription queued...</p>
-            {{else if eq .TranscriptStatus "processing"}}
-            <p class="transcript-processing">Transcription in progress...</p>
-            {{else if eq .TranscriptStatus "ready"}}
-            <div id="transcript-panel">
-                {{range .Segments}}
-                <div class="transcript-segment" data-start="{{.Start}}" data-end="{{.End}}">
-                    <span class="transcript-timestamp">{{formatTimestamp .Start}}</span>
-                    <span class="transcript-text">{{.Text}}</span>
-                </div>
-                {{end}}
-            </div>
-            {{else if eq .TranscriptStatus "failed"}}
-            <p class="transcript-processing hidden" id="transcript-failed">Transcription failed.</p>
-            {{end}}
-            {{end}}
-        </div>
         {{end}}
         <script nonce="{{.Nonce}}">
         (function() {
