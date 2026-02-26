@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 
@@ -37,13 +37,6 @@ export function Upload() {
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
-  const [limits, setLimits] = useState<LimitsResponse | null>(null);
-
-  useEffect(() => {
-    apiFetch<LimitsResponse>("/api/videos/limits")
-      .then((result) => setLimits(result ?? null))
-      .catch(() => {});
-  }, []);
 
   function acceptFiles(selected: File[]) {
     const valid = selected.filter((f) => SUPPORTED_TYPES.includes(f.type));
@@ -357,32 +350,6 @@ export function Upload() {
 
   return (
     <div className="upload-page">
-      <h1 className="page-heading">
-        Upload Video
-      </h1>
-
-      {limits && limits.videosUsedThisMonth === 0 && (
-        <div className="onboarding-card">
-          <p className="onboarding-title">
-            Get started in 3 steps
-          </p>
-          <div className="onboarding-steps">
-            <div className="onboarding-step">
-              <span className="onboarding-step-num">1.</span>
-              <span className="onboarding-step-text">Record your screen or upload a video</span>
-            </div>
-            <div className="onboarding-step">
-              <span className="onboarding-step-num">2.</span>
-              <span className="onboarding-step-text">Share the link with anyone</span>
-            </div>
-            <div className="onboarding-step">
-              <span className="onboarding-step-num">3.</span>
-              <span className="onboarding-step-text">Track views and get feedback</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="upload-content">
         <input
           ref={fileInputRef}

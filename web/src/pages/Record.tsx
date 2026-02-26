@@ -274,7 +274,7 @@ export function Record() {
           </div>
         </div>
       )}
-      {limits && limits.videosUsedThisMonth === 0 && (
+      {tab === "record" && limits && limits.videosUsedThisMonth === 0 && (
         <div className="onboarding-card">
           <p className="onboarding-title">Get started in 3 steps</p>
           <div className="onboarding-steps">
