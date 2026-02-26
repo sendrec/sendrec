@@ -104,6 +104,14 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .cta-overlay a { display: inline-block; padding: 8px 24px; background: #00b67a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
         .cta-overlay a:hover { opacity: 0.9; color: #fff; }
 ` + safariWarningCSS + `
+        .browser-warning {
+            position: absolute;
+            bottom: 40px;
+            left: 12px;
+            right: 12px;
+            z-index: 5;
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
