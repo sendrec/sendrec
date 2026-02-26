@@ -41,10 +41,10 @@ describe("Layout", () => {
     expect(screen.getByRole("link", { name: /SendRec/ })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("href", "/library");
+    expect(screen.getByRole("link", { name: "Playlists" })).toHaveAttribute("href", "/playlists");
     expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute("href", "/analytics");
     expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Playlists" })).not.toBeInTheDocument();
   });
 
   it("renders logo image in nav", () => {

@@ -80,6 +80,14 @@ export function Layout({ children }: LayoutProps) {
           </Link>
 
           <Link
+            to="/playlists"
+            className={`nav-link${isActive("/playlists") ? " nav-link--active" : ""}`}
+            onClick={handleNavClick}
+          >
+            Playlists
+          </Link>
+
+          <Link
             to="/analytics"
             className={`nav-link${isActive("/analytics") ? " nav-link--active" : ""}`}
             onClick={handleNavClick}
