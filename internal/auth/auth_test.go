@@ -359,7 +359,7 @@ func TestConfirmEmail_Success(t *testing.T) {
 	if emailSender.lastEmail != "alice@example.com" {
 		t.Errorf("expected welcome email to alice@example.com, got %q", emailSender.lastEmail)
 	}
-	if emailSender.lastDashboardURL != "https://app.sendrec.eu/dashboard" {
+	if emailSender.lastDashboardURL != "https://app.sendrec.eu" {
 		t.Errorf("expected dashboard URL, got %q", emailSender.lastDashboardURL)
 	}
 

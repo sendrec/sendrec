@@ -465,7 +465,7 @@ func (h *Handler) ConfirmEmail(w http.ResponseWriter, r *http.Request) {
 		).Scan(&userEmail, &userName); err != nil {
 			slog.Error("confirm-email: failed to load user for welcome email", "error", err)
 		} else {
-			dashboardURL := h.baseURL + "/dashboard"
+			dashboardURL := h.baseURL
 			if err := h.emailSender.SendWelcome(r.Context(), userEmail, userName, dashboardURL); err != nil {
 				slog.Error("confirm-email: failed to send welcome email", "error", err)
 			}
