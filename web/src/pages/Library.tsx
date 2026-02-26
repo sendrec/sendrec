@@ -658,16 +658,8 @@ export function Library() {
         />
         <Link
           to="/"
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 8,
-            padding: "8px 20px",
-            fontSize: 14,
-            fontWeight: 600,
-            textDecoration: "none",
-            whiteSpace: "nowrap",
-          }}
+          className="detail-btn detail-btn--accent"
+          style={{ textDecoration: "none", whiteSpace: "nowrap" }}
         >
           New Recording
         </Link>

@@ -271,7 +271,6 @@ input:focus-visible {
 }
 
 .nav-signout {
-  margin-left: auto;
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 14px;
@@ -291,6 +290,7 @@ input:focus-visible {
   background: transparent;
   border: none;
   cursor: pointer;
+  margin-left: auto;
 }
 
 .nav-theme-toggle:hover {
@@ -2296,7 +2296,6 @@ textarea.form-input {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  overflow: hidden;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
   cursor: pointer;
   position: relative;
@@ -2315,6 +2314,7 @@ textarea.form-input {
   aspect-ratio: 16 / 9;
   background: var(--color-bg-tertiary);
   overflow: hidden;
+  border-radius: 8px 8px 0 0;
 }
 
 .video-card-thumbnail img {
@@ -3444,6 +3444,57 @@ textarea.form-input {
   flex-shrink: 0;
 }
 
+/* Analytics — Engagement Heatmap */
+.heatmap-bar-container {
+  display: flex;
+  gap: 1px;
+  height: 48px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.heatmap-segment {
+  flex: 1;
+  background: var(--color-accent);
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.heatmap-segment:hover {
+  transform: scaleY(1.15);
+  transform-origin: bottom;
+  z-index: 1;
+}
+
+.heatmap-segment:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.heatmap-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.heatmap-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
 /* Analytics — Breakdown Grid */
 .breakdown-grid {
   display: grid;
@@ -3818,6 +3869,15 @@ textarea.form-input {
     min-height: 44px;
     display: flex;
     align-items: center;
+  }
+
+  .nav-theme-toggle {
+    margin-left: 0;
+    padding: 12px 16px;
+    width: auto;
+    height: auto;
+    justify-content: flex-start;
+    border-radius: 0;
   }
 
   .nav-signout {

@@ -80,23 +80,27 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 12px;
-            background: #1e293b;
+            padding: 6px 10px;
+            background: #111d32;
             color: #e2e8f0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 13px;
+            font-size: 12px;
+            flex-shrink: 0;
+            border-top: 1px solid #1e2d45;
         }
         .footer-title {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            margin-right: 12px;
+            margin-right: 8px;
+            font-weight: 500;
         }
         .footer a {
-            color: #94a3b8;
+            color: #8892a4;
             text-decoration: none;
             white-space: nowrap;
-            font-size: 12px;
+            font-size: 11px;
+            transition: color 0.15s;
         }
         .footer a:hover { color: #e2e8f0; }
         .cta-overlay { display: none; position: absolute; bottom: 48px; left: 0; right: 0; padding: 12px; text-align: center; background: rgba(15, 23, 42, 0.9); }

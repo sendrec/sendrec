@@ -166,6 +166,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         .branding {
             margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--color-border, #1e2d45);
             font-size: 0.75rem;
             color: #64748b;
         }
@@ -584,7 +586,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 6px 0;
+            padding: 6px 8px;
             cursor: pointer;
             border-radius: 4px;
         }
