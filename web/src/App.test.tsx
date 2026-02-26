@@ -55,10 +55,6 @@ vi.mock("./pages/Analytics", () => ({
   Analytics: () => <div>Analytics Page</div>,
 }));
 
-vi.mock("./pages/AnalyticsDashboard", () => ({
-  AnalyticsDashboard: () => <div>Analytics Dashboard Page</div>,
-}));
-
 vi.mock("./pages/NotFound", () => ({
   NotFound: () => <div>Not Found Page</div>,
 }));
@@ -133,7 +129,7 @@ describe("App", () => {
     renderApp("/analytics");
 
     expect(screen.getByTestId("layout")).toBeInTheDocument();
-    expect(screen.getByText("Analytics Dashboard Page")).toBeInTheDocument();
+    expect(screen.getByText("Analytics Page")).toBeInTheDocument();
   });
 
   it("redirects /upload to Record page", () => {

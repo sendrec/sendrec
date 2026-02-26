@@ -13,7 +13,6 @@ import { ConfirmEmail } from "./pages/ConfirmEmail";
 import { NotFound } from "./pages/NotFound";
 import { Settings } from "./pages/Settings";
 import { Analytics } from "./pages/Analytics";
-import { AnalyticsDashboard } from "./pages/AnalyticsDashboard";
 import { VideoDetail } from "./pages/VideoDetail";
 import { Playlists } from "./pages/Playlists";
 import { PlaylistDetail } from "./pages/PlaylistDetail";
@@ -97,7 +96,7 @@ export function App() {
         path="/analytics"
         element={
           <ProtectedRoute>
-            <AnalyticsDashboard />
+            <Analytics />
           </ProtectedRoute>
         }
       />

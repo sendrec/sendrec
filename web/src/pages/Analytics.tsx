@@ -1,13 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { apiFetch } from "../api/client";
-import { useTheme } from "../hooks/useTheme";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { apiFetch, getAccessToken } from "../api/client";
 
-interface DailyViews {
-  date: string;
-  views: number;
-  uniqueViews: number;
-}
+type View = "video" | "dashboard";
+type Range = "7d" | "30d" | "90d" | "all";
+type SortColumn = "viewer" | "watchTime" | "completion" | "date" | "location";
+type SortDirection = "asc" | "desc";
 
 interface AnalyticsSummary {
   totalViews: number;
@@ -18,6 +16,12 @@ interface AnalyticsSummary {
   peakDayViews: number;
   totalCtaClicks: number;
   ctaClickRate: number;
+}
+
+interface DailyViews {
+  date: string;
+  views: number;
+  uniqueViews: number;
 }
 
 interface Milestones {
@@ -32,6 +36,9 @@ interface Viewer {
   firstViewedAt: string;
   viewCount: number;
   completion: number;
+  watchTimeSeconds: number;
+  country: string;
+  city: string;
 }
 
 interface SegmentData {
@@ -40,315 +47,865 @@ interface SegmentData {
   intensity: number;
 }
 
+interface Trends {
+  views: number | null;
+  uniqueViews: number | null;
+  avgWatchTime: number | null;
+  completionRate: number | null;
+}
+
+interface Referrer {
+  source: string;
+  count: number;
+  percentage: number;
+}
+
+interface BrowserStat {
+  name: string;
+  percentage: number;
+}
+
+interface DeviceStat {
+  name: string;
+  percentage: number;
+}
+
 interface AnalyticsData {
   summary: AnalyticsSummary;
   daily: DailyViews[];
   milestones: Milestones;
   viewers: Viewer[];
-  heatmap: SegmentData[];
+  heatmap: SegmentData[] | null;
+  trends?: Trends | null;
+  referrers: Referrer[];
+  browsers: BrowserStat[];
+  devices: DeviceStat[];
 }
 
-type Range = "7d" | "30d" | "all";
+interface DashboardSummary {
+  totalViews: number;
+  uniqueViews: number;
+  avgDailyViews: number;
+  totalVideos: number;
+  totalWatchTimeSeconds: number;
+  avgCompletion: number;
+}
 
-function formatPeakDate(isoDate: string): string {
+interface DashboardTopVideo {
+  id: string;
+  title: string;
+  views: number;
+  uniqueViews: number;
+  thumbnailUrl: string;
+  completion: number;
+}
+
+interface DashboardData {
+  summary: DashboardSummary;
+  daily: DailyViews[];
+  topVideos: DashboardTopVideo[];
+}
+
+function formatDate(isoDate: string): string {
   if (!isoDate) return "";
   const date = new Date(isoDate + "T00:00:00");
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function formatChartDate(isoDate: string): string {
   const date = new Date(isoDate + "T00:00:00");
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function formatWatchTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (remainingMinutes === 0) return `${hours}h`;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
+function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB");
+}
+
+function formatTrend(value: number | null): string {
+  if (value === null) return "";
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${value.toFixed(0)}%`;
+}
+
+function trendDirection(value: number | null): "up" | "down" | null {
+  if (value === null || value === 0) return null;
+  return value > 0 ? "up" : "down";
+}
+
+const RANGES: Range[] = ["7d", "30d", "90d", "all"];
+
+const RANGE_LABELS: Record<Range, string> = {
+  "7d": "7d",
+  "30d": "30d",
+  "90d": "90d",
+  all: "All",
+};
+
+function sortViewers(
+  viewers: Viewer[],
+  column: SortColumn,
+  direction: SortDirection,
+): Viewer[] {
+  return [...viewers].sort((a, b) => {
+    let comparison = 0;
+    switch (column) {
+      case "viewer":
+        comparison = a.email.localeCompare(b.email);
+        break;
+      case "watchTime":
+        comparison = a.watchTimeSeconds - b.watchTimeSeconds;
+        break;
+      case "completion":
+        comparison = a.completion - b.completion;
+        break;
+      case "date":
+        comparison =
+          new Date(a.firstViewedAt).getTime() -
+          new Date(b.firstViewedAt).getTime();
+        break;
+      case "location": {
+        const locA = [a.city, a.country].filter(Boolean).join(", ");
+        const locB = [b.city, b.country].filter(Boolean).join(", ");
+        comparison = locA.localeCompare(locB);
+        break;
+      }
+    }
+    return direction === "asc" ? comparison : -comparison;
+  });
+}
+
+function SkeletonLoading() {
+  return (
+    <div className="page-container">
+      <div className="analytics-header">
+        <div className="skeleton" style={{ width: 120, height: 28 }} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <div className="skeleton" style={{ width: 60, height: 28 }} />
+          <div className="skeleton" style={{ width: 60, height: 28 }} />
+        </div>
+      </div>
+      <div className="analytics-stats">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="skeleton skeleton-stat" />
+        ))}
+      </div>
+      <div className="skeleton skeleton-chart" style={{ marginBottom: 16 }} />
+      <div className="skeleton skeleton-chart" />
+    </div>
+  );
+}
+
+function CssBarChart({ daily }: { daily: DailyViews[] }) {
+  if (daily.length === 0) return null;
+
+  const maxViews = Math.max(...daily.map((d) => d.views), 1);
+  const yLabels = [maxViews, Math.round(maxViews * 0.75), Math.round(maxViews * 0.5), Math.round(maxViews * 0.25), 0];
+
+  const showEveryNth = daily.length > 14 ? Math.ceil(daily.length / 10) : 1;
+
+  return (
+    <div className="analytics-chart">
+      <div className="analytics-chart-yaxis">
+        {yLabels.map((label, i) => (
+          <span key={i}>{label}</span>
+        ))}
+      </div>
+      <div className="analytics-chart-area">
+        <div className="analytics-chart-grid">
+          {yLabels.map((_, i) => (
+            <div key={i} className="analytics-chart-grid-line" />
+          ))}
+        </div>
+        <div className="analytics-chart-bars">
+          {daily.map((d, i) => {
+            const heightPct =
+              maxViews > 0 ? (d.views / maxViews) * 100 : 0;
+            return (
+              <div key={i} className="analytics-chart-bar-wrapper">
+                <div className="analytics-chart-tooltip">
+                  {formatChartDate(d.date)}: {d.views} views ({d.uniqueViews}{" "}
+                  unique)
+                </div>
+                <div
+                  className="analytics-chart-bar"
+                  style={{ height: `${heightPct}%` }}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div className="analytics-chart-xaxis">
+          {daily.map((d, i) => (
+            <span key={i}>
+              {i % showEveryNth === 0 ? formatChartDate(d.date) : ""}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function Analytics() {
   const { id } = useParams<{ id: string }>();
-  const [data, setData] = useState<AnalyticsData | null>(null);
+  const navigate = useNavigate();
+
+  const [view, setView] = useState<View>(id ? "video" : "dashboard");
+  const [range, setRange] = useState<Range>("7d");
+
+  const [videoData, setVideoData] = useState<AnalyticsData | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
+    null,
+  );
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [range, setRange] = useState<Range>("7d");
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<unknown>(null);
-  const { resolvedTheme } = useTheme();
 
-  const fetchAnalytics = useCallback(async (selectedRange: Range) => {
-    setLoading(true);
-    setError(false);
-    try {
-      const result = await apiFetch<AnalyticsData>(`/api/videos/${id}/analytics?range=${selectedRange}`);
-      if (result) {
-        setData(result);
-      } else {
+  const [sortColumn, setSortColumn] = useState<SortColumn>("date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [visibleViewerCount, setVisibleViewerCount] = useState(7);
+
+  const fetchData = useCallback(
+    async (currentView: View, currentRange: Range) => {
+      setLoading(true);
+      setError(false);
+      try {
+        if (currentView === "video" && id) {
+          const result = await apiFetch<AnalyticsData>(
+            `/api/videos/${id}/analytics?range=${currentRange}`,
+          );
+          if (result) {
+            setVideoData(result);
+          } else {
+            setError(true);
+          }
+        } else {
+          const result = await apiFetch<DashboardData>(
+            `/api/analytics/dashboard?range=${currentRange}`,
+          );
+          if (result) {
+            setDashboardData(result);
+          } else {
+            setError(true);
+          }
+        }
+      } catch {
         setError(true);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    fetchData(view, range);
+  }, [view, range, fetchData]);
+
+  function handleViewToggle(newView: View) {
+    if (newView === view) return;
+    if (newView === "video" && !id) return;
+
+    setView(newView);
+    setVisibleViewerCount(7);
+    setSortColumn("date");
+    setSortDirection("desc");
+
+    if (newView === "dashboard" && id) {
+      navigate("/analytics");
     }
-  }, [id]);
+  }
 
-  useEffect(() => {
-    fetchAnalytics(range);
-  }, [range, fetchAnalytics]);
+  function handleSort(column: SortColumn) {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  }
 
-  useEffect(() => {
-    if (!data || data.summary.totalViews === 0 || !canvasRef.current) return;
+  function sortIndicator(column: SortColumn): string {
+    if (sortColumn !== column) return "";
+    return sortDirection === "asc" ? " \u2191" : " \u2193";
+  }
 
-    let destroyed = false;
-
-    async function renderChart() {
-      const chartModule = await import("chart.js/auto");
-      const Chart = chartModule.default;
-
-      if (destroyed || !canvasRef.current) return;
-
-      if (chartRef.current) {
-        (chartRef.current as { destroy: () => void }).destroy();
-      }
-
-      const styles = getComputedStyle(document.documentElement);
-      const accentColor = styles.getPropertyValue("--color-accent").trim();
-      const chartLabelColor = styles.getPropertyValue("--color-chart-label").trim();
-      const chartGridColor = styles.getPropertyValue("--color-chart-grid").trim();
-
-      chartRef.current = new Chart(canvasRef.current, {
-        type: "bar",
-        data: {
-          labels: data!.daily.map((d) => formatChartDate(d.date)),
-          datasets: [
-            {
-              label: "Views",
-              data: data!.daily.map((d) => d.views),
-              backgroundColor: accentColor,
-              borderRadius: 3,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: false,
-            },
-            tooltip: {
-              callbacks: {
-                afterLabel: (context) => {
-                  const dayData = data!.daily[context.dataIndex];
-                  return `Unique: ${dayData.uniqueViews}`;
-                },
-              },
-            },
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: {
-                stepSize: 1,
-                color: chartLabelColor,
-              },
-              grid: {
-                color: chartGridColor,
-              },
-            },
-            x: {
-              ticks: {
-                color: chartLabelColor,
-              },
-              grid: {
-                display: false,
-              },
-            },
-          },
-        },
+  async function handleExport() {
+    const url =
+      view === "video"
+        ? `/api/videos/${id}/analytics/export?range=${range}`
+        : `/api/analytics/dashboard/export?range=${range}`;
+    const token = getAccessToken();
+    try {
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const anchor = document.createElement("a");
+      anchor.href = URL.createObjectURL(blob);
+      anchor.download =
+        view === "video"
+          ? `analytics-${id}.csv`
+          : "dashboard-analytics.csv";
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
+    } catch {
+      // Export failed silently
     }
-
-    renderChart();
-
-    return () => {
-      destroyed = true;
-      if (chartRef.current) {
-        (chartRef.current as { destroy: () => void }).destroy();
-        chartRef.current = null;
-      }
-    };
-  }, [data, resolvedTheme]);
-
-  function handleRangeChange(newRange: Range) {
-    setRange(newRange);
   }
 
   if (loading) {
+    return <SkeletonLoading />;
+  }
+
+  if (error) {
     return (
       <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Loading...</p>
+        <p style={{ color: "var(--color-error)", fontSize: 16 }}>
+          Failed to load analytics.
+        </p>
       </div>
     );
   }
-
-  if (error || !data) {
-    return (
-      <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-error)", fontSize: 16 }}>Failed to load analytics.</p>
-      </div>
-    );
-  }
-
-  const ranges: Range[] = ["7d", "30d", "all"];
 
   return (
     <div className="page-container">
-      <Link to={`/videos/${id}`} className="back-link">
-        &larr; Back
-      </Link>
+      {view === "video" && id && (
+        <Link to={`/videos/${id}`} className="back-link">
+          &larr; Back
+        </Link>
+      )}
 
       <div className="analytics-header">
-        <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
-          Analytics
-        </h1>
-        <div className="range-pills">
-          {ranges.map((r) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <h1
+            style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}
+          >
+            Analytics
+          </h1>
+          <div className="analytics-toggle">
             <button
-              key={r}
-              className={`range-pill${range === r ? " range-pill--active" : ""}`}
-              onClick={() => handleRangeChange(r)}
+              className={`analytics-toggle-btn${view === "video" ? " analytics-toggle-btn--active" : ""}`}
+              onClick={() => handleViewToggle("video")}
+              disabled={!id && view === "dashboard"}
             >
-              {r === "all" ? "All" : r}
+              Video
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="analytics-stats">
-        <div className="stat-card">
-          <p className="stat-card-label">Total Views</p>
-          <p className="stat-card-value">{data.summary.totalViews}</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-card-label">Unique Views</p>
-          <p className="stat-card-value">{data.summary.uniqueViews}</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-card-label">Avg / Day</p>
-          <p className="stat-card-value">{data.summary.averageDailyViews}</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-card-label">Peak Day</p>
-          <p className="stat-card-value">{data.summary.peakDayViews}</p>
-          {data.summary.peakDay && (
-            <p className="stat-card-detail">{formatPeakDate(data.summary.peakDay)}</p>
-          )}
-        </div>
-        <div className="stat-card">
-          <p className="stat-card-label">CTA Clicks</p>
-          <p className="stat-card-value">{data.summary.totalCtaClicks}</p>
-          {data.summary.totalViews > 0 && (
-            <p className="stat-card-detail">
-              {(data.summary.ctaClickRate * 100).toFixed(1)}% click rate
-            </p>
-          )}
-        </div>
-      </div>
-
-      {data.summary.totalViews > 0 && data.heatmap && data.heatmap.length > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <h3 className="card-title">Engagement</h3>
-          <div style={{ display: "flex", gap: 1, height: 40, borderRadius: 4, overflow: "hidden" }}>
-            {Array.from({ length: 50 }, (_, i) => {
-              const seg = data.heatmap.find((s) => s.segment === i);
-              const intensity = seg ? seg.intensity : 0;
-              return (
-                <div
-                  key={i}
-                  title={`${i * 2}%-${(i + 1) * 2}%: ${seg ? seg.watchCount : 0} views`}
-                  style={{
-                    flex: 1,
-                    background: "var(--color-accent)",
-                    opacity: Math.max(intensity, 0.08),
-                  }}
-                />
-              );
-            })}
+            <button
+              className={`analytics-toggle-btn${view === "dashboard" ? " analytics-toggle-btn--active" : ""}`}
+              onClick={() => handleViewToggle("dashboard")}
+            >
+              Dashboard
+            </button>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 11 }}>0%</span>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 11 }}>50%</span>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 11 }}>100%</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="range-pills">
+            {RANGES.map((r) => (
+              <button
+                key={r}
+                className={`range-pill${range === r ? " range-pill--active" : ""}`}
+                onClick={() => setRange(r)}
+              >
+                {RANGE_LABELS[r]}
+              </button>
+            ))}
+          </div>
+          <button className="btn-export" onClick={handleExport}>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      {view === "video" && videoData ? (
+        <VideoAnalyticsView
+          data={videoData}
+          range={range}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          visibleViewerCount={visibleViewerCount}
+          onSort={handleSort}
+          onShowMore={() =>
+            setVisibleViewerCount((prev) => prev + 10)
+          }
+          sortIndicator={sortIndicator}
+        />
+      ) : view === "dashboard" && dashboardData ? (
+        <DashboardView data={dashboardData} />
+      ) : (
+        <div className="page-container page-container--centered">
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>
+            No data available.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VideoAnalyticsView({
+  data,
+  range,
+  sortColumn,
+  sortDirection,
+  visibleViewerCount,
+  onSort,
+  onShowMore,
+  sortIndicator,
+}: {
+  data: AnalyticsData;
+  range: Range;
+  sortColumn: SortColumn;
+  sortDirection: SortDirection;
+  visibleViewerCount: number;
+  onSort: (column: SortColumn) => void;
+  onShowMore: () => void;
+  sortIndicator: (column: SortColumn) => string;
+}) {
+  const hasViews = data.summary.totalViews > 0;
+  const trends = range !== "all" ? data.trends : null;
+
+  return (
+    <>
+      <div className="analytics-stats">
+        <StatCard
+          label="Total Views"
+          value={data.summary.totalViews}
+          trend={trends?.views ?? null}
+        />
+        <StatCard
+          label="Unique Views"
+          value={data.summary.uniqueViews}
+          trend={trends?.uniqueViews ?? null}
+        />
+        <StatCard
+          label="Avg / Day"
+          value={data.summary.averageDailyViews}
+        />
+        <StatCard
+          label="Peak Day"
+          value={data.summary.peakDayViews}
+          sub={data.summary.peakDay ? formatDate(data.summary.peakDay) : undefined}
+        />
+        <StatCard
+          label="CTA Clicks"
+          value={data.summary.totalCtaClicks}
+          sub={
+            data.summary.totalViews > 0
+              ? `${(data.summary.ctaClickRate * 100).toFixed(1)}% click rate`
+              : undefined
+          }
+        />
+      </div>
+
+      {!hasViews && (
+        <div className="card">
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 20V10M12 20V4M6 20v-6" />
+              </svg>
+            </div>
+            <div className="empty-state-title">No views in this period</div>
+            <div className="empty-state-desc">
+              Share your video to start getting analytics data.
+            </div>
           </div>
         </div>
       )}
 
-      {data.summary.totalViews > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
+      {hasViews && data.daily.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h3 className="card-title">Views Over Time</h3>
+          <CssBarChart daily={data.daily} />
+        </div>
+      )}
+
+      {hasViews && data.heatmap && data.heatmap.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h3 className="card-title">Viewer Retention</h3>
+          <div className="heatmap-bar-container">
+            {Array.from({ length: 50 }, (_, i) => {
+              const seg = data.heatmap!.find((s) => s.segment === i);
+              const intensity = seg ? seg.intensity : 0;
+              return (
+                <div
+                  key={i}
+                  className="heatmap-segment"
+                  data-tooltip={`${i * 2}%-${(i + 1) * 2}%: ${seg ? seg.watchCount : 0} views`}
+                  style={{ opacity: Math.max(intensity, 0.08) }}
+                />
+              );
+            })}
+          </div>
+          <div className="heatmap-labels">
+            <span className="heatmap-label">0%</span>
+            <span className="heatmap-label">50%</span>
+            <span className="heatmap-label">100%</span>
+          </div>
+        </div>
+      )}
+
+      {hasViews && (
+        <div className="card" style={{ marginBottom: 16 }}>
           <h3 className="card-title">Completion Funnel</h3>
           {[
             { label: "25%", value: data.milestones.reached25 },
             { label: "50%", value: data.milestones.reached50 },
             { label: "75%", value: data.milestones.reached75 },
             { label: "100%", value: data.milestones.reached100 },
-          ].map((m) => (
-            <div key={m.label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 13, width: 40, textAlign: "right" }}>
-                {m.label}
-              </span>
-              <div style={{ flex: 1, background: "var(--color-border)", borderRadius: 4, height: 24, overflow: "hidden" }}>
-                <div
+          ].map((m) => {
+            const pct =
+              data.summary.totalViews > 0
+                ? (m.value / data.summary.totalViews) * 100
+                : 0;
+            return (
+              <div
+                key={m.label}
+                className="referrer-row"
+              >
+                <span className="referrer-label" style={{ width: 40, textAlign: "right" }}>
+                  {m.label}
+                </span>
+                <div className="referrer-bar-track">
+                  <div
+                    className="referrer-bar-fill"
+                    style={{
+                      width: `${pct}%`,
+                      minWidth: m.value > 0 ? 2 : 0,
+                    }}
+                  />
+                </div>
+                <span
                   style={{
-                    width: `${(m.value / data.summary.totalViews) * 100}%`,
-                    background: "var(--color-accent)",
-                    height: "100%",
-                    borderRadius: 4,
-                    minWidth: m.value > 0 ? 2 : 0,
+                    color: "var(--color-text)",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    width: 50,
+                    textAlign: "right",
+                    flexShrink: 0,
+                  }}
+                >
+                  {m.value}
+                </span>
+                <span className="referrer-pct">{pct.toFixed(0)}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {hasViews && data.referrers.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h3 className="card-title">Top Referrers</h3>
+          {data.referrers.map((r) => (
+            <div key={r.source} className="referrer-row">
+              <span className="referrer-label">{r.source}</span>
+              <div className="referrer-bar-track">
+                <div
+                  className="referrer-bar-fill"
+                  style={{
+                    width: `${r.percentage}%`,
+                    minWidth: r.count > 0 ? 2 : 0,
                   }}
                 />
               </div>
-              <span style={{ color: "var(--color-text)", fontSize: 13, fontWeight: 600, width: 50 }}>
-                {m.value}
-              </span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 12, width: 45 }}>
-                {((m.value / data.summary.totalViews) * 100).toFixed(0)}%
+              <span className="referrer-pct">
+                {r.percentage.toFixed(0)}%
               </span>
             </div>
           ))}
         </div>
       )}
 
-      {data.viewers && data.viewers.length > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <h3 className="card-title">Viewers</h3>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 8px 8px 0" }}>Email</th>
-                <th style={{ textAlign: "left", color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 8px 8px 0" }}>First viewed</th>
-                <th style={{ textAlign: "right", color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 0 8px 8px" }}>Views</th>
-                <th style={{ textAlign: "right", color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 0 8px 8px" }}>Completion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.viewers.map((v) => (
-                <tr key={v.email}>
-                  <td style={{ color: "var(--color-text)", fontSize: 13, padding: "4px 8px 4px 0" }}>{v.email}</td>
-                  <td style={{ color: "var(--color-text-secondary)", fontSize: 13, padding: "4px 8px 4px 0" }}>{new Date(v.firstViewedAt).toLocaleDateString("en-GB")}</td>
-                  <td style={{ textAlign: "right", color: "var(--color-text)", fontSize: 13, padding: "4px 0 4px 8px" }}>{v.viewCount}</td>
-                  <td style={{ textAlign: "right", color: "var(--color-text)", fontSize: 13, padding: "4px 0 4px 8px" }}>{v.completion}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {hasViews && data.viewers.length > 0 && (
+        <ViewerTable
+          viewers={data.viewers}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          visibleCount={visibleViewerCount}
+          onSort={onSort}
+          onShowMore={onShowMore}
+          sortIndicator={sortIndicator}
+        />
+      )}
+
+      {hasViews &&
+        (data.browsers.length > 0 || data.devices.length > 0) && (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <h3 className="card-title">Devices &amp; Browsers</h3>
+            <div className="breakdown-grid">
+              {data.browsers.length > 0 && (
+                <div>
+                  <h4 className="breakdown-title">Browsers</h4>
+                  {data.browsers.map((b) => (
+                    <div key={b.name} className="breakdown-row">
+                      <span className="breakdown-name">{b.name}</span>
+                      <span className="breakdown-pct">
+                        {b.percentage.toFixed(0)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {data.devices.length > 0 && (
+                <div>
+                  <h4 className="breakdown-title">Devices</h4>
+                  {data.devices.map((d) => (
+                    <div key={d.name} className="breakdown-row">
+                      <span className="breakdown-name">{d.name}</span>
+                      <span className="breakdown-pct">
+                        {d.percentage.toFixed(0)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+    </>
+  );
+}
+
+function DashboardView({ data }: { data: DashboardData }) {
+  const hasViews = data.summary.totalViews > 0;
+
+  return (
+    <>
+      <div className="analytics-stats">
+        <StatCard label="Total Views" value={data.summary.totalViews} />
+        <StatCard
+          label="Unique Viewers"
+          value={data.summary.uniqueViews}
+        />
+        <StatCard label="Avg / Day" value={data.summary.avgDailyViews} />
+        <StatCard label="Total Videos" value={data.summary.totalVideos} />
+        <StatCard
+          label="Watch Time"
+          value={formatWatchTime(data.summary.totalWatchTimeSeconds)}
+        />
+        <StatCard
+          label="Avg Completion"
+          value={`${data.summary.avgCompletion}%`}
+        />
+      </div>
+
+      {!hasViews && (
+        <div className="card">
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 20V10M12 20V4M6 20v-6" />
+              </svg>
+            </div>
+            <div className="empty-state-title">
+              No analytics yet
+            </div>
+            <div className="empty-state-desc">
+              Views will appear here once your videos are watched.
+            </div>
+          </div>
         </div>
       )}
 
-      {data.summary.totalViews === 0 ? (
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, textAlign: "center", marginTop: 32 }}>
-          No views in this period.
-        </p>
-      ) : (
-        <div className="card" style={{ marginTop: 16, height: 300 }}>
-          <canvas ref={canvasRef} />
+      {hasViews && data.topVideos.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h3 className="card-title">Top Videos</h3>
+          {data.topVideos.map((video, index) => (
+            <Link
+              key={video.id}
+              to={`/videos/${video.id}/analytics`}
+              className="top-video-row"
+            >
+              <span className="top-video-rank">{index + 1}</span>
+              <div className="top-video-thumb">
+                {video.thumbnailUrl && (
+                  <img src={video.thumbnailUrl} alt="" />
+                )}
+              </div>
+              <div className="top-video-info">
+                <div className="top-video-title">{video.title}</div>
+              </div>
+              <div className="top-video-stats">
+                <div className="top-video-stat">
+                  <div className="top-video-stat-value">{video.views}</div>
+                  <div className="top-video-stat-label">views</div>
+                </div>
+                <div className="top-video-stat">
+                  <div className="top-video-stat-value">
+                    {video.uniqueViews}
+                  </div>
+                  <div className="top-video-stat-label">unique</div>
+                </div>
+                <div className="top-video-stat">
+                  <div className="top-video-stat-value">
+                    {video.completion}%
+                  </div>
+                  <div className="top-video-stat-label">completion</div>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
+      )}
+
+      {hasViews && data.daily.length > 0 && (
+        <div className="card">
+          <h3 className="card-title">Total Views Over Time</h3>
+          <CssBarChart daily={data.daily} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  trend,
+}: {
+  label: string;
+  value: number | string;
+  sub?: string;
+  trend?: number | null;
+}) {
+  const dir = trend !== undefined ? trendDirection(trend ?? null) : null;
+
+  return (
+    <div className="stat-card">
+      <p className="stat-card-label">{label}</p>
+      <p className="stat-card-value">{value}</p>
+      {sub && <p className="stat-card-detail">{sub}</p>}
+      {dir && trend !== undefined && trend !== null && (
+        <p className={`stat-card-trend stat-card-trend--${dir}`}>
+          {dir === "up" ? "\u2191" : "\u2193"} {formatTrend(trend)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ViewerTable({
+  viewers,
+  sortColumn,
+  sortDirection,
+  visibleCount,
+  onSort,
+  onShowMore,
+  sortIndicator,
+}: {
+  viewers: Viewer[];
+  sortColumn: SortColumn;
+  sortDirection: SortDirection;
+  visibleCount: number;
+  onSort: (column: SortColumn) => void;
+  onShowMore: () => void;
+  sortIndicator: (column: SortColumn) => string;
+}) {
+  const sorted = sortViewers(viewers, sortColumn, sortDirection);
+  const visible = sorted.slice(0, visibleCount);
+  const remaining = sorted.length - visibleCount;
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h3 className="card-title">Viewer Activity</h3>
+      <table className="viewers-table">
+        <thead>
+          <tr>
+            <th onClick={() => onSort("viewer")}>
+              Viewer{sortIndicator("viewer")}
+            </th>
+            <th data-align="right" onClick={() => onSort("watchTime")}>
+              Watch Time{sortIndicator("watchTime")}
+            </th>
+            <th data-align="right" onClick={() => onSort("completion")}>
+              Completion{sortIndicator("completion")}
+            </th>
+            <th onClick={() => onSort("date")}>
+              Date{sortIndicator("date")}
+            </th>
+            <th onClick={() => onSort("location")}>
+              Location{sortIndicator("location")}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((v, i) => {
+            const location = [v.city, v.country]
+              .filter(Boolean)
+              .join(", ");
+            return (
+              <tr key={`${v.email}-${i}`}>
+                <td>
+                  {v.email ? (
+                    v.email
+                  ) : (
+                    <span className="viewer-anonymous">
+                      Anonymous
+                    </span>
+                  )}
+                </td>
+                <td data-align="right">
+                  {formatWatchTime(v.watchTimeSeconds)}
+                </td>
+                <td data-align="right">
+                  {v.completion}%
+                  <span className="viewer-completion-bar">
+                    <span
+                      className="viewer-completion-fill"
+                      style={{ width: `${v.completion}%` }}
+                    />
+                  </span>
+                </td>
+                <td>{formatTimestamp(v.firstViewedAt)}</td>
+                <td>{location || "-"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {remaining > 0 && (
+        <button className="show-more-btn" onClick={onShowMore}>
+          Show {Math.min(remaining, 10)} more viewer
+          {Math.min(remaining, 10) !== 1 ? "s" : ""}
+        </button>
       )}
     </div>
   );
