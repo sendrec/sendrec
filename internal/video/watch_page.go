@@ -21,6 +21,19 @@ func derefString(s *string) string {
 	return *s
 }
 
+func initials(name string) string {
+	parts := strings.Fields(name)
+	if len(parts) == 0 {
+		return "?"
+	}
+	first := string([]rune(parts[0])[:1])
+	if len(parts) == 1 {
+		return strings.ToUpper(first)
+	}
+	last := string([]rune(parts[len(parts)-1])[:1])
+	return strings.ToUpper(first + last)
+}
+
 func formatDuration(totalSeconds int) string {
 	if totalSeconds >= 3600 {
 		return fmt.Sprintf("%d:%02d:%02d", totalSeconds/3600, (totalSeconds%3600)/60, totalSeconds%60)
@@ -138,8 +151,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 ` + playerCSS + `
         .video-title {
             margin-top: 1rem;
-            font-size: 1.5rem;
-            font-weight: 600;
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1.3;
         }
         .video-meta {
             display: flex;
@@ -149,8 +163,21 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: #94a3b8;
             font-size: 0.875rem;
         }
+        .video-meta-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--brand-surface);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
         .video-meta-name {
-            font-weight: 500;
+            font-weight: 600;
             color: #cbd5e1;
         }
         .video-meta-sep {
@@ -180,6 +207,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             border-top: 1px solid var(--color-border, #1e2d45);
             font-size: 0.75rem;
             color: #64748b;
+            text-align: center;
         }
         .branding a {
             color: var(--brand-accent);
@@ -195,7 +223,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             gap: 1rem;
         }
         .download-btn {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             background: transparent;
             color: var(--brand-accent);
             border: 1px solid var(--brand-accent);
@@ -205,9 +235,15 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             font-weight: 600;
             cursor: pointer;
             text-decoration: none;
+            transition: background 0.15s;
         }
         .download-btn:hover {
             background: rgba(0, 182, 122, 0.1);
+        }
+        .download-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: var(--brand-accent);
         }
         .comments-section {
             margin-top: 2rem;
@@ -221,6 +257,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         .comment {
             background: var(--brand-surface);
+            border: 1px solid #1e2d45;
             border-radius: 8px;
             padding: 0.875rem 1rem;
             margin-bottom: 0.75rem;
@@ -317,6 +354,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         .comment-submit:hover { opacity: 0.9; }
         .comment-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+        .comment-submit:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
         .comment-error {
             color: #ef4444;
             font-size: 0.8125rem;
@@ -422,6 +460,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             padding: 0.125rem 0.5rem;
             border-radius: 10px;
             cursor: pointer;
+            font-family: monospace;
         }
         .comment-timestamp:hover {
             opacity: 0.85;
@@ -583,7 +622,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .summary-text {
             color: var(--brand-text);
             font-size: 14px;
-            line-height: 1.6;
+            line-height: 1.7;
             margin: 0 0 16px;
         }
         .chapter-list-title {
@@ -602,6 +641,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         .chapter-item:hover {
             background: rgba(255,255,255,0.05);
+        }
+        .chapter-item.active {
+            background: rgba(0, 182, 122, 0.1);
         }
         .chapter-timestamp {
             color: var(--brand-accent);
@@ -668,14 +710,22 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 ` + safariWarningCSS + `
         @media (max-width: 640px) {
             .container { padding: 1rem 0.75rem; }
-            h1 { font-size: 1.25rem; }
+            .video-title { font-size: 20px; }
             .actions { flex-wrap: wrap; }
             .form-row { flex-direction: column; }
             .download-btn { min-height: 44px; }
             .volume-slider { display: none; }
             .comment-submit { min-height: 44px; }
+            .reaction-btn { min-width: 44px; min-height: 44px; }
             .emoji-trigger { min-height: 44px; min-width: 44px; }
             .emoji-grid { width: min(260px, calc(100vw - 2rem)); right: auto; left: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
         }
         {{if .CustomCSS}}{{.CustomCSS}}{{end}}
     </style>
@@ -708,11 +758,12 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{end}}
         <h1 class="video-title">{{.Title}}</h1>
         <div class="video-meta">
+            <span class="video-meta-avatar">{{.CreatorInitials}}</span>
             <span class="video-meta-name">{{.Creator}}</span>
             <span class="video-meta-sep">&middot;</span>
             <span>{{.Date}}</span>
         </div>
-        {{if .DownloadEnabled}}<div class="actions"><button class="download-btn" id="download-btn">Download</button></div>{{end}}
+        {{if .DownloadEnabled}}<div class="actions"><button class="download-btn" id="download-btn"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Download</button></div>{{end}}
         {{if and .CtaText .CtaUrl}}
         <div class="cta-card" id="cta-card">
             <button class="cta-dismiss" onclick="document.getElementById('cta-card').classList.remove('visible')" aria-label="Dismiss">&times;</button>
@@ -1623,6 +1674,7 @@ type watchPageData struct {
 	Title              string
 	VideoURL           string
 	Creator            string
+	CreatorInitials    string
 	Date               string
 	Nonce              string
 	ThumbnailURL       string
@@ -1682,8 +1734,20 @@ var passwordPageTemplate = template.Must(template.New("password").Parse(`<!DOCTY
             justify-content: center;
         }
         .container { text-align: center; padding: 2rem; max-width: 400px; width: 100%; }
-        h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
-        p { color: #94a3b8; margin-bottom: 1.5rem; }
+        .gate-icon {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 1.5rem;
+            background: {{.Branding.ColorSurface}};
+            border: 1px solid #1e2d45;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gate-icon svg { width: 24px; height: 24px; fill: #94a3b8; }
+        h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.75rem; }
+        p { color: #94a3b8; margin-bottom: 1.5rem; font-size: 0.875rem; }
         .error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
         input[type="password"] {
             width: 100%;
@@ -1695,8 +1759,10 @@ var passwordPageTemplate = template.Must(template.New("password").Parse(`<!DOCTY
             font-size: 1rem;
             margin-bottom: 1rem;
             outline: none;
+            font-family: inherit;
         }
         input[type="password"]:focus { border-color: {{.Branding.ColorAccent}}; }
+        input[type="password"]::placeholder { color: #94a3b8; }
         button {
             width: 100%;
             background: {{.Branding.ColorAccent}};
@@ -1707,13 +1773,18 @@ var passwordPageTemplate = template.Must(template.New("password").Parse(`<!DOCTY
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
+            transition: opacity 0.15s;
         }
         button:hover { opacity: 0.9; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button:focus-visible { outline: 2px solid {{.Branding.ColorAccent}}; outline-offset: 2px; }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="gate-icon">
+            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+        </div>
         <h1>This video is password protected</h1>
         <p>Enter the password to watch this video.</p>
         <p class="error" id="error-msg"></p>
@@ -1769,8 +1840,20 @@ var emailGatePageTemplate = template.Must(template.New("emailgate").Parse(`<!DOC
             justify-content: center;
         }
         .container { text-align: center; padding: 2rem; max-width: 400px; width: 100%; }
-        h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
-        p { color: #94a3b8; margin-bottom: 1.5rem; }
+        .gate-icon {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 1.5rem;
+            background: #111d32;
+            border: 1px solid #1e2d45;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gate-icon svg { width: 24px; height: 24px; fill: #94a3b8; }
+        h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.75rem; }
+        p { color: #94a3b8; margin-bottom: 1.5rem; font-size: 0.875rem; }
         .error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
         input[type="email"] {
             width: 100%;
@@ -1782,8 +1865,10 @@ var emailGatePageTemplate = template.Must(template.New("emailgate").Parse(`<!DOC
             font-size: 1rem;
             margin-bottom: 1rem;
             outline: none;
+            font-family: inherit;
         }
         input[type="email"]:focus { border-color: #00b67a; }
+        input[type="email"]::placeholder { color: #94a3b8; }
         button {
             width: 100%;
             background: #00b67a;
@@ -1794,15 +1879,20 @@ var emailGatePageTemplate = template.Must(template.New("emailgate").Parse(`<!DOC
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
+            transition: opacity 0.15s;
         }
         button:hover { opacity: 0.9; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button:focus-visible { outline: 2px solid #00b67a; outline-offset: 2px; }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="gate-icon">
+            <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        </div>
         <h1>{{.Title}}</h1>
-        <p>Enter your email to watch this video</p>
+        <p>Enter your email to watch this video.</p>
         <p class="error" id="error-msg"></p>
         <form id="email-gate-form">
             <input type="email" id="email-input" placeholder="you@example.com" required maxlength="320" autofocus>
@@ -2036,6 +2126,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		Title:              title,
 		VideoURL:           videoURL,
 		Creator:            creator,
+		CreatorInitials:    initials(creator),
 		Date:               createdAt.Format("02/01/2006"),
 		Nonce:              nonce,
 		ThumbnailURL:       thumbnailURL,
