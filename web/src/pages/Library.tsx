@@ -459,7 +459,7 @@ export function Library() {
             Record
           </Link>
           <Link
-            to="/upload"
+            to="/?tab=upload"
             style={{
               background: "transparent",
               color: "var(--color-accent)",

@@ -92,7 +92,7 @@ describe("Library", () => {
       expect(screen.getByText("No recordings yet.")).toBeInTheDocument();
     });
     expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/upload");
+    expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/?tab=upload");
   });
 
   it("renders video list with title and metadata", async () => {
@@ -607,7 +607,7 @@ describe("Library", () => {
         expect(screen.getByText("No recordings yet.")).toBeInTheDocument();
       });
       expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
-      expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/upload");
+      expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/?tab=upload");
     });
   });
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { CameraRecorder } from "../components/CameraRecorder";
 import { Recorder } from "../components/Recorder";
@@ -19,7 +19,10 @@ interface LimitsResponse {
 }
 
 export function Record() {
-  const [tab, setTab] = useState<"record" | "upload">("record");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<"record" | "upload">(() =>
+    searchParams.get("tab") === "upload" ? "upload" : "record"
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState("");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
