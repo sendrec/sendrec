@@ -119,7 +119,14 @@ export function Library() {
   const [sidebarMenuId, setSidebarMenuId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewModeState] = useState<"grid" | "list">(() => {
+    const stored = localStorage.getItem("library-view");
+    return stored === "list" ? "list" : "grid";
+  });
+  function setViewMode(mode: "grid" | "list") {
+    setViewModeState(mode);
+    localStorage.setItem("library-view", mode);
+  }
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "most-viewed" | "title">("newest");
 
   const sortedVideos = useMemo(() => {

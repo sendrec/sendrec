@@ -279,6 +279,30 @@ input:focus-visible {
   border-radius: 4px;
 }
 
+.nav-theme-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: color 0.15s ease, background 0.15s ease;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.nav-theme-toggle:hover {
+  color: var(--color-text);
+  background: var(--color-bg-tertiary);
+}
+
+.nav-theme-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
 .nav-hamburger {
   display: none;
   flex-direction: column;
@@ -2818,38 +2842,54 @@ textarea.form-input {
 .playlist-thumb-stack {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  padding: 12px 12px 0;
+  height: 120px;
+  margin: 12px 12px 0;
+  width: calc(100% - 24px);
 }
 
 .playlist-thumb {
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 0;
-  height: 100%;
   border-radius: 4px;
+  left: 0;
+  right: 0;
 }
 
 .playlist-thumb--back2 {
-  background: var(--color-border);
-  transform: translateY(-8px) scale(0.92);
-  opacity: 0.4;
+  top: 0;
+  height: calc(100% - 8px);
+  background: linear-gradient(135deg, var(--color-bg-tertiary) 0%, #1a3050 100%);
+  opacity: 0.5;
+  transform: scale(0.92);
 }
 
 .playlist-thumb--back1 {
-  background: var(--color-border);
-  transform: translateY(-4px) scale(0.96);
+  top: 4px;
+  height: calc(100% - 8px);
+  background: linear-gradient(135deg, var(--color-bg-tertiary) 0%, #1e3a5c 100%);
   opacity: 0.7;
+  transform: scale(0.96);
 }
 
 .playlist-thumb--front {
-  background: var(--color-bg-tertiary);
+  top: 8px;
+  height: calc(100% - 8px);
+  background: linear-gradient(135deg, #1a2740 0%, #243352 60%, #1a3050 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
   overflow: hidden;
+}
+
+[data-theme="light"] .playlist-thumb--back2 {
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+}
+
+[data-theme="light"] .playlist-thumb--back1 {
+  background: linear-gradient(135deg, #e2e8f0 0%, #d4dce8 100%);
+}
+
+[data-theme="light"] .playlist-thumb--front {
+  background: linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 60%, #e2e8f0 100%);
 }
 
 .playlist-thumb-img {

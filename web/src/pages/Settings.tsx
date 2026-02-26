@@ -633,7 +633,7 @@ export function Settings() {
           Choose how SendRec looks to you.
         </p>
 
-        <fieldset className="btn-row">
+        <fieldset className="btn-row" style={{ border: "none", padding: 0, margin: 0 }}>
           <legend className="sr-only">Theme preference</legend>
           {(["dark", "light", "system"] as const).map((option) => {
             const labels: Record<string, string> = { dark: "Dark", light: "Light", system: "System" };
