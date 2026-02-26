@@ -41,15 +41,15 @@ export function ForgotPassword() {
             <span className="auth-logo-rec">Rec</span>
           </span>
         </div>
-        <div className="auth-card" style={{ textAlign: "center" }}>
+        <div className="auth-card auth-centered">
           <h1>Check your email</h1>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
+          <p className="auth-subtitle">
             If an account with that email exists, we&apos;ve sent a password
             reset link. The link expires in 1 hour.
           </p>
-          <Link to="/login" style={{ color: "var(--color-accent)", fontSize: 14 }}>
-            Back to sign in
-          </Link>
+          <div className="auth-footer">
+            <Link to="/login">Back to sign in</Link>
+          </div>
         </div>
       </main>
     );
@@ -77,27 +77,18 @@ export function ForgotPassword() {
         </label>
 
         {error && (
-          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>
+          <div className="auth-error-banner">
             {error}
-          </p>
+          </div>
         )}
 
         <button type="submit" disabled={loading}>
           {loading ? "Sending..." : "Send reset link"}
         </button>
 
-        <p
-          style={{
-            color: "var(--color-text-secondary)",
-            fontSize: 14,
-            textAlign: "center",
-            margin: 0,
-          }}
-        >
-          <Link to="/login" style={{ color: "var(--color-accent)" }}>
-            Back to sign in
-          </Link>
-        </p>
+        <div className="auth-footer">
+          <Link to="/login">Back to sign in</Link>
+        </div>
       </form>
     </main>
   );

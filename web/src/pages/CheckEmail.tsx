@@ -55,40 +55,32 @@ export function CheckEmail() {
           <span className="auth-logo-rec">Rec</span>
         </span>
       </div>
-      <div className="auth-card" style={{ textAlign: "center" }}>
+      <div className="auth-card auth-centered">
         <h1>Check your email</h1>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
+        <p className="auth-subtitle">
           We&apos;ve sent a confirmation link to <strong>{email}</strong>. Click
           the link to activate your account. The link expires in 24 hours.
         </p>
 
         {sent && (
-          <p style={{ color: "var(--color-accent)", fontSize: 14 }}>
+          <p className="auth-success-text">
             Confirmation email resent.
           </p>
         )}
 
         {error && (
-          <p style={{ color: "var(--color-error)", fontSize: 14 }}>
+          <div className="auth-error-banner">
             {error}
-          </p>
+          </div>
         )}
 
         <button onClick={handleResend} disabled={cooldown > 0}>
           {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend confirmation email"}
         </button>
 
-        <p
-          style={{
-            color: "var(--color-text-secondary)",
-            fontSize: 14,
-            margin: 0,
-          }}
-        >
-          <Link to="/login" style={{ color: "var(--color-accent)" }}>
-            Back to sign in
-          </Link>
-        </p>
+        <div className="auth-footer">
+          <Link to="/login">Back to sign in</Link>
+        </div>
       </div>
     </main>
   );

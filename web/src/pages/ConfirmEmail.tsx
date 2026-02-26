@@ -42,7 +42,7 @@ export function ConfirmEmail() {
           <span className="auth-logo-rec">Rec</span>
         </span>
       </div>
-      <div className="auth-card" style={{ textAlign: "center" }}>
+      <div className="auth-card auth-centered">
         {status === "loading" && (
           <h1>Confirming your email...</h1>
         )}
@@ -50,30 +50,24 @@ export function ConfirmEmail() {
         {status === "success" && (
           <>
             <h1>Email confirmed</h1>
-            <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
+            <p className="auth-subtitle">
               Your account is now active. You can sign in.
             </p>
-            <Link
-              to="/login"
-              style={{ color: "var(--color-accent)", fontSize: 14 }}
-            >
-              Sign in
-            </Link>
+            <div className="auth-footer">
+              <Link to="/login">Sign in</Link>
+            </div>
           </>
         )}
 
         {status === "error" && (
           <>
             <h1>Confirmation failed</h1>
-            <p style={{ color: "var(--color-error)", fontSize: 14 }}>
+            <div className="auth-error-banner">
               {errorMessage}
-            </p>
-            <Link
-              to="/register"
-              style={{ color: "var(--color-accent)", fontSize: 14 }}
-            >
-              Try again
-            </Link>
+            </div>
+            <div className="auth-footer">
+              <Link to="/register">Try again</Link>
+            </div>
           </>
         )}
       </div>

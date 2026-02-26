@@ -20,17 +20,14 @@ export function ResetPassword() {
             <span className="auth-logo-rec">Rec</span>
           </span>
         </div>
-        <div className="auth-card" style={{ textAlign: "center" }}>
+        <div className="auth-card auth-centered">
           <h1>Invalid reset link</h1>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
+          <p className="auth-subtitle">
             This password reset link is invalid. Please request a new one.
           </p>
-          <Link
-            to="/forgot-password"
-            style={{ color: "var(--color-accent)", fontSize: 14 }}
-          >
-            Request new reset link
-          </Link>
+          <div className="auth-footer">
+            <Link to="/forgot-password">Request new reset link</Link>
+          </div>
         </div>
       </main>
     );
@@ -45,17 +42,14 @@ export function ResetPassword() {
             <span className="auth-logo-rec">Rec</span>
           </span>
         </div>
-        <div className="auth-card" style={{ textAlign: "center" }}>
+        <div className="auth-card auth-centered">
           <h1>Password updated</h1>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
+          <p className="auth-subtitle">
             Your password has been reset successfully.
           </p>
-          <Link
-            to="/login"
-            style={{ color: "var(--color-accent)", fontSize: 14 }}
-          >
-            Sign in
-          </Link>
+          <div className="auth-footer">
+            <Link to="/login">Sign in</Link>
+          </div>
         </div>
       </main>
     );
@@ -131,27 +125,18 @@ export function ResetPassword() {
         </label>
 
         {error && (
-          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>
+          <div className="auth-error-banner">
             {error}
-          </p>
+          </div>
         )}
 
         <button type="submit" disabled={loading}>
           {loading ? "Updating..." : "Reset password"}
         </button>
 
-        <p
-          style={{
-            color: "var(--color-text-secondary)",
-            fontSize: 14,
-            textAlign: "center",
-            margin: 0,
-          }}
-        >
-          <Link to="/forgot-password" style={{ color: "var(--color-accent)" }}>
-            Request new reset link
-          </Link>
-        </p>
+        <div className="auth-footer">
+          <Link to="/forgot-password">Request new reset link</Link>
+        </div>
       </form>
     </main>
   );

@@ -92,7 +92,7 @@ export function AuthForm({
             minLength={8}
           />
           {showPasswordConfirm && (
-            <span style={{ fontSize: 12, marginTop: 2 }}>
+            <span className="form-hint">
               Must be at least 8 characters
             </span>
           )}
@@ -112,25 +112,18 @@ export function AuthForm({
         )}
 
         {error && (
-          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>
+          <div className="auth-error-banner">
             {error}
-          </p>
+          </div>
         )}
 
         <button type="submit" disabled={loading}>
           {loading ? "Loading..." : submitLabel}
         </button>
 
-        <p
-          style={{
-            color: "var(--color-text-secondary)",
-            fontSize: 14,
-            textAlign: "center",
-            margin: 0,
-          }}
-        >
+        <div className="auth-footer">
           {footer}
-        </p>
+        </div>
       </form>
     </main>
   );
