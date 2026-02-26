@@ -766,7 +766,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{if .DownloadEnabled}}<div class="actions"><button class="download-btn" id="download-btn"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Download</button></div>{{end}}
         {{if and .CtaText .CtaUrl}}
         <div class="cta-card" id="cta-card">
-            <button class="cta-dismiss" onclick="document.getElementById('cta-card').classList.remove('visible')" aria-label="Dismiss">&times;</button>
+            <button class="cta-dismiss" id="cta-dismiss" aria-label="Dismiss">&times;</button>
             <p class="cta-title">Continue the conversation</p>
             <p class="cta-desc">Interested? Click below to take the next step.</p>
             <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" class="cta-btn" id="cta-btn">{{.CtaText}}</a>
@@ -1485,9 +1485,17 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             var player = document.getElementById('player');
             var ctaCard = document.getElementById('cta-card');
             var ctaBtn = document.getElementById('cta-btn');
+            var ctaDismissed = false;
+            var dismissBtn = document.getElementById('cta-dismiss');
+            if (dismissBtn) {
+                dismissBtn.addEventListener('click', function() {
+                    ctaDismissed = true;
+                    ctaCard.classList.remove('visible');
+                });
+            }
             if (player && ctaCard) {
                 player.addEventListener('ended', function() {
-                    ctaCard.classList.add('visible');
+                    if (!ctaDismissed) ctaCard.classList.add('visible');
                 });
             }
             if (ctaBtn) {

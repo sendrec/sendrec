@@ -777,14 +777,32 @@ textarea.form-input {
 }
 
 .color-swatch {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
   width: 36px;
   height: 36px;
-  border: none;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
   padding: 0;
   background: transparent;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.color-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-sm) - 1px);
+}
+
+.color-swatch::-moz-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-sm) - 1px);
 }
 
 /* Settings page — Logo upload */
