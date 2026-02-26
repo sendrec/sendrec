@@ -547,6 +547,11 @@ input:focus-visible {
   gap: 12px;
 }
 
+.card-subtitle {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 /* Settings page — Danger card border */
 .card--danger {
   border-color: var(--color-error);
@@ -729,7 +734,8 @@ textarea.form-input {
   flex-shrink: 0;
 }
 
-.toggle-track--active {
+.toggle-track--active,
+.toggle-track.active {
   background: var(--color-accent);
   border-color: var(--color-accent);
 }
@@ -746,7 +752,8 @@ textarea.form-input {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.toggle-track--active .toggle-thumb {
+.toggle-track--active .toggle-thumb,
+.toggle-track.active .toggle-thumb {
   transform: translateX(20px);
 }
 

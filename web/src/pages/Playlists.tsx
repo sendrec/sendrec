@@ -216,6 +216,11 @@ export function Playlists() {
               />
             </div>
           </div>
+          {limits.playlistsUsed >= limits.maxPlaylists && (
+            <Link to="/settings" className="detail-btn detail-btn--accent" style={{ textDecoration: "none", whiteSpace: "nowrap", fontSize: 12, padding: "4px 12px" }}>
+              Upgrade to Pro
+            </Link>
+          )}
         </div>
       )}
 

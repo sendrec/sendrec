@@ -219,6 +219,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .video-list-item.active {
             background: #1e3a5f;
+            border-left: 3px solid #00b67a;
         }
         .video-list-item .position {
             font-size: 0.75rem;

@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { apiFetch } from "../api/client";
+import { useNavigate } from "react-router-dom";
+import { apiFetch, setAccessToken } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
 
@@ -659,6 +660,8 @@ export function Settings() {
         </fieldset>
       </div>
 
+      <RecordingDefaults />
+
       {transcriptionEnabled && (
         <div className="card settings-section">
           <h2>Transcription</h2>
@@ -1288,6 +1291,159 @@ h1                /* Video title */
           </button>
         </div>
       </form>
+
+      <DangerZone />
+    </div>
+  );
+}
+
+type RecordingMode = "camera" | "screen" | "screen-camera";
+
+function RecordingDefaults() {
+  const [mode, setModeState] = useState<RecordingMode>(() => {
+    const stored = localStorage.getItem("recording-mode");
+    if (stored === "camera" || stored === "screen" || stored === "screen-camera") return stored;
+    return "screen-camera";
+  });
+  const [countdown, setCountdownState] = useState(() => localStorage.getItem("recording-countdown") !== "false");
+  const [systemAudio, setSystemAudioState] = useState(() => localStorage.getItem("recording-audio") !== "false");
+
+  function setMode(m: RecordingMode) {
+    setModeState(m);
+    localStorage.setItem("recording-mode", m);
+  }
+  function setCountdown(v: boolean) {
+    setCountdownState(v);
+    localStorage.setItem("recording-countdown", String(v));
+  }
+  function setSystemAudio(v: boolean) {
+    setSystemAudioState(v);
+    localStorage.setItem("recording-audio", String(v));
+  }
+
+  const modes: { value: RecordingMode; label: string }[] = [
+    { value: "camera", label: "Camera" },
+    { value: "screen", label: "Screen" },
+    { value: "screen-camera", label: "Screen + Camera" },
+  ];
+
+  return (
+    <div className="card settings-section">
+      <h2>Recording Defaults</h2>
+      <p className="card-description">
+        Set your preferred recording mode and options.
+      </p>
+
+      <div className="form-field">
+        <label className="form-label">Default recording mode</label>
+        <fieldset className="btn-row" style={{ border: "none", padding: 0, margin: 0 }}>
+          <legend className="sr-only">Recording mode</legend>
+          {modes.map((m) => (
+            <label
+              key={m.value}
+              className={`theme-option${mode === m.value ? " theme-option--active" : ""}`}
+            >
+              <input
+                type="radio"
+                name="recording-mode"
+                value={m.value}
+                checked={mode === m.value}
+                onChange={() => setMode(m.value)}
+                className="sr-only"
+              />
+              {m.label}
+            </label>
+          ))}
+        </fieldset>
+      </div>
+
+      <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <label className="form-label" style={{ margin: 0 }}>Countdown timer</label>
+        <button
+          type="button"
+          className={`toggle-track${countdown ? " active" : ""}`}
+          onClick={() => setCountdown(!countdown)}
+          role="switch"
+          aria-checked={countdown}
+        >
+          <span className="toggle-thumb" />
+        </button>
+      </div>
+
+      <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <label className="form-label" style={{ margin: 0 }}>System audio capture</label>
+        <button
+          type="button"
+          className={`toggle-track${systemAudio ? " active" : ""}`}
+          onClick={() => setSystemAudio(!systemAudio)}
+          role="switch"
+          aria-checked={systemAudio}
+        >
+          <span className="toggle-thumb" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DangerZone() {
+  const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function handleSignOut() {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+    setAccessToken(null);
+    navigate("/login");
+  }
+
+  async function handleDeleteAccount() {
+    if (!confirm("Are you sure you want to delete your account? This action cannot be undone. All your videos and data will be permanently deleted.")) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await apiFetch("/api/user", { method: "DELETE" });
+      setAccessToken(null);
+      navigate("/login");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete account");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="card settings-section card--danger">
+      <h2 style={{ color: "var(--color-error)" }}>Danger Zone</h2>
+
+      <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <p className="form-label" style={{ margin: 0 }}>Sign out</p>
+          <p className="form-hint">Sign out of your account on this device.</p>
+        </div>
+        <button type="button" className="btn btn--secondary" onClick={handleSignOut}>
+          Sign out
+        </button>
+      </div>
+
+      <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <p className="form-label" style={{ margin: 0 }}>Delete account</p>
+          <p className="form-hint">Permanently delete your account and all data.</p>
+        </div>
+        <button
+          type="button"
+          className="btn"
+          style={{ background: "var(--color-error)", color: "#fff", borderColor: "var(--color-error)" }}
+          onClick={handleDeleteAccount}
+          disabled={deleting}
+        >
+          {deleting ? "Deleting..." : "Delete account"}
+        </button>
+      </div>
+      {deleteError && (
+        <p className="status-message status-message--error">{deleteError}</p>
+      )}
     </div>
   );
 }

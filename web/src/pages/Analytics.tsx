@@ -157,6 +157,13 @@ const RANGE_LABELS: Record<Range, string> = {
   all: "All",
 };
 
+const RANGE_SUBTITLES: Record<Range, string> = {
+  "7d": "Last 7 days",
+  "30d": "Last 30 days",
+  "90d": "Last 90 days",
+  all: "All time",
+};
+
 function sortViewers(
   viewers: Viewer[],
   column: SortColumn,
@@ -452,7 +459,7 @@ export function Analytics() {
           sortIndicator={sortIndicator}
         />
       ) : view === "dashboard" && dashboardData ? (
-        <DashboardView data={dashboardData} />
+        <DashboardView data={dashboardData} range={range} />
       ) : (
         <div className="page-container page-container--centered">
           <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>
@@ -546,14 +553,20 @@ function VideoAnalyticsView({
 
       {hasViews && data.daily.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <h3 className="card-title">Views Over Time</h3>
+          <div className="card-header">
+            <h3 className="card-title" style={{ margin: 0 }}>Views Over Time</h3>
+            <span className="card-subtitle">{RANGE_SUBTITLES[range]}</span>
+          </div>
           <CssBarChart daily={data.daily} />
         </div>
       )}
 
       {hasViews && data.heatmap && data.heatmap.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <h3 className="card-title">Viewer Retention</h3>
+          <div className="card-header">
+            <h3 className="card-title" style={{ margin: 0 }}>Viewer Retention</h3>
+            <span className="card-subtitle">Avg: {Math.round(data.heatmap.reduce((sum, s) => sum + s.intensity, 0) / data.heatmap.length * 100)}%</span>
+          </div>
           <div className="heatmap-bar-container">
             {Array.from({ length: 50 }, (_, i) => {
               const seg = data.heatmap!.find((s) => s.segment === i);
@@ -698,7 +711,7 @@ function VideoAnalyticsView({
   );
 }
 
-function DashboardView({ data }: { data: DashboardData }) {
+function DashboardView({ data, range }: { data: DashboardData; range: Range }) {
   const hasViews = data.summary.totalViews > 0;
 
   return (
@@ -750,7 +763,10 @@ function DashboardView({ data }: { data: DashboardData }) {
 
       {hasViews && data.topVideos.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <h3 className="card-title">Top Videos</h3>
+          <div className="card-header">
+            <h3 className="card-title" style={{ margin: 0 }}>Top Videos</h3>
+            <span className="card-subtitle">{RANGE_SUBTITLES[range]}</span>
+          </div>
           {data.topVideos.map((video, index) => (
             <Link
               key={video.id}
@@ -791,7 +807,10 @@ function DashboardView({ data }: { data: DashboardData }) {
 
       {hasViews && data.daily.length > 0 && (
         <div className="card">
-          <h3 className="card-title">Total Views Over Time</h3>
+          <div className="card-header">
+            <h3 className="card-title" style={{ margin: 0 }}>Total Views Over Time</h3>
+            <span className="card-subtitle">{RANGE_SUBTITLES[range]}</span>
+          </div>
           <CssBarChart daily={data.daily} />
         </div>
       )}

@@ -136,15 +136,25 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             --player-accent: var(--brand-accent, #00b67a);
         }
 ` + playerCSS + `
-        h1 {
+        .video-title {
             margin-top: 1rem;
             font-size: 1.5rem;
             font-weight: 600;
         }
-        .meta {
+        .video-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
             margin-top: 0.5rem;
             color: #94a3b8;
             font-size: 0.875rem;
+        }
+        .video-meta-name {
+            font-weight: 500;
+            color: #cbd5e1;
+        }
+        .video-meta-sep {
+            color: #475569;
         }
         .logo {
             display: inline-flex;
@@ -603,8 +613,10 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: var(--brand-text);
             font-size: 14px;
         }
-        .cta-card { display: none; margin: 1rem 0; padding: 1.25rem; background: var(--brand-surface); border: 1px solid var(--brand-accent); border-radius: 8px; text-align: center; position: relative; }
+        .cta-card { display: none; margin: 1.5rem 0; padding: 1.5rem; background: var(--brand-surface); border: 1px solid var(--brand-accent); border-radius: 8px; text-align: center; position: relative; }
         .cta-card.visible { display: block; }
+        .cta-title { font-size: 1rem; font-weight: 600; color: var(--brand-text); margin-bottom: 0.25rem; }
+        .cta-desc { font-size: 0.875rem; color: #94a3b8; margin-bottom: 0.75rem; }
         .cta-dismiss { position: absolute; top: 8px; right: 12px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.25rem; line-height: 1; padding: 4px; }
         .cta-dismiss:hover { color: #e2e8f0; }
         .cta-btn { display: inline-block; padding: 0.75rem 2rem; background: var(--brand-accent); color: #fff; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; text-decoration: none; }
@@ -694,12 +706,18 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         </div>
         <p class="comment-error reaction-error" id="reaction-error" role="alert"></p>
         {{end}}
-        <h1>{{.Title}}</h1>
-        <p class="meta">{{.Creator}} · {{.Date}}</p>
+        <h1 class="video-title">{{.Title}}</h1>
+        <div class="video-meta">
+            <span class="video-meta-name">{{.Creator}}</span>
+            <span class="video-meta-sep">&middot;</span>
+            <span>{{.Date}}</span>
+        </div>
         {{if .DownloadEnabled}}<div class="actions"><button class="download-btn" id="download-btn">Download</button></div>{{end}}
         {{if and .CtaText .CtaUrl}}
         <div class="cta-card" id="cta-card">
             <button class="cta-dismiss" onclick="document.getElementById('cta-card').classList.remove('visible')" aria-label="Dismiss">&times;</button>
+            <p class="cta-title">Continue the conversation</p>
+            <p class="cta-desc">Interested? Click below to take the next step.</p>
             <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" class="cta-btn" id="cta-btn">{{.CtaText}}</a>
         </div>
         {{end}}
