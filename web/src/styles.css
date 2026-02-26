@@ -215,6 +215,14 @@ input:focus-visible {
   margin-right: 6px;
 }
 
+.logo-send {
+  color: var(--color-text);
+}
+
+.logo-rec {
+  color: var(--color-accent);
+}
+
 .nav-links {
   display: flex;
   align-items: center;
