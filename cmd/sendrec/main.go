@@ -93,6 +93,7 @@ func main() {
 		CommentTemplateID: int(getEnvInt64("LISTMONK_COMMENT_TEMPLATE_ID", 0)),
 		ViewTemplateID:    int(getEnvInt64("LISTMONK_VIEW_TEMPLATE_ID", 0)),
 		ConfirmTemplateID: int(getEnvInt64("LISTMONK_CONFIRM_TEMPLATE_ID", 0)),
+		WelcomeTemplateID: int(getEnvInt64("LISTMONK_WELCOME_TEMPLATE_ID", 0)),
 		Allowlist:         email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
 	})
 

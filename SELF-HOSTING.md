@@ -330,7 +330,8 @@ Enable subscription billing with [Creem](https://creem.io) (EU merchant of recor
 | `LISTMONK_COMMENT_TEMPLATE_ID` | Template ID for new comment notifications |
 | `LISTMONK_VIEW_TEMPLATE_ID` | Template ID for view notifications (instant and digest) |
 | `LISTMONK_CONFIRM_TEMPLATE_ID` | Template ID for email confirmation on signup. Template variables: `{{ .Tx.Data.name }}`, `{{ .Tx.Data.confirmLink }}`. Confirmation emails bypass the allowlist and are always sent |
-| `EMAIL_ALLOWLIST` | Comma-separated list of allowed recipient domains (`@example.com`) and addresses (`alice@example.com`). When set, emails are only sent to matching recipients (except confirmation emails). Useful for staging/preview environments |
+| `LISTMONK_WELCOME_TEMPLATE_ID` | Template ID for the welcome email sent after email confirmation. Template variables: `{{ .Tx.Data.name }}`, `{{ .Tx.Data.dashboardURL }}`. Bypasses the allowlist |
+| `EMAIL_ALLOWLIST` | Comma-separated list of allowed recipient domains (`@example.com`) and addresses (`alice@example.com`). When set, emails are only sent to matching recipients (except confirmation and welcome emails). Useful for staging/preview environments |
 
 ## S3_PUBLIC_ENDPOINT explained
 

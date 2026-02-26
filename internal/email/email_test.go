@@ -589,6 +589,113 @@ func TestSendConfirmation_SkipsWhenTemplateIDZero(t *testing.T) {
 	}
 }
 
+func TestSendWelcome_Success(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "user",
+		Password:          "pass",
+		WelcomeTemplateID: 8,
+	})
+
+	err := client.SendWelcome(context.Background(),
+		"alice@example.com", "Alice", "https://app.sendrec.eu/dashboard")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.TemplateID != 8 {
+		t.Errorf("expected template_id=8, got %d", received.TemplateID)
+	}
+	if received.SubscriberEmail != "alice@example.com" {
+		t.Errorf("expected subscriber email alice@example.com, got %q", received.SubscriberEmail)
+	}
+	if received.Data["name"] != "Alice" {
+		t.Errorf("expected name=Alice, got %v", received.Data["name"])
+	}
+	if received.Data["dashboardURL"] != "https://app.sendrec.eu/dashboard" {
+		t.Errorf("expected dashboardURL, got %v", received.Data["dashboardURL"])
+	}
+}
+
+func TestSendWelcome_SkipsWhenTemplateIDZero(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "user",
+		Password:          "pass",
+		WelcomeTemplateID: 0,
+	})
+
+	err := client.SendWelcome(context.Background(),
+		"alice@example.com", "Alice", "https://app.sendrec.eu/dashboard")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if serverHit {
+		t.Error("expected no HTTP request when WelcomeTemplateID is zero")
+	}
+}
+
+func TestSendWelcome_BypassesAllowlist(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "user",
+		Password:          "pass",
+		WelcomeTemplateID: 8,
+		Allowlist:         []string{"@sendrec.eu"},
+	})
+
+	err := client.SendWelcome(context.Background(),
+		"stranger@example.com", "Stranger", "https://app.sendrec.eu/dashboard")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.SubscriberEmail != "stranger@example.com" {
+		t.Errorf("expected welcome email to bypass allowlist, got %q", received.SubscriberEmail)
+	}
+}
+
 func TestParseAllowlist(t *testing.T) {
 	tests := []struct {
 		input    string
