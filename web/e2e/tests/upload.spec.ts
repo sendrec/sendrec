@@ -28,7 +28,7 @@ test.describe("Upload", () => {
 
     await expect(page.getByText(/1 file/i)).toBeVisible();
 
-    await page.getByRole("button", { name: /upload/i }).click();
+    await page.getByRole("button", { name: /upload \d+ video/i }).click();
 
     await expect(page.getByText(/upload complete/i)).toBeVisible({
       timeout: 60000,
