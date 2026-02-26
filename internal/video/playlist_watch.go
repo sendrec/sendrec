@@ -47,88 +47,65 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
     <title>{{.Title}} — SendRec</title>
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #0f172a;
-            color: #e2e8f0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            min-height: 100vh;
-        }
-        {{if .NeedsPassword}}
+        :focus-visible { outline: 2px solid #00b67a; outline-offset: 2px; }
         body {
             background: #0a1628;
             color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
+        .hidden { display: none !important; }
+        {{if .NeedsPassword}}
+        body { display: flex; align-items: center; justify-content: center; }
         .gate-container { text-align: center; padding: 2rem; max-width: 400px; width: 100%; }
-        .gate-container h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+        .gate-icon { width: 56px; height: 56px; border-radius: 12px; background: rgba(0,182,122,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 24px; }
+        .gate-container h1 { font-size: 24px; font-weight: 700; margin-bottom: 0.75rem; }
         .gate-container p { color: #94a3b8; margin-bottom: 1.5rem; }
         .gate-error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
         .gate-error.visible { display: block; }
         .gate-container input[type="password"] {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            border: 1px solid #334155;
-            background: #1e293b;
-            color: #fff;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            outline: none;
+            width: 100%; padding: 0.75rem 1rem; border-radius: 8px;
+            border: 1px solid #334155; background: #1e293b; color: #fff;
+            font-size: 1rem; margin-bottom: 1rem; outline: none;
         }
-        .gate-container input[type="password"]:focus { border-color: #00b67a; }
+        .gate-container input[type="password"]:focus { border-color: #00b67a; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
+        .gate-container input[type="password"]::placeholder { color: #94a3b8; opacity: 0.5; }
         .gate-container button {
-            width: 100%;
-            background: #00b67a;
-            color: #fff;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
+            width: 100%; background: #00b67a; color: #fff; padding: 0.75rem 1.5rem;
+            border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
+            transition: background 0.15s;
         }
-        .gate-container button:hover { opacity: 0.9; }
+        .gate-container button:hover { background: #00a06b; }
         .gate-container button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .gate-branding { margin-top: 24px; font-size: 12px; color: #8892a4; }
+        .gate-branding a { color: #00b67a; text-decoration: none; }
+        .gate-branding a:hover { text-decoration: underline; }
         {{else if .NeedsEmail}}
-        body {
-            background: #0a1628;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        body { display: flex; align-items: center; justify-content: center; }
         .gate-container { text-align: center; padding: 2rem; max-width: 400px; width: 100%; }
-        .gate-container h1 { font-size: 1.5rem; margin-bottom: 0.75rem; }
+        .gate-icon { width: 56px; height: 56px; border-radius: 12px; background: rgba(0,182,122,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 24px; }
+        .gate-container h1 { font-size: 24px; font-weight: 700; margin-bottom: 0.75rem; }
         .gate-container p { color: #94a3b8; margin-bottom: 1.5rem; }
         .gate-error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
         .gate-error.visible { display: block; }
         .gate-container input[type="email"] {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            border: 1px solid #334155;
-            background: #1e293b;
-            color: #fff;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            outline: none;
+            width: 100%; padding: 0.75rem 1rem; border-radius: 8px;
+            border: 1px solid #334155; background: #1e293b; color: #fff;
+            font-size: 1rem; margin-bottom: 1rem; outline: none;
         }
-        .gate-container input[type="email"]:focus { border-color: #00b67a; }
+        .gate-container input[type="email"]:focus { border-color: #00b67a; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
+        .gate-container input[type="email"]::placeholder { color: #94a3b8; opacity: 0.5; }
         .gate-container button {
-            width: 100%;
-            background: #00b67a;
-            color: #fff;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
+            width: 100%; background: #00b67a; color: #fff; padding: 0.75rem 1.5rem;
+            border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
+            transition: background 0.15s;
         }
-        .gate-container button:hover { opacity: 0.9; }
+        .gate-container button:hover { background: #00a06b; }
         .gate-container button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .gate-branding { margin-top: 24px; font-size: 12px; color: #8892a4; }
+        .gate-branding a { color: #00b67a; text-decoration: none; }
+        .gate-branding a:hover { text-decoration: underline; }
         {{else}}
 ` + playerCSS + safariWarningCSS + `
         .playlist-layout {
@@ -136,41 +113,47 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             min-height: 100vh;
         }
         .playlist-sidebar {
-            width: 280px;
-            min-width: 280px;
-            background: #0f172a;
-            color: #e2e8f0;
+            width: 300px;
+            min-width: 300px;
+            background: #111d32;
+            border-right: 1px solid #1e2d45;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
         .sidebar-header {
-            padding: 1.25rem 1rem;
-            border-bottom: 1px solid #1e293b;
+            padding: 20px 16px 16px;
+            border-bottom: 1px solid #1e2d45;
+            flex-shrink: 0;
         }
         .sidebar-header h2 {
-            font-size: 1rem;
+            font-size: 18px;
             font-weight: 600;
-            color: #f1f5f9;
-            margin-bottom: 0.25rem;
+            color: #ffffff;
+            margin-bottom: 8px;
             word-break: break-word;
+            line-height: 1.3;
         }
         .sidebar-meta {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-top: 0.375rem;
+            gap: 8px;
         }
         .now-playing-label {
-            font-size: 0.75rem;
-            color: #64748b;
+            font-size: 13px;
+            color: #8892a4;
+        }
+        .now-playing-label strong {
+            color: #00b67a;
+            font-weight: 600;
         }
         .auto-advance-toggle {
             display: flex;
             align-items: center;
             gap: 6px;
             font-size: 12px;
-            color: #64748b;
+            color: #8892a4;
             cursor: pointer;
             user-select: none;
         }
@@ -200,19 +183,43 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         .aa-toggle-track.active .aa-toggle-knob {
             left: 16px;
         }
+        .sidebar-collapse-btn {
+            display: none;
+            width: 100%;
+            padding: 10px;
+            background: #1a2740;
+            border: none;
+            border-bottom: 1px solid #1e2d45;
+            color: #8892a4;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+        }
+        .sidebar-collapse-btn:hover { background: #1e2d45; }
+        .sidebar-collapse-btn svg {
+            width: 14px; height: 14px; vertical-align: middle; margin-left: 4px;
+            transition: transform 0.2s;
+        }
+        .sidebar-collapse-btn.collapsed svg { transform: rotate(180deg); }
         .video-list {
             flex: 1;
             overflow-y: auto;
             list-style: none;
         }
+        .video-list::-webkit-scrollbar { width: 6px; }
+        .video-list::-webkit-scrollbar-track { background: transparent; }
+        .video-list::-webkit-scrollbar-thumb { background: #1e2d45; border-radius: 3px; }
+        .video-list.mobile-collapsed { display: none; }
         .video-list-item {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 0.625rem 1rem;
+            gap: 10px;
+            padding: 10px 16px;
             cursor: pointer;
             transition: background 0.15s;
-            border-bottom: 1px solid #1e293b;
+            border-bottom: 1px solid #1e2d45;
+            position: relative;
         }
         .video-list-item:hover {
             background: #1e293b;
@@ -220,16 +227,29 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         .video-list-item.active {
             background: #1e3a5f;
             border-left: 3px solid #00b67a;
+            padding-left: 13px;
         }
         .video-list-item .position {
-            font-size: 0.75rem;
-            color: #64748b;
-            min-width: 1.25rem;
+            font-size: 12px;
+            color: #8892a4;
+            min-width: 18px;
             text-align: center;
+            flex-shrink: 0;
+            font-family: monospace;
         }
         .video-list-item.active .position {
             color: #00b67a;
+            font-weight: 600;
         }
+        .now-playing-tag {
+            font-size: 10px;
+            font-weight: 600;
+            color: #00b67a;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            display: none;
+        }
+        .video-list-item.active .now-playing-tag { display: block; }
         .video-thumb {
             width: 80px;
             height: 45px;
@@ -237,6 +257,8 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             object-fit: cover;
             background: #334155;
             flex-shrink: 0;
+            overflow: hidden;
+            position: relative;
         }
         .video-thumb-placeholder {
             width: 80px;
@@ -247,35 +269,50 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;
+            position: relative;
         }
         .video-thumb-placeholder svg {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             fill: #64748b;
+        }
+        .item-thumb-duration {
+            position: absolute;
+            bottom: 2px;
+            right: 3px;
+            font-size: 10px;
+            font-family: monospace;
+            background: rgba(0,0,0,0.75);
+            color: #fff;
+            padding: 1px 4px;
+            border-radius: 2px;
+            line-height: 1.2;
         }
         .video-info {
             flex: 1;
             min-width: 0;
         }
         .video-info .video-title {
-            font-size: 0.8125rem;
+            font-size: 13px;
             font-weight: 500;
-            color: #e2e8f0;
+            color: #ffffff;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            line-height: 1.3;
         }
         .video-list-item.active .video-title {
-            color: #ffffff;
+            font-weight: 600;
         }
         .video-info .video-duration {
-            font-size: 0.6875rem;
-            color: #64748b;
-            margin-top: 0.125rem;
+            font-size: 11px;
+            color: #8892a4;
+            margin-top: 2px;
         }
         .video-list-item .watched-badge {
             color: #00b67a;
-            font-size: 0.75rem;
+            font-size: 14px;
             flex-shrink: 0;
         }
         .playlist-player {
@@ -283,43 +320,53 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             display: flex;
             flex-direction: column;
             min-width: 0;
+            background: #0a1628;
         }
         .player-header {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid #1e293b;
+            padding: 16px 24px;
+            border-bottom: 1px solid #1e2d45;
+            background: #111d32;
+            flex-shrink: 0;
         }
         .player-header h1 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #f1f5f9;
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.3;
         }
-        .player-header .player-counter {
-            font-size: 0.8125rem;
-            color: #64748b;
-            margin-top: 0.25rem;
+        .player-meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-top: 6px;
+        }
+        .player-meta-item {
+            font-size: 13px;
+            color: #8892a4;
+        }
+        .player-counter {
+            font-size: 13px;
+            color: #8892a4;
         }
         .player-container {
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 1.5rem;
             background: #000;
             position: relative;
             overflow: hidden;
+            min-height: 300px;
         }
         .player-container video {
             width: 100%;
-            max-height: 70vh;
-            border-radius: 4px;
+            max-height: calc(100vh - 220px);
             background: #000;
+            display: block;
         }
         .next-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0, 0, 0, 0.85);
             display: flex;
             flex-direction: column;
@@ -328,51 +375,60 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             color: #ffffff;
             z-index: 10;
         }
-        .hidden { display: none; }
-        .next-overlay.hidden { display: none; }
         .next-overlay .next-label {
-            font-size: 0.875rem;
+            font-size: 14px;
             color: #94a3b8;
-            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+            margin-bottom: 8px;
         }
         .next-overlay .next-title {
-            font-size: 1.25rem;
+            font-size: 20px;
             font-weight: 600;
-            margin-bottom: 1.5rem;
+            margin-bottom: 8px;
             text-align: center;
             padding: 0 2rem;
+            line-height: 1.3;
+        }
+        .next-countdown {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 12px;
         }
         .next-progress-bar {
             width: 200px;
             height: 4px;
             background: #334155;
             border-radius: 2px;
-            margin-bottom: 1.5rem;
+            margin-bottom: 20px;
             overflow: hidden;
         }
         .next-progress-fill {
             height: 100%;
             background: #00b67a;
             border-radius: 2px;
+            width: 100%;
             transition: width 0.1s linear;
         }
         .next-actions {
             display: flex;
-            gap: 0.75rem;
+            gap: 12px;
         }
         .next-actions button {
-            padding: 0.5rem 1.25rem;
+            padding: 8px 20px;
             border-radius: 6px;
-            font-size: 0.875rem;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             border: none;
+            transition: all 0.15s;
         }
         .btn-play-now {
             background: #00b67a;
             color: #fff;
         }
-        .btn-play-now:hover { opacity: 0.9; }
+        .btn-play-now:hover { background: #00a06b; }
         .btn-cancel {
             background: transparent;
             color: #94a3b8;
@@ -380,33 +436,48 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .btn-cancel:hover { color: #e2e8f0; border-color: #94a3b8 !important; }
         .branding-footer {
-            padding: 0.75rem 1.5rem;
+            padding: 12px 24px;
             text-align: center;
-            font-size: 0.75rem;
-            color: #94a3b8;
-            border-top: 1px solid #1e293b;
+            font-size: 12px;
+            color: #8892a4;
+            border-top: 1px solid #1e2d45;
+            background: #111d32;
+            flex-shrink: 0;
         }
         .branding-footer a {
-            color: #00b67a;
+            color: #8892a4;
             text-decoration: none;
+            transition: color 0.15s;
         }
-        .branding-footer a:hover { text-decoration: underline; }
-        @media (max-width: 768px) {
+        .branding-footer a:hover { color: #ffffff; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        @media (max-width: 640px) {
             .playlist-layout {
                 flex-direction: column;
             }
             .playlist-sidebar {
                 width: 100%;
                 min-width: 100%;
-                max-height: 40vh;
+                max-height: none;
                 order: 2;
+                border-right: none;
+                border-top: 1px solid #1e2d45;
             }
+            .sidebar-collapse-btn { display: block; }
             .playlist-player {
                 order: 1;
             }
+            .player-container { min-height: 200px; }
             .player-container video {
                 max-height: 40vh;
             }
+            .player-header { padding: 12px 16px; }
+            .player-header h1 { font-size: 18px; }
             .volume-slider { display: none; }
         }
         {{end}}
@@ -415,6 +486,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
 <body>
     {{if .NeedsPassword}}
     <div class="gate-container">
+        <div class="gate-icon">&#128274;</div>
         <h1>{{.Title}}</h1>
         <p>This playlist is password protected</p>
         <p class="gate-error" id="error-msg"></p>
@@ -422,6 +494,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             <input type="password" id="password-input" placeholder="Enter password" required maxlength="128" autofocus>
             <button type="submit" id="submit-btn">Continue</button>
         </form>
+        <div class="gate-branding">Powered by <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a></div>
     </div>
     <script nonce="{{.Nonce}}">
         document.getElementById('password-form').addEventListener('submit', function(e) {
@@ -445,6 +518,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
     </script>
     {{else if .NeedsEmail}}
     <div class="gate-container">
+        <div class="gate-icon">&#9993;</div>
         <h1>{{.Title}}</h1>
         <p>Enter your email to watch this playlist</p>
         <p class="gate-error" id="error-msg"></p>
@@ -452,6 +526,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             <input type="email" id="email-input" placeholder="you@example.com" required maxlength="320" autofocus>
             <button type="submit" id="submit-btn">Watch Playlist</button>
         </form>
+        <div class="gate-branding">Powered by <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a></div>
     </div>
     <script nonce="{{.Nonce}}">
         document.getElementById('email-gate-form').addEventListener('submit', function(e) {
@@ -488,20 +563,26 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                     </div>
                 </div>
             </div>
+            <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" aria-label="Toggle playlist sidebar">
+                Playlist ({{len .Videos}} videos)
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
             <ul class="video-list" id="video-list">
                 {{range $i, $v := .Videos}}
-                <li class="video-list-item{{if eq $i 0}} active{{end}}" data-index="{{$i}}">
+                <li class="video-list-item{{if eq $i 0}} active{{end}}" data-index="{{$i}}" tabindex="0" role="listitem">
                     <span class="position">{{$i | inc}}</span>
                     {{if $v.ThumbnailURL}}
                     <img class="video-thumb" src="{{$v.ThumbnailURL}}" alt="">
                     {{else}}
                     <div class="video-thumb-placeholder">
                         <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <span class="item-thumb-duration">{{formatDuration $v.Duration}}</span>
                     </div>
                     {{end}}
                     <div class="video-info">
                         <div class="video-title" title="{{$v.Title}}">{{$v.Title}}</div>
                         <div class="video-duration">{{formatDuration $v.Duration}}</div>
+                        <div class="now-playing-tag">Now Playing</div>
                     </div>
                     <span class="watched-badge hidden">&#10003;</span>
                 </li>
@@ -511,7 +592,9 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         <main class="playlist-player">
             <div class="player-header">
                 <h1 id="current-title">{{if .Videos}}{{(index .Videos 0).Title}}{{end}}</h1>
-                <div class="player-counter" id="player-counter">{{if .Videos}}1 of {{len .Videos}}{{end}}</div>
+                <div class="player-meta">
+                    <span class="player-counter" id="player-counter">{{if .Videos}}1 of {{len .Videos}}{{end}}</span>
+                </div>
             </div>
             <div class="player-container" id="player-container">
                 <video id="player" playsinline{{if .Videos}} src="{{(index .Videos 0).VideoURL}}"{{end}}></video>
@@ -519,6 +602,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                 <div class="next-overlay hidden" id="next-overlay">
                     <div class="next-label">Up next</div>
                     <div class="next-title" id="next-title"></div>
+                    <div class="next-countdown" id="next-countdown"></div>
                     <div class="next-progress-bar"><div class="next-progress-fill" id="next-progress"></div></div>
                     <div class="next-actions">
                         <button class="btn-play-now" id="btn-play-now">Play Now</button>
@@ -546,6 +630,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         var nextOverlay = document.getElementById('next-overlay');
         var nextTitleEl = document.getElementById('next-title');
         var progressEl = document.getElementById('next-progress');
+        var nextCountdownEl = document.getElementById('next-countdown');
         var listItems = document.querySelectorAll('.video-list-item');
         var countdownTimer = null;
         var autoAdvance = true;
@@ -553,11 +638,24 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         var nowPlayingNum = document.getElementById('now-playing-num');
         var aaToggle = document.getElementById('auto-advance-toggle');
         var aaTrack = document.getElementById('aa-toggle-track');
+        var sidebarCollapseBtn = document.getElementById('sidebar-collapse-btn');
+        if (sidebarCollapseBtn) {
+            sidebarCollapseBtn.addEventListener('click', function() {
+                var list = document.getElementById('video-list');
+                if (list) {
+                    list.classList.toggle('mobile-collapsed');
+                    sidebarCollapseBtn.classList.toggle('collapsed');
+                }
+            });
+        }
         if (aaToggle) {
             aaToggle.addEventListener('click', function() {
                 autoAdvance = !autoAdvance;
                 aaTrack.classList.toggle('active', autoAdvance);
                 aaToggle.setAttribute('aria-checked', autoAdvance ? 'true' : 'false');
+            });
+            aaToggle.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); aaToggle.click(); }
             });
         }
 
@@ -757,6 +855,12 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             li.addEventListener('click', function() {
                 switchVideo(parseInt(this.getAttribute('data-index'), 10));
             });
+            li.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    switchVideo(parseInt(this.getAttribute('data-index'), 10));
+                }
+            });
         });
 
         // --- Next-video countdown ---
@@ -769,15 +873,19 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         });
 
         function startCountdown(nextIndex) {
+            if (!autoAdvance) return;
             var nextVideo = videos[nextIndex];
             nextTitleEl.textContent = nextVideo.title;
             nextOverlay.classList.remove('hidden');
             var remaining = 5000;
             var interval = 50;
             progressEl.style.width = '100%';
+            if (nextCountdownEl) nextCountdownEl.textContent = 'Playing in 5...';
             countdownTimer = setInterval(function() {
                 remaining -= interval;
                 progressEl.style.width = Math.max(0, (remaining / 5000) * 100) + '%';
+                var seconds = Math.ceil(remaining / 1000);
+                if (nextCountdownEl) nextCountdownEl.textContent = 'Playing in ' + seconds + '...';
                 if (remaining <= 0) {
                     cancelCountdown();
                     switchVideo(nextIndex);
