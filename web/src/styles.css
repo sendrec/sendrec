@@ -1698,6 +1698,415 @@ input:focus-visible {
   background: var(--color-bg-tertiary);
 }
 
+/* Analytics — View Toggle */
+.analytics-toggle {
+  display: flex;
+  background: var(--color-bg-tertiary);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.analytics-toggle-btn {
+  padding: 6px 16px;
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.analytics-toggle-btn--active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 1px 3px var(--color-shadow);
+}
+
+/* Analytics — CSS Bar Chart */
+.analytics-chart {
+  position: relative;
+  height: 200px;
+  display: flex;
+  gap: 0;
+}
+
+.analytics-chart-yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-right: 8px;
+  width: 36px;
+  text-align: right;
+}
+
+.analytics-chart-yaxis span {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  line-height: 1;
+}
+
+.analytics-chart-area {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.analytics-chart-grid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.analytics-chart-grid-line {
+  border-top: 1px solid var(--color-border);
+  width: 100%;
+}
+
+.analytics-chart-bars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  position: relative;
+  z-index: 1;
+}
+
+.analytics-chart-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  min-width: 0;
+}
+
+.analytics-chart-bar {
+  width: 100%;
+  max-width: 32px;
+  background: var(--color-accent);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+  transition: opacity 0.15s ease;
+  cursor: pointer;
+}
+
+.analytics-chart-bar:hover {
+  opacity: 0.8;
+}
+
+.analytics-chart-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.analytics-chart-bar-wrapper:hover .analytics-chart-tooltip {
+  display: block;
+}
+
+.analytics-chart-xaxis {
+  display: flex;
+  padding-top: 6px;
+}
+
+.analytics-chart-xaxis span {
+  flex: 1;
+  text-align: center;
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Analytics — Stat Card Trends */
+.stat-card-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.stat-card-trend--up {
+  color: var(--color-success);
+}
+
+.stat-card-trend--down {
+  color: var(--color-error);
+}
+
+/* Analytics — Referrer Rows */
+.referrer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.referrer-label {
+  width: 90px;
+  font-size: 13px;
+  color: var(--color-text);
+  flex-shrink: 0;
+}
+
+.referrer-bar-track {
+  flex: 1;
+  height: 20px;
+  background: var(--color-bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.referrer-bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 4px;
+  min-width: 2px;
+}
+
+.referrer-pct {
+  width: 40px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Analytics — Breakdown Grid */
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.breakdown-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.breakdown-name {
+  color: var(--color-text);
+}
+
+.breakdown-pct {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Analytics — Sortable Viewer Table */
+.viewers-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.viewers-table th {
+  text-align: left;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.viewers-table th:hover {
+  color: var(--color-text);
+}
+
+.viewers-table th[data-align="right"] {
+  text-align: right;
+}
+
+.viewers-table td {
+  color: var(--color-text);
+  font-size: 13px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.viewers-table td[data-align="right"] {
+  text-align: right;
+}
+
+.viewer-anonymous {
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+.viewer-completion-bar {
+  display: inline-block;
+  width: 48px;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.viewer-completion-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 2px;
+}
+
+/* Analytics — Show More Button */
+.show-more-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: none;
+  color: var(--color-accent);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.show-more-btn:hover {
+  background: var(--color-bg-tertiary);
+}
+
+/* Analytics — Export Button */
+.btn-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-export:hover {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text);
+}
+
+/* Analytics — Top Video Row */
+.top-video-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.top-video-row:last-child {
+  border-bottom: none;
+}
+
+.top-video-rank {
+  width: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.top-video-thumb {
+  width: 64px;
+  height: 40px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-bg-tertiary);
+  flex-shrink: 0;
+}
+
+.top-video-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.top-video-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.top-video-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-video-date {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.top-video-stats {
+  display: flex;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.top-video-stat {
+  text-align: right;
+  font-size: 12px;
+}
+
+.top-video-stat-value {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.top-video-stat-label {
+  color: var(--color-text-secondary);
+}
+
+/* Analytics — Skeleton Loading */
+.skeleton-chart {
+  height: 200px;
+  border-radius: 8px;
+}
+
+.skeleton-stat {
+  height: 80px;
+  border-radius: 8px;
+}
+
 @media (max-width: 640px) {
   .page-container {
     margin: 24px auto;
@@ -1812,6 +2221,10 @@ input:focus-visible {
   .analytics-header {
     flex-wrap: wrap;
   }
+
+  .breakdown-grid { grid-template-columns: 1fr; }
+  .top-video-thumb { display: none; }
+  .top-video-stats { gap: 8px; }
 
   .api-key-form {
     flex-direction: column;
