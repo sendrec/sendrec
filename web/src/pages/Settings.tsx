@@ -84,6 +84,8 @@ export function Settings() {
   const [webhookMessage, setWebhookMessage] = useState("");
   const [webhookDeliveries, setWebhookDeliveries] = useState<WebhookDelivery[]>([]);
   const [expandedDelivery, setExpandedDelivery] = useState<string | null>(null);
+  const [deliverySearch, setDeliverySearch] = useState("");
+  const [deliveryFilter, setDeliveryFilter] = useState<"all" | "success" | "error">("all");
   const [regeneratingSecret, setRegeneratingSecret] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [brandingEnabled, setBrandingEnabled] = useState(false);
@@ -840,53 +842,88 @@ export function Settings() {
           <p className="status-message status-message--success">{webhookMessage}</p>
         )}
 
-        {webhookDeliveries.length > 0 && (
-          <div className="delivery-list">
-            <h3 className="delivery-list-title">Recent deliveries</h3>
-            {webhookDeliveries.map((delivery) => {
-              const isSuccess = delivery.statusCode >= 200 && delivery.statusCode < 300;
-              const isExpanded = expandedDelivery === delivery.id;
-              return (
-                <div key={delivery.id}>
-                  <button
-                    type="button"
-                    className="delivery-row"
-                    onClick={() => setExpandedDelivery(isExpanded ? null : delivery.id)}
-                  >
-                    <span className={`delivery-dot ${isSuccess ? "delivery-dot--success" : "delivery-dot--error"}`} />
-                    <code className="delivery-event">
-                      {delivery.event}
-                    </code>
-                    <span className="delivery-status">
-                      {delivery.statusCode}
-                    </span>
-                    <span className="delivery-time">
-                      {new Date(delivery.createdAt).toLocaleString("en-GB")}
-                    </span>
-                  </button>
-                  {isExpanded && (
-                    <div className="delivery-detail">
-                      <div>
-                        <span className="delivery-detail-label">Payload</span>
-                        <pre className="delivery-detail-pre">
-                          {formatJson(delivery.payload)}
-                        </pre>
-                      </div>
-                      {delivery.responseBody && (
-                        <div>
-                          <span className="delivery-detail-label">Response</span>
-                          <pre className="delivery-detail-pre">
-                            {delivery.responseBody}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  )}
+        {webhookDeliveries.length > 0 && (() => {
+          const filtered = webhookDeliveries.filter((d) => {
+            if (deliveryFilter === "success" && (d.statusCode < 200 || d.statusCode >= 300)) return false;
+            if (deliveryFilter === "error" && d.statusCode >= 200 && d.statusCode < 300) return false;
+            if (deliverySearch && !d.event.toLowerCase().includes(deliverySearch.toLowerCase())) return false;
+            return true;
+          });
+          return (
+            <div className="delivery-list">
+              <h3 className="delivery-list-title">Recent deliveries</h3>
+              <div className="delivery-toolbar">
+                <input
+                  type="text"
+                  className="delivery-search"
+                  placeholder="Filter by event..."
+                  value={deliverySearch}
+                  onChange={(e) => setDeliverySearch(e.target.value)}
+                />
+                <div className="delivery-filters">
+                  {(["all", "success", "error"] as const).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      className={`delivery-filter-btn${deliveryFilter === f ? " delivery-filter-btn--active" : ""}`}
+                      onClick={() => setDeliveryFilter(f)}
+                    >
+                      {f === "all" ? "All" : f === "success" ? "Success" : "Errors"}
+                    </button>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+              <div className="delivery-scroll">
+                {filtered.length === 0 ? (
+                  <p className="delivery-empty">No matching deliveries</p>
+                ) : (
+                  filtered.map((delivery) => {
+                    const isSuccess = delivery.statusCode >= 200 && delivery.statusCode < 300;
+                    const isExpanded = expandedDelivery === delivery.id;
+                    return (
+                      <div key={delivery.id}>
+                        <button
+                          type="button"
+                          className="delivery-row"
+                          onClick={() => setExpandedDelivery(isExpanded ? null : delivery.id)}
+                        >
+                          <span className={`delivery-dot ${isSuccess ? "delivery-dot--success" : "delivery-dot--error"}`} />
+                          <code className="delivery-event">
+                            {delivery.event}
+                          </code>
+                          <span className="delivery-status">
+                            {delivery.statusCode}
+                          </span>
+                          <span className="delivery-time">
+                            {new Date(delivery.createdAt).toLocaleString("en-GB")}
+                          </span>
+                        </button>
+                        {isExpanded && (
+                          <div className="delivery-detail">
+                            <div>
+                              <span className="delivery-detail-label">Payload</span>
+                              <pre className="delivery-detail-pre">
+                                {formatJson(delivery.payload)}
+                              </pre>
+                            </div>
+                            {delivery.responseBody && (
+                              <div>
+                                <span className="delivery-detail-label">Response</span>
+                                <pre className="delivery-detail-pre">
+                                  {delivery.responseBody}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         <details className="settings-details">
           <summary>Supported events</summary>
@@ -1138,65 +1175,111 @@ export function Settings() {
             </span>
             <details className="settings-details">
               <summary>Available CSS selectors</summary>
-              <pre>{`/* CSS Variables (override colors set in branding) */
-:root { --brand-bg; --brand-surface; --brand-text; --brand-accent }
+              <pre>{`/* CSS Variables */
+:root {
+  --brand-bg;       /* Page background */
+  --brand-surface;  /* Cards, panels */
+  --brand-text;     /* Primary text */
+  --brand-accent;   /* Buttons, links */
+  --player-accent;  /* Seek bar, progress */
+}
 
 /* Layout */
-body              /* Page background, font-family, text color */
-.container        /* Max-width wrapper (960px) */
-video             /* Video player element */
-h1                /* Video title */
-.meta             /* "Creator · Date" line below title */
+body                /* Background, font, text color */
+.container          /* Max-width wrapper (960px) */
+.video-title        /* Video heading */
+.video-meta         /* Creator info row */
+.video-meta-avatar  /* Creator avatar */
+.video-meta-name    /* Creator name */
 
 /* Header & Footer */
-.logo             /* Company logo + name link */
-.logo img         /* Logo image (20x20) */
-.branding         /* Footer: "Shared via SendRec" */
-.branding a       /* Footer link */
+.logo               /* Logo + name link */
+.logo img           /* Logo image */
+.branding           /* "Shared via SendRec" footer */
+.branding a         /* Footer link */
 
-/* Actions Bar */
-.actions          /* Container for download + speed buttons */
-.download-btn     /* Download button */
-.speed-controls   /* Speed button group */
-.speed-btn        /* Individual speed button (0.5x, 1x, ...) */
-.speed-btn.active /* Currently selected speed */
+/* Video Player */
+.player-container   /* Player wrapper */
+.player-overlay     /* Play button overlay */
+.play-overlay-btn   /* Large play button */
+.player-controls    /* Control bar */
+.ctrl-btn           /* Control buttons */
+.time-display       /* Current / duration */
+.seek-bar           /* Seek bar wrapper */
+.seek-track         /* Track background */
+.seek-progress      /* Play progress */
+.seek-buffered      /* Buffered range */
+.seek-thumb         /* Draggable handle */
+.volume-group       /* Volume control */
+.volume-slider      /* Volume slider */
+.speed-dropdown     /* Speed selector */
+.speed-menu         /* Speed options dropdown */
+.speed-menu button.active /* Selected speed */
+
+/* Seek Bar Overlays */
+.seek-chapters      /* Chapter markers */
+.seek-chapter       /* Single chapter */
+.seek-markers       /* Comment markers */
+.seek-marker        /* Single marker dot */
+
+/* Actions */
+.actions            /* Download + controls */
+.download-btn       /* Download button */
 
 /* Comments */
-.comments-section    /* Full comments area */
-.comments-header     /* "Comments" heading */
-.comment             /* Single comment card */
-.comment-meta        /* Author + badges row */
-.comment-author      /* Commenter name */
-.comment-body        /* Comment text */
-.comment-owner-badge /* "Owner" badge */
-.comment-timestamp   /* Timestamp badge on comment */
-.comment-form        /* New comment form */
-.comment-form input  /* Name + email fields */
-.comment-form textarea /* Comment text area */
-.comment-submit      /* "Post comment" button */
+.comments-section   /* Full comments area */
+.comments-header    /* Heading */
+.comment            /* Single comment */
+.comment-meta       /* Author + badges */
+.comment-author     /* Commenter name */
+.comment-body       /* Comment text */
+.comment-owner-badge   /* "Owner" badge */
+.comment-private-badge /* "Private" badge */
+.comment-timestamp  /* Timestamp link */
+.comment-form       /* New comment form */
+.comment-form input /* Name + email fields */
+.comment-form textarea /* Text area */
+.comment-submit     /* "Post comment" button */
+.no-comments        /* Empty state text */
 
-/* Comment Markers Bar */
-.markers-bar      /* Timeline bar below video */
-.marker-dot       /* Individual comment marker */
+/* Reactions */
+.reaction-bar       /* Quick-reaction buttons */
+.reaction-btn       /* Single reaction */
 
 /* Emoji Picker */
-.emoji-trigger    /* Emoji button */
-.emoji-grid       /* Emoji dropdown panel */
-.emoji-btn        /* Individual emoji button */
+.emoji-trigger      /* Emoji button */
+.emoji-grid         /* Dropdown panel */
+.emoji-btn          /* Single emoji */
 
-/* Transcript */
-.transcript-section   /* Full transcript area */
-.transcript-header    /* "Transcript" heading */
-.transcript-segment   /* Single transcript line */
-.transcript-segment.active /* Currently playing segment */
-.transcript-timestamp /* Timestamp in transcript */
-.transcript-text      /* Transcript text */
+/* Transcript & Summary */
+.transcript-section /* Full panel area */
+.panel-tabs         /* Summary/Transcript tabs */
+.panel-tab          /* Tab button */
+.panel-tab--active  /* Active tab */
+.summary-text       /* Summary paragraph */
+.chapter-list       /* Chapters container */
+.chapter-item       /* Single chapter */
+.chapter-item.active /* Playing chapter */
+.chapter-timestamp  /* Chapter time */
+.chapter-title      /* Chapter name */
+.transcript-header  /* Heading */
+.transcript-segment /* Single line */
+.transcript-segment.active /* Playing line */
+.transcript-timestamp /* Time link */
+.transcript-text    /* Segment text */
+
+/* Call to Action */
+.cta-card           /* CTA container */
+.cta-title          /* CTA heading */
+.cta-desc           /* CTA description */
+.cta-btn            /* CTA button */
 
 /* Utilities */
-.hidden           /* display: none */
+.hidden             /* display: none */
 
-/* Mobile (max-width: 640px) */
-@media (max-width: 640px) { ... }`}</pre>
+/* Responsive & Accessibility */
+@media (max-width: 640px) { ... }
+@media (prefers-reduced-motion: reduce) { ... }`}</pre>
             </details>
           </div>
 
