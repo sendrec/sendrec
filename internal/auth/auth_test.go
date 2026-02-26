@@ -317,6 +317,9 @@ func TestConfirmEmail_Success(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
+	emailSender := &mockEmailSender{}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
 	rawToken, tokenHash, _ := generateSecureToken()
 
 	mock.ExpectQuery(`SELECT user_id FROM email_confirmations`).
@@ -331,6 +334,10 @@ func TestConfirmEmail_Success(t *testing.T) {
 		WithArgs("user-uuid-1").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
+	mock.ExpectQuery(`SELECT email, name FROM users WHERE id`).
+		WithArgs("user-uuid-1").
+		WillReturnRows(pgxmock.NewRows([]string{"email", "name"}).AddRow("alice@example.com", "Alice"))
+
 	body := `{"token":"` + rawToken + `"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/confirm-email", strings.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -344,6 +351,16 @@ func TestConfirmEmail_Success(t *testing.T) {
 	resp := decodeMessageResponse(t, rec)
 	if !strings.Contains(resp.Message, "confirmed") {
 		t.Errorf("expected message to contain 'confirmed', got %q", resp.Message)
+	}
+
+	if !emailSender.welcomeCalled {
+		t.Error("expected welcome email to be sent after confirmation")
+	}
+	if emailSender.lastEmail != "alice@example.com" {
+		t.Errorf("expected welcome email to alice@example.com, got %q", emailSender.lastEmail)
+	}
+	if emailSender.lastDashboardURL != "https://app.sendrec.eu/dashboard" {
+		t.Errorf("expected dashboard URL, got %q", emailSender.lastDashboardURL)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -1097,11 +1114,13 @@ func TestRegister_NoTokensIssued(t *testing.T) {
 // --- mock email sender ---
 
 type mockEmailSender struct {
-	lastEmail       string
-	lastName        string
-	lastResetLink   string
-	lastConfirmLink string
-	sendErr         error
+	lastEmail        string
+	lastName         string
+	lastResetLink    string
+	lastConfirmLink  string
+	lastDashboardURL string
+	welcomeCalled    bool
+	sendErr          error
 }
 
 func (m *mockEmailSender) SendPasswordReset(_ context.Context, toEmail, toName, resetLink string) error {
@@ -1115,6 +1134,14 @@ func (m *mockEmailSender) SendConfirmation(_ context.Context, toEmail, toName, c
 	m.lastEmail = toEmail
 	m.lastName = toName
 	m.lastConfirmLink = confirmLink
+	return m.sendErr
+}
+
+func (m *mockEmailSender) SendWelcome(_ context.Context, toEmail, toName, dashboardURL string) error {
+	m.welcomeCalled = true
+	m.lastEmail = toEmail
+	m.lastName = toName
+	m.lastDashboardURL = dashboardURL
 	return m.sendErr
 }
 

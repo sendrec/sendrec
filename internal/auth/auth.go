@@ -29,6 +29,7 @@ const userIDKey contextKey = "userID"
 type EmailSender interface {
 	SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error
 	SendConfirmation(ctx context.Context, toEmail, toName, confirmLink string) error
+	SendWelcome(ctx context.Context, toEmail, toName, dashboardURL string) error
 }
 
 type Handler struct {
@@ -455,6 +456,20 @@ func (h *Handler) ConfirmEmail(w http.ResponseWriter, r *http.Request) {
 	); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to verify email")
 		return
+	}
+
+	if h.emailSender != nil {
+		var userEmail, userName string
+		if err := h.db.QueryRow(r.Context(),
+			"SELECT email, name FROM users WHERE id = $1", userID,
+		).Scan(&userEmail, &userName); err != nil {
+			slog.Error("confirm-email: failed to load user for welcome email", "error", err)
+		} else {
+			dashboardURL := h.baseURL + "/dashboard"
+			if err := h.emailSender.SendWelcome(r.Context(), userEmail, userName, dashboardURL); err != nil {
+				slog.Error("confirm-email: failed to send welcome email", "error", err)
+			}
+		}
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, messageResponse{Message: "Email confirmed successfully. You can now sign in."})

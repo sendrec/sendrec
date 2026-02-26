@@ -20,6 +20,7 @@ type Config struct {
 	CommentTemplateID int
 	ViewTemplateID    int
 	ConfirmTemplateID int
+	WelcomeTemplateID int
 	Allowlist         []string
 }
 
@@ -250,6 +251,34 @@ func (c *Client) SendConfirmation(ctx context.Context, toEmail, toName, confirmL
 		Data: map[string]any{
 			"confirmLink": confirmLink,
 			"name":        toName,
+		},
+		ContentType: "html",
+	}
+
+	return c.sendTx(ctx, body)
+}
+
+func (c *Client) SendWelcome(ctx context.Context, toEmail, toName, dashboardURL string) error {
+	if c.config.BaseURL == "" {
+		slog.Warn("email not configured, welcome email skipped", "recipient", toEmail)
+		return nil
+	}
+
+	if c.config.WelcomeTemplateID == 0 {
+		slog.Warn("welcome template ID not set, skipping welcome email", "recipient", toEmail)
+		return nil
+	}
+
+	// Welcome emails bypass the allowlist — they are part of the core
+	// onboarding flow and must always be sent after email confirmation.
+	c.ensureSubscriber(ctx, toEmail, toName)
+
+	body := txRequest{
+		SubscriberEmail: toEmail,
+		TemplateID:      c.config.WelcomeTemplateID,
+		Data: map[string]any{
+			"name":         toName,
+			"dashboardURL": dashboardURL,
 		},
 		ContentType: "html",
 	}
