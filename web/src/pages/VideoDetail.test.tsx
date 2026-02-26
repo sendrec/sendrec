@@ -315,9 +315,11 @@ describe("VideoDetail", () => {
   it("shows loading state initially when no router state", () => {
     mockApiFetch.mockReturnValue(new Promise(() => {}));
 
-    renderVideoDetail("v1");
+    const { container } = renderVideoDetail("v1");
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    expect(container.querySelector(".skeleton-thumb")).toBeInTheDocument();
+    expect(container.querySelector(".skeleton-title")).toBeInTheDocument();
+    expect(container.querySelector(".skeleton-btn")).toBeInTheDocument();
   });
 
   it("displays video player when download URL is available", async () => {
@@ -1576,4 +1578,81 @@ describe("VideoDetail", () => {
       );
     });
   });
+
+  // ─── Processing state tests ────────────────────────────────────
+
+  it("shows processing status badge when video is processing", async () => {
+    setupDefaultMocks({ video: makeVideo({ status: "processing" }) });
+    const { container } = renderVideoDetail("v1");
+    await waitFor(() => {
+      expect(
+        container.querySelector(".status-badge--processing"),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText("Processing")).toBeInTheDocument();
+  });
+
+  it("shows processing overlay on thumbnail when processing", async () => {
+    setupDefaultMocks({ video: makeVideo({ status: "processing" }) });
+    const { container } = renderVideoDetail("v1");
+    await waitFor(() => {
+      expect(
+        container.querySelector(".hero-processing-overlay"),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByText("Processing video...")).toBeInTheDocument();
+  });
+
+  it("disables copy link button when processing", async () => {
+    setupDefaultMocks({ video: makeVideo({ status: "processing" }) });
+    renderVideoDetail("v1");
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: /copy share link/i });
+      expect(btn).toBeDisabled();
+    });
+  });
+
+  it("hides download button when processing", async () => {
+    setupDefaultMocks({ video: makeVideo({ status: "processing" }) });
+    renderVideoDetail("v1");
+    await waitFor(() => {
+      expect(screen.getByText("My Recording")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Download")).not.toBeInTheDocument();
+  });
+
+  it("shows placeholder for share link when processing", async () => {
+    setupDefaultMocks({ video: makeVideo({ status: "processing" }) });
+    renderVideoDetail("v1");
+    await waitFor(() => {
+      expect(
+        screen.getByText("Available once processing completes"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("disables trim button when processing", async () => {
+    setupDefaultMocks({ video: makeVideo({ status: "processing" }) });
+    renderVideoDetail("v1");
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: /trim/i });
+      expect(btn).toBeDisabled();
+    });
+  });
+
+  it("polls video status when processing", async () => {
+    setupDefaultMocks({ video: makeVideo({ status: "processing" }) });
+    renderVideoDetail("v1");
+    await waitFor(() => {
+      expect(screen.getByText("Processing")).toBeInTheDocument();
+    });
+    mockApiFetch.mockClear();
+    mockApiFetch.mockResolvedValue([makeVideo({ status: "ready" })]);
+    await waitFor(
+      () => {
+        expect(mockApiFetch).toHaveBeenCalledWith("/api/videos");
+      },
+      { timeout: 4000 },
+    );
+  }, 10000);
 });
