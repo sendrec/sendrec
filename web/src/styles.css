@@ -284,7 +284,6 @@ input:focus-visible {
   font-size: 14px;
   padding: 6px 12px;
   border-radius: 4px;
-  margin-left: auto;
 }
 
 .nav-theme-toggle {
@@ -299,6 +298,7 @@ input:focus-visible {
   background: transparent;
   border: none;
   cursor: pointer;
+  margin-left: auto;
 }
 
 .nav-theme-toggle:hover {
@@ -2218,9 +2218,9 @@ textarea.form-input {
 }
 
 .auth-theme-toggle {
-  position: absolute;
-  top: 0;
-  right: max(24px, env(safe-area-inset-right));
+  position: fixed;
+  top: 16px;
+  right: max(16px, env(safe-area-inset-right));
   width: 36px;
   height: 36px;
   border-radius: 6px;
@@ -4024,6 +4024,14 @@ textarea.form-input {
     min-height: 44px;
     display: flex;
     align-items: center;
+  }
+
+  .nav-theme-toggle {
+    position: fixed;
+    top: 10px;
+    right: 60px;
+    margin-left: 0;
+    z-index: 51;
   }
 
   .nav-signout {
