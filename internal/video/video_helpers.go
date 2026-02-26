@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mssola/useragent"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
@@ -62,4 +63,59 @@ func clientIP(r *http.Request) string {
 		return strings.TrimSpace(forwarded)
 	}
 	return r.RemoteAddr
+}
+
+func categorizeReferrer(referer string) string {
+	if referer == "" {
+		return "Direct"
+	}
+	lower := strings.ToLower(referer)
+	switch {
+	case strings.Contains(lower, "mail") || strings.Contains(lower, "outlook") || strings.Contains(lower, "proton"):
+		return "Email"
+	case strings.Contains(lower, "slack"):
+		return "Slack"
+	case strings.Contains(lower, "twitter") || strings.Contains(lower, "x.com"):
+		return "Twitter"
+	case strings.Contains(lower, "linkedin"):
+		return "LinkedIn"
+	default:
+		return "Other"
+	}
+}
+
+func parseBrowser(userAgent string) string {
+	if userAgent == "" {
+		return "Other"
+	}
+	ua := useragent.New(userAgent)
+	name, _ := ua.Browser()
+	switch {
+	case strings.Contains(name, "Edge"):
+		return "Edge"
+	case strings.Contains(name, "Chrome"):
+		return "Chrome"
+	case strings.Contains(name, "Firefox"):
+		return "Firefox"
+	case strings.Contains(name, "Safari"):
+		return "Safari"
+	default:
+		return "Other"
+	}
+}
+
+func parseDevice(userAgent string) string {
+	if userAgent == "" {
+		return "Desktop"
+	}
+	ua := useragent.New(userAgent)
+	lower := strings.ToLower(userAgent)
+	if ua.Mobile() {
+		if strings.Contains(lower, "ipad") || strings.Contains(lower, "tablet") ||
+			(strings.Contains(lower, "android") && !strings.Contains(lower, "mobile")) {
+			return "Tablet"
+		}
+		return "Mobile"
+	}
+	return "Desktop"
 }
