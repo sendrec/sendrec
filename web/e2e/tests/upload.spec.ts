@@ -12,14 +12,15 @@ test.describe("Upload", () => {
   });
 
   test("upload page renders", async ({ page }) => {
-    await page.goto("/upload");
+    await page.goto("/?tab=upload");
     await expect(
-      page.getByRole("heading", { name: /upload video/i })
+      page.getByRole("heading", { name: /new recording/i })
     ).toBeVisible();
+    await expect(page.locator('[data-testid="file-input"]')).toBeAttached();
   });
 
   test("upload a video file", async ({ page }) => {
-    await page.goto("/upload");
+    await page.goto("/?tab=upload");
 
     const testVideoPath = join(__dirname, "..", "fixtures", "test-video.webm");
     const fileInput = page.locator('[data-testid="file-input"]');

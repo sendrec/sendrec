@@ -64,7 +64,7 @@ export function App() {
         path="/upload"
         element={
           <ProtectedRoute>
-            <Navigate to="/" replace />
+            <Navigate to="/?tab=upload" replace />
           </ProtectedRoute>
         }
       />
