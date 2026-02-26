@@ -4975,7 +4975,7 @@ func TestAnalytics_InvalidRange(t *testing.T) {
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/{id}/analytics", handler.Analytics)
 
-	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics?range=90d", nil)
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos/"+videoID+"/analytics?range=1y", nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -4984,8 +4984,8 @@ func TestAnalytics_InvalidRange(t *testing.T) {
 	}
 
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
-	if errMsg != "invalid range: must be 7d, 30d, or all" {
-		t.Errorf("expected error %q, got %q", "invalid range: must be 7d, 30d, or all", errMsg)
+	if errMsg != "invalid range: must be 7d, 30d, 90d, or all" {
+		t.Errorf("expected error %q, got %q", "invalid range: must be 7d, 30d, 90d, or all", errMsg)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -5542,9 +5542,9 @@ func TestAnalytics_ViewerList(t *testing.T) {
 	mock.ExpectQuery(`SELECT vv.email, vv.created_at`).
 		WithArgs(videoID).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"email", "created_at", "view_count", "completion"}).
-				AddRow("alice@example.com", firstViewedAt, int64(3), 75).
-				AddRow("bob@example.com", firstViewedAt.Add(-2*time.Hour), int64(1), 0),
+			pgxmock.NewRows([]string{"email", "created_at", "view_count", "completion", "country", "city"}).
+				AddRow("alice@example.com", firstViewedAt, int64(3), 75, "DE", "Berlin").
+				AddRow("bob@example.com", firstViewedAt.Add(-2*time.Hour), int64(1), 0, "", ""),
 		)
 
 	r := chi.NewRouter()
