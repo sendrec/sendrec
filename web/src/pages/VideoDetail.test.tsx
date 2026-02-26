@@ -158,6 +158,8 @@ const defaultPlaylists = [
   },
 ];
 
+const defaultComments = { comments: [], commentMode: "disabled" };
+
 function setupDefaultMocks(
   overrides: {
     video?: Record<string, unknown>;
@@ -165,6 +167,7 @@ function setupDefaultMocks(
     folders?: Record<string, unknown>[];
     tags?: Record<string, unknown>[];
     playlists?: Record<string, unknown>[];
+    comments?: Record<string, unknown>;
   } = {},
 ) {
   mockApiFetch
@@ -173,7 +176,29 @@ function setupDefaultMocks(
     .mockResolvedValueOnce(overrides.folders ?? defaultFolders)
     .mockResolvedValueOnce(overrides.tags ?? defaultTags)
     .mockResolvedValueOnce(overrides.playlists ?? defaultPlaylists)
-    .mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" });
+    .mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" })
+    .mockResolvedValueOnce(overrides.comments ?? defaultComments);
+}
+
+function setupWithTranscript(
+  overrides: {
+    video?: Record<string, unknown>;
+    limits?: Record<string, unknown>;
+    folders?: Record<string, unknown>[];
+    tags?: Record<string, unknown>[];
+    playlists?: Record<string, unknown>[];
+    comments?: Record<string, unknown>;
+    transcript?: Record<string, unknown>;
+  } = {},
+) {
+  const { video: videoOverrides, transcript, ...rest } = overrides;
+  setupDefaultMocks({
+    video: makeVideo({ transcriptStatus: "ready", ...(videoOverrides ?? {}) }),
+    ...rest,
+  });
+  mockApiFetch.mockResolvedValueOnce(
+    transcript ?? { status: "ready", segments: [{ start: 0, end: 2.5, text: "Hello" }] },
+  );
 }
 
 function renderVideoDetail(videoId = "v1") {
@@ -225,7 +250,8 @@ describe("VideoDetail", () => {
       .mockResolvedValueOnce(defaultFolders)
       .mockResolvedValueOnce(defaultTags)
       .mockResolvedValueOnce(defaultPlaylists)
-      .mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" });
+      .mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" })
+      .mockResolvedValueOnce(defaultComments);
 
     renderVideoDetail("v1");
 
@@ -273,7 +299,8 @@ describe("VideoDetail", () => {
       .mockResolvedValueOnce(defaultFolders)
       .mockResolvedValueOnce(defaultTags)
       .mockResolvedValueOnce(defaultPlaylists)
-      .mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" });
+      .mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" })
+      .mockResolvedValueOnce(defaultComments);
 
     renderVideoDetail("nonexistent");
 
@@ -368,17 +395,16 @@ describe("VideoDetail", () => {
     });
   });
 
-  // ─── Sharing section ──────────────────────────────────────────
+  // ─── Share Settings section ──────────────────────────────────
 
-  it("shows Sharing section heading", async () => {
-    const video = makeVideo();
+  it("shows Share Settings section heading", async () => {
     setupDefaultMocks();
 
     renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { level: 2, name: "Sharing" }),
+        screen.getByRole("heading", { level: 2, name: "Share Settings" }),
       ).toBeInTheDocument();
     });
   });
@@ -728,8 +754,7 @@ describe("VideoDetail", () => {
   });
 
   it("shows transcript status 'Ready' with Redo transcript button", async () => {
-    const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks({ video });
+    setupWithTranscript();
 
     renderVideoDetail("v1");
 
@@ -787,17 +812,13 @@ describe("VideoDetail", () => {
   });
 
   it("hides summarize button when AI disabled", async () => {
-    const video = makeVideo({
-      transcriptStatus: "ready",
-      summaryStatus: "none",
-    });
     setupDefaultMocks({ limits: { ...defaultLimits, aiEnabled: false } });
 
     renderVideoDetail("v1");
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { level: 2, name: "Editing" }),
+        screen.getByRole("heading", { level: 2, name: "AI" }),
       ).toBeInTheDocument();
     });
 
@@ -925,8 +946,7 @@ describe("VideoDetail", () => {
   });
 
   it("shows remove fillers button when transcript ready", async () => {
-    const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks({ video });
+    setupWithTranscript();
 
     renderVideoDetail("v1");
 
@@ -951,8 +971,7 @@ describe("VideoDetail", () => {
   });
 
   it("opens filler modal when remove fillers clicked", async () => {
-    const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks({ video });
+    setupWithTranscript();
 
     renderVideoDetail("v1");
 
@@ -980,20 +999,7 @@ describe("VideoDetail", () => {
     expect(screen.getByTestId("silence-modal")).toBeInTheDocument();
   });
 
-  // ─── Customization section ────────────────────────────────────
-
-  it("shows Customization section heading", async () => {
-    const video = makeVideo();
-    setupDefaultMocks();
-
-    renderVideoDetail("v1");
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { level: 2, name: "Customization" }),
-      ).toBeInTheDocument();
-    });
-  });
+  // ─── Thumbnail, Notifications, Branding (in Share Settings) ──
 
   it("shows thumbnail upload button", async () => {
     const video = makeVideo();
@@ -1027,7 +1033,7 @@ describe("VideoDetail", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { level: 2, name: "Customization" }),
+        screen.getByRole("heading", { level: 2, name: "Share Settings" }),
       ).toBeInTheDocument();
     });
 
@@ -1062,7 +1068,6 @@ describe("VideoDetail", () => {
   });
 
   it("hides branding button when branding disabled", async () => {
-    const video = makeVideo();
     setupDefaultMocks({
       limits: { ...defaultLimits, brandingEnabled: false },
     });
@@ -1071,7 +1076,7 @@ describe("VideoDetail", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { level: 2, name: "Customization" }),
+        screen.getByRole("heading", { level: 2, name: "Share Settings" }),
       ).toBeInTheDocument();
     });
 
@@ -1260,8 +1265,8 @@ describe("VideoDetail", () => {
 
     fireEvent.click(screen.getByText("Delete video"));
 
-    // Should not have called delete API (only the initial 5 setup calls)
-    expect(mockApiFetch).toHaveBeenCalledTimes(6);
+    // Should not have called delete API (only the initial 7 setup calls)
+    expect(mockApiFetch).toHaveBeenCalledTimes(7);
   });
 
   // ─── Toast ────────────────────────────────────────────────────
@@ -1286,8 +1291,7 @@ describe("VideoDetail", () => {
   // ─── Language selector ──────────────────────────────────────
 
   it("shows language selector next to retranscribe when transcription enabled", async () => {
-    const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks({ video, limits: { ...defaultLimits, transcriptionEnabled: true } });
+    setupWithTranscript({ limits: { ...defaultLimits, transcriptionEnabled: true } });
 
     renderVideoDetail();
 
@@ -1297,8 +1301,7 @@ describe("VideoDetail", () => {
   });
 
   it("hides language selector when transcription disabled", async () => {
-    const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks({ video });
+    setupWithTranscript();
 
     renderVideoDetail();
 
@@ -1309,8 +1312,7 @@ describe("VideoDetail", () => {
   });
 
   it("sends language when retranscribing with specific language", async () => {
-    const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks({ video, limits: { ...defaultLimits, transcriptionEnabled: true } });
+    setupWithTranscript({ limits: { ...defaultLimits, transcriptionEnabled: true } });
     mockApiFetch.mockResolvedValueOnce(undefined); // retranscribe response
 
     renderVideoDetail();
@@ -1334,8 +1336,7 @@ describe("VideoDetail", () => {
   });
 
   it("does not send language body when auto is selected", async () => {
-    const video = makeVideo({ transcriptStatus: "ready" });
-    setupDefaultMocks({ video, limits: { ...defaultLimits, transcriptionEnabled: true } });
+    setupWithTranscript({ limits: { ...defaultLimits, transcriptionEnabled: true } });
     mockApiFetch.mockResolvedValueOnce(undefined); // retranscribe response
 
     renderVideoDetail();
@@ -1355,8 +1356,10 @@ describe("VideoDetail", () => {
   });
 
   it("pre-selects video transcription language in dropdown", async () => {
-    const video = makeVideo({ transcriptStatus: "ready", transcriptionLanguage: "de" });
-    setupDefaultMocks({ video, limits: { ...defaultLimits, transcriptionEnabled: true } });
+    setupWithTranscript({
+      video: { transcriptionLanguage: "de" },
+      limits: { ...defaultLimits, transcriptionEnabled: true },
+    });
 
     renderVideoDetail();
 
@@ -1379,8 +1382,8 @@ describe("VideoDetail", () => {
   });
 
   it("shows generate document button when AI enabled and transcript ready", async () => {
-    setupDefaultMocks({
-      video: makeVideo({ transcriptStatus: "ready", documentStatus: "none" }),
+    setupWithTranscript({
+      video: { documentStatus: "none" },
       limits: { ...defaultLimits, aiEnabled: true },
     });
     renderVideoDetail();
@@ -1391,8 +1394,8 @@ describe("VideoDetail", () => {
   });
 
   it("shows view and regenerate buttons when document is ready", async () => {
-    setupDefaultMocks({
-      video: makeVideo({ transcriptStatus: "ready", documentStatus: "ready", document: "## Doc" }),
+    setupWithTranscript({
+      video: { documentStatus: "ready", document: "## Doc" },
       limits: { ...defaultLimits, aiEnabled: true },
     });
     renderVideoDetail();
@@ -1400,6 +1403,177 @@ describe("VideoDetail", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "View" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Regenerate" })).toBeInTheDocument();
+    });
+  });
+
+  // ─── Primary Actions Bar ──────────────────────────────────────
+
+  it("shows primary action buttons", async () => {
+    setupDefaultMocks();
+    renderVideoDetail();
+    await waitFor(() => {
+      expect(screen.getByText("Copy share link")).toBeInTheDocument();
+      expect(screen.getByText("View analytics")).toBeInTheDocument();
+      expect(screen.getByText("Download")).toBeInTheDocument();
+    });
+  });
+
+  // ─── AI section ───────────────────────────────────────────────
+
+  it("shows AI section heading", async () => {
+    setupDefaultMocks();
+    renderVideoDetail();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 2, name: "AI" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // ─── Transcript segments ──────────────────────────────────────
+
+  it("shows transcript segments when ready", async () => {
+    setupWithTranscript();
+    const { container } = renderVideoDetail();
+    await waitFor(() => {
+      expect(container.querySelector(".transcript-segments")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Hello")).toBeInTheDocument();
+    expect(screen.getByText("0:00")).toBeInTheDocument();
+  });
+
+  it("hides transcript segments when not ready", async () => {
+    setupDefaultMocks();
+    const { container } = renderVideoDetail();
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    });
+    expect(container.querySelector(".transcript-segments")).not.toBeInTheDocument();
+  });
+
+  // ─── Call to Action section ───────────────────────────────────
+
+  it("shows Call to Action section heading", async () => {
+    setupDefaultMocks();
+    renderVideoDetail();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Call to Action" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // ─── Comments section ─────────────────────────────────────────
+
+  it("shows Comments section with count", async () => {
+    setupDefaultMocks({
+      comments: {
+        comments: [
+          {
+            id: "c1",
+            authorName: "Alice",
+            body: "Great video!",
+            isPrivate: false,
+            isOwner: false,
+            createdAt: "2026-02-25T10:00:00Z",
+            videoTimestamp: null,
+          },
+        ],
+        commentMode: "anonymous",
+      },
+    });
+    renderVideoDetail();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Comments (1)" }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Great video!")).toBeInTheDocument();
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+    });
+  });
+
+  it("shows empty comments state", async () => {
+    setupDefaultMocks();
+    renderVideoDetail();
+    await waitFor(() => {
+      expect(screen.getByText("No comments yet.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows video timestamp on comment", async () => {
+    setupDefaultMocks({
+      comments: {
+        comments: [
+          {
+            id: "c1",
+            authorName: "Bob",
+            body: "Nice part",
+            isPrivate: false,
+            isOwner: false,
+            createdAt: "2026-02-25T10:00:00Z",
+            videoTimestamp: 65.5,
+          },
+        ],
+        commentMode: "anonymous",
+      },
+    });
+    renderVideoDetail();
+    await waitFor(() => {
+      expect(screen.getByText("@1:05")).toBeInTheDocument();
+    });
+  });
+
+  it("shows private badge on private comment", async () => {
+    setupDefaultMocks({
+      comments: {
+        comments: [
+          {
+            id: "c1",
+            authorName: "Eve",
+            body: "Secret note",
+            isPrivate: true,
+            isOwner: false,
+            createdAt: "2026-02-25T10:00:00Z",
+            videoTimestamp: null,
+          },
+        ],
+        commentMode: "anonymous",
+      },
+    });
+    renderVideoDetail();
+    await waitFor(() => {
+      expect(screen.getByText("Private")).toBeInTheDocument();
+    });
+  });
+
+  it("deletes comment when delete button clicked", async () => {
+    setupDefaultMocks({
+      comments: {
+        comments: [
+          {
+            id: "c1",
+            authorName: "Alice",
+            body: "Delete me",
+            isPrivate: false,
+            isOwner: true,
+            createdAt: "2026-02-25T10:00:00Z",
+            videoTimestamp: null,
+          },
+        ],
+        commentMode: "anonymous",
+      },
+    });
+    renderVideoDetail();
+    await waitFor(() => {
+      expect(screen.getByText("Delete me")).toBeInTheDocument();
+    });
+    mockApiFetch.mockResolvedValueOnce(undefined);
+    fireEvent.click(screen.getByLabelText("Delete comment"));
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/videos/v1/comments/c1",
+        { method: "DELETE" },
+      );
     });
   });
 });
