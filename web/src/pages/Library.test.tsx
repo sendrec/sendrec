@@ -41,12 +41,13 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function mockFetch(videos: unknown[], limits = unlimitedLimits, folders: unknown[] = [], tags: unknown[] = []) {
+function mockFetch(videos: unknown[], limits = unlimitedLimits, folders: unknown[] = [], tags: unknown[] = [], playlists: unknown[] = []) {
   mockApiFetch
     .mockResolvedValueOnce(videos)
     .mockResolvedValueOnce(limits)
     .mockResolvedValueOnce(folders)
-    .mockResolvedValueOnce(tags);
+    .mockResolvedValueOnce(tags)
+    .mockResolvedValueOnce(playlists);
 }
 
 function renderLibrary() {
@@ -237,8 +238,8 @@ describe("Library", () => {
     await user.click(screen.getByText("Delete"));
 
     expect(confirmSpy).toHaveBeenCalledWith("Delete this recording? This cannot be undone.");
-    // Should not have called delete API (only initial fetches: videos, limits, folders, tags)
-    expect(mockApiFetch).toHaveBeenCalledTimes(4);
+    // Should not have called delete API (only initial fetches: videos, limits, folders, tags, playlists)
+    expect(mockApiFetch).toHaveBeenCalledTimes(5);
   });
 
   it("deletes video when confirmed", async () => {
@@ -606,6 +607,17 @@ describe("Library", () => {
       expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
       expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/upload");
     });
+  });
+
+  it("renders playlists in sidebar", async () => {
+    const playlists = [{ id: "p1", title: "Demo Reel", videoCount: 3 }];
+    mockFetch([makeVideo()], unlimitedLimits, [], [], playlists);
+    renderLibrary();
+    await waitFor(() => {
+      expect(screen.getByText("Playlists")).toBeInTheDocument();
+    });
+    const link = screen.getByRole("link", { name: /Demo Reel/ });
+    expect(link).toHaveAttribute("href", "/playlists/p1");
   });
 
   describe("batch operations", () => {

@@ -666,14 +666,7 @@ export function VideoDetail() {
           marginBottom: 24,
         }}
       >
-        <Link
-          to="/library"
-          style={{
-            color: "var(--color-text-secondary)",
-            textDecoration: "none",
-            fontSize: 14,
-          }}
-        >
+        <Link to="/library" className="back-link">
           &larr; Library
         </Link>
         <a
@@ -1442,7 +1435,7 @@ export function VideoDetail() {
       </div>
 
       {/* Footer: Delete */}
-      <div style={{ marginTop: 32, paddingTop: 16, borderTop: "1px solid var(--color-border)" }}>
+      <div className="danger-zone">
         <button
           onClick={deleteVideo}
           className="detail-btn detail-btn--danger"

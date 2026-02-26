@@ -13,9 +13,8 @@ import { ConfirmEmail } from "./pages/ConfirmEmail";
 import { NotFound } from "./pages/NotFound";
 import { Settings } from "./pages/Settings";
 import { Analytics } from "./pages/Analytics";
+import { AnalyticsDashboard } from "./pages/AnalyticsDashboard";
 import { VideoDetail } from "./pages/VideoDetail";
-import { Upload } from "./pages/Upload";
-import { Playlists } from "./pages/Playlists";
 import { PlaylistDetail } from "./pages/PlaylistDetail";
 import { useTheme } from "./hooks/useTheme";
 
@@ -65,7 +64,7 @@ export function App() {
         path="/upload"
         element={
           <ProtectedRoute>
-            <Upload />
+            <Navigate to="/" replace />
           </ProtectedRoute>
         }
       />
@@ -81,7 +80,7 @@ export function App() {
         path="/playlists"
         element={
           <ProtectedRoute>
-            <Playlists />
+            <Navigate to="/library" replace />
           </ProtectedRoute>
         }
       />
@@ -90,6 +89,14 @@ export function App() {
         element={
           <ProtectedRoute>
             <PlaylistDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <AnalyticsDashboard />
           </ProtectedRoute>
         }
       />

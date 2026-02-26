@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { CameraRecorder } from "../components/CameraRecorder";
 import { Recorder } from "../components/Recorder";
+import { Upload } from "./Upload";
 
 interface CreateVideoResponse {
   id: string;
@@ -18,6 +19,7 @@ interface LimitsResponse {
 }
 
 export function Record() {
+  const [tab, setTab] = useState<"record" | "upload">("record");
   const [uploading, setUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState("");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -211,10 +213,10 @@ export function Record() {
         </h1>
         <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginBottom: 24, maxWidth: 400, margin: "0 auto 24px" }}>
           Recording is not supported on this device. Please use a modern browser, or{" "}
-          <Link to="/upload" style={{ color: "var(--color-accent)" }}>upload a video</Link> instead.
+          <button onClick={() => setTab("upload")} style={{ color: "var(--color-accent)", background: "none", border: "none", cursor: "pointer", font: "inherit", textDecoration: "underline", padding: 0 }}>upload a video</button> instead.
         </p>
-        <Link
-          to="/upload"
+        <button
+          onClick={() => setTab("upload")}
           style={{
             background: "var(--color-accent)",
             color: "var(--color-text)",
@@ -222,11 +224,12 @@ export function Record() {
             padding: "10px 24px",
             fontSize: 14,
             fontWeight: 600,
-            textDecoration: "none",
+            border: "none",
+            cursor: "pointer",
           }}
         >
           Go to Upload
-        </Link>
+        </button>
       </div>
     );
   }
@@ -394,6 +397,20 @@ export function Record() {
       >
         New Recording
       </h1>
+      <div className="record-tabs">
+        <button
+          className={`record-tab${tab === "record" ? " record-tab--active" : ""}`}
+          onClick={() => setTab("record")}
+        >
+          Record
+        </button>
+        <button
+          className={`record-tab${tab === "upload" ? " record-tab--active" : ""}`}
+          onClick={() => setTab("upload")}
+        >
+          Upload
+        </button>
+      </div>
       {hasLimits && (
         <div style={{ marginBottom: 16, maxWidth: 300, margin: "0 auto 16px" }}>
           <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 6 }}>
@@ -441,16 +458,20 @@ export function Record() {
           </div>
         </div>
       )}
-      {screenRecordingSupported ? (
-        <Recorder
-          onRecordingComplete={handleRecordingComplete}
-          maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
-        />
+      {tab === "record" ? (
+        screenRecordingSupported ? (
+          <Recorder
+            onRecordingComplete={handleRecordingComplete}
+            maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
+          />
+        ) : (
+          <CameraRecorder
+            onRecordingComplete={handleRecordingComplete}
+            maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
+          />
+        )
       ) : (
-        <CameraRecorder
-          onRecordingComplete={handleRecordingComplete}
-          maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
-        />
+        <Upload />
       )}
     </div>
   );

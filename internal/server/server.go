@@ -263,6 +263,11 @@ func (s *Server) routes() {
 			})
 		})
 
+		s.router.Route("/api/analytics", func(r chi.Router) {
+			r.Use(s.authHandler.Middleware)
+			r.Get("/dashboard", s.videoHandler.AnalyticsDashboard)
+		})
+
 		s.router.Route("/api/folders", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
 			r.Use(maxBodySize(64 * 1024))

@@ -103,6 +103,10 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             --brand-surface: {{.Branding.ColorSurface}};
             --brand-text: {{.Branding.ColorText}};
             --brand-accent: {{.Branding.ColorAccent}};
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --radius-lg: 8px;
+            --radius-xl: 12px;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {

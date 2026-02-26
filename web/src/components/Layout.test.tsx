@@ -41,7 +41,10 @@ describe("Layout", () => {
     expect(screen.getByRole("link", { name: /SendRec/ })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("href", "/library");
+    expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute("href", "/analytics");
     expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+    expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Playlists" })).not.toBeInTheDocument();
   });
 
   it("renders logo image in nav", () => {
@@ -69,6 +72,20 @@ describe("Layout", () => {
     expect(libraryLink).toHaveClass("nav-link--active");
     const recordLink = screen.getByRole("link", { name: "Record" });
     expect(recordLink).not.toHaveClass("nav-link--active");
+  });
+
+  it("highlights active link for Analytics on /analytics", () => {
+    renderLayout("/analytics");
+    const analyticsLink = screen.getByRole("link", { name: "Analytics" });
+    expect(analyticsLink).toHaveClass("nav-link--active");
+    const recordLink = screen.getByRole("link", { name: "Record" });
+    expect(recordLink).not.toHaveClass("nav-link--active");
+  });
+
+  it("highlights Analytics link for per-video analytics", () => {
+    renderLayout("/videos/123/analytics");
+    const analyticsLink = screen.getByRole("link", { name: "Analytics" });
+    expect(analyticsLink).toHaveClass("nav-link--active");
   });
 
   it("signs out on button click", async () => {

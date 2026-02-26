@@ -15,14 +15,36 @@ describe("NotFound", () => {
     expect(screen.getByText("Page not found")).toBeInTheDocument();
   });
 
-  it("renders link to home page", () => {
+  it("renders description text", () => {
     render(
       <MemoryRouter>
         <NotFound />
       </MemoryRouter>
     );
 
-    const link = screen.getByRole("link", { name: "Go home" });
+    expect(screen.getByText(/doesn't exist or has been moved/)).toBeInTheDocument();
+  });
+
+  it("renders link to library", () => {
+    render(
+      <MemoryRouter>
+        <NotFound />
+      </MemoryRouter>
+    );
+
+    const link = screen.getByRole("link", { name: "Go to Library" });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/library");
+  });
+
+  it("renders link to record", () => {
+    render(
+      <MemoryRouter>
+        <NotFound />
+      </MemoryRouter>
+    );
+
+    const link = screen.getByRole("link", { name: "Start Recording" });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/");
   });

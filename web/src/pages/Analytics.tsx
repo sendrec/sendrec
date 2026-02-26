@@ -200,16 +200,7 @@ export function Analytics() {
 
   return (
     <div className="page-container">
-      <Link
-        to={`/videos/${id}`}
-        style={{
-          color: "var(--color-text-secondary)",
-          textDecoration: "none",
-          fontSize: 14,
-          marginBottom: 16,
-          display: "inline-block",
-        }}
-      >
+      <Link to={`/videos/${id}`} className="back-link">
         &larr; Back
       </Link>
 
@@ -217,21 +208,12 @@ export function Analytics() {
         <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
           Analytics
         </h1>
-        <div style={{ display: "flex", gap: 4 }}>
+        <div className="range-pills">
           {ranges.map((r) => (
             <button
               key={r}
+              className={`range-pill${range === r ? " range-pill--active" : ""}`}
               onClick={() => handleRangeChange(r)}
-              style={{
-                background: range === r ? "var(--color-accent)" : "transparent",
-                color: range === r ? "var(--color-on-accent)" : "var(--color-text-secondary)",
-                border: `1px solid ${range === r ? "var(--color-accent)" : "var(--color-border)"}`,
-                borderRadius: 4,
-                padding: "6px 12px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
             >
               {r === "all" ? "All" : r}
             </button>
@@ -240,82 +222,30 @@ export function Analytics() {
       </div>
 
       <div className="analytics-stats">
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 4px" }}>Total Views</p>
-          <p style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 700, margin: 0 }}>
-            {data.summary.totalViews}
-          </p>
+        <div className="stat-card">
+          <p className="stat-card-label">Total Views</p>
+          <p className="stat-card-value">{data.summary.totalViews}</p>
         </div>
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 4px" }}>Unique Views</p>
-          <p style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 700, margin: 0 }}>
-            {data.summary.uniqueViews}
-          </p>
+        <div className="stat-card">
+          <p className="stat-card-label">Unique Views</p>
+          <p className="stat-card-value">{data.summary.uniqueViews}</p>
         </div>
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 4px" }}>Avg / Day</p>
-          <p style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 700, margin: 0 }}>
-            {data.summary.averageDailyViews}
-          </p>
+        <div className="stat-card">
+          <p className="stat-card-label">Avg / Day</p>
+          <p className="stat-card-value">{data.summary.averageDailyViews}</p>
         </div>
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 4px" }}>Peak Day</p>
-          <p style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 700, margin: 0 }}>
-            {data.summary.peakDayViews}
-          </p>
+        <div className="stat-card">
+          <p className="stat-card-label">Peak Day</p>
+          <p className="stat-card-value">{data.summary.peakDayViews}</p>
           {data.summary.peakDay && (
-            <p style={{ color: "var(--color-text-secondary)", fontSize: 12, margin: "4px 0 0" }}>
-              {formatPeakDate(data.summary.peakDay)}
-            </p>
+            <p className="stat-card-detail">{formatPeakDate(data.summary.peakDay)}</p>
           )}
         </div>
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            textAlign: "center",
-          }}
-        >
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 4px" }}>CTA Clicks</p>
-          <p style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 700, margin: 0 }}>
-            {data.summary.totalCtaClicks}
-          </p>
+        <div className="stat-card">
+          <p className="stat-card-label">CTA Clicks</p>
+          <p className="stat-card-value">{data.summary.totalCtaClicks}</p>
           {data.summary.totalViews > 0 && (
-            <p style={{ color: "var(--color-text-secondary)", fontSize: 12, margin: "4px 0 0" }}>
+            <p className="stat-card-detail">
               {(data.summary.ctaClickRate * 100).toFixed(1)}% click rate
             </p>
           )}
@@ -323,18 +253,8 @@ export function Analytics() {
       </div>
 
       {data.summary.totalViews > 0 && data.heatmap && data.heatmap.length > 0 && (
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            marginTop: 16,
-          }}
-        >
-          <h3 style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>
-            Engagement
-          </h3>
+        <div className="card" style={{ marginTop: 16 }}>
+          <h3 className="card-title">Engagement</h3>
           <div style={{ display: "flex", gap: 1, height: 40, borderRadius: 4, overflow: "hidden" }}>
             {Array.from({ length: 50 }, (_, i) => {
               const seg = data.heatmap.find((s) => s.segment === i);
@@ -361,18 +281,8 @@ export function Analytics() {
       )}
 
       {data.summary.totalViews > 0 && (
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            marginTop: 16,
-          }}
-        >
-          <h3 style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>
-            Completion Funnel
-          </h3>
+        <div className="card" style={{ marginTop: 16 }}>
+          <h3 className="card-title">Completion Funnel</h3>
           {[
             { label: "25%", value: data.milestones.reached25 },
             { label: "50%", value: data.milestones.reached50 },
@@ -406,18 +316,8 @@ export function Analytics() {
       )}
 
       {data.viewers && data.viewers.length > 0 && (
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            marginTop: 16,
-          }}
-        >
-          <h3 style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>
-            Viewers
-          </h3>
+        <div className="card" style={{ marginTop: 16 }}>
+          <h3 className="card-title">Viewers</h3>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
@@ -446,16 +346,7 @@ export function Analytics() {
           No views in this period.
         </p>
       ) : (
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 16,
-            marginTop: 16,
-            height: 300,
-          }}
-        >
+        <div className="card" style={{ marginTop: 16, height: 300 }}>
           <canvas ref={canvasRef} />
         </div>
       )}

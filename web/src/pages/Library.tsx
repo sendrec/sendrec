@@ -59,6 +59,12 @@ interface VideoTag {
   color: string | null;
 }
 
+interface Playlist {
+  id: string;
+  title: string;
+  videoCount: number;
+}
+
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
@@ -101,6 +107,7 @@ export function Library() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [creatingTag, setCreatingTag] = useState(false);
@@ -129,12 +136,14 @@ export function Library() {
   }, []);
 
   const fetchFoldersAndTags = useCallback(async () => {
-    const [foldersResult, tagsResult] = await Promise.all([
+    const [foldersResult, tagsResult, playlistsResult] = await Promise.all([
       apiFetch<Folder[]>("/api/folders"),
       apiFetch<Tag[]>("/api/tags"),
+      apiFetch<Playlist[]>("/api/playlists"),
     ]);
     setFolders(foldersResult ?? []);
     setTags(tagsResult ?? []);
+    setPlaylists(playlistsResult ?? []);
   }, []);
 
   useEffect(() => {
@@ -571,6 +580,25 @@ export function Library() {
               </div>
             ))}
           </div>
+
+          {playlists.length > 0 && (
+            <div className="sidebar-section">
+              <div className="sidebar-section-header">
+                <span>Playlists</span>
+              </div>
+              {playlists.map((playlist) => (
+                <Link
+                  key={playlist.id}
+                  to={`/playlists/${playlist.id}`}
+                  className="sidebar-item"
+                  style={{ textDecoration: "none" }}
+                >
+                  <span className="sidebar-item-name">{playlist.title}</span>
+                  <span className="sidebar-item-count">{playlist.videoCount}</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </nav>
 
         <div className="library-main">

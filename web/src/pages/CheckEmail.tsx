@@ -49,75 +49,32 @@ export function CheckEmail() {
 
   return (
     <main className="auth-container">
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          textAlign: "center",
-        }}
-      >
-        <h1
-          style={{
-            color: "var(--color-text)",
-            fontSize: 24,
-            marginBottom: 16,
-          }}
-        >
-          Check your email
-        </h1>
-        <p
-          style={{
-            color: "var(--color-text-secondary)",
-            fontSize: 14,
-            marginBottom: 24,
-          }}
-        >
+      <div className="auth-brand">
+        <span className="auth-logo">
+          <span className="auth-logo-send">Send</span>
+          <span className="auth-logo-rec">Rec</span>
+        </span>
+      </div>
+      <div className="auth-card" style={{ textAlign: "center" }}>
+        <h1>Check your email</h1>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
           We&apos;ve sent a confirmation link to <strong>{email}</strong>. Click
           the link to activate your account. The link expires in 24 hours.
         </p>
 
         {sent && (
-          <p
-            style={{
-              color: "var(--color-accent)",
-              fontSize: 14,
-              marginBottom: 16,
-            }}
-          >
+          <p style={{ color: "var(--color-accent)", fontSize: 14 }}>
             Confirmation email resent.
           </p>
         )}
 
         {error && (
-          <p
-            style={{
-              color: "var(--color-error)",
-              fontSize: 14,
-              marginBottom: 16,
-            }}
-          >
+          <p style={{ color: "var(--color-error)", fontSize: 14 }}>
             {error}
           </p>
         )}
 
-        <button
-          onClick={handleResend}
-          disabled={cooldown > 0}
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 4,
-            padding: "10px 16px",
-            fontSize: 14,
-            fontWeight: 600,
-            opacity: cooldown > 0 ? 0.7 : 1,
-            marginBottom: 16,
-            cursor: cooldown > 0 ? "default" : "pointer",
-            border: "none",
-          }}
-        >
+        <button onClick={handleResend} disabled={cooldown > 0}>
           {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend confirmation email"}
         </button>
 

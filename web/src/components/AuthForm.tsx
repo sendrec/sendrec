@@ -50,145 +50,74 @@ export function AuthForm({
 
   return (
     <main className="auth-container">
-      <h1
-        style={{
-          color: "var(--color-text)",
-          fontSize: 24,
-          marginBottom: 24,
-          textAlign: "center",
-        }}
-      >
-        {title}
-      </h1>
+      <div className="auth-brand">
+        <span className="auth-logo">
+          <span className="auth-logo-send">Send</span>
+          <span className="auth-logo-rec">Rec</span>
+        </span>
+      </div>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
+      <form onSubmit={handleSubmit} className="auth-card">
+        <h1>{title}</h1>
+
         {showName && (
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
-              Name
-            </span>
+          <label>
+            <span>Name</span>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              style={{
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 4,
-                color: "var(--color-text)",
-                padding: "8px 12px",
-                fontSize: 14,
-              }}
             />
           </label>
         )}
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
-            Email
-          </span>
+        <label>
+          <span>Email</span>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              color: "var(--color-text)",
-              padding: "8px 12px",
-              fontSize: 14,
-            }}
           />
         </label>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
-            Password
-          </span>
+        <label>
+          <span>Password</span>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            style={{
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              color: "var(--color-text)",
-              padding: "8px 12px",
-              fontSize: 14,
-            }}
           />
           {showPasswordConfirm && (
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
+            <span style={{ fontSize: 12, marginTop: 2 }}>
               Must be at least 8 characters
             </span>
           )}
         </label>
 
         {showPasswordConfirm && (
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
-              Confirm password
-            </span>
+          <label>
+            <span>Confirm password</span>
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               minLength={8}
-              style={{
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 4,
-                color: "var(--color-text)",
-                padding: "8px 12px",
-                fontSize: 14,
-              }}
             />
           </label>
         )}
 
         {error && (
-          <p
-            style={{
-              color: "var(--color-error)",
-              fontSize: 14,
-              margin: 0,
-            }}
-          >
+          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>
             {error}
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 4,
-            padding: "10px 16px",
-            fontSize: 14,
-            fontWeight: 600,
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
+        <button type="submit" disabled={loading}>
           {loading ? "Loading..." : submitLabel}
         </button>
 

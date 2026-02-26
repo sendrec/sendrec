@@ -23,6 +23,9 @@ export function Layout({ children }: LayoutProps) {
   }, []);
 
   function isActive(path: string): boolean {
+    if (path === "/analytics") {
+      return location.pathname === "/analytics" || location.pathname.endsWith("/analytics");
+    }
     return location.pathname === path;
   }
 
@@ -69,14 +72,6 @@ export function Layout({ children }: LayoutProps) {
           </Link>
 
           <Link
-            to="/upload"
-            className={`nav-link${isActive("/upload") ? " nav-link--active" : ""}`}
-            onClick={handleNavClick}
-          >
-            Upload
-          </Link>
-
-          <Link
             to="/library"
             className={`nav-link${isActive("/library") ? " nav-link--active" : ""}`}
             onClick={handleNavClick}
@@ -85,11 +80,11 @@ export function Layout({ children }: LayoutProps) {
           </Link>
 
           <Link
-            to="/playlists"
-            className={`nav-link${isActive("/playlists") ? " nav-link--active" : ""}`}
+            to="/analytics"
+            className={`nav-link${isActive("/analytics") ? " nav-link--active" : ""}`}
             onClick={handleNavClick}
           >
-            Playlists
+            Analytics
           </Link>
 
           <Link

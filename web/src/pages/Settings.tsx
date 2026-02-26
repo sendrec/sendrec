@@ -494,16 +494,6 @@ export function Settings() {
     );
   }
 
-  const inputStyle = {
-    background: "var(--color-bg)",
-    border: "1px solid var(--color-border)",
-    borderRadius: 4,
-    color: "var(--color-text)",
-    padding: "8px 12px",
-    fontSize: 14,
-    width: "100%",
-  };
-
   async function handleTranscriptionLanguageChange(value: string) {
     const previous = transcriptionLanguage;
     setTranscriptionLanguage(value);
@@ -519,23 +509,14 @@ export function Settings() {
 
   return (
     <div className="page-container">
-      <h1 style={{ color: "var(--color-text)", fontSize: 24, marginBottom: 24 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>
         Settings
       </h1>
 
       {billingEnabled && billing && (
-        <div style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}>
+        <div className="card settings-section">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Subscription</h2>
+            <h2>Subscription</h2>
             <span style={{
               background: billing.plan === "pro" ? "var(--color-accent)" : "var(--color-border)",
               color: billing.plan === "pro" ? "#fff" : "var(--color-text-secondary)",
@@ -638,37 +619,27 @@ export function Settings() {
 
       <form
         onSubmit={handleNameSubmit}
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
+        className="card settings-section"
       >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Profile</h2>
+        <h2>Profile</h2>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Email</span>
+        <label>
+          <span>Email</span>
           <input
             type="email"
             value={profile.email}
             disabled
-            style={{ ...inputStyle, opacity: 0.6 }}
+            style={{ opacity: 0.6 }}
           />
         </label>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Name</span>
+        <label>
+          <span>Name</span>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            style={inputStyle}
           />
         </label>
 
@@ -697,20 +668,9 @@ export function Settings() {
         </button>
       </form>
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Appearance</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>Appearance</h2>
+        <p className="card-description">
           Choose how SendRec looks to you.
         </p>
 
@@ -755,29 +715,17 @@ export function Settings() {
       </div>
 
       {transcriptionEnabled && (
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 24,
-            marginBottom: 24,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-          }}
-        >
-          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Transcription</h2>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+        <div className="card settings-section">
+          <h2>Transcription</h2>
+          <p className="card-description">
             Choose the default language for video transcription.
           </p>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Default transcription language</span>
+          <label>
+            <span>Default transcription language</span>
             <select
               id="transcription-language"
               value={transcriptionLanguage}
               onChange={(e) => handleTranscriptionLanguageChange(e.target.value)}
-              style={inputStyle}
             >
               {TRANSCRIPTION_LANGUAGES.map((lang) => (
                 <option key={lang.code} value={lang.code}>{lang.name}</option>
@@ -787,29 +735,17 @@ export function Settings() {
         </div>
       )}
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Email Notifications</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>Email Notifications</h2>
+        <p className="card-description">
           Choose when to get email notifications for views and comments.
         </p>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Notifications</span>
+        <label>
+          <span>Notifications</span>
           <select
             value={notificationMode}
             onChange={(e) => handleNotificationChange(e.target.value)}
-            style={inputStyle}
           >
             <option value="off">Off</option>
             <option value="views_only">Views only</option>
@@ -824,31 +760,19 @@ export function Settings() {
         )}
       </div>
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Slack Notifications</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>Slack Notifications</h2>
+        <p className="card-description">
           Send video view and comment notifications to a Slack channel.
         </p>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Webhook URL</span>
+        <label>
+          <span>Webhook URL</span>
           <input
             type="url"
             value={slackWebhookUrl}
             onChange={(e) => setSlackWebhookUrl(e.target.value)}
             placeholder="https://hooks.slack.com/services/..."
-            style={inputStyle}
           />
         </label>
 
@@ -907,31 +831,19 @@ export function Settings() {
         </details>
       </div>
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Webhooks</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>Webhooks</h2>
+        <p className="card-description">
           Receive HTTP POST notifications for video events. Use with n8n, Zapier, or custom integrations.
         </p>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Webhook URL</span>
+        <label>
+          <span>Webhook URL</span>
           <input
             type="url"
             value={webhookUrl}
             onChange={(e) => setWebhookUrl(e.target.value)}
             placeholder="https://example.com/webhook"
-            style={inputStyle}
           />
         </label>
 
@@ -1152,33 +1064,21 @@ export function Settings() {
         </details>
       </div>
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>API Keys</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>API Keys</h2>
+        <p className="card-description">
           Generate API keys for integrations like Nextcloud. Keys are shown only once when created.
         </p>
 
         <form onSubmit={handleCreateAPIKey} className="api-key-form">
           <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Label</span>
+            <span>Label</span>
             <input
               type="text"
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               placeholder="e.g. My Nextcloud"
               maxLength={100}
-              style={inputStyle}
             />
           </label>
           <button
@@ -1303,31 +1203,21 @@ export function Settings() {
       {brandingEnabled && (
         <form
           onSubmit={handleBrandingSave}
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 24,
-            marginBottom: 24,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-          }}
+          className="card settings-section"
         >
-          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Branding</h2>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+          <h2>Branding</h2>
+          <p className="card-description">
             Customize how your shared video pages look to viewers.
           </p>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Company name</span>
+          <label>
+            <span>Company name</span>
             <input
               type="text"
               value={branding.companyName ?? ""}
               onChange={(e) => setBranding({ ...branding, companyName: e.target.value || null })}
               placeholder="SendRec"
               maxLength={200}
-              style={inputStyle}
             />
           </label>
 
@@ -1421,15 +1311,15 @@ export function Settings() {
             </div>
           </div>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Footer text</span>
+          <label>
+            <span>Footer text</span>
             <textarea
               value={branding.footerText ?? ""}
               onChange={(e) => setBranding({ ...branding, footerText: e.target.value || null })}
               placeholder="Custom footer message"
               maxLength={500}
               rows={2}
-              style={{ ...inputStyle, resize: "vertical" as const }}
+              style={{ resize: "vertical" }}
             />
           </label>
 
@@ -1449,7 +1339,7 @@ export function Settings() {
               };
               return (
                 <label key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>{labels[key]}</span>
+                  <span>{labels[key]}</span>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <input
                       type="color"
@@ -1462,7 +1352,7 @@ export function Settings() {
                       value={branding[key] ?? ""}
                       onChange={(e) => setBranding({ ...branding, [key]: e.target.value || null })}
                       placeholder={defaults[key]}
-                      style={{ ...inputStyle, flex: 1 }}
+                      style={{ flex: 1 }}
                     />
                   </div>
                 </label>
@@ -1489,15 +1379,15 @@ export function Settings() {
             </div>
           </div>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Custom CSS</span>
+          <label>
+            <span>Custom CSS</span>
             <textarea
               value={branding.customCss ?? ""}
               onChange={(e) => setBranding({ ...branding, customCss: e.target.value || null })}
               placeholder={"/* Override watch page styles */\nbody { font-family: 'Inter', sans-serif; }\n.download-btn { border-radius: 20px; }\n.comment-submit { border-radius: 20px; }"}
               maxLength={10240}
               rows={6}
-              style={{ ...inputStyle, resize: "vertical" as const, fontFamily: "monospace" }}
+              style={{ resize: "vertical", fontFamily: "monospace" }}
             />
             <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
               Injected into the watch page &lt;style&gt; tag. Max 10KB. No @import url() or closing style tags.
@@ -1619,53 +1509,42 @@ h1                /* Video title */
 
       <form
         onSubmit={handlePasswordSubmit}
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
+        className="card settings-section"
       >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Change password</h2>
+        <h2>Change password</h2>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Current password</span>
+        <label>
+          <span>Current password</span>
           <input
             type="password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             required
-            style={inputStyle}
           />
         </label>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>New password</span>
+        <label>
+          <span>New password</span>
           <input
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
             minLength={8}
-            style={inputStyle}
           />
           <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
             Must be at least 8 characters
           </span>
         </label>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Confirm new password</span>
+        <label>
+          <span>Confirm new password</span>
           <input
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
             minLength={8}
-            style={inputStyle}
           />
         </label>
 
