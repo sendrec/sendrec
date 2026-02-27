@@ -450,6 +450,87 @@ func TestCreate_StorageError(t *testing.T) {
 
 // --- Duration Limit Tests ---
 
+func TestCreate_RejectsDurationBelowMinimum(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, 0, testJWTSecret, false)
+
+	expectPlanQuery(mock, "free")
+
+	body, _ := json.Marshal(createRequest{
+		Duration: 0,
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if !strings.Contains(errMsg, "at least 1 second") {
+		t.Errorf("expected error mentioning at least 1 second, got %q", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_AllowsDurationOfOneSecond(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{uploadURL: "https://s3.example.com/upload"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 300, 0, testJWTSecret, false)
+
+	expectPlanQuery(mock, "free")
+	mock.ExpectQuery(`INSERT INTO videos`).
+		WithArgs(
+			testUserID,
+			"Untitled Recording",
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+			pgxmock.AnyArg(),
+		).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("video-1s"))
+
+	body, _ := json.Marshal(createRequest{
+		Duration: 1,
+		FileSize: 5000000,
+	})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/videos", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
 func TestCreate_RejectsDurationExceedingLimit(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
