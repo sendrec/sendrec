@@ -47,6 +47,12 @@ describe("FillerRemovalModal", () => {
     vi.restoreAllMocks();
   });
 
+  it("has dialog role", () => {
+    globalThis.fetch = vi.fn().mockReturnValueOnce(new Promise(() => {}));
+    render(<FillerRemovalModal {...defaultProps} />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("detects filler-only segments", async () => {
     const segments = [
       { start: 0, end: 3, text: "Hello everyone, welcome." },

@@ -2,7 +2,9 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch, setAccessToken } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 interface UserProfile {
   name: string;
@@ -102,9 +104,18 @@ export function Settings() {
   const [billingEnabled, setBillingEnabled] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+    confirmLabel?: string;
+    danger?: boolean;
+  } | null>(null);
   const [billingMessage, setBillingMessage] = useState("");
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
   const [transcriptionLanguage, setTranscriptionLanguage] = useState("auto");
+
+  const nameIsDirty = profile !== null && name !== profile.name;
+  useUnsavedChanges(nameIsDirty);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -474,8 +485,17 @@ export function Settings() {
     }
   }
 
-  async function handleCancelSubscription() {
-    if (!confirm("Cancel your Pro subscription? You'll keep access until the end of your billing period.")) return;
+  function handleCancelSubscription() {
+    setConfirmDialog({
+      message: "Cancel your Pro subscription? You'll keep access until the end of your billing period.",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        handleCancelSubscriptionConfirmed();
+      },
+    });
+  }
+
+  async function handleCancelSubscriptionConfirmed() {
     setCanceling(true);
     setBillingMessage("");
     try {
@@ -1375,6 +1395,16 @@ body                /* Background, font, text color */
         </div>
       </form>
 
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          danger={confirmDialog.danger}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
       <DangerZone />
     </div>
   );
@@ -1473,6 +1503,10 @@ function DangerZone() {
   const navigate = useNavigate();
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   async function handleSignOut() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
@@ -1480,19 +1514,24 @@ function DangerZone() {
     navigate("/login");
   }
 
-  async function handleDeleteAccount() {
-    if (!confirm("Are you sure you want to delete your account? This action cannot be undone. All your videos and data will be permanently deleted.")) return;
-    setDeleting(true);
-    setDeleteError("");
-    try {
-      await apiFetch("/api/user", { method: "DELETE" });
-      setAccessToken(null);
-      navigate("/login");
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Failed to delete account");
-    } finally {
-      setDeleting(false);
-    }
+  function handleDeleteAccount() {
+    setConfirmDialog({
+      message: "Are you sure you want to delete your account? This action cannot be undone. All your videos and data will be permanently deleted.",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setDeleting(true);
+        setDeleteError("");
+        try {
+          await apiFetch("/api/user", { method: "DELETE" });
+          setAccessToken(null);
+          navigate("/login");
+        } catch (err) {
+          setDeleteError(err instanceof Error ? err.message : "Failed to delete account");
+        } finally {
+          setDeleting(false);
+        }
+      },
+    });
   }
 
   return (
@@ -1526,6 +1565,15 @@ function DangerZone() {
       </div>
       {deleteError && (
         <p className="status-message status-message--error">{deleteError}</p>
+      )}
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          confirmLabel="Delete account"
+          danger
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

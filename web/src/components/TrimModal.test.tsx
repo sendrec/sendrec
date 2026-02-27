@@ -26,6 +26,11 @@ describe("TrimModal", () => {
     mockApiFetch.mockResolvedValueOnce({ downloadUrl: "https://s3.example.com/video.webm" });
   });
 
+  it("has dialog role", async () => {
+    render(<TrimModal {...defaultProps} />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("renders modal with video player and trim controls", async () => {
     const { container } = render(<TrimModal {...defaultProps} />);
 

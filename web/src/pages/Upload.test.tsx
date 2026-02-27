@@ -10,6 +10,20 @@ vi.mock("../api/client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
+class MockXMLHttpRequest {
+  open = vi.fn();
+  setRequestHeader = vi.fn();
+  status = 200;
+  upload = { onprogress: null as ((e: any) => void) | null };
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  send = vi.fn().mockImplementation(() => {
+    Promise.resolve().then(() => {
+      if (this.onload) this.onload();
+    });
+  });
+}
+
 function renderUpload() {
   return render(
     <MemoryRouter>
@@ -26,7 +40,7 @@ function createMockFile(name: string, size: number, type = "video/mp4"): File {
 describe("Upload", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+    globalThis.XMLHttpRequest = MockXMLHttpRequest as any;
   });
 
   afterEach(() => {

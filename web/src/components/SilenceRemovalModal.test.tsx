@@ -24,6 +24,12 @@ describe("SilenceRemovalModal", () => {
     defaultProps.onRemovalStarted = vi.fn();
   });
 
+  it("has dialog role", () => {
+    mockApiFetch.mockReturnValueOnce(new Promise(() => {}));
+    render(<SilenceRemovalModal {...defaultProps} />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("shows loading state while detecting", () => {
     mockApiFetch.mockReturnValueOnce(new Promise(() => {}));
 

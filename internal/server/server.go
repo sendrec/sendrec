@@ -312,10 +312,11 @@ func (s *Server) routes() {
 
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
 		commentLimiter := ratelimit.NewLimiter(0.2, 3)
+		commentReadLimiter := ratelimit.NewLimiter(5, 20)
 		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
 		s.router.Get("/api/watch/{shareToken}/download", s.videoHandler.WatchDownload)
 		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/verify", s.videoHandler.VerifyWatchPassword)
-		s.router.Get("/api/watch/{shareToken}/comments", s.videoHandler.ListWatchComments)
+		s.router.With(commentReadLimiter.Middleware).Get("/api/watch/{shareToken}/comments", s.videoHandler.ListWatchComments)
 		s.router.With(commentLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/comments", s.videoHandler.PostWatchComment)
 		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/identify", s.videoHandler.IdentifyViewer)
 		s.router.Post("/api/watch/{shareToken}/cta-click", s.videoHandler.RecordCTAClick)

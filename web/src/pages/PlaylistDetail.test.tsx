@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { PlaylistDetail } from "./PlaylistDetail";
@@ -288,11 +288,8 @@ describe("PlaylistDetail", () => {
     });
   });
 
-  it("confirms before deleting playlist", async () => {
+  it("shows confirm dialog before deleting playlist", async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi
-      .spyOn(window, "confirm")
-      .mockReturnValue(false);
     mockApiFetch.mockResolvedValueOnce(mockPlaylist);
     renderDetail();
 
@@ -304,14 +301,17 @@ describe("PlaylistDetail", () => {
       screen.getByRole("button", { name: "Delete playlist" }),
     );
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      "Delete this playlist? Videos will not be deleted.",
-    );
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(
+      screen.getByText("Delete this playlist? Videos will not be deleted."),
+    ).toBeInTheDocument();
+
+    await user.click(within(screen.getByRole("alertdialog")).getByText("Cancel"));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
   it("deletes playlist and navigates to playlists list", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     mockApiFetch.mockResolvedValueOnce(mockPlaylist);
     renderDetail();
 
@@ -324,6 +324,9 @@ describe("PlaylistDetail", () => {
     await user.click(
       screen.getByRole("button", { name: "Delete playlist" }),
     );
+
+    const dialog = screen.getByRole("alertdialog");
+    await user.click(within(dialog).getByText("Delete"));
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/playlists/pl-1", {

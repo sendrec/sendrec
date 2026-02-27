@@ -4,6 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { DocumentModal } from "./DocumentModal";
 
 describe("DocumentModal", () => {
+  it("has dialog role", () => {
+    render(<DocumentModal document="Content" onClose={vi.fn()} />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("renders markdown content", () => {
     render(
       <DocumentModal document={"## Hello\n\n- Item 1"} onClose={vi.fn()} />

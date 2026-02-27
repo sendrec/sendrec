@@ -29,6 +29,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   const [captureHeight, setCaptureHeight] = useState(1080);
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(() => localStorage.getItem("recording-audio") !== "false");
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const countdownEnabled = useRef(localStorage.getItem("recording-countdown") !== "false");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -188,6 +189,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   }, [stopAllStreams, stopCompositing]);
 
   async function toggleWebcam() {
+    setMediaError(null);
     if (webcamEnabled) {
       stopWebcamStream();
       setWebcamEnabled(false);
@@ -202,11 +204,12 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       setWebcamEnabled(true);
     } catch (err) {
       console.error("Webcam access failed", err);
-      alert("Could not access your camera. Please allow camera access and try again.");
+      setMediaError("Could not access your camera. Please allow camera access and try again.");
     }
   }
 
   async function startRecording() {
+    setMediaError(null);
     try {
       const displayMediaOptions: DisplayMediaStreamOptions & Record<string, unknown> = {
         video: true,
@@ -296,7 +299,18 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       const handleStop = async () => {
         const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeTypeRef.current) });
         const elapsed = elapsedSeconds();
-        const webcamBlob = webcamBlobPromiseRef.current ? await webcamBlobPromiseRef.current : undefined;
+
+        let webcamBlob: Blob | undefined;
+        if (webcamBlobPromiseRef.current) {
+          const timeout = new Promise<undefined>((resolve) => {
+            setTimeout(() => {
+              console.warn("Webcam blob promise timed out after 10s");
+              resolve(undefined);
+            }, 10_000);
+          });
+          webcamBlob = await Promise.race([webcamBlobPromiseRef.current, timeout]);
+        }
+
         stopAllStreams();
 
         if (elapsed < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES) {
@@ -353,7 +367,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       }
     } catch (err) {
       console.error("Screen capture failed", err);
-      alert("Screen recording was blocked or failed. Please allow screen capture and try again.");
+      setMediaError("Screen recording was blocked or failed. Please allow screen capture and try again.");
       stopAllStreams();
     }
   }
@@ -495,6 +509,40 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       {/* Idle UI */}
       {isIdle && (
         <>
+          {mediaError && (
+            <div
+              role="alert"
+              style={{
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid var(--color-error)",
+                borderRadius: 8,
+                padding: "12px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                width: "100%",
+                maxWidth: 480,
+              }}
+            >
+              <span style={{ color: "var(--color-error)", fontSize: 13 }}>{mediaError}</span>
+              <button
+                onClick={() => setMediaError(null)}
+                aria-label="Dismiss error"
+                style={{
+                  background: "transparent",
+                  color: "var(--color-error)",
+                  border: "none",
+                  fontSize: 16,
+                  cursor: "pointer",
+                  padding: "2px 6px",
+                  lineHeight: 1,
+                }}
+              >
+                &times;
+              </button>
+            </div>
+          )}
           {maxDurationSeconds > 0 && (
             <p className="max-duration-label">
               Maximum recording length: {formatDuration(maxDurationSeconds)}
@@ -528,7 +576,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
       {/* Recording controls — always above preview */}
       {isRecording && (
-        <div className="recording-header">
+        <div className="recording-header" role="status" aria-live="polite">
           <div className={`recording-indicator ${isPaused ? "recording-indicator--paused" : "recording-indicator--active"}`}>
             <div className={`recording-dot ${isPaused ? "recording-dot--paused" : "recording-dot--active"}`} />
             {formatDuration(duration)}

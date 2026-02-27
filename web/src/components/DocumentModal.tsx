@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 interface DocumentModalProps {
   document: string;
@@ -8,6 +9,9 @@ interface DocumentModalProps {
 
 export function DocumentModal({ document, onClose }: DocumentModalProps) {
   const [copied, setCopied] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(contentRef);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -31,7 +35,7 @@ export function DocumentModal({ document, onClose }: DocumentModalProps) {
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{
+      <div ref={contentRef} role="dialog" aria-modal="true" style={{
         background: "var(--color-surface)", border: "1px solid var(--color-border)",
         borderRadius: 12, padding: 24, width: 720, maxWidth: "90vw", maxHeight: "80vh", overflow: "auto",
       }}>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 interface Playlist {
   id: string;
@@ -34,6 +35,10 @@ export function Playlists() {
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -96,14 +101,19 @@ export function Playlists() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this playlist? Videos will not be deleted.")) return;
-    try {
-      await apiFetch(`/api/playlists/${id}`, { method: "DELETE" });
-      fetchPlaylists();
-    } catch {
-      // ignore
-    }
+  const handleDelete = (id: string) => {
+    setConfirmDialog({
+      message: "Delete this playlist? Videos will not be deleted.",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          await apiFetch(`/api/playlists/${id}`, { method: "DELETE" });
+          fetchPlaylists();
+        } catch {
+          // ignore
+        }
+      },
+    });
   };
 
   if (loading) {
@@ -339,6 +349,16 @@ export function Playlists() {
             </div>
           ))}
         </div>
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          confirmLabel="Delete"
+          danger
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

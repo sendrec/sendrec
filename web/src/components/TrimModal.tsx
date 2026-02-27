@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 interface TranscriptSegment {
   start: number;
@@ -33,6 +34,9 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<"start" | "end" | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(contentRef);
 
   useEffect(() => {
     apiFetch<{ downloadUrl: string }>(`/api/videos/${videoId}/download`)
@@ -156,6 +160,9 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
       }}
     >
       <div
+        ref={contentRef}
+        role="dialog"
+        aria-modal="true"
         style={{
           background: "var(--color-surface)",
           border: "1px solid var(--color-border)",

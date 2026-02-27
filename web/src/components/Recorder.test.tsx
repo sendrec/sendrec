@@ -411,8 +411,7 @@ describe("Recorder", () => {
     expect(screen.getByText("Camera Off")).toBeInTheDocument();
   });
 
-  it("shows alert when webcam access fails", async () => {
-    const alertSpy = vi.spyOn(globalThis, "alert").mockImplementation(() => {});
+  it("shows inline error when webcam access fails", async () => {
     (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error("Permission denied"),
     );
@@ -421,14 +420,11 @@ describe("Recorder", () => {
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Enable camera" }));
 
-    expect(alertSpy).toHaveBeenCalledWith(
-      "Could not access your camera. Please allow camera access and try again.",
-    );
-    alertSpy.mockRestore();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Could not access your camera. Please allow camera access and try again.")).toBeInTheDocument();
   });
 
-  it("shows alert when screen capture fails", async () => {
-    const alertSpy = vi.spyOn(globalThis, "alert").mockImplementation(() => {});
+  it("shows inline error when screen capture fails", async () => {
     (navigator.mediaDevices.getDisplayMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error("User cancelled"),
     );
@@ -437,10 +433,36 @@ describe("Recorder", () => {
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
 
-    expect(alertSpy).toHaveBeenCalledWith(
-      "Screen recording was blocked or failed. Please allow screen capture and try again.",
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Screen recording was blocked or failed. Please allow screen capture and try again.")).toBeInTheDocument();
+  });
+
+  it("dismisses media error when dismiss button is clicked", async () => {
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("Permission denied"),
     );
-    alertSpy.mockRestore();
+
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Enable camera" }));
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Dismiss error" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("clears media error when starting a new recording attempt", async () => {
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("Permission denied"),
+    );
+
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Enable camera" }));
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("calls setDrawColor when color picker changes", async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Library } from "./Library";
@@ -226,9 +226,8 @@ describe("Library", () => {
     expect(container.querySelector("img")).toBeNull();
   });
 
-  it("confirms before deleting", async () => {
+  it("shows confirm dialog before deleting", async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     mockFetch([makeVideo()]);
     renderLibrary();
 
@@ -239,14 +238,17 @@ describe("Library", () => {
     await openOverflowMenu(user);
     await user.click(screen.getByText("Delete"));
 
-    expect(confirmSpy).toHaveBeenCalledWith("Delete this recording? This cannot be undone.");
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByText("Delete this recording? This cannot be undone.")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Cancel"));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     // Should not have called delete API (only initial fetches: videos, limits, folders, tags, playlists)
     expect(mockApiFetch).toHaveBeenCalledTimes(5);
   });
 
   it("deletes video when confirmed", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     mockFetch([makeVideo()]);
     mockApiFetch.mockResolvedValueOnce(undefined); // delete response
     renderLibrary();
@@ -257,6 +259,9 @@ describe("Library", () => {
 
     await openOverflowMenu(user);
     await user.click(screen.getByText("Delete"));
+
+    const dialog = screen.getByRole("alertdialog");
+    await user.click(within(dialog).getByText("Delete"));
 
     await waitFor(() => {
       expect(screen.queryByText("My Recording")).not.toBeInTheDocument();
@@ -652,7 +657,6 @@ describe("Library", () => {
 
     it("batch delete calls API and refreshes", async () => {
       const user = userEvent.setup();
-      vi.spyOn(window, "confirm").mockReturnValue(true);
       mockFetch([makeVideo(), makeVideo({ id: "v2", title: "Second Recording" })]);
       renderLibrary();
 
@@ -673,6 +677,9 @@ describe("Library", () => {
       mockApiFetch.mockResolvedValueOnce([]);
 
       await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      const dialog = screen.getByRole("alertdialog");
+      await user.click(within(dialog).getByText("Delete"));
 
       await waitFor(() => {
         expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/batch/delete", {
