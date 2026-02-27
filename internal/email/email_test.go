@@ -696,6 +696,220 @@ func TestSendWelcome_BypassesAllowlist(t *testing.T) {
 	}
 }
 
+func TestSendOnboardingDay2_Success(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                  srv.URL,
+		Username:                 "user",
+		Password:                 "pass",
+		OnboardingDay2TemplateID: 20,
+	})
+
+	err := client.SendOnboardingDay2(context.Background(),
+		"alice@example.com", "Alice", "https://app.sendrec.eu")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.TemplateID != 20 {
+		t.Errorf("expected template_id=20, got %d", received.TemplateID)
+	}
+	if received.SubscriberEmail != "alice@example.com" {
+		t.Errorf("expected subscriber email alice@example.com, got %q", received.SubscriberEmail)
+	}
+	if received.Data["name"] != "Alice" {
+		t.Errorf("expected name=Alice, got %v", received.Data["name"])
+	}
+	if received.Data["dashboardURL"] != "https://app.sendrec.eu" {
+		t.Errorf("expected dashboardURL, got %v", received.Data["dashboardURL"])
+	}
+}
+
+func TestSendOnboardingDay2_SkipsWhenTemplateIDZero(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                  srv.URL,
+		Username:                 "user",
+		Password:                 "pass",
+		OnboardingDay2TemplateID: 0,
+	})
+
+	err := client.SendOnboardingDay2(context.Background(),
+		"alice@example.com", "Alice", "https://app.sendrec.eu")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if serverHit {
+		t.Error("expected no HTTP request when OnboardingDay2TemplateID is zero")
+	}
+}
+
+func TestSendOnboardingDay2_BypassesAllowlist(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                  srv.URL,
+		Username:                 "user",
+		Password:                 "pass",
+		OnboardingDay2TemplateID: 20,
+		Allowlist:                []string{"@sendrec.eu"},
+	})
+
+	err := client.SendOnboardingDay2(context.Background(),
+		"stranger@example.com", "Stranger", "https://app.sendrec.eu")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.SubscriberEmail != "stranger@example.com" {
+		t.Errorf("expected onboarding day 2 email to bypass allowlist, got %q", received.SubscriberEmail)
+	}
+}
+
+func TestSendOnboardingDay7_Success(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                  srv.URL,
+		Username:                 "user",
+		Password:                 "pass",
+		OnboardingDay7TemplateID: 21,
+	})
+
+	err := client.SendOnboardingDay7(context.Background(),
+		"alice@example.com", "Alice", "https://app.sendrec.eu")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.TemplateID != 21 {
+		t.Errorf("expected template_id=21, got %d", received.TemplateID)
+	}
+	if received.SubscriberEmail != "alice@example.com" {
+		t.Errorf("expected subscriber email alice@example.com, got %q", received.SubscriberEmail)
+	}
+	if received.Data["name"] != "Alice" {
+		t.Errorf("expected name=Alice, got %v", received.Data["name"])
+	}
+	if received.Data["dashboardURL"] != "https://app.sendrec.eu" {
+		t.Errorf("expected dashboardURL, got %v", received.Data["dashboardURL"])
+	}
+}
+
+func TestSendOnboardingDay7_SkipsWhenTemplateIDZero(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                  srv.URL,
+		Username:                 "user",
+		Password:                 "pass",
+		OnboardingDay7TemplateID: 0,
+	})
+
+	err := client.SendOnboardingDay7(context.Background(),
+		"alice@example.com", "Alice", "https://app.sendrec.eu")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if serverHit {
+		t.Error("expected no HTTP request when OnboardingDay7TemplateID is zero")
+	}
+}
+
+func TestSendOnboardingDay7_BypassesAllowlist(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                  srv.URL,
+		Username:                 "user",
+		Password:                 "pass",
+		OnboardingDay7TemplateID: 21,
+		Allowlist:                []string{"@sendrec.eu"},
+	})
+
+	err := client.SendOnboardingDay7(context.Background(),
+		"stranger@example.com", "Stranger", "https://app.sendrec.eu")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.SubscriberEmail != "stranger@example.com" {
+		t.Errorf("expected onboarding day 7 email to bypass allowlist, got %q", received.SubscriberEmail)
+	}
+}
+
 func TestParseAllowlist(t *testing.T) {
 	tests := []struct {
 		input    string
