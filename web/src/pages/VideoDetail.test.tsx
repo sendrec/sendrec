@@ -1640,6 +1640,78 @@ describe("VideoDetail", () => {
     });
   });
 
+  // ─── Video error / placeholder tests ─────────────────────────
+
+  it("shows error overlay when video fails to load", async () => {
+    setupDefaultMocks();
+    renderVideoDetail("v1");
+
+    const videoEl = await screen.findByRole("generic", { hidden: true }).catch(
+      () => null,
+    );
+    // Wait for the video element to render
+    await waitFor(() => {
+      expect(document.querySelector("video")).toBeInTheDocument();
+    });
+
+    const video = document.querySelector("video")!;
+    fireEvent.error(video);
+
+    await waitFor(() => {
+      expect(screen.getByText("Video failed to load")).toBeInTheDocument();
+    });
+    expect(document.querySelector("video")).not.toBeInTheDocument();
+  });
+
+  it("shows placeholder when no thumbnail and no video URL", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce([makeVideo({ thumbnailUrl: undefined })])
+      .mockResolvedValueOnce(defaultLimits)
+      .mockResolvedValueOnce(defaultFolders)
+      .mockResolvedValueOnce(defaultTags)
+      .mockResolvedValueOnce(defaultPlaylists)
+      .mockRejectedValueOnce(new Error("no download"))
+      .mockResolvedValueOnce(defaultComments);
+
+    renderVideoDetail("v1");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "My Recording",
+      );
+    });
+    expect(
+      document.querySelector(".video-thumbnail-placeholder"),
+    ).toBeInTheDocument();
+    expect(document.querySelector("video")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("img", { name: /thumbnail/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not show placeholder when thumbnail exists", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce([makeVideo()])
+      .mockResolvedValueOnce(defaultLimits)
+      .mockResolvedValueOnce(defaultFolders)
+      .mockResolvedValueOnce(defaultTags)
+      .mockResolvedValueOnce(defaultPlaylists)
+      .mockRejectedValueOnce(new Error("no download"))
+      .mockResolvedValueOnce(defaultComments);
+
+    renderVideoDetail("v1");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "My Recording",
+      );
+    });
+    expect(screen.getByRole("img", { name: /thumbnail/i })).toBeInTheDocument();
+    expect(
+      document.querySelector(".video-thumbnail-placeholder"),
+    ).not.toBeInTheDocument();
+  });
+
   it("polls video status when processing", async () => {
     setupDefaultMocks({ video: makeVideo({ status: "processing" }) });
     renderVideoDetail("v1");

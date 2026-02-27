@@ -206,6 +206,7 @@ export function VideoDetail() {
   const [documentContent, setDocumentContent] = useState<string | null>(null);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
 
   const [brandingOpen, setBrandingOpen] = useState(false);
@@ -788,19 +789,40 @@ export function VideoDetail() {
       <div className="video-detail-hero">
         <div style={{ position: "relative" }}>
           {videoUrl ? (
-            <video
-              src={videoUrl}
-              controls
-              className="video-detail-thumbnail"
-              poster={video.thumbnailUrl}
-            />
+            videoError ? (
+              <div className="video-detail-thumbnail video-error-placeholder">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+                <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginTop: 12 }}>
+                  Video failed to load
+                </p>
+              </div>
+            ) : (
+              <video
+                src={videoUrl}
+                controls
+                className="video-detail-thumbnail"
+                poster={video.thumbnailUrl}
+                onError={() => setVideoError(true)}
+              />
+            )
           ) : video.thumbnailUrl ? (
             <img
               src={video.thumbnailUrl}
               alt="Video thumbnail"
               className="video-detail-thumbnail"
             />
-          ) : null}
+          ) : (
+            <div className="video-detail-thumbnail video-thumbnail-placeholder">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+              </svg>
+            </div>
+          )}
           {video.status === "processing" && (
             <div className="hero-processing-overlay">
               <p className="hero-processing-pulse">Processing video...</p>
