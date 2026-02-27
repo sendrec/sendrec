@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ForgotPassword } from "./ForgotPassword";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const originalFetch = globalThis.fetch;
 
@@ -33,6 +34,11 @@ describe("ForgotPassword", () => {
     expect(
       screen.getByRole("button", { name: "Send reset link" })
     ).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderForgotPassword();
+    await expectNoA11yViolations(container);
   });
 
   it("submits email and shows success message", async () => {

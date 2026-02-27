@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ConfirmEmail } from "./ConfirmEmail";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 function renderConfirmEmail(token?: string) {
   const path = token ? `/confirm-email?token=${token}` : "/confirm-email";
@@ -49,6 +50,11 @@ describe("ConfirmEmail", () => {
 
     expect(screen.getByText("invalid or expired token")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Try again" })).toHaveAttribute("href", "/register");
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderConfirmEmail();
+    await expectNoA11yViolations(container);
   });
 
   it("shows error when token is missing", () => {

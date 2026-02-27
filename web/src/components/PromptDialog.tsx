@@ -80,6 +80,7 @@ export function PromptDialog({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
+            aria-label={title}
             autoFocus
             style={{
               width: "100%",

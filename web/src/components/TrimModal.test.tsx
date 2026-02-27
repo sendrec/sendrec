@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TrimModal } from "./TrimModal";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockApiFetch = vi.fn();
 
@@ -344,5 +345,10 @@ describe("TrimModal", () => {
     await waitFor(() => {
       expect(screen.getByText(/Start: 0:12/)).toBeInTheDocument();
     });
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = render(<TrimModal {...defaultProps} />);
+    await expectNoA11yViolations(container);
   });
 });

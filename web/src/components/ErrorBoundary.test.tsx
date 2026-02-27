@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 function ThrowingComponent({ shouldThrow }: { shouldThrow: boolean }) {
   if (shouldThrow) {
@@ -34,5 +35,14 @@ describe("ErrorBoundary", () => {
     expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
 
     consoleSpy.mockRestore();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = render(
+      <ErrorBoundary>
+        <ThrowingComponent shouldThrow={false} />
+      </ErrorBoundary>
+    );
+    await expectNoA11yViolations(container);
   });
 });

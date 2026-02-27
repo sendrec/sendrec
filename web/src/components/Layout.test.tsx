@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Layout } from "./Layout";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -49,9 +50,9 @@ describe("Layout", () => {
 
   it("renders logo image in nav", () => {
     renderLayout();
-    const logo = screen.getByAltText("SendRec");
+    const logo = document.querySelector('img[src="/images/logo.png"]') as HTMLImageElement;
     expect(logo).toBeInTheDocument();
-    expect(logo).toHaveAttribute("src", "/images/logo.png");
+    expect(logo).toHaveAttribute("alt", "");
   });
 
   it("renders children in main element", () => {
@@ -170,5 +171,10 @@ describe("Layout", () => {
       expect(screen.getByText("Free")).toBeInTheDocument();
     });
     expect(screen.queryByText("Pro")).not.toBeInTheDocument();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderLayout();
+    await expectNoA11yViolations(container);
   });
 });

@@ -2,8 +2,18 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { NotFound } from "./NotFound";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 describe("NotFound", () => {
+  it("has no accessibility violations", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <NotFound />
+      </MemoryRouter>
+    );
+    await expectNoA11yViolations(container);
+  });
+
   it("renders 404 heading and message", () => {
     render(
       <MemoryRouter>

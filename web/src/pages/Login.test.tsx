@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Login } from "./Login";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -87,6 +88,11 @@ describe("Login", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(screen.getByText("Invalid credentials")).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderLogin();
+    await expectNoA11yViolations(container);
   });
 
   it("redirects to check-email on unverified email error", async () => {

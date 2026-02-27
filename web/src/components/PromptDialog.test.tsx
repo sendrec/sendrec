@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { PromptDialog } from "./PromptDialog";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 describe("PromptDialog", () => {
   it("renders title and input", () => {
@@ -86,5 +87,16 @@ describe("PromptDialog", () => {
     );
 
     expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = render(
+      <PromptDialog
+        title="Enter password"
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    await expectNoA11yViolations(container);
   });
 });

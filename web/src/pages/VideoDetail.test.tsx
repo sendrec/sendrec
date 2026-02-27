@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { VideoDetail } from "./VideoDetail";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockApiFetch = vi.fn();
 
@@ -224,6 +225,12 @@ describe("VideoDetail", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("has no accessibility violations", async () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}));
+    const { container } = renderVideoDetail();
+    await expectNoA11yViolations(container);
   });
 
   // ─── Skeleton tests ───────────────────────────────────────────
