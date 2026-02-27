@@ -16,13 +16,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 const (
 	apiKeyPrefix    = "sr_"
 	apiKeyRandBytes = 32
 	maxAPIKeys      = 10
-	maxKeyNameLen   = 100
 )
 
 type generateAPIKeyRequest struct {
@@ -66,8 +66,8 @@ func GenerateAPIKey(db database.DBTX) http.HandlerFunc {
 			return
 		}
 
-		if len(req.Name) > maxKeyNameLen {
-			httputil.WriteError(w, http.StatusBadRequest, "name must be at most 100 characters")
+		if msg := validate.APIKeyName(req.Name); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 

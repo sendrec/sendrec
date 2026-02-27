@@ -11,10 +11,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/validate"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
-
-const maxCommentBodyLength = 5000
 
 var validCommentModes = map[string]bool{
 	"disabled":            true,
@@ -171,8 +170,8 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Body) > maxCommentBodyLength {
-		httputil.WriteError(w, http.StatusBadRequest, "comment body is too long")
+	if msg := validate.CommentBody(req.Body); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 

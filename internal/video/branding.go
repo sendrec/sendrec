@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 var hexColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -26,10 +27,7 @@ const (
 	defaultLogoPath        = "/images/logo.png"
 	defaultFooterText      = ""
 
-	maxCompanyNameLength = 200
-	maxFooterTextLength  = 500
-	maxLogoUploadBytes   = 512 * 1024
-	maxCustomCSSLength   = 10 * 1024
+	maxLogoUploadBytes = 512 * 1024
 )
 
 type brandingConfig struct {
@@ -81,8 +79,8 @@ type logoUploadResponse struct {
 }
 
 func sanitizeCustomCSS(css string) (string, string) {
-	if len(css) > maxCustomCSSLength {
-		return "", "custom CSS must be 10KB or smaller"
+	if msg := validate.CustomCSS(css); msg != "" {
+		return "", msg
 	}
 	lower := strings.ToLower(css)
 	if strings.Contains(lower, "</style") {
@@ -223,13 +221,17 @@ func (h *Handler) PutBrandingSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.CompanyName != nil && len(*req.CompanyName) > maxCompanyNameLength {
-		httputil.WriteError(w, http.StatusBadRequest, "company name must be 200 characters or fewer")
-		return
+	if req.CompanyName != nil {
+		if msg := validate.CompanyName(*req.CompanyName); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
+			return
+		}
 	}
-	if req.FooterText != nil && len(*req.FooterText) > maxFooterTextLength {
-		httputil.WriteError(w, http.StatusBadRequest, "footer text must be 500 characters or fewer")
-		return
+	if req.FooterText != nil {
+		if msg := validate.FooterText(*req.FooterText); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
+			return
+		}
 	}
 	if errMsg := validateBrandingColors(req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent); errMsg != "" {
 		httputil.WriteError(w, http.StatusBadRequest, errMsg)
@@ -383,13 +385,17 @@ func (h *Handler) SetVideoBranding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.CompanyName != nil && len(*req.CompanyName) > maxCompanyNameLength {
-		httputil.WriteError(w, http.StatusBadRequest, "company name must be 200 characters or fewer")
-		return
+	if req.CompanyName != nil {
+		if msg := validate.CompanyName(*req.CompanyName); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
+			return
+		}
 	}
-	if req.FooterText != nil && len(*req.FooterText) > maxFooterTextLength {
-		httputil.WriteError(w, http.StatusBadRequest, "footer text must be 500 characters or fewer")
-		return
+	if req.FooterText != nil {
+		if msg := validate.FooterText(*req.FooterText); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
+			return
+		}
 	}
 	if errMsg := validateBrandingColors(req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent); errMsg != "" {
 		httputil.WriteError(w, http.StatusBadRequest, errMsg)
