@@ -125,6 +125,7 @@ func main() {
 		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",
 		AiEnabled:               aiEnabled,
 		TranscriptionEnabled:    getEnv("TRANSCRIPTION_ENABLED", "false") == "true",
+		NoiseReductionFilter:    os.Getenv("NOISE_REDUCTION_FILTER"),
 		AllowedFrameAncestors:   os.Getenv("ALLOWED_FRAME_ANCESTORS"),
 		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
 		EmailSender:             emailClient,

@@ -10,6 +10,7 @@ interface UserProfile {
   name: string;
   email: string;
   transcriptionLanguage?: string;
+  noiseReduction?: boolean;
 }
 
 interface APIKeyItem {
@@ -113,6 +114,8 @@ export function Settings() {
   const [billingMessage, setBillingMessage] = useState("");
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
   const [transcriptionLanguage, setTranscriptionLanguage] = useState("auto");
+  const [noiseReductionEnabled, setNoiseReductionEnabled] = useState(false);
+  const [noiseReduction, setNoiseReduction] = useState(true);
 
   const nameIsDirty = profile !== null && name !== profile.name;
   useUnsavedChanges(nameIsDirty);
@@ -123,7 +126,7 @@ export function Settings() {
         const [result, notifPrefs, limits, keys] = await Promise.all([
           apiFetch<UserProfile>("/api/user"),
           apiFetch<{ notificationMode: string; slackWebhookUrl: string | null; webhookUrl: string | null; webhookSecret: string | null }>("/api/settings/notifications"),
-          apiFetch<{ brandingEnabled: boolean; transcriptionEnabled: boolean }>("/api/videos/limits"),
+          apiFetch<{ brandingEnabled: boolean; transcriptionEnabled: boolean; noiseReductionEnabled: boolean }>("/api/videos/limits"),
           apiFetch<APIKeyItem[]>("/api/settings/api-keys"),
         ]);
         if (result) {
@@ -131,6 +134,9 @@ export function Settings() {
           setName(result.name);
           if (result.transcriptionLanguage) {
             setTranscriptionLanguage(result.transcriptionLanguage);
+          }
+          if (result.noiseReduction !== undefined) {
+            setNoiseReduction(result.noiseReduction);
           }
         }
         if (notifPrefs) {
@@ -153,6 +159,7 @@ export function Settings() {
         if (limits?.transcriptionEnabled) {
           setTranscriptionEnabled(true);
         }
+        setNoiseReductionEnabled(limits?.noiseReductionEnabled ?? false);
         if (limits?.brandingEnabled) {
           setBrandingEnabled(true);
           const brandingData = await apiFetch<BrandingSettings>("/api/settings/branding");
@@ -530,6 +537,19 @@ export function Settings() {
     }
   }
 
+  async function handleNoiseReductionChange(enabled: boolean) {
+    const previous = noiseReduction;
+    setNoiseReduction(enabled);
+    try {
+      await apiFetch("/api/user", {
+        method: "PATCH",
+        body: JSON.stringify({ noiseReduction: enabled }),
+      });
+    } catch {
+      setNoiseReduction(previous);
+    }
+  }
+
   return (
     <div className="page-container">
       <h1 className="page-title">Settings</h1>
@@ -684,25 +704,41 @@ export function Settings() {
 
       <RecordingDefaults />
 
-      {transcriptionEnabled && (
+      {(transcriptionEnabled || noiseReductionEnabled) && (
         <div className="card settings-section">
-          <h2>Transcription</h2>
+          <h2>Audio</h2>
           <p className="card-description">
-            Choose the default language for video transcription.
+            Configure transcription and audio processing for new recordings.
           </p>
-          <div className="form-field">
-            <label className="form-label" htmlFor="transcription-language">Default transcription language</label>
-            <select
-              id="transcription-language"
-              className="form-input"
-              value={transcriptionLanguage}
-              onChange={(e) => handleTranscriptionLanguageChange(e.target.value)}
-            >
-              {TRANSCRIPTION_LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code}>{lang.name}</option>
-              ))}
-            </select>
-          </div>
+          {transcriptionEnabled && (
+            <div className="form-field">
+              <label className="form-label" htmlFor="transcription-language">Default transcription language</label>
+              <select
+                id="transcription-language"
+                className="form-input"
+                value={transcriptionLanguage}
+                onChange={(e) => handleTranscriptionLanguageChange(e.target.value)}
+              >
+                {TRANSCRIPTION_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>{lang.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {noiseReductionEnabled && (
+            <div className="form-field">
+              <label className="form-label" htmlFor="noise-reduction">Noise reduction</label>
+              <select
+                id="noise-reduction"
+                className="form-input"
+                value={noiseReduction ? "on" : "off"}
+                onChange={(e) => handleNoiseReductionChange(e.target.value === "on")}
+              >
+                <option value="on">Enabled — reduce background noise in new recordings</option>
+                <option value="off">Disabled</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
 

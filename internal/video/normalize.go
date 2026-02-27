@@ -107,8 +107,8 @@ func probeVideoProperties(inputPath string) (videoProperties, error) {
 	}, nil
 }
 
-func transcodeToIOSCompatible(inputPath, outputPath string) error {
-	cmd := exec.Command("ffmpeg",
+func buildNormalizeArgs(inputPath, outputPath, audioFilter string) []string {
+	args := []string{
 		"-i", inputPath,
 		"-c:v", "libx264",
 		"-profile:v", "high",
@@ -117,11 +117,17 @@ func transcodeToIOSCompatible(inputPath, outputPath string) error {
 		"-crf", "23",
 		"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
 		"-r", "60",
-		"-c:a", "aac",
-		"-movflags", "+faststart",
-		"-y",
-		outputPath,
-	)
+	}
+	if audioFilter != "" {
+		args = append(args, "-af", audioFilter)
+	}
+	args = append(args, "-c:a", "aac", "-movflags", "+faststart", "-y", outputPath)
+	return args
+}
+
+func transcodeToIOSCompatible(inputPath, outputPath, audioFilter string) error {
+	args := buildNormalizeArgs(inputPath, outputPath, audioFilter)
+	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg normalize: %w: %s", err, string(output))
@@ -129,8 +135,19 @@ func transcodeToIOSCompatible(inputPath, outputPath string) error {
 	return nil
 }
 
-func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey string) {
-	slog.Info("normalize: starting", "video_id", videoID)
+func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, audioFilter string) {
+	// Check if video is already normalized (another normalize may have completed)
+	var normalized bool
+	if err := db.QueryRow(ctx, "SELECT ios_normalized FROM videos WHERE id = $1", videoID).Scan(&normalized); err != nil {
+		slog.Error("normalize: failed to check status", "video_id", videoID, "error", err)
+		return
+	}
+	if normalized {
+		slog.Info("normalize: skipped, already normalized", "video_id", videoID)
+		return
+	}
+
+	slog.Info("normalize: starting", "video_id", videoID, "audio_filter", audioFilter)
 
 	tmpInput, err := os.CreateTemp("", "sendrec-normalize-in-*.mp4")
 	if err != nil {
@@ -173,7 +190,7 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	if err := transcodeToIOSCompatible(tmpInputPath, tmpOutputPath); err != nil {
+	if err := transcodeToIOSCompatible(tmpInputPath, tmpOutputPath, audioFilter); err != nil {
 		slog.Error("normalize: ffmpeg failed", "video_id", videoID, "error", err)
 		return
 	}

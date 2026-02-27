@@ -340,6 +340,24 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 
+		audioFilter := ""
+		if h.noiseReductionFilter != "" {
+			var noiseReduction bool
+			if err := h.db.QueryRow(r.Context(),
+				"SELECT noise_reduction FROM users WHERE id = $1", userID,
+			).Scan(&noiseReduction); err == nil && noiseReduction {
+				audioFilter = h.noiseReductionFilter
+			}
+		}
+
+		if audioFilter != "" {
+			if _, err := h.db.Exec(r.Context(),
+				"UPDATE videos SET noise_reduction = true WHERE id = $1", videoID,
+			); err != nil {
+				slog.Error("failed to set noise_reduction on video", "video_id", videoID, "error", err)
+			}
+		}
+
 		if webcamKey != nil {
 			h.EnqueueJob(r.Context(), JobTypeComposite, videoID, map[string]any{
 				"fileKey":      fileKey,
@@ -358,10 +376,16 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 				h.EnqueueJob(r.Context(), JobTypeProbe, videoID, map[string]any{"fileKey": fileKey})
 			}
 			if expectedContentType == "video/webm" {
-				h.EnqueueJob(r.Context(), JobTypeTranscode, videoID, map[string]any{"fileKey": fileKey})
+				h.EnqueueJob(r.Context(), JobTypeTranscode, videoID, map[string]any{
+					"fileKey":     fileKey,
+					"audioFilter": audioFilter,
+				})
 			}
 			if expectedContentType == "video/mp4" || expectedContentType == "video/quicktime" {
-				h.EnqueueJob(r.Context(), JobTypeNormalize, videoID, map[string]any{"fileKey": fileKey})
+				h.EnqueueJob(r.Context(), JobTypeNormalize, videoID, map[string]any{
+					"fileKey":     fileKey,
+					"audioFilter": audioFilter,
+				})
 			}
 		}
 	}

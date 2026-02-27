@@ -1124,4 +1124,58 @@ describe("Settings", () => {
       }));
     });
   });
+
+  it("renders noise reduction select when enabled", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", noiseReduction: true })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: false, noiseReductionEnabled: true })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")); // billing
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Noise reduction")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Noise reduction")).toHaveValue("on");
+  });
+
+  it("hides noise reduction select when server feature disabled", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: false, noiseReductionEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")); // billing
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
+    });
+    expect(screen.queryByLabelText("Noise reduction")).not.toBeInTheDocument();
+  });
+
+  it("changing noise reduction calls PATCH /api/user", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", noiseReduction: true })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: false, noiseReductionEnabled: true })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce({ message: "Settings updated" }); // PATCH /api/user
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Noise reduction")).toBeInTheDocument();
+    });
+
+    await userEvent.selectOptions(screen.getByLabelText("Noise reduction"), "off");
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/user", expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ noiseReduction: false }),
+      }));
+    });
+  });
 });

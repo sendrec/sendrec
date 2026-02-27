@@ -56,6 +56,7 @@ type Handler struct {
 	analyticsScript         string
 	aiEnabled               bool
 	transcriptionEnabled    bool
+	noiseReductionFilter    string
 	webhookClient           *webhook.Client
 	geoResolver             GeoResolver
 }
@@ -100,6 +101,10 @@ func (h *Handler) SetAIEnabled(enabled bool) {
 
 func (h *Handler) SetTranscriptionEnabled(enabled bool) {
 	h.transcriptionEnabled = enabled
+}
+
+func (h *Handler) SetNoiseReductionFilter(filter string) {
+	h.noiseReductionFilter = filter
 }
 
 func (h *Handler) SetWebhookClient(c *webhook.Client) {

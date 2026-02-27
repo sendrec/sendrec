@@ -1364,9 +1364,9 @@ func TestGetUser_Success(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT name, email, transcription_language FROM users WHERE id = \$1`).
+	mock.ExpectQuery(`SELECT name, email, transcription_language, noise_reduction FROM users WHERE id = \$1`).
 		WithArgs("user-uuid-1").
-		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language"}).AddRow("Alice", "alice@example.com", "auto"))
+		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language", "noise_reduction"}).AddRow("Alice", "alice@example.com", "auto", true))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/user", nil)
 	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
@@ -1401,7 +1401,7 @@ func TestGetUser_NotFound(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT name, email, transcription_language FROM users WHERE id = \$1`).
+	mock.ExpectQuery(`SELECT name, email, transcription_language, noise_reduction FROM users WHERE id = \$1`).
 		WithArgs("missing-id").
 		WillReturnError(pgx.ErrNoRows)
 
@@ -1551,10 +1551,10 @@ func TestGetUser_IncludesTranscriptionLanguage(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT name, email, transcription_language FROM users WHERE id = \$1`).
+	mock.ExpectQuery(`SELECT name, email, transcription_language, noise_reduction FROM users WHERE id = \$1`).
 		WithArgs("user-uuid-1").
-		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language"}).
-			AddRow("Alice", "alice@example.com", "de"))
+		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language", "noise_reduction"}).
+			AddRow("Alice", "alice@example.com", "de", true))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/user", nil)
 	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))

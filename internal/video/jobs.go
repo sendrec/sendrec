@@ -33,10 +33,11 @@ func (h *Handler) EnqueueJob(ctx context.Context, jobType JobType, videoID strin
 		}()
 	case JobTypeTranscode:
 		fileKey, _ := payload["fileKey"].(string)
+		audioFilter, _ := payload["audioFilter"].(string)
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
-			TranscodeWebMAsync(ctx, h.db, h.storage, videoID, fileKey)
+			TranscodeWebMAsync(ctx, h.db, h.storage, videoID, fileKey, audioFilter)
 		}()
 	case JobTypeTranscribe:
 		if err := EnqueueTranscription(ctx, h.db, videoID); err != nil {
@@ -44,10 +45,11 @@ func (h *Handler) EnqueueJob(ctx context.Context, jobType JobType, videoID strin
 		}
 	case JobTypeNormalize:
 		fileKey, _ := payload["fileKey"].(string)
+		audioFilter, _ := payload["audioFilter"].(string)
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
-			NormalizeVideoAsync(ctx, h.db, h.storage, videoID, fileKey)
+			NormalizeVideoAsync(ctx, h.db, h.storage, videoID, fileKey, audioFilter)
 		}()
 	case JobTypeProbe:
 		fileKey, _ := payload["fileKey"].(string)
