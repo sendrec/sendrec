@@ -5,6 +5,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { LimitsResponse } from "../types/limits";
 
 interface UserProfile {
   name: string;
@@ -116,6 +117,7 @@ export function Settings() {
   const [transcriptionLanguage, setTranscriptionLanguage] = useState("auto");
   const [noiseReductionEnabled, setNoiseReductionEnabled] = useState(false);
   const [noiseReduction, setNoiseReduction] = useState(true);
+  const [limits, setLimits] = useState<LimitsResponse | null>(null);
 
   const nameIsDirty = profile !== null && name !== profile.name;
   useUnsavedChanges(nameIsDirty);
@@ -126,7 +128,7 @@ export function Settings() {
         const [result, notifPrefs, limits, keys] = await Promise.all([
           apiFetch<UserProfile>("/api/user"),
           apiFetch<{ notificationMode: string; slackWebhookUrl: string | null; webhookUrl: string | null; webhookSecret: string | null }>("/api/settings/notifications"),
-          apiFetch<{ brandingEnabled: boolean; transcriptionEnabled: boolean; noiseReductionEnabled: boolean }>("/api/videos/limits"),
+          apiFetch<LimitsResponse>("/api/videos/limits"),
           apiFetch<APIKeyItem[]>("/api/settings/api-keys"),
         ]);
         if (result) {
@@ -156,6 +158,7 @@ export function Settings() {
         if (keys) {
           setApiKeys(keys);
         }
+        setLimits(limits ?? null);
         if (limits?.transcriptionEnabled) {
           setTranscriptionEnabled(true);
         }
@@ -1010,7 +1013,7 @@ export function Settings() {
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               placeholder="e.g. My Nextcloud"
-              maxLength={100}
+              maxLength={limits?.fieldLimits?.apiKeyName ?? 100}
             />
           </div>
           <button
@@ -1094,7 +1097,7 @@ export function Settings() {
               value={branding.companyName ?? ""}
               onChange={(e) => setBranding({ ...branding, companyName: e.target.value || null })}
               placeholder="SendRec"
-              maxLength={200}
+              maxLength={limits?.fieldLimits?.companyName ?? 200}
             />
           </div>
 
@@ -1160,7 +1163,7 @@ export function Settings() {
               value={branding.footerText ?? ""}
               onChange={(e) => setBranding({ ...branding, footerText: e.target.value || null })}
               placeholder="Custom footer message"
-              maxLength={500}
+              maxLength={limits?.fieldLimits?.footerText ?? 500}
               rows={2}
             />
           </div>
@@ -1223,7 +1226,7 @@ export function Settings() {
               value={branding.customCss ?? ""}
               onChange={(e) => setBranding({ ...branding, customCss: e.target.value || null })}
               placeholder={"/* Override watch page styles */\nbody { font-family: 'Inter', sans-serif; }\n.download-btn { border-radius: 20px; }\n.comment-submit { border-radius: 20px; }"}
-              maxLength={10240}
+              maxLength={limits?.fieldLimits?.customCSS ?? 10240}
               rows={6}
             />
             <span className="form-hint">

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { CameraRecorder } from "../components/CameraRecorder";
 import { Recorder } from "../components/Recorder";
+import { LimitsResponse } from "../types/limits";
 import { Upload } from "./Upload";
 
 interface CreateVideoResponse {
@@ -10,12 +11,6 @@ interface CreateVideoResponse {
   uploadUrl: string;
   shareToken: string;
   webcamUploadUrl?: string;
-}
-
-interface LimitsResponse {
-  maxVideosPerMonth: number;
-  maxVideoDurationSeconds: number;
-  videosUsedThisMonth: number;
 }
 
 function uploadWithProgress(

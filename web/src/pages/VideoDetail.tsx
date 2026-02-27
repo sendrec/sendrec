@@ -9,6 +9,7 @@ import { DocumentModal } from "../components/DocumentModal";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PromptDialog } from "../components/PromptDialog";
+import { LimitsResponse } from "../types/limits";
 
 interface VideoTag {
   id: string;
@@ -70,14 +71,6 @@ interface PlaylistInfo {
   videoCount: number;
 }
 
-interface LimitsResponse {
-  maxVideosPerMonth: number;
-  maxVideoDurationSeconds: number;
-  videosUsedThisMonth: number;
-  brandingEnabled: boolean;
-  aiEnabled: boolean;
-  transcriptionEnabled: boolean;
-}
 
 interface VideoBranding {
   companyName: string | null;
@@ -1801,7 +1794,7 @@ export function VideoDetail() {
                   })
                 }
                 placeholder="Inherit from account"
-                maxLength={200}
+                maxLength={limits?.fieldLimits?.companyName ?? 200}
                 style={{
                   background: "var(--color-bg)",
                   border: "1px solid var(--color-border)",
@@ -1904,7 +1897,7 @@ export function VideoDetail() {
                   })
                 }
                 placeholder="Inherit from account"
-                maxLength={500}
+                maxLength={limits?.fieldLimits?.footerText ?? 500}
                 style={{
                   background: "var(--color-bg)",
                   border: "1px solid var(--color-border)",

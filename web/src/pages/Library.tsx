@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { LimitsResponse } from "../types/limits";
 
 interface Video {
   id: string;
@@ -30,13 +31,6 @@ interface Video {
   tags: VideoTag[];
 }
 
-interface LimitsResponse {
-  maxVideosPerMonth: number;
-  maxVideoDurationSeconds: number;
-  videosUsedThisMonth: number;
-  brandingEnabled: boolean;
-  aiEnabled: boolean;
-}
 
 interface Folder {
   id: string;
@@ -540,7 +534,7 @@ export function Library() {
                   onChange={(e) => setNewFolderName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") createFolder(); if (e.key === "Escape") setCreatingFolder(false); }}
                   placeholder="Folder name"
-                  maxLength={100}
+                  maxLength={limits?.fieldLimits?.folderName ?? 100}
                   style={{ width: "100%", padding: "4px 8px", fontSize: 13, background: "var(--color-background)", border: "1px solid var(--color-border)", borderRadius: 4, color: "var(--color-text)" }}
                 />
               </div>
@@ -601,7 +595,7 @@ export function Library() {
                     onChange={(e) => setNewTagName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") createTag(); if (e.key === "Escape") setCreatingTag(false); }}
                     placeholder="Tag name"
-                    maxLength={50}
+                    maxLength={limits?.fieldLimits?.tagName ?? 50}
                     style={{ flex: 1, padding: "4px 8px", fontSize: 13, background: "var(--color-background)", border: "1px solid var(--color-border)", borderRadius: 4, color: "var(--color-text)" }}
                   />
                 </div>
