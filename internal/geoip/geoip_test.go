@@ -39,7 +39,7 @@ func TestLookup_InvalidIP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	country, city := r.Lookup("not-an-ip")
 	if country != "" {
@@ -55,7 +55,7 @@ func TestLookup_LoopbackIP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	country, city := r.Lookup("127.0.0.1")
 	if country != "" {
