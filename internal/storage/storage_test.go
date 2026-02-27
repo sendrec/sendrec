@@ -3,8 +3,10 @@ package storage_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -361,5 +363,208 @@ func TestEnsureBucketCreateFails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "create bucket") {
 		t.Fatalf("expected error to contain 'create bucket', got: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GenerateUploadURL — upload limit & nil receiver
+// ---------------------------------------------------------------------------
+
+func TestGenerateUploadURL_ExceedsMaxBytes(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	store, err := storage.New(context.Background(), storage.Config{
+		Endpoint:       ts.URL,
+		Bucket:         "test-bucket",
+		AccessKey:      "testkey",
+		SecretKey:      "testsecret",
+		MaxUploadBytes: 1024,
+	})
+	if err != nil {
+		t.Fatalf("failed to create storage: %v", err)
+	}
+
+	_, err = store.GenerateUploadURL(context.Background(), "big.bin", "application/octet-stream", 2048, 15*time.Minute)
+	if err == nil {
+		t.Fatal("expected error for oversized upload, got nil")
+	}
+	if !strings.Contains(err.Error(), "file too large") {
+		t.Fatalf("expected error to contain 'file too large', got: %v", err)
+	}
+}
+
+func TestGenerateUploadURL_NilStorage(t *testing.T) {
+	var s *storage.Storage
+
+	_, err := s.GenerateUploadURL(context.Background(), "key.bin", "application/octet-stream", 100, 5*time.Minute)
+	if err == nil {
+		t.Fatal("expected error from nil storage, got nil")
+	}
+	if !strings.Contains(err.Error(), "not initialized") {
+		t.Fatalf("expected error to contain 'not initialized', got: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GenerateDownloadURLWithDisposition
+// ---------------------------------------------------------------------------
+
+func TestGenerateDownloadURLWithDisposition_Success(t *testing.T) {
+	bucket := "test-bucket"
+	store := newTestStorage(t, storage.Config{Bucket: bucket})
+
+	url, err := store.GenerateDownloadURLWithDisposition(context.Background(), "videos/demo.mp4", "demo.mp4", 15*time.Minute)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if url == "" {
+		t.Fatal("expected non-empty URL")
+	}
+	if !strings.Contains(url, bucket) {
+		t.Fatalf("expected URL to contain bucket %q, got: %s", bucket, url)
+	}
+}
+
+func TestGenerateDownloadURLWithDisposition_SpecialChars(t *testing.T) {
+	store := newTestStorage(t, storage.Config{})
+
+	// Filename with quotes, backslashes, and a control character (tab).
+	filename := "file\"with\\special\tchars.mp4"
+	url, err := store.GenerateDownloadURLWithDisposition(context.Background(), "videos/special.mp4", filename, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("expected no error for special-char filename, got: %v", err)
+	}
+	if url == "" {
+		t.Fatal("expected non-empty URL for special-char filename")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// HeadObject
+// ---------------------------------------------------------------------------
+
+func TestHeadObject_Success(t *testing.T) {
+	ts, store := newFakeS3Server(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead {
+			w.Header().Set("Content-Length", "12345")
+			w.Header().Set("Content-Type", "video/mp4")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	defer ts.Close()
+
+	size, contentType, err := store.HeadObject(context.Background(), "videos/clip.mp4")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if size != 12345 {
+		t.Fatalf("expected content length 12345, got: %d", size)
+	}
+	if contentType != "video/mp4" {
+		t.Fatalf("expected content type video/mp4, got: %s", contentType)
+	}
+}
+
+func TestHeadObject_NotFound(t *testing.T) {
+	ts, store := newFakeS3Server(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	defer ts.Close()
+
+	_, _, err := store.HeadObject(context.Background(), "missing/key.mp4")
+	if err == nil {
+		t.Fatal("expected error for missing object, got nil")
+	}
+	if !strings.Contains(err.Error(), "head object") {
+		t.Fatalf("expected error to contain 'head object', got: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// DownloadToFile
+// ---------------------------------------------------------------------------
+
+func TestDownloadToFile_Success(t *testing.T) {
+	expectedBody := "fake video content"
+
+	ts, store := newFakeS3Server(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprint(w, expectedBody)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	defer ts.Close()
+
+	destPath := t.TempDir() + "/downloaded.bin"
+
+	err := store.DownloadToFile(context.Background(), "videos/clip.mp4", destPath)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	data, err := os.ReadFile(destPath)
+	if err != nil {
+		t.Fatalf("failed to read downloaded file: %v", err)
+	}
+	if string(data) != expectedBody {
+		t.Fatalf("expected file content %q, got %q", expectedBody, string(data))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// UploadFile
+// ---------------------------------------------------------------------------
+
+func TestUploadFile_Success(t *testing.T) {
+	expectedContent := "uploaded file content"
+
+	var mu sync.Mutex
+	var receivedBody string
+	var receivedMethod string
+
+	ts, store := newFakeS3Server(t, func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		if r.Method == http.MethodPut {
+			receivedMethod = r.Method
+			body, _ := io.ReadAll(r.Body)
+			receivedBody = string(body)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	defer ts.Close()
+
+	srcPath := t.TempDir() + "/upload.txt"
+	if err := os.WriteFile(srcPath, []byte(expectedContent), 0o644); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+
+	err := store.UploadFile(context.Background(), "uploads/file.txt", srcPath, "text/plain")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if receivedMethod != http.MethodPut {
+		t.Fatalf("expected PUT method, got: %s", receivedMethod)
+	}
+	if receivedBody != expectedContent {
+		t.Fatalf("expected body %q, got %q", expectedContent, receivedBody)
 	}
 }
