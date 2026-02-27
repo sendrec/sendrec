@@ -99,6 +99,7 @@ type limitsResponse struct {
 	BrandingEnabled         bool `json:"brandingEnabled"`
 	AiEnabled               bool `json:"aiEnabled"`
 	TranscriptionEnabled    bool `json:"transcriptionEnabled"`
+	NoiseReductionEnabled   bool `json:"noiseReductionEnabled"`
 	MaxPlaylists            int  `json:"maxPlaylists"`
 	PlaylistsUsed           int  `json:"playlistsUsed"`
 }
@@ -143,6 +144,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		BrandingEnabled:         h.brandingEnabled,
 		AiEnabled:               h.aiEnabled,
 		TranscriptionEnabled:    h.transcriptionEnabled,
+		NoiseReductionEnabled:   h.noiseReductionFilter != "",
 		MaxPlaylists:            maxPlaylists,
 		PlaylistsUsed:           playlistsUsed,
 	})
