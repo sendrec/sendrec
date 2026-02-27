@@ -153,3 +153,52 @@ func TestGetPortalURL(t *testing.T) {
 		t.Errorf("expected portal_url https://creem.io/portal/cust_abc, got %s", info.Customer.PortalURL)
 	}
 }
+
+func TestNew_TestKeySelectsTestURL(t *testing.T) {
+	client := New("creem_test_abc", "")
+	if client.baseURL != "https://test-api.creem.io" {
+		t.Errorf("expected baseURL https://test-api.creem.io, got %s", client.baseURL)
+	}
+}
+
+func TestNew_ProductionKeySelectsProductionURL(t *testing.T) {
+	client := New("creem_live_abc", "")
+	if client.baseURL != "https://api.creem.io" {
+		t.Errorf("expected baseURL https://api.creem.io, got %s", client.baseURL)
+	}
+}
+
+func TestNew_CustomURLOverrides(t *testing.T) {
+	client := New("creem_test_abc", "https://custom.example.com")
+	if client.baseURL != "https://custom.example.com" {
+		t.Errorf("expected baseURL https://custom.example.com, got %s", client.baseURL)
+	}
+}
+
+func TestGetSubscription_ErrorResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"internal server error"}`))
+	}))
+	defer server.Close()
+
+	client := New("test-key", server.URL)
+	_, err := client.GetSubscription(context.Background(), "sub_err")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestCancelSubscription_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"internal server error"}`))
+	}))
+	defer server.Close()
+
+	client := New("test-key", server.URL)
+	err := client.CancelSubscription(context.Background(), "sub_err")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
