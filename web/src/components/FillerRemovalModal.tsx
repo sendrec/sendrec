@@ -118,7 +118,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
           display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
         }}
       >
-        <div role="dialog" aria-modal="true" style={{
+        <div role="dialog" aria-modal="true" aria-label="Remove Filler Words" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
@@ -137,7 +137,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
         }}
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div role="dialog" aria-modal="true" style={{
+        <div role="dialog" aria-modal="true" aria-label="Remove Filler Words" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
@@ -169,7 +169,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
         }}
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div role="dialog" aria-modal="true" style={{
+        <div role="dialog" aria-modal="true" aria-label="Remove Filler Words" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
@@ -200,7 +200,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div ref={contentRef} role="dialog" aria-modal="true" style={{
+      <div ref={contentRef} role="dialog" aria-modal="true" aria-label="Remove Filler Words" style={{
         background: "var(--color-surface)", border: "1px solid var(--color-border)",
         borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
       }}>

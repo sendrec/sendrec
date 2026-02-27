@@ -2,6 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Recorder } from "./Recorder";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 // Polyfill MediaStream for jsdom
 class MockMediaStream {
@@ -758,5 +759,10 @@ describe("Recorder", () => {
         audio: false,
       }),
     );
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = render(<Recorder onRecordingComplete={vi.fn()} />);
+    await expectNoA11yViolations(container);
   });
 });

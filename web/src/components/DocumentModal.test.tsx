@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DocumentModal } from "./DocumentModal";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 describe("DocumentModal", () => {
   it("has dialog role", () => {
@@ -54,5 +55,12 @@ describe("DocumentModal", () => {
     await user.click(btn);
     expect(writeText).toHaveBeenCalledWith("## Doc content");
     expect(btn).toHaveTextContent("Copied!");
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = render(
+      <DocumentModal document="Content" onClose={vi.fn()} />
+    );
+    await expectNoA11yViolations(container);
   });
 });

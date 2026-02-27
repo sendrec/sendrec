@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FillerRemovalModal } from "./FillerRemovalModal";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockApiFetch = vi.fn();
 
@@ -186,5 +187,11 @@ describe("FillerRemovalModal", () => {
 
     const removeButton = screen.getByRole("button", { name: /Remove 0 fillers/ });
     expect(removeButton).toBeDisabled();
+  });
+
+  it("has no accessibility violations", async () => {
+    globalThis.fetch = vi.fn().mockReturnValueOnce(new Promise(() => {}));
+    const { container } = render(<FillerRemovalModal {...defaultProps} />);
+    await expectNoA11yViolations(container);
   });
 });

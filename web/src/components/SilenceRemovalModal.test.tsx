@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SilenceRemovalModal } from "./SilenceRemovalModal";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockApiFetch = vi.fn();
 
@@ -157,5 +158,11 @@ describe("SilenceRemovalModal", () => {
     await user.keyboard("{Escape}");
 
     expect(defaultProps.onClose).toHaveBeenCalled();
+  });
+
+  it("has no accessibility violations", async () => {
+    mockApiFetch.mockReturnValueOnce(new Promise(() => {}));
+    const { container } = render(<SilenceRemovalModal {...defaultProps} />);
+    await expectNoA11yViolations(container);
   });
 });

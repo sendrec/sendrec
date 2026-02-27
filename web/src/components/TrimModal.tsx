@@ -163,6 +163,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
         ref={contentRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="trim-modal-title"
         style={{
           background: "var(--color-surface)",
           border: "1px solid var(--color-border)",
@@ -172,7 +173,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
           maxWidth: "90vw",
         }}
       >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>
+        <h2 id="trim-modal-title" style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>
           Trim Video
         </h2>
 

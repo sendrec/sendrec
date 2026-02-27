@@ -35,11 +35,11 @@ export function DocumentModal({ document, onClose }: DocumentModalProps) {
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div ref={contentRef} role="dialog" aria-modal="true" style={{
+      <div ref={contentRef} role="dialog" aria-modal="true" aria-labelledby="document-modal-title" style={{
         background: "var(--color-surface)", border: "1px solid var(--color-border)",
         borderRadius: 12, padding: 24, width: 720, maxWidth: "90vw", maxHeight: "80vh", overflow: "auto",
       }}>
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Generated Document</h2>
+        <h2 id="document-modal-title" style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Generated Document</h2>
         <div style={{ textAlign: "left", lineHeight: 1.6, color: "var(--color-text)" }}>
           <ReactMarkdown>{document}</ReactMarkdown>
         </div>

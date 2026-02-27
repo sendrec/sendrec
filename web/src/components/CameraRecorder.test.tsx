@@ -2,6 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CameraRecorder } from "./CameraRecorder";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 // Polyfill MediaStream for jsdom
 class MockMediaStream {
@@ -489,5 +490,13 @@ describe("CameraRecorder", () => {
     await user.click(screen.getByRole("button", { name: "Start recording" }));
 
     expect(screen.getByText("Click to start now")).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = render(<CameraRecorder onRecordingComplete={vi.fn()} />);
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+    });
+    await expectNoA11yViolations(container);
   });
 });

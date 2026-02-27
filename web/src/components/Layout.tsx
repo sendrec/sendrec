@@ -49,7 +49,7 @@ export function Layout({ children }: LayoutProps) {
     <>
       <nav className="nav-bar">
         <Link to="/" className="nav-logo" onClick={handleNavClick}>
-          <img src="/images/logo.png" alt="SendRec" width="48" height="48" />
+          <img src="/images/logo.png" alt="" width="48" height="48" />
           <span className="logo-send">Send</span><span className="logo-rec">Rec</span>
           {plan && (
             <span className={`plan-badge${plan === "pro" ? " plan-badge--pro" : ""}`}>

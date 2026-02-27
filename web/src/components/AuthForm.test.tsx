@@ -3,6 +3,7 @@ import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { AuthForm } from "./AuthForm";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 function renderAuthForm(props: Partial<Parameters<typeof AuthForm>[0]> = {}) {
   const defaults = {
@@ -118,5 +119,10 @@ describe("AuthForm", () => {
     renderAuthForm();
     expect(screen.getByText("Send")).toBeInTheDocument();
     expect(screen.getByText("Rec")).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderAuthForm();
+    await expectNoA11yViolations(container);
   });
 });
