@@ -211,6 +211,21 @@ func TestVideoFileKey(t *testing.T) {
 	}
 }
 
+func TestWebcamFileKey_TableDriven(t *testing.T) {
+	tests := []struct {
+		userID, shareToken, contentType, expected string
+	}{
+		{"user-1", "abc", "video/webm", "recordings/user-1/abc_webcam.webm"},
+		{"user-1", "abc", "video/mp4", "recordings/user-1/abc_webcam.mp4"},
+		{"user-1", "abc", "", "recordings/user-1/abc_webcam.webm"},
+	}
+	for _, tt := range tests {
+		if got := webcamFileKey(tt.userID, tt.shareToken, tt.contentType); got != tt.expected {
+			t.Errorf("webcamFileKey(%q, %q, %q) = %q, want %q", tt.userID, tt.shareToken, tt.contentType, got, tt.expected)
+		}
+	}
+}
+
 // --- Create Tests ---
 
 func TestCreate_Success(t *testing.T) {
