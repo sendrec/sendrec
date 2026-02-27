@@ -751,7 +751,7 @@ export function Library() {
 
       <div className={viewMode === "grid" ? "video-grid" : "video-list"}>
         {sortedVideos.map((video) => (
-          <div key={video.id} className="video-card">
+          <div key={video.id} className="video-card" style={openMenuId === video.id ? { zIndex: 10 } : undefined}>
             <Link to={`/videos/${video.id}`} state={{ video }} style={{ textDecoration: "none" }}>
               <div className="video-card-thumbnail">
                 {video.thumbnailUrl && (
