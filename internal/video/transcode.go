@@ -12,8 +12,8 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 )
 
-func transcodeToMP4(inputPath, outputPath string) error {
-	cmd := exec.Command("ffmpeg",
+func buildTranscodeArgs(inputPath, outputPath, audioFilter string) []string {
+	args := []string{
 		"-i", inputPath,
 		"-c:v", "libx264",
 		"-profile:v", "high",
@@ -22,11 +22,17 @@ func transcodeToMP4(inputPath, outputPath string) error {
 		"-crf", "23",
 		"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
 		"-r", "60",
-		"-c:a", "aac",
-		"-movflags", "+faststart",
-		"-y",
-		outputPath,
-	)
+	}
+	if audioFilter != "" {
+		args = append(args, "-af", audioFilter)
+	}
+	args = append(args, "-c:a", "aac", "-movflags", "+faststart", "-y", outputPath)
+	return args
+}
+
+func transcodeToMP4(inputPath, outputPath, audioFilter string) error {
+	args := buildTranscodeArgs(inputPath, outputPath, audioFilter)
+	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg transcode: %w: %s", err, string(output))
@@ -34,7 +40,7 @@ func transcodeToMP4(inputPath, outputPath string) error {
 	return nil
 }
 
-func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey string) {
+func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, audioFilter string) {
 	slog.Info("transcode: starting", "video_id", videoID)
 
 	tmpInput, err := os.CreateTemp("", "sendrec-transcode-in-*.webm")
@@ -60,7 +66,7 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	if err := transcodeToMP4(tmpInputPath, tmpOutputPath); err != nil {
+	if err := transcodeToMP4(tmpInputPath, tmpOutputPath, audioFilter); err != nil {
 		slog.Error("transcode: ffmpeg failed", "video_id", videoID, "error", err)
 		return
 	}
@@ -111,7 +117,7 @@ func transcodeExistingWebM(ctx context.Context, db database.DBTX, storage Object
 			slog.Error("transcode-worker: failed to scan", "error", err)
 			continue
 		}
-		TranscodeWebMAsync(ctx, db, storage, videoID, fileKey)
+		TranscodeWebMAsync(ctx, db, storage, videoID, fileKey, "")
 	}
 }
 
@@ -133,7 +139,7 @@ func normalizeExistingVideos(ctx context.Context, db database.DBTX, storage Obje
 			slog.Error("normalize-worker: failed to scan", "error", err)
 			continue
 		}
-		NormalizeVideoAsync(ctx, db, storage, videoID, fileKey)
+		NormalizeVideoAsync(ctx, db, storage, videoID, fileKey, "")
 	}
 }
 
