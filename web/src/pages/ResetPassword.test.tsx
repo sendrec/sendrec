@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ResetPassword } from "./ResetPassword";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const originalFetch = globalThis.fetch;
 
@@ -45,6 +46,11 @@ describe("ResetPassword", () => {
     expect(
       screen.getByRole("button", { name: "Reset password" })
     ).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderResetPassword(["/reset-password?token=abc123"]);
+    await expectNoA11yViolations(container);
   });
 
   it("shows error when passwords don't match", async () => {

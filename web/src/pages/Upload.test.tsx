@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Upload } from "./Upload";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockApiFetch = vi.fn();
 
@@ -45,6 +46,11 @@ describe("Upload", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderUpload();
+    await expectNoA11yViolations(container);
   });
 
   it("renders file input and drop zone", () => {

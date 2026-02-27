@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Settings } from "./Settings";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockApiFetch = vi.fn();
 
@@ -31,6 +32,12 @@ describe("Settings", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("has no accessibility violations", async () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}));
+    const { container } = renderSettings();
+    await expectNoA11yViolations(container);
   });
 
   it("shows loading state initially", () => {

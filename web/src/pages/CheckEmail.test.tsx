@@ -3,6 +3,7 @@ import { render, screen, waitFor, act, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { CheckEmail } from "./CheckEmail";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -38,6 +39,11 @@ describe("CheckEmail", () => {
     renderCheckEmail("alice@example.com");
     expect(screen.getByRole("button", { name: "Resend confirmation email" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to sign in" })).toHaveAttribute("href", "/login");
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderCheckEmail("alice@example.com");
+    await expectNoA11yViolations(container);
   });
 
   it("redirects to register when no email in state", () => {

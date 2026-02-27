@@ -4,6 +4,7 @@ import { act } from "react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Record } from "./Record";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockApiFetch = vi.fn();
 
@@ -93,6 +94,12 @@ describe("Record", () => {
   afterEach(() => {
     globalThis.XMLHttpRequest = originalXHR;
     vi.restoreAllMocks();
+  });
+
+  it("has no accessibility violations", async () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}));
+    const { container } = renderRecord();
+    await expectNoA11yViolations(container);
   });
 
   it("shows limit reached message when monthly quota is full", async () => {

@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Register } from "./Register";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -58,6 +59,11 @@ describe("Register", () => {
       body: JSON.stringify({ email: "alice@example.com", password: "password123", name: "Alice" }),
     });
     expect(mockNavigate).toHaveBeenCalledWith("/check-email", { state: { email: "alice@example.com" } });
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderRegister();
+    await expectNoA11yViolations(container);
   });
 
   it("shows error on failed registration", async () => {

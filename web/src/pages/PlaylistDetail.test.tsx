@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { PlaylistDetail } from "./PlaylistDetail";
+import { expectNoA11yViolations } from "../test-utils/a11y";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -70,6 +71,12 @@ describe("PlaylistDetail", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("has no accessibility violations", async () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}));
+    const { container } = renderDetail();
+    await expectNoA11yViolations(container);
   });
 
   it("shows loading state initially", () => {

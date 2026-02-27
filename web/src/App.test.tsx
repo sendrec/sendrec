@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
+import { expectNoA11yViolations } from "./test-utils/a11y";
 
 const mockGetAccessToken = vi.fn();
 const mockTryRefreshToken = vi.fn();
@@ -77,6 +78,11 @@ describe("App", () => {
   beforeEach(() => {
     mockGetAccessToken.mockReset();
     mockTryRefreshToken.mockReset();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderApp("/login");
+    await expectNoA11yViolations(container);
   });
 
   it("renders login page at /login", () => {
