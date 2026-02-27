@@ -1,16 +1,12 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { LimitsResponse } from "../types/limits";
 
 interface UploadResponse {
   id: string;
   uploadUrl: string;
   shareToken: string;
-}
-
-interface LimitsResponse {
-  maxVideosPerMonth: number;
-  videosUsedThisMonth: number;
 }
 
 interface FileEntry {

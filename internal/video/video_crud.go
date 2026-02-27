@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/validate"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
@@ -94,8 +95,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if title == "" {
 		title = "Untitled Recording"
 	}
-	if len(title) > 500 {
-		httputil.WriteError(w, http.StatusBadRequest, "title is too long")
+	if msg := validate.Title(title); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -218,8 +219,8 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	if title == "" {
 		title = "Untitled Video"
 	}
-	if len(title) > 500 {
-		httputil.WriteError(w, http.StatusBadRequest, "title is too long")
+	if msg := validate.Title(title); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -391,8 +392,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Title != "" {
-		if len(req.Title) > 500 {
-			httputil.WriteError(w, http.StatusBadRequest, "title is too long")
+		if msg := validate.Title(req.Title); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 		tag, err := h.db.Exec(r.Context(),

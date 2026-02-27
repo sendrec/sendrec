@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 type tagItem struct {
@@ -25,7 +26,6 @@ type tagItem struct {
 }
 
 const maxTagsPerUser = 100
-const maxTagNameLength = 50
 
 var colorRegex = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
@@ -80,8 +80,8 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "tag name is required")
 		return
 	}
-	if len(name) > maxTagNameLength {
-		httputil.WriteError(w, http.StatusBadRequest, "tag name must be 50 characters or less")
+	if msg := validate.TagName(name); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -154,8 +154,8 @@ func (h *Handler) UpdateTag(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusBadRequest, "tag name is required")
 			return
 		}
-		if len(trimmed) > maxTagNameLength {
-			httputil.WriteError(w, http.StatusBadRequest, "tag name must be 50 characters or less")
+		if msg := validate.TagName(trimmed); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 		req.Name = &trimmed

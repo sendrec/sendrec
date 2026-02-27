@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 const defaultPageSize = 50
@@ -94,15 +95,16 @@ func generateShareToken() (string, error) {
 }
 
 type limitsResponse struct {
-	MaxVideosPerMonth       int  `json:"maxVideosPerMonth"`
-	MaxVideoDurationSeconds int  `json:"maxVideoDurationSeconds"`
-	VideosUsedThisMonth     int  `json:"videosUsedThisMonth"`
-	BrandingEnabled         bool `json:"brandingEnabled"`
-	AiEnabled               bool `json:"aiEnabled"`
-	TranscriptionEnabled    bool `json:"transcriptionEnabled"`
-	NoiseReductionEnabled   bool `json:"noiseReductionEnabled"`
-	MaxPlaylists            int  `json:"maxPlaylists"`
-	PlaylistsUsed           int  `json:"playlistsUsed"`
+	MaxVideosPerMonth       int            `json:"maxVideosPerMonth"`
+	MaxVideoDurationSeconds int            `json:"maxVideoDurationSeconds"`
+	VideosUsedThisMonth     int            `json:"videosUsedThisMonth"`
+	BrandingEnabled         bool           `json:"brandingEnabled"`
+	AiEnabled               bool           `json:"aiEnabled"`
+	TranscriptionEnabled    bool           `json:"transcriptionEnabled"`
+	NoiseReductionEnabled   bool           `json:"noiseReductionEnabled"`
+	MaxPlaylists            int            `json:"maxPlaylists"`
+	PlaylistsUsed           int            `json:"playlistsUsed"`
+	FieldLimits             map[string]int `json:"fieldLimits"`
 }
 
 func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
@@ -148,6 +150,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		NoiseReductionEnabled:   h.noiseReductionFilter != "",
 		MaxPlaylists:            maxPlaylists,
 		PlaylistsUsed:           playlistsUsed,
+		FieldLimits:             validate.FieldLimits(),
 	})
 }
 

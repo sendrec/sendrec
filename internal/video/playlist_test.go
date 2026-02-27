@@ -127,8 +127,8 @@ func TestCreatePlaylist_TitleTooLong(t *testing.T) {
 	}
 
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
-	if errMsg != "playlist title must be 200 characters or less" {
-		t.Errorf("expected error %q, got %q", "playlist title must be 200 characters or less", errMsg)
+	if errMsg != "playlist title must be 200 characters or fewer" {
+		t.Errorf("expected error %q, got %q", "playlist title must be 200 characters or fewer", errMsg)
 	}
 }
 

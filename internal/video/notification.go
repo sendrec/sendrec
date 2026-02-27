@@ -16,6 +16,7 @@ import (
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
 	"github.com/sendrec/sendrec/internal/slack"
+	"github.com/sendrec/sendrec/internal/validate"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
@@ -86,9 +87,6 @@ func (h *Handler) GetNotificationPreferences(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-const maxSlackWebhookURLLength = 500
-const maxWebhookURLLength = 500
-
 func isValidWebhookURL(u string) bool {
 	if strings.HasPrefix(u, "https://") {
 		return true
@@ -129,8 +127,8 @@ func (h *Handler) PutNotificationPreferences(w http.ResponseWriter, r *http.Requ
 				httputil.WriteError(w, http.StatusBadRequest, "Slack webhook URL must start with https://hooks.slack.com/")
 				return
 			}
-			if len(trimmed) > maxSlackWebhookURLLength {
-				httputil.WriteError(w, http.StatusBadRequest, "Slack webhook URL must be 500 characters or fewer")
+			if msg := validate.SlackWebhookURL(trimmed); msg != "" {
+				httputil.WriteError(w, http.StatusBadRequest, msg)
 				return
 			}
 			slackWebhookUrl = &trimmed
@@ -146,8 +144,8 @@ func (h *Handler) PutNotificationPreferences(w http.ResponseWriter, r *http.Requ
 				httputil.WriteError(w, http.StatusBadRequest, "webhook URL must use HTTPS (HTTP allowed only for localhost)")
 				return
 			}
-			if len(trimmed) > maxWebhookURLLength {
-				httputil.WriteError(w, http.StatusBadRequest, "webhook URL must be 500 characters or fewer")
+			if msg := validate.WebhookURL(trimmed); msg != "" {
+				httputil.WriteError(w, http.StatusBadRequest, msg)
 				return
 			}
 			webhookUrl = &trimmed

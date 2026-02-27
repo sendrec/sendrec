@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { LimitsResponse } from "../types/limits";
 
 interface Playlist {
   id: string;
@@ -17,10 +18,6 @@ interface Playlist {
   updatedAt: string;
 }
 
-interface LimitsResponse {
-  maxPlaylists: number;
-  playlistsUsed: number;
-}
 
 function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString("en-GB");
@@ -177,7 +174,7 @@ export function Playlists() {
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             placeholder="Playlist title"
-            maxLength={200}
+            maxLength={limits?.fieldLimits?.playlistTitle ?? 200}
             autoFocus
             style={{
               flex: 1,
