@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN noise_reduction BOOLEAN NOT NULL DEFAULT true;
