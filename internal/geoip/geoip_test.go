@@ -34,9 +34,54 @@ func TestLookup_EmptyIP(t *testing.T) {
 	}
 }
 
+func TestLookup_InvalidIP(t *testing.T) {
+	r, err := New("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+
+	country, city := r.Lookup("not-an-ip")
+	if country != "" {
+		t.Errorf("expected empty country for invalid IP, got %q", country)
+	}
+	if city != "" {
+		t.Errorf("expected empty city for invalid IP, got %q", city)
+	}
+}
+
+func TestLookup_LoopbackIP(t *testing.T) {
+	r, err := New("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+
+	country, city := r.Lookup("127.0.0.1")
+	if country != "" {
+		t.Errorf("expected empty country for loopback, got %q", country)
+	}
+	if city != "" {
+		t.Errorf("expected empty city for loopback, got %q", city)
+	}
+}
+
 func TestClose_NilDB(t *testing.T) {
 	r, _ := New("")
 	if err := r.Close(); err != nil {
 		t.Errorf("expected no error closing nil resolver, got %v", err)
+	}
+}
+
+func TestClose_AlreadyClosed(t *testing.T) {
+	r, err := New("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Close(); err != nil {
+		t.Errorf("first close failed: %v", err)
+	}
+	if err := r.Close(); err != nil {
+		t.Errorf("second close failed: %v", err)
 	}
 }
