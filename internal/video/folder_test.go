@@ -96,8 +96,8 @@ func TestCreateFolder_NameTooLong(t *testing.T) {
 	}
 
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
-	if errMsg != "folder name must be 100 characters or less" {
-		t.Errorf("expected error %q, got %q", "folder name must be 100 characters or less", errMsg)
+	if errMsg != "folder name must be 100 characters or fewer" {
+		t.Errorf("expected error %q, got %q", "folder name must be 100 characters or fewer", errMsg)
 	}
 }
 

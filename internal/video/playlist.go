@@ -11,10 +11,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/validate"
 )
-
-const maxPlaylistTitleLength = 200
-const maxPlaylistDescriptionLength = 2000
 
 type playlistItem struct {
 	ID           string  `json:"id"`
@@ -68,15 +66,15 @@ func (h *Handler) CreatePlaylist(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "playlist title is required")
 		return
 	}
-	if len(title) > maxPlaylistTitleLength {
-		httputil.WriteError(w, http.StatusBadRequest, "playlist title must be 200 characters or less")
+	if msg := validate.PlaylistTitle(title); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 
 	if req.Description != nil {
 		trimmed := strings.TrimSpace(*req.Description)
-		if len(trimmed) > maxPlaylistDescriptionLength {
-			httputil.WriteError(w, http.StatusBadRequest, "playlist description must be 2000 characters or less")
+		if msg := validate.PlaylistDescription(trimmed); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 		if trimmed == "" {
@@ -271,8 +269,8 @@ func (h *Handler) UpdatePlaylist(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusBadRequest, "playlist title is required")
 			return
 		}
-		if len(trimmed) > maxPlaylistTitleLength {
-			httputil.WriteError(w, http.StatusBadRequest, "playlist title must be 200 characters or less")
+		if msg := validate.PlaylistTitle(trimmed); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 		req.Title = &trimmed
@@ -280,8 +278,8 @@ func (h *Handler) UpdatePlaylist(w http.ResponseWriter, r *http.Request) {
 
 	if req.Description != nil {
 		trimmed := strings.TrimSpace(*req.Description)
-		if len(trimmed) > maxPlaylistDescriptionLength {
-			httputil.WriteError(w, http.StatusBadRequest, "playlist description must be 2000 characters or less")
+		if msg := validate.PlaylistDescription(trimmed); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 type folderItem struct {
@@ -24,7 +25,6 @@ type folderItem struct {
 }
 
 const maxFoldersPerUser = 50
-const maxFolderNameLength = 100
 
 func (h *Handler) ListFolders(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
@@ -76,8 +76,8 @@ func (h *Handler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "folder name is required")
 		return
 	}
-	if len(name) > maxFolderNameLength {
-		httputil.WriteError(w, http.StatusBadRequest, "folder name must be 100 characters or less")
+	if msg := validate.FolderName(name); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -144,8 +144,8 @@ func (h *Handler) UpdateFolder(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusBadRequest, "folder name is required")
 			return
 		}
-		if len(trimmed) > maxFolderNameLength {
-			httputil.WriteError(w, http.StatusBadRequest, "folder name must be 100 characters or less")
+		if msg := validate.FolderName(trimmed); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 		req.Name = &trimmed

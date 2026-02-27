@@ -176,8 +176,8 @@ func TestCreateTag_NameTooLong(t *testing.T) {
 	}
 
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
-	if errMsg != "tag name must be 50 characters or less" {
-		t.Errorf("expected error %q, got %q", "tag name must be 50 characters or less", errMsg)
+	if errMsg != "tag name must be 50 characters or fewer" {
+		t.Errorf("expected error %q, got %q", "tag name must be 50 characters or fewer", errMsg)
 	}
 }
 
