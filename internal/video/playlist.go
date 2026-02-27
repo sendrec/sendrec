@@ -17,16 +17,17 @@ const maxPlaylistTitleLength = 200
 const maxPlaylistDescriptionLength = 2000
 
 type playlistItem struct {
-	ID          string  `json:"id"`
-	Title       string  `json:"title"`
-	Description *string `json:"description"`
-	IsShared    bool    `json:"isShared"`
-	ShareToken  *string `json:"shareToken,omitempty"`
-	ShareURL    *string `json:"shareUrl,omitempty"`
-	Position    int     `json:"position"`
-	VideoCount  int64   `json:"videoCount"`
-	CreatedAt   string  `json:"createdAt"`
-	UpdatedAt   string  `json:"updatedAt"`
+	ID           string  `json:"id"`
+	Title        string  `json:"title"`
+	Description  *string `json:"description"`
+	IsShared     bool    `json:"isShared"`
+	ShareToken   *string `json:"shareToken,omitempty"`
+	ShareURL     *string `json:"shareUrl,omitempty"`
+	Position     int     `json:"position"`
+	VideoCount   int64   `json:"videoCount"`
+	ThumbnailURL *string `json:"thumbnailUrl"`
+	CreatedAt    string  `json:"createdAt"`
+	UpdatedAt    string  `json:"updatedAt"`
 }
 
 type playlistVideo struct {
@@ -126,7 +127,11 @@ func (h *Handler) ListPlaylists(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(r.Context(),
 		`SELECT p.id, p.title, p.description, p.is_shared, p.share_token, p.position, p.created_at, p.updated_at,
-		        (SELECT COUNT(*) FROM playlist_videos pv WHERE pv.playlist_id = p.id) AS video_count
+		        (SELECT COUNT(*) FROM playlist_videos pv WHERE pv.playlist_id = p.id) AS video_count,
+		        (SELECT v.share_token FROM playlist_videos pv2
+		         JOIN videos v ON v.id = pv2.video_id
+		         WHERE pv2.playlist_id = p.id AND v.thumbnail_key IS NOT NULL AND v.thumbnail_key != ''
+		         ORDER BY pv2.position, v.created_at LIMIT 1) AS thumb_share_token
 		 FROM playlists p
 		 WHERE p.user_id = $1
 		 ORDER BY p.position, p.created_at`,
@@ -143,7 +148,8 @@ func (h *Handler) ListPlaylists(w http.ResponseWriter, r *http.Request) {
 		var item playlistItem
 		var createdAt, updatedAt time.Time
 		var shareToken *string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.IsShared, &shareToken, &item.Position, &createdAt, &updatedAt, &item.VideoCount); err != nil {
+		var thumbShareToken *string
+		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.IsShared, &shareToken, &item.Position, &createdAt, &updatedAt, &item.VideoCount, &thumbShareToken); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan playlist")
 			return
 		}
@@ -153,6 +159,10 @@ func (h *Handler) ListPlaylists(w http.ResponseWriter, r *http.Request) {
 		if shareToken != nil {
 			shareURL := h.baseURL + "/watch/playlist/" + *shareToken
 			item.ShareURL = &shareURL
+		}
+		if thumbShareToken != nil {
+			thumbURL := "/api/watch/" + *thumbShareToken + "/thumbnail"
+			item.ThumbnailURL = &thumbURL
 		}
 		items = append(items, item)
 	}

@@ -63,6 +63,11 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Duration < 1 {
+		httputil.WriteError(w, http.StatusBadRequest, "video duration must be at least 1 second")
+		return
+	}
+
 	if h.maxUploadBytes > 0 && req.FileSize > h.maxUploadBytes {
 		httputil.WriteError(w, http.StatusBadRequest, "file too large")
 		return

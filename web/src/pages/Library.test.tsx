@@ -41,12 +41,13 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function mockFetch(videos: unknown[], limits = unlimitedLimits, folders: unknown[] = [], tags: unknown[] = []) {
+function mockFetch(videos: unknown[], limits = unlimitedLimits, folders: unknown[] = [], tags: unknown[] = [], playlists: unknown[] = []) {
   mockApiFetch
     .mockResolvedValueOnce(videos)
     .mockResolvedValueOnce(limits)
     .mockResolvedValueOnce(folders)
-    .mockResolvedValueOnce(tags);
+    .mockResolvedValueOnce(tags)
+    .mockResolvedValueOnce(playlists);
 }
 
 function renderLibrary() {
@@ -75,10 +76,12 @@ describe("Library", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows loading state initially", () => {
+  it("shows skeleton cards during loading", () => {
     mockApiFetch.mockReturnValue(new Promise(() => {}));
-    renderLibrary();
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    const { container } = renderLibrary();
+    expect(container.querySelectorAll(".skeleton-card")).toHaveLength(6);
+    expect(container.querySelector(".skeleton-thumb")).not.toBeNull();
+    expect(container.querySelector(".skeleton-title")).not.toBeNull();
   });
 
   it("shows empty state when no videos", async () => {
@@ -89,7 +92,7 @@ describe("Library", () => {
       expect(screen.getByText("No recordings yet.")).toBeInTheDocument();
     });
     expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/upload");
+    expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/?tab=upload");
   });
 
   it("renders video list with title and metadata", async () => {
@@ -240,8 +243,8 @@ describe("Library", () => {
 
     await user.click(screen.getByText("Cancel"));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    // Should not have called delete API (only initial fetches: videos, limits, folders, tags)
-    expect(mockApiFetch).toHaveBeenCalledTimes(4);
+    // Should not have called delete API (only initial fetches: videos, limits, folders, tags, playlists)
+    expect(mockApiFetch).toHaveBeenCalledTimes(5);
   });
 
   it("deletes video when confirmed", async () => {
@@ -609,8 +612,19 @@ describe("Library", () => {
         expect(screen.getByText("No recordings yet.")).toBeInTheDocument();
       });
       expect(screen.getByRole("link", { name: "Record" })).toHaveAttribute("href", "/");
-      expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/upload");
+      expect(screen.getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/?tab=upload");
     });
+  });
+
+  it("renders playlists in sidebar", async () => {
+    const playlists = [{ id: "p1", title: "Demo Reel", videoCount: 3 }];
+    mockFetch([makeVideo()], unlimitedLimits, [], [], playlists);
+    renderLibrary();
+    await waitFor(() => {
+      expect(screen.getByText("Playlists")).toBeInTheDocument();
+    });
+    const link = screen.getByRole("link", { name: /Demo Reel/ });
+    expect(link).toHaveAttribute("href", "/playlists/p1");
   });
 
   describe("batch operations", () => {
@@ -712,6 +726,75 @@ describe("Library", () => {
       for (const cb of checkboxes) {
         expect(cb).toBeChecked();
       }
+    });
+  });
+
+  describe("grid view and controls", () => {
+    it("renders videos in grid layout by default", async () => {
+      mockFetch([makeVideo()]);
+      const { container } = renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      expect(container.querySelector(".video-grid")).not.toBeNull();
+      expect(container.querySelector(".video-list")).toBeNull();
+    });
+
+    it("switches to list view when list toggle is clicked", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo()]);
+      const { container } = renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: "List view" }));
+
+      expect(container.querySelector(".video-list")).not.toBeNull();
+      expect(container.querySelector(".video-grid")).toBeNull();
+    });
+
+    it("renders sort dropdown with options", async () => {
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      const sortSelect = screen.getByRole("combobox", { name: "Sort videos" });
+      expect(sortSelect).toBeInTheDocument();
+      expect(screen.getByText("Newest first")).toBeInTheDocument();
+      expect(screen.getByText("Oldest first")).toBeInTheDocument();
+      expect(screen.getByText("Most viewed")).toBeInTheDocument();
+      expect(screen.getByText("Title A-Z")).toBeInTheDocument();
+    });
+
+    it("renders duration badge on thumbnail", async () => {
+      mockFetch([makeVideo()]);
+      const { container } = renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      const badge = container.querySelector(".video-card-duration");
+      expect(badge).not.toBeNull();
+      expect(badge!.textContent).toBe("2:05");
+    });
+
+    it("renders play overlay on thumbnail", async () => {
+      mockFetch([makeVideo()]);
+      const { container } = renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      expect(container.querySelector(".video-card-play")).not.toBeNull();
     });
   });
 });

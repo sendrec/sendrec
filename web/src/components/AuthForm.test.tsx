@@ -113,4 +113,10 @@ describe("AuthForm", () => {
     renderAuthForm({ footer: <span>Go to register</span> });
     expect(screen.getByText("Go to register")).toBeInTheDocument();
   });
+
+  it("renders SendRec brand logo", () => {
+    renderAuthForm();
+    expect(screen.getByText("Send")).toBeInTheDocument();
+    expect(screen.getByText("Rec")).toBeInTheDocument();
+  });
 });

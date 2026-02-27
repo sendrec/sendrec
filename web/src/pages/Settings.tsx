@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { apiFetch } from "../api/client";
+import { useNavigate } from "react-router-dom";
+import { apiFetch, setAccessToken } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
@@ -85,6 +86,8 @@ export function Settings() {
   const [webhookMessage, setWebhookMessage] = useState("");
   const [webhookDeliveries, setWebhookDeliveries] = useState<WebhookDelivery[]>([]);
   const [expandedDelivery, setExpandedDelivery] = useState<string | null>(null);
+  const [deliverySearch, setDeliverySearch] = useState("");
+  const [deliveryFilter, setDeliveryFilter] = useState<"all" | "success" | "error">("all");
   const [regeneratingSecret, setRegeneratingSecret] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [brandingEnabled, setBrandingEnabled] = useState(false);
@@ -104,6 +107,8 @@ export function Settings() {
   const [confirmDialog, setConfirmDialog] = useState<{
     message: string;
     onConfirm: () => void;
+    confirmLabel?: string;
+    danger?: boolean;
   } | null>(null);
   const [billingMessage, setBillingMessage] = useState("");
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
@@ -507,20 +512,10 @@ export function Settings() {
   if (!profile) {
     return (
       <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Loading...</p>
+        <p className="status-message status-message--success">Loading...</p>
       </div>
     );
   }
-
-  const inputStyle = {
-    background: "var(--color-bg)",
-    border: "1px solid var(--color-border)",
-    borderRadius: 4,
-    color: "var(--color-text)",
-    padding: "8px 12px",
-    fontSize: 14,
-    width: "100%",
-  };
 
   async function handleTranscriptionLanguageChange(value: string) {
     const previous = transcriptionLanguage;
@@ -537,111 +532,65 @@ export function Settings() {
 
   return (
     <div className="page-container">
-      <h1 style={{ color: "var(--color-text)", fontSize: 24, marginBottom: 24 }}>
-        Settings
-      </h1>
+      <h1 className="page-title">Settings</h1>
 
       {billingEnabled && billing && (
-        <div style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Subscription</h2>
-            <span style={{
-              background: billing.plan === "pro" ? "var(--color-accent)" : "var(--color-border)",
-              color: billing.plan === "pro" ? "#fff" : "var(--color-text-secondary)",
-              padding: "2px 10px",
-              borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 600,
-              textTransform: "capitalize",
-            }}>
+        <div className="card settings-section">
+          <div className="card-header">
+            <h2>Subscription</h2>
+            <span className={`plan-badge ${billing.plan === "pro" ? "plan-badge--pro" : ""}`}>
               {billing.plan === "pro" ? "Pro" : "Free"}
             </span>
           </div>
 
           {billing.plan === "free" && !billing.subscriptionStatus && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+            <>
+              <p className="card-description">
                 Upgrade to Pro for unlimited videos and recording duration.
               </p>
-              <div style={{
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                padding: 16,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}>
-                <div>
-                  <p style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, margin: 0 }}>Pro</p>
-                  <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: "4px 0 0" }}>Unlimited videos and duration</p>
+              <div className="upgrade-card">
+                <div className="upgrade-card-info">
+                  <span className="upgrade-card-plan">Pro</span>
+                  <span className="upgrade-card-desc">Unlimited videos and duration</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ color: "var(--color-text)", fontSize: 18, fontWeight: 600 }}>€8/mo</span>
+                <div className="upgrade-card-actions">
+                  <span className="upgrade-card-price">&euro;8/mo</span>
                   <button
                     type="button"
+                    className="btn btn--primary"
                     onClick={handleUpgrade}
                     disabled={upgrading}
-                    style={{
-                      background: "var(--color-accent)",
-                      color: "#fff",
-                      borderRadius: 4,
-                      padding: "8px 16px",
-                      fontSize: 14,
-                      fontWeight: 600,
-                      border: "none",
-                      cursor: upgrading ? "default" : "pointer",
-                      opacity: upgrading ? 0.7 : 1,
-                    }}
                   >
                     {upgrading ? "Redirecting..." : "Upgrade to Pro"}
                   </button>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {billing.subscriptionStatus === "canceled" && (
-            <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+            <p className="card-description">
               Your subscription has been canceled. You have access to Pro features until the end of your billing period.
             </p>
           )}
 
           {billing.plan === "pro" && billing.subscriptionStatus !== "canceled" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="btn-row">
               {billing.portalUrl && (
                 <a
                   href={billing.portalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "var(--color-accent)", fontSize: 14 }}
+                  className="billing-portal-link"
                 >
                   Manage subscription
                 </a>
               )}
               <button
                 type="button"
+                className="btn btn--danger"
                 onClick={handleCancelSubscription}
                 disabled={canceling}
-                style={{
-                  background: "transparent",
-                  color: "var(--color-error, #ef4444)",
-                  border: "1px solid var(--color-error, #ef4444)",
-                  borderRadius: 4,
-                  padding: "8px 16px",
-                  fontSize: 14,
-                  cursor: canceling ? "default" : "pointer",
-                  opacity: canceling ? 0.7 : 1,
-                  alignSelf: "flex-start",
-                }}
               >
                 {canceling ? "Canceling..." : "Cancel subscription"}
               </button>
@@ -649,112 +598,73 @@ export function Settings() {
           )}
 
           {billingMessage && (
-            <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>{billingMessage}</p>
+            <p className="status-message">{billingMessage}</p>
           )}
         </div>
       )}
 
       <form
         onSubmit={handleNameSubmit}
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
+        className="card settings-section"
       >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Profile</h2>
+        <h2>Profile</h2>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Email</span>
+        <div className="form-field">
+          <label className="form-label" htmlFor="profile-email">Email</label>
           <input
+            id="profile-email"
             type="email"
+            className="form-input"
             value={profile.email}
             disabled
-            style={{ ...inputStyle, opacity: 0.6 }}
           />
-        </label>
+        </div>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Name</span>
+        <div className="form-field">
+          <label className="form-label" htmlFor="profile-name">Name</label>
           <input
+            id="profile-name"
             type="text"
+            className="form-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            style={inputStyle}
           />
-        </label>
+        </div>
 
         {nameError && (
-          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{nameError}</p>
+          <p className="status-message status-message--error">{nameError}</p>
         )}
         {nameMessage && (
-          <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{nameMessage}</p>
+          <p className="status-message status-message--success">{nameMessage}</p>
         )}
 
-        <button
-          type="submit"
-          disabled={savingName || name.trim() === profile.name}
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 4,
-            padding: "10px 16px",
-            fontSize: 14,
-            fontWeight: 600,
-            opacity: savingName || name.trim() === profile.name ? 0.7 : 1,
-            alignSelf: "flex-start",
-          }}
-        >
-          {savingName ? "Saving..." : "Save name"}
-        </button>
+        <div className="btn-row">
+          <button
+            type="submit"
+            className="btn btn--primary"
+            disabled={savingName || name.trim() === profile.name}
+          >
+            {savingName ? "Saving..." : "Save name"}
+          </button>
+        </div>
       </form>
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Appearance</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>Appearance</h2>
+        <p className="card-description">
           Choose how SendRec looks to you.
         </p>
 
-        <fieldset style={{ border: "none", padding: 0, margin: 0, display: "flex", gap: 8 }}>
-          <legend style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)" }}>
-            Theme preference
-          </legend>
+        <fieldset className="btn-row" style={{ border: "none", padding: 0, margin: 0 }}>
+          <legend className="sr-only">Theme preference</legend>
           {(["dark", "light", "system"] as const).map((option) => {
             const labels: Record<string, string> = { dark: "Dark", light: "Light", system: "System" };
             const selected = theme === option;
             return (
               <label
                 key={option}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  border: `1px solid ${selected ? "var(--color-accent)" : "var(--color-border)"}`,
-                  background: selected ? "var(--color-bg)" : "transparent",
-                  cursor: "pointer",
-                  fontSize: 14,
-                  color: selected ? "var(--color-text)" : "var(--color-text-secondary)",
-                  fontWeight: selected ? 600 : 400,
-                }}
+                className={`theme-option${selected ? " theme-option--active" : ""}`}
               >
                 <input
                   type="radio"
@@ -762,7 +672,7 @@ export function Settings() {
                   value={option}
                   checked={selected}
                   onChange={() => setTheme(option)}
-                  style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+                  className="sr-only"
                   aria-label={labels[option]}
                 />
                 {labels[option]}
@@ -772,62 +682,43 @@ export function Settings() {
         </fieldset>
       </div>
 
+      <RecordingDefaults />
+
       {transcriptionEnabled && (
-        <div
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 24,
-            marginBottom: 24,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-          }}
-        >
-          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Transcription</h2>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+        <div className="card settings-section">
+          <h2>Transcription</h2>
+          <p className="card-description">
             Choose the default language for video transcription.
           </p>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Default transcription language</span>
+          <div className="form-field">
+            <label className="form-label" htmlFor="transcription-language">Default transcription language</label>
             <select
               id="transcription-language"
+              className="form-input"
               value={transcriptionLanguage}
               onChange={(e) => handleTranscriptionLanguageChange(e.target.value)}
-              style={inputStyle}
             >
               {TRANSCRIPTION_LANGUAGES.map((lang) => (
                 <option key={lang.code} value={lang.code}>{lang.name}</option>
               ))}
             </select>
-          </label>
+          </div>
         </div>
       )}
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Email Notifications</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>Email Notifications</h2>
+        <p className="card-description">
           Choose when to get email notifications for views and comments.
         </p>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Notifications</span>
+        <div className="form-field">
+          <label className="form-label" htmlFor="notification-mode">Notifications</label>
           <select
+            id="notification-mode"
+            className="form-input"
             value={notificationMode}
             onChange={(e) => handleNotificationChange(e.target.value)}
-            style={inputStyle}
           >
             <option value="off">Off</option>
             <option value="views_only">Views only</option>
@@ -835,88 +726,60 @@ export function Settings() {
             <option value="views_and_comments">Views + comments</option>
             <option value="digest">Daily digest (views + comments)</option>
           </select>
-        </label>
+        </div>
 
         {notificationMessage && (
-          <p style={{ color: notificationMessage === "Failed to save" ? "var(--color-error)" : "var(--color-accent)", fontSize: 14, margin: 0 }}>{notificationMessage}</p>
+          <p className={`status-message ${notificationMessage === "Failed to save" ? "status-message--error" : "status-message--success"}`}>{notificationMessage}</p>
         )}
       </div>
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Slack Notifications</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>Slack Notifications</h2>
+        <p className="card-description">
           Send video view and comment notifications to a Slack channel.
         </p>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Webhook URL</span>
+        <div className="form-field">
+          <label className="form-label">Slack webhook URL</label>
           <input
             type="url"
+            className="form-input"
             value={slackWebhookUrl}
             onChange={(e) => setSlackWebhookUrl(e.target.value)}
             placeholder="https://hooks.slack.com/services/..."
-            style={inputStyle}
           />
-        </label>
+        </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="btn-row">
           <button
             type="button"
+            className="btn btn--primary"
             onClick={handleSlackSave}
             disabled={savingSlack}
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-text)",
-              borderRadius: 4,
-              padding: "8px 16px",
-              fontSize: 14,
-              fontWeight: 600,
-              opacity: savingSlack ? 0.7 : 1,
-            }}
           >
             {savingSlack ? "Saving..." : "Save"}
           </button>
           <button
             type="button"
+            className="btn btn--secondary"
             onClick={handleSlackTest}
             disabled={testingSlack || !savedSlackUrl}
-            style={{
-              background: "transparent",
-              color: "var(--color-text-secondary)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              padding: "8px 16px",
-              fontSize: 14,
-              cursor: !savedSlackUrl ? "default" : "pointer",
-              opacity: !savedSlackUrl ? 0.5 : 1,
-            }}
           >
             {testingSlack ? "Sending..." : "Send test message"}
           </button>
         </div>
 
         {slackError && (
-          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{slackError}</p>
+          <p className="status-message status-message--error">{slackError}</p>
         )}
         {slackMessage && (
-          <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{slackMessage}</p>
+          <p className="status-message status-message--success">{slackMessage}</p>
         )}
 
-        <details style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-          <summary style={{ cursor: "pointer" }}>How to get a webhook URL</summary>
-          <ol style={{ marginTop: 8, paddingLeft: 20, lineHeight: 1.8 }}>
-            <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-accent)" }}>api.slack.com/apps</a></li>
+        <details className="settings-details">
+          <summary>How to get a webhook URL</summary>
+          <ol>
+            <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer">api.slack.com/apps</a></li>
             <li>Click <strong>Create New App</strong> and choose <strong>From scratch</strong></li>
             <li>Under <strong>Features</strong>, select <strong>Incoming Webhooks</strong></li>
             <li>Activate webhooks and click <strong>Add New Webhook to Workspace</strong></li>
@@ -925,87 +788,47 @@ export function Settings() {
         </details>
       </div>
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Webhooks</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>Webhooks</h2>
+        <p className="card-description">
           Receive HTTP POST notifications for video events. Use with n8n, Zapier, or custom integrations.
         </p>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Webhook URL</span>
+        <div className="form-field">
+          <label className="form-label">Webhook URL</label>
           <input
             type="url"
+            className="form-input"
             value={webhookUrl}
             onChange={(e) => setWebhookUrl(e.target.value)}
             placeholder="https://example.com/webhook"
-            style={inputStyle}
           />
-        </label>
+          <span className="form-hint">Receive HTTP POST notifications for video events (n8n, Zapier, custom).</span>
+        </div>
 
         {webhookSecret && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Signing secret</span>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <code
-                style={{
-                  color: "var(--color-text)",
-                  fontSize: 13,
-                  background: "var(--color-bg)",
-                  padding: "6px 10px",
-                  borderRadius: 4,
-                  flex: 1,
-                  wordBreak: "break-all",
-                  fontFamily: "monospace",
-                }}
-              >
+          <div className="form-field">
+            <span className="form-label">Signing secret</span>
+            <div className="secret-row">
+              <code className="secret-code">
                 {webhookSecret}
               </code>
               <button
                 type="button"
+                className="btn btn--secondary"
                 onClick={() => {
                   navigator.clipboard.writeText(webhookSecret);
                   setCopiedSecret(true);
                   setTimeout(() => setCopiedSecret(false), 2000);
-                }}
-                style={{
-                  background: "transparent",
-                  color: "var(--color-text-secondary)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 4,
-                  padding: "6px 12px",
-                  fontSize: 13,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
                 }}
               >
                 {copiedSecret ? "Copied" : "Copy"}
               </button>
               <button
                 type="button"
+                className="btn btn--secondary"
                 onClick={handleRegenerateSecret}
                 disabled={regeneratingSecret}
-                style={{
-                  background: "transparent",
-                  color: "var(--color-text-secondary)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 4,
-                  padding: "6px 12px",
-                  fontSize: 13,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  opacity: regeneratingSecret ? 0.7 : 1,
-                }}
               >
                 {regeneratingSecret ? "Regenerating..." : "Regenerate"}
               </button>
@@ -1013,255 +836,172 @@ export function Settings() {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="btn-row">
           <button
             type="button"
+            className="btn btn--primary"
             onClick={handleWebhookSave}
             disabled={savingWebhook}
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-text)",
-              borderRadius: 4,
-              padding: "8px 16px",
-              fontSize: 14,
-              fontWeight: 600,
-              opacity: savingWebhook ? 0.7 : 1,
-            }}
           >
             {savingWebhook ? "Saving..." : "Save webhook"}
           </button>
           <button
             type="button"
+            className="btn btn--secondary"
             onClick={handleWebhookTest}
             disabled={testingWebhook || !savedWebhookUrl}
-            style={{
-              background: "transparent",
-              color: "var(--color-text-secondary)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              padding: "8px 16px",
-              fontSize: 14,
-              cursor: !savedWebhookUrl ? "default" : "pointer",
-              opacity: !savedWebhookUrl ? 0.5 : 1,
-            }}
           >
             {testingWebhook ? "Sending..." : "Send test event"}
           </button>
         </div>
 
         {webhookError && (
-          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{webhookError}</p>
+          <p className="status-message status-message--error">{webhookError}</p>
         )}
         {webhookMessage && (
-          <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{webhookMessage}</p>
+          <p className="status-message status-message--success">{webhookMessage}</p>
         )}
 
-        {webhookDeliveries.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <h3 style={{ color: "var(--color-text)", fontSize: 15, margin: 0 }}>Recent deliveries</h3>
-            {webhookDeliveries.map((delivery) => {
-              const isSuccess = delivery.statusCode >= 200 && delivery.statusCode < 300;
-              const isExpanded = expandedDelivery === delivery.id;
-              return (
-                <div key={delivery.id}>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedDelivery(isExpanded ? null : delivery.id)}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      background: "var(--color-bg)",
-                      borderRadius: 4,
-                      padding: "8px 12px",
-                      border: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: isSuccess ? "var(--color-accent)" : "var(--color-error)",
-                        flexShrink: 0,
-                      }}
-                    />
-                    <code style={{ color: "var(--color-text)", fontSize: 13, fontFamily: "monospace" }}>
-                      {delivery.event}
-                    </code>
-                    <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
-                      {delivery.statusCode}
-                    </span>
-                    <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginLeft: "auto" }}>
-                      {new Date(delivery.createdAt).toLocaleString("en-GB")}
-                    </span>
-                  </button>
-                  {isExpanded && (
-                    <div
-                      style={{
-                        background: "var(--color-bg)",
-                        borderRadius: "0 0 4px 4px",
-                        padding: "8px 12px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 8,
-                      }}
+        {webhookDeliveries.length > 0 && (() => {
+          const filtered = webhookDeliveries.filter((d) => {
+            if (deliveryFilter === "success" && (d.statusCode < 200 || d.statusCode >= 300)) return false;
+            if (deliveryFilter === "error" && d.statusCode >= 200 && d.statusCode < 300) return false;
+            if (deliverySearch && !d.event.toLowerCase().includes(deliverySearch.toLowerCase())) return false;
+            return true;
+          });
+          return (
+            <div className="delivery-list">
+              <h3 className="delivery-list-title">Recent deliveries</h3>
+              <div className="delivery-toolbar">
+                <input
+                  type="text"
+                  className="delivery-search"
+                  placeholder="Filter by event..."
+                  value={deliverySearch}
+                  onChange={(e) => setDeliverySearch(e.target.value)}
+                />
+                <div className="delivery-filters">
+                  {(["all", "success", "error"] as const).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      className={`delivery-filter-btn${deliveryFilter === f ? " delivery-filter-btn--active" : ""}`}
+                      onClick={() => setDeliveryFilter(f)}
                     >
-                      <div>
-                        <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>Payload</span>
-                        <pre
-                          style={{
-                            color: "var(--color-text)",
-                            fontSize: 12,
-                            fontFamily: "monospace",
-                            background: "var(--color-surface)",
-                            padding: 8,
-                            borderRadius: 4,
-                            overflowX: "auto",
-                            whiteSpace: "pre-wrap",
-                            margin: "4px 0 0",
-                          }}
-                        >
-                          {formatJson(delivery.payload)}
-                        </pre>
-                      </div>
-                      {delivery.responseBody && (
-                        <div>
-                          <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>Response</span>
-                          <pre
-                            style={{
-                              color: "var(--color-text)",
-                              fontSize: 12,
-                              fontFamily: "monospace",
-                              background: "var(--color-surface)",
-                              padding: 8,
-                              borderRadius: 4,
-                              overflowX: "auto",
-                              whiteSpace: "pre-wrap",
-                              margin: "4px 0 0",
-                            }}
-                          >
-                            {delivery.responseBody}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                      {f === "all" ? "All" : f === "success" ? "Success" : "Errors"}
+                    </button>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+              <div className="delivery-scroll">
+                {filtered.length === 0 ? (
+                  <p className="delivery-empty">No matching deliveries</p>
+                ) : (
+                  filtered.map((delivery) => {
+                    const isSuccess = delivery.statusCode >= 200 && delivery.statusCode < 300;
+                    const isExpanded = expandedDelivery === delivery.id;
+                    return (
+                      <div key={delivery.id}>
+                        <button
+                          type="button"
+                          className="delivery-row"
+                          onClick={() => setExpandedDelivery(isExpanded ? null : delivery.id)}
+                        >
+                          <span className={`delivery-dot ${isSuccess ? "delivery-dot--success" : "delivery-dot--error"}`} />
+                          <code className="delivery-event">
+                            {delivery.event}
+                          </code>
+                          <span className="delivery-status">
+                            {delivery.statusCode}
+                          </span>
+                          <span className="delivery-time">
+                            {new Date(delivery.createdAt).toLocaleString("en-GB")}
+                          </span>
+                        </button>
+                        {isExpanded && (
+                          <div className="delivery-detail">
+                            <div>
+                              <span className="delivery-detail-label">Payload</span>
+                              <pre className="delivery-detail-pre">
+                                {formatJson(delivery.payload)}
+                              </pre>
+                            </div>
+                            {delivery.responseBody && (
+                              <div>
+                                <span className="delivery-detail-label">Response</span>
+                                <pre className="delivery-detail-pre">
+                                  {delivery.responseBody}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
-        <details style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
-          <summary style={{ cursor: "pointer" }}>Supported events</summary>
-          <ul style={{ marginTop: 8, paddingLeft: 20, lineHeight: 1.8 }}>
-            <li><code style={{ fontFamily: "monospace" }}>video.viewed</code> — A viewer watched a video</li>
-            <li><code style={{ fontFamily: "monospace" }}>video.comment.created</code> — A new comment was posted</li>
-            <li><code style={{ fontFamily: "monospace" }}>video.reaction.created</code> — An emoji reaction was added</li>
-            <li><code style={{ fontFamily: "monospace" }}>video.transcription.ready</code> — Transcription completed</li>
-            <li><code style={{ fontFamily: "monospace" }}>video.summary.ready</code> — AI summary completed</li>
-            <li><code style={{ fontFamily: "monospace" }}>video.cta.clicked</code> — A CTA button was clicked</li>
-            <li><code style={{ fontFamily: "monospace" }}>test</code> — Test event from Settings</li>
+        <details className="settings-details">
+          <summary>Supported events</summary>
+          <ul>
+            <li><code>video.viewed</code> — A viewer watched a video</li>
+            <li><code>video.comment.created</code> — A new comment was posted</li>
+            <li><code>video.reaction.created</code> — An emoji reaction was added</li>
+            <li><code>video.transcription.ready</code> — Transcription completed</li>
+            <li><code>video.summary.ready</code> — AI summary completed</li>
+            <li><code>video.cta.clicked</code> — A CTA button was clicked</li>
+            <li><code>test</code> — Test event from Settings</li>
           </ul>
         </details>
       </div>
 
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          marginBottom: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>API Keys</h2>
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+      <div className="card settings-section">
+        <h2>API Keys</h2>
+        <p className="card-description">
           Generate API keys for integrations like Nextcloud. Keys are shown only once when created.
         </p>
 
-        <form onSubmit={handleCreateAPIKey} className="api-key-form">
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Label</span>
+        <form onSubmit={handleCreateAPIKey} className="api-key-form-row">
+          <div className="form-field" style={{ flex: 1 }}>
+            <label className="form-label">Label</label>
             <input
               type="text"
+              className="form-input"
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               placeholder="e.g. My Nextcloud"
               maxLength={100}
-              style={inputStyle}
             />
-          </label>
+          </div>
           <button
             type="submit"
+            className="btn btn--primary"
             disabled={creatingKey}
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-text)",
-              borderRadius: 4,
-              padding: "8px 16px",
-              fontSize: 14,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-              opacity: creatingKey ? 0.7 : 1,
-            }}
           >
             {creatingKey ? "Creating..." : "Create key"}
           </button>
         </form>
 
         {generatedKey && (
-          <div
-            style={{
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-accent)",
-              borderRadius: 4,
-              padding: 12,
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
-            <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0, fontWeight: 600 }}>
+          <div className="api-key-display">
+            <span className="api-key-display-notice">
               Copy this key now — it won't be shown again
-            </p>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <code
-                style={{
-                  color: "var(--color-text)",
-                  fontSize: 13,
-                  background: "var(--color-surface)",
-                  padding: "6px 10px",
-                  borderRadius: 4,
-                  flex: 1,
-                  wordBreak: "break-all",
-                }}
-              >
+            </span>
+            <div className="api-key-display-row">
+              <code className="api-key-display-code">
                 {generatedKey}
               </code>
               <button
                 type="button"
+                className="btn btn--secondary"
                 onClick={() => {
                   navigator.clipboard.writeText(generatedKey);
                   setCopiedKey(true);
                   setTimeout(() => setCopiedKey(false), 2000);
-                }}
-                style={{
-                  background: "transparent",
-                  color: "var(--color-text-secondary)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 4,
-                  padding: "6px 12px",
-                  fontSize: 13,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
                 }}
               >
                 {copiedKey ? "Copied" : "Copy"}
@@ -1271,44 +1011,26 @@ export function Settings() {
         )}
 
         {apiKeyError && (
-          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{apiKeyError}</p>
+          <p className="status-message status-message--error">{apiKeyError}</p>
         )}
 
         {apiKeys.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="key-list">
             {apiKeys.map((key) => (
-              <div
-                key={key.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  background: "var(--color-bg)",
-                  borderRadius: 4,
-                  padding: "10px 12px",
-                }}
-              >
-                <div>
-                  <span style={{ color: "var(--color-text)", fontSize: 14 }}>
+              <div key={key.id} className="api-key-row">
+                <div className="api-key-info">
+                  <span className="api-key-name">
                     {key.name || "Unnamed key"}
                   </span>
-                  <div style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
+                  <span className="api-key-meta">
                     Created {new Date(key.createdAt).toLocaleDateString("en-GB")}
-                    {key.lastUsedAt && ` · Last used ${new Date(key.lastUsedAt).toLocaleDateString("en-GB")}`}
-                  </div>
+                    {key.lastUsedAt && ` \u00B7 Last used ${new Date(key.lastUsedAt).toLocaleDateString("en-GB")}`}
+                  </span>
                 </div>
                 <button
                   type="button"
+                  className="btn btn--danger btn--danger-sm"
                   onClick={() => handleDeleteAPIKey(key.id)}
-                  style={{
-                    background: "transparent",
-                    color: "var(--color-error)",
-                    border: "1px solid var(--color-error)",
-                    borderRadius: 4,
-                    padding: "4px 10px",
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
                 >
                   Delete
                 </button>
@@ -1321,96 +1043,60 @@ export function Settings() {
       {brandingEnabled && (
         <form
           onSubmit={handleBrandingSave}
-          style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: 24,
-            marginBottom: 24,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-          }}
+          className="card settings-section"
         >
-          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Branding</h2>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: 0 }}>
+          <h2>Branding</h2>
+          <p className="card-description">
             Customize how your shared video pages look to viewers.
           </p>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Company name</span>
+          <div className="form-field">
+            <label className="form-label">Company name</label>
             <input
               type="text"
+              className="form-input"
               value={branding.companyName ?? ""}
               onChange={(e) => setBranding({ ...branding, companyName: e.target.value || null })}
               placeholder="SendRec"
               maxLength={200}
-              style={inputStyle}
             />
-          </label>
+          </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Logo</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div className="logo-section">
+            <span className="logo-section-label">Logo</span>
+            <div className="logo-section-controls">
               {branding.logoKey && branding.logoKey !== "none" ? (
                 <>
-                  <span style={{ color: "var(--color-text)", fontSize: 14 }}>
+                  <span className="logo-section-name">
                     {branding.logoKey.split("/").pop()}
                   </span>
                   <button
                     type="button"
+                    className="btn btn--danger btn--danger-sm"
                     onClick={handleLogoRemove}
-                    style={{
-                      background: "transparent",
-                      color: "var(--color-error)",
-                      border: "1px solid var(--color-error)",
-                      borderRadius: 4,
-                      padding: "4px 10px",
-                      fontSize: 13,
-                      cursor: "pointer",
-                    }}
                   >
                     Remove
                   </button>
                 </>
               ) : branding.logoKey === "none" ? (
                 <>
-                  <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Logo hidden</span>
+                  <span className="logo-section-status">Logo hidden</span>
                   <button
                     type="button"
+                    className="btn btn--secondary"
                     onClick={handleLogoRemove}
-                    style={{
-                      background: "transparent",
-                      color: "var(--color-text-secondary)",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: 4,
-                      padding: "4px 10px",
-                      fontSize: 13,
-                      cursor: "pointer",
-                    }}
                   >
                     Show default logo
                   </button>
                 </>
               ) : (
                 <>
-                  <label
-                    style={{
-                      background: "var(--color-bg)",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: 4,
-                      padding: "6px 12px",
-                      fontSize: 14,
-                      color: "var(--color-text-secondary)",
-                      cursor: uploadingLogo ? "default" : "pointer",
-                      opacity: uploadingLogo ? 0.7 : 1,
-                    }}
-                  >
+                  <label className="btn btn--secondary" style={{ cursor: uploadingLogo ? "default" : "pointer" }}>
                     {uploadingLogo ? "Uploading..." : "Upload logo (PNG or SVG, max 512KB)"}
                     <input
                       type="file"
                       accept="image/png,image/svg+xml"
-                      style={{ display: "none" }}
+                      className="sr-only"
                       disabled={uploadingLogo}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -1421,16 +1107,8 @@ export function Settings() {
                   </label>
                   <button
                     type="button"
+                    className="btn btn--secondary"
                     onClick={() => setBranding((prev) => ({ ...prev, logoKey: "none" }))}
-                    style={{
-                      background: "transparent",
-                      color: "var(--color-text-secondary)",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: 4,
-                      padding: "6px 12px",
-                      fontSize: 14,
-                      cursor: "pointer",
-                    }}
                   >
                     Hide logo
                   </button>
@@ -1439,19 +1117,19 @@ export function Settings() {
             </div>
           </div>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Footer text</span>
+          <div className="form-field">
+            <label className="form-label">Footer text</label>
             <textarea
+              className="form-input"
               value={branding.footerText ?? ""}
               onChange={(e) => setBranding({ ...branding, footerText: e.target.value || null })}
               placeholder="Custom footer message"
               maxLength={500}
               rows={2}
-              style={{ ...inputStyle, resize: "vertical" as const }}
             />
-          </label>
+          </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="color-grid">
             {(["colorBackground", "colorSurface", "colorText", "colorAccent"] as const).map((key) => {
               const labels: Record<string, string> = {
                 colorBackground: "Background",
@@ -1466,168 +1144,184 @@ export function Settings() {
                 colorAccent: "#00b67a",
               };
               return (
-                <label key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>{labels[key]}</span>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div key={key} className="color-field">
+                  <span className="form-label">{labels[key]}</span>
+                  <div className="color-row">
                     <input
                       type="color"
+                      className="color-swatch"
                       value={branding[key] ?? defaults[key]}
                       onChange={(e) => setBranding({ ...branding, [key]: e.target.value })}
-                      style={{ width: 36, height: 36, border: "none", borderRadius: 4, cursor: "pointer", padding: 0, background: "transparent" }}
                     />
                     <input
                       type="text"
+                      className="form-input"
                       value={branding[key] ?? ""}
                       onChange={(e) => setBranding({ ...branding, [key]: e.target.value || null })}
                       placeholder={defaults[key]}
-                      style={{ ...inputStyle, flex: 1 }}
+                      style={{ flex: 1 }}
                     />
                   </div>
-                </label>
+                </div>
               );
             })}
           </div>
 
           <div
-            style={{
-              borderRadius: 8,
-              padding: 16,
-              background: branding.colorBackground ?? "#0a1628",
-              border: "1px solid var(--color-border)",
-            }}
+            className="branding-preview"
+            style={{ background: branding.colorBackground ?? "#0a1628" }}
           >
-            <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 8 }}>Preview</p>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ color: branding.colorAccent ?? "#00b67a", fontWeight: 600 }}>
-                {branding.companyName || "SendRec"}
-              </span>
+            <p className="branding-preview-label">Preview</p>
+            <div className="branding-preview-title" style={{ color: branding.colorAccent ?? "#00b67a" }}>
+              {branding.companyName || "SendRec"}
             </div>
-            <div style={{ background: branding.colorSurface ?? "#1e293b", borderRadius: 6, padding: 12 }}>
+            <div className="branding-preview-card" style={{ background: branding.colorSurface ?? "#1e293b" }}>
               <span style={{ color: branding.colorText ?? "#ffffff", fontSize: 14 }}>Sample video title</span>
             </div>
           </div>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Custom CSS</span>
+          <div className="form-field">
+            <label className="form-label">Custom CSS</label>
             <textarea
+              className="form-input form-input--mono"
               value={branding.customCss ?? ""}
               onChange={(e) => setBranding({ ...branding, customCss: e.target.value || null })}
               placeholder={"/* Override watch page styles */\nbody { font-family: 'Inter', sans-serif; }\n.download-btn { border-radius: 20px; }\n.comment-submit { border-radius: 20px; }"}
               maxLength={10240}
               rows={6}
-              style={{ ...inputStyle, resize: "vertical" as const, fontFamily: "monospace" }}
             />
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
+            <span className="form-hint">
               Injected into the watch page &lt;style&gt; tag. Max 10KB. No @import url() or closing style tags.
             </span>
-            <details style={{ marginTop: 4, fontSize: 12, color: "var(--color-text-secondary)" }}>
-              <summary style={{ cursor: "pointer" }}>Available CSS selectors</summary>
-              <pre style={{
-                marginTop: 6,
-                padding: "8px 10px",
-                background: "var(--color-bg-tertiary)",
-                borderRadius: 6,
-                fontSize: 11,
-                lineHeight: 1.6,
-                overflowX: "auto",
-                whiteSpace: "pre",
-              }}>{`/* CSS Variables (override colors set in branding) */
-:root { --brand-bg; --brand-surface; --brand-text; --brand-accent }
+            <details className="settings-details">
+              <summary>Available CSS selectors</summary>
+              <pre>{`/* CSS Variables */
+:root {
+  --brand-bg;       /* Page background */
+  --brand-surface;  /* Cards, panels */
+  --brand-text;     /* Primary text */
+  --brand-accent;   /* Buttons, links */
+  --player-accent;  /* Seek bar, progress */
+}
 
 /* Layout */
-body              /* Page background, font-family, text color */
-.container        /* Max-width wrapper (960px) */
-video             /* Video player element */
-h1                /* Video title */
-.meta             /* "Creator · Date" line below title */
+body                /* Background, font, text color */
+.container          /* Max-width wrapper (960px) */
+.video-title        /* Video heading */
+.video-meta         /* Creator info row */
+.video-meta-avatar  /* Creator avatar */
+.video-meta-name    /* Creator name */
 
 /* Header & Footer */
-.logo             /* Company logo + name link */
-.logo img         /* Logo image (20x20) */
-.branding         /* Footer: "Shared via SendRec" */
-.branding a       /* Footer link */
+.logo               /* Logo + name link */
+.logo img           /* Logo image */
+.branding           /* "Shared via SendRec" footer */
+.branding a         /* Footer link */
 
-/* Actions Bar */
-.actions          /* Container for download + speed buttons */
-.download-btn     /* Download button */
-.speed-controls   /* Speed button group */
-.speed-btn        /* Individual speed button (0.5x, 1x, ...) */
-.speed-btn.active /* Currently selected speed */
+/* Video Player */
+.player-container   /* Player wrapper */
+.player-overlay     /* Play button overlay */
+.play-overlay-btn   /* Large play button */
+.player-controls    /* Control bar */
+.ctrl-btn           /* Control buttons */
+.time-display       /* Current / duration */
+.seek-bar           /* Seek bar wrapper */
+.seek-track         /* Track background */
+.seek-progress      /* Play progress */
+.seek-buffered      /* Buffered range */
+.seek-thumb         /* Draggable handle */
+.volume-group       /* Volume control */
+.volume-slider      /* Volume slider */
+.speed-dropdown     /* Speed selector */
+.speed-menu         /* Speed options dropdown */
+.speed-menu button.active /* Selected speed */
+
+/* Seek Bar Overlays */
+.seek-chapters      /* Chapter markers */
+.seek-chapter       /* Single chapter */
+.seek-markers       /* Comment markers */
+.seek-marker        /* Single marker dot */
+
+/* Actions */
+.actions            /* Download + controls */
+.download-btn       /* Download button */
 
 /* Comments */
-.comments-section    /* Full comments area */
-.comments-header     /* "Comments" heading */
-.comment             /* Single comment card */
-.comment-meta        /* Author + badges row */
-.comment-author      /* Commenter name */
-.comment-body        /* Comment text */
-.comment-owner-badge /* "Owner" badge */
-.comment-timestamp   /* Timestamp badge on comment */
-.comment-form        /* New comment form */
-.comment-form input  /* Name + email fields */
-.comment-form textarea /* Comment text area */
-.comment-submit      /* "Post comment" button */
+.comments-section   /* Full comments area */
+.comments-header    /* Heading */
+.comment            /* Single comment */
+.comment-meta       /* Author + badges */
+.comment-author     /* Commenter name */
+.comment-body       /* Comment text */
+.comment-owner-badge   /* "Owner" badge */
+.comment-private-badge /* "Private" badge */
+.comment-timestamp  /* Timestamp link */
+.comment-form       /* New comment form */
+.comment-form input /* Name + email fields */
+.comment-form textarea /* Text area */
+.comment-submit     /* "Post comment" button */
+.no-comments        /* Empty state text */
 
-/* Comment Markers Bar */
-.markers-bar      /* Timeline bar below video */
-.marker-dot       /* Individual comment marker */
+/* Reactions */
+.reaction-bar       /* Quick-reaction buttons */
+.reaction-btn       /* Single reaction */
 
 /* Emoji Picker */
-.emoji-trigger    /* Emoji button */
-.emoji-grid       /* Emoji dropdown panel */
-.emoji-btn        /* Individual emoji button */
+.emoji-trigger      /* Emoji button */
+.emoji-grid         /* Dropdown panel */
+.emoji-btn          /* Single emoji */
 
-/* Transcript */
-.transcript-section   /* Full transcript area */
-.transcript-header    /* "Transcript" heading */
-.transcript-segment   /* Single transcript line */
-.transcript-segment.active /* Currently playing segment */
-.transcript-timestamp /* Timestamp in transcript */
-.transcript-text      /* Transcript text */
+/* Transcript & Summary */
+.transcript-section /* Full panel area */
+.panel-tabs         /* Summary/Transcript tabs */
+.panel-tab          /* Tab button */
+.panel-tab--active  /* Active tab */
+.summary-text       /* Summary paragraph */
+.chapter-list       /* Chapters container */
+.chapter-item       /* Single chapter */
+.chapter-item.active /* Playing chapter */
+.chapter-timestamp  /* Chapter time */
+.chapter-title      /* Chapter name */
+.transcript-header  /* Heading */
+.transcript-segment /* Single line */
+.transcript-segment.active /* Playing line */
+.transcript-timestamp /* Time link */
+.transcript-text    /* Segment text */
+
+/* Call to Action */
+.cta-card           /* CTA container */
+.cta-title          /* CTA heading */
+.cta-desc           /* CTA description */
+.cta-btn            /* CTA button */
 
 /* Utilities */
-.hidden           /* display: none */
+.hidden             /* display: none */
 
-/* Mobile (max-width: 640px) */
-@media (max-width: 640px) { ... }`}</pre>
+/* Responsive & Accessibility */
+@media (max-width: 640px) { ... }
+@media (prefers-reduced-motion: reduce) { ... }`}</pre>
             </details>
-          </label>
+          </div>
 
           {brandingError && (
-            <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{brandingError}</p>
+            <p className="status-message status-message--error">{brandingError}</p>
           )}
           {brandingMessage && (
-            <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{brandingMessage}</p>
+            <p className="status-message status-message--success">{brandingMessage}</p>
           )}
 
-          <div className="settings-button-row">
+          <div className="btn-row">
             <button
               type="submit"
+              className="btn btn--primary"
               disabled={savingBranding}
-              style={{
-                background: "var(--color-accent)",
-                color: "var(--color-text)",
-                borderRadius: 4,
-                padding: "10px 16px",
-                fontSize: 14,
-                fontWeight: 600,
-                opacity: savingBranding ? 0.7 : 1,
-              }}
             >
               {savingBranding ? "Saving..." : "Save branding"}
             </button>
             <button
               type="button"
+              className="btn btn--secondary"
               onClick={handleBrandingReset}
-              style={{
-                background: "transparent",
-                color: "var(--color-text-secondary)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 4,
-                padding: "10px 16px",
-                fontSize: 14,
-                cursor: "pointer",
-              }}
             >
               Reset to defaults
             </button>
@@ -1637,85 +1331,245 @@ h1                /* Video title */
 
       <form
         onSubmit={handlePasswordSubmit}
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
+        className="card settings-section"
       >
-        <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: 0 }}>Change password</h2>
+        <h2>Change Password</h2>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Current password</span>
+        <div className="form-field">
+          <label className="form-label" htmlFor="current-password">Current password</label>
           <input
+            id="current-password"
             type="password"
+            className="form-input"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             required
-            style={inputStyle}
+            autoComplete="current-password"
           />
-        </label>
+        </div>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>New password</span>
+        <div className="form-field">
+          <label className="form-label" htmlFor="new-password">New password</label>
           <input
+            id="new-password"
             type="password"
+            className="form-input"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
             minLength={8}
-            style={inputStyle}
+            autoComplete="new-password"
           />
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 12, marginTop: 2 }}>
-            Must be at least 8 characters
-          </span>
-        </label>
+          <span className="form-hint">Must be at least 8 characters</span>
+        </div>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Confirm new password</span>
+        <div className="form-field">
+          <label className="form-label" htmlFor="confirm-password">Confirm new password</label>
           <input
+            id="confirm-password"
             type="password"
+            className="form-input"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
             minLength={8}
-            style={inputStyle}
+            autoComplete="new-password"
           />
-        </label>
+        </div>
 
         {passwordError && (
-          <p style={{ color: "var(--color-error)", fontSize: 14, margin: 0 }}>{passwordError}</p>
+          <p className="status-message status-message--error">{passwordError}</p>
         )}
         {passwordMessage && (
-          <p style={{ color: "var(--color-accent)", fontSize: 14, margin: 0 }}>{passwordMessage}</p>
+          <p className="status-message status-message--success">{passwordMessage}</p>
         )}
 
-        <button
-          type="submit"
-          disabled={savingPassword}
-          style={{
-            background: "var(--color-accent)",
-            color: "var(--color-text)",
-            borderRadius: 4,
-            padding: "10px 16px",
-            fontSize: 14,
-            fontWeight: 600,
-            opacity: savingPassword ? 0.7 : 1,
-            alignSelf: "flex-start",
-          }}
-        >
-          {savingPassword ? "Updating..." : "Change password"}
-        </button>
+        <div className="btn-row">
+          <button
+            type="submit"
+            className="btn btn--primary"
+            disabled={savingPassword}
+          >
+            {savingPassword ? "Updating..." : "Change password"}
+          </button>
+        </div>
       </form>
 
       {confirmDialog && (
         <ConfirmDialog
           message={confirmDialog.message}
-          confirmLabel="Cancel subscription"
+          confirmLabel={confirmDialog.confirmLabel}
+          danger={confirmDialog.danger}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      <DangerZone />
+    </div>
+  );
+}
+
+type RecordingMode = "camera" | "screen" | "screen-camera";
+
+function RecordingDefaults() {
+  const [mode, setModeState] = useState<RecordingMode>(() => {
+    const stored = localStorage.getItem("recording-mode");
+    if (stored === "camera" || stored === "screen" || stored === "screen-camera") return stored;
+    return "screen";
+  });
+  const [countdown, setCountdownState] = useState(() => localStorage.getItem("recording-countdown") !== "false");
+  const [systemAudio, setSystemAudioState] = useState(() => localStorage.getItem("recording-audio") !== "false");
+
+  function setMode(m: RecordingMode) {
+    setModeState(m);
+    localStorage.setItem("recording-mode", m);
+  }
+  function setCountdown(v: boolean) {
+    setCountdownState(v);
+    localStorage.setItem("recording-countdown", String(v));
+  }
+  function setSystemAudio(v: boolean) {
+    setSystemAudioState(v);
+    localStorage.setItem("recording-audio", String(v));
+  }
+
+  const modes: { value: RecordingMode; label: string }[] = [
+    { value: "camera", label: "Camera" },
+    { value: "screen", label: "Screen" },
+    { value: "screen-camera", label: "Screen + Camera" },
+  ];
+
+  return (
+    <div className="card settings-section">
+      <h2>Recording Defaults</h2>
+      <p className="card-description">
+        Set your preferred recording mode and options.
+      </p>
+
+      <div className="form-field">
+        <label className="form-label">Default recording mode</label>
+        <fieldset className="btn-row" style={{ border: "none", padding: 0, margin: 0 }}>
+          <legend className="sr-only">Recording mode</legend>
+          {modes.map((m) => (
+            <label
+              key={m.value}
+              className={`theme-option${mode === m.value ? " theme-option--active" : ""}`}
+            >
+              <input
+                type="radio"
+                name="recording-mode"
+                value={m.value}
+                checked={mode === m.value}
+                onChange={() => setMode(m.value)}
+                className="sr-only"
+              />
+              {m.label}
+            </label>
+          ))}
+        </fieldset>
+      </div>
+
+      <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <label className="form-label" style={{ margin: 0 }}>Countdown timer</label>
+        <button
+          type="button"
+          className={`toggle-track${countdown ? " active" : ""}`}
+          onClick={() => setCountdown(!countdown)}
+          role="switch"
+          aria-checked={countdown}
+        >
+          <span className="toggle-thumb" />
+        </button>
+      </div>
+
+      <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <label className="form-label" style={{ margin: 0 }}>System audio capture</label>
+        <button
+          type="button"
+          className={`toggle-track${systemAudio ? " active" : ""}`}
+          onClick={() => setSystemAudio(!systemAudio)}
+          role="switch"
+          aria-checked={systemAudio}
+        >
+          <span className="toggle-thumb" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DangerZone() {
+  const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  async function handleSignOut() {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+    setAccessToken(null);
+    navigate("/login");
+  }
+
+  function handleDeleteAccount() {
+    setConfirmDialog({
+      message: "Are you sure you want to delete your account? This action cannot be undone. All your videos and data will be permanently deleted.",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setDeleting(true);
+        setDeleteError("");
+        try {
+          await apiFetch("/api/user", { method: "DELETE" });
+          setAccessToken(null);
+          navigate("/login");
+        } catch (err) {
+          setDeleteError(err instanceof Error ? err.message : "Failed to delete account");
+        } finally {
+          setDeleting(false);
+        }
+      },
+    });
+  }
+
+  return (
+    <div className="card settings-section card--danger">
+      <h2 style={{ color: "var(--color-error)" }}>Danger Zone</h2>
+
+      <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <p className="form-label" style={{ margin: 0 }}>Sign out</p>
+          <p className="form-hint">Sign out of your account on this device.</p>
+        </div>
+        <button type="button" className="btn btn--secondary" onClick={handleSignOut}>
+          Sign out
+        </button>
+      </div>
+
+      <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <p className="form-label" style={{ margin: 0 }}>Delete account</p>
+          <p className="form-hint">Permanently delete your account and all data.</p>
+        </div>
+        <button
+          type="button"
+          className="btn"
+          style={{ background: "var(--color-error)", color: "#fff", borderColor: "var(--color-error)" }}
+          onClick={handleDeleteAccount}
+          disabled={deleting}
+        >
+          {deleting ? "Deleting..." : "Delete account"}
+        </button>
+      </div>
+      {deleteError && (
+        <p className="status-message status-message--error">{deleteError}</p>
+      )}
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          confirmLabel="Delete account"
           danger
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}

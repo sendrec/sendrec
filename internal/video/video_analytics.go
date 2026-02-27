@@ -3,7 +3,9 @@ package video
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"time"
 
@@ -38,10 +40,13 @@ type milestoneCounts struct {
 }
 
 type viewerInfo struct {
-	Email         string `json:"email"`
-	FirstViewedAt string `json:"firstViewedAt"`
-	ViewCount     int64  `json:"viewCount"`
-	Completion    int    `json:"completion"`
+	Email            string `json:"email"`
+	FirstViewedAt    string `json:"firstViewedAt"`
+	ViewCount        int64  `json:"viewCount"`
+	Completion       int    `json:"completion"`
+	WatchTimeSeconds int64  `json:"watchTimeSeconds"`
+	Country          string `json:"country"`
+	City             string `json:"city"`
 }
 
 type segmentData struct {
@@ -50,12 +55,34 @@ type segmentData struct {
 	Intensity  float64 `json:"intensity"`
 }
 
+type trendData struct {
+	Views          *float64 `json:"views"`
+	UniqueViews    *float64 `json:"uniqueViews"`
+	AvgWatchTime   *float64 `json:"avgWatchTime"`
+	CompletionRate *float64 `json:"completionRate"`
+}
+
+type referrerData struct {
+	Source     string  `json:"source"`
+	Count      int64  `json:"count"`
+	Percentage float64 `json:"percentage"`
+}
+
+type breakdownItem struct {
+	Name       string  `json:"name"`
+	Percentage float64 `json:"percentage"`
+}
+
 type analyticsResponse struct {
 	Summary    analyticsSummary `json:"summary"`
 	Daily      []dailyViews     `json:"daily"`
 	Milestones milestoneCounts  `json:"milestones"`
 	Viewers    []viewerInfo     `json:"viewers"`
 	Heatmap    []segmentData    `json:"heatmap"`
+	Trends     *trendData       `json:"trends,omitempty"`
+	Referrers  []referrerData   `json:"referrers"`
+	Browsers   []breakdownItem  `json:"browsers"`
+	Devices    []breakdownItem  `json:"devices"`
 }
 
 type milestoneRequest struct {
@@ -250,10 +277,12 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		days = 7
 	case "30d":
 		days = 30
+	case "90d":
+		days = 90
 	case "all":
 		days = 0
 	default:
-		httputil.WriteError(w, http.StatusBadRequest, "invalid range: must be 7d, 30d, or all")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid range: must be 7d, 30d, 90d, or all")
 		return
 	}
 
@@ -354,7 +383,9 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		viewerRows, err := h.db.Query(r.Context(),
 			`SELECT vv.email, vv.created_at,
 			        COUNT(views.id) AS view_count,
-			        COALESCE(MAX(vm.milestone), 0) AS completion
+			        COALESCE(MAX(vm.milestone), 0) AS completion,
+			        COALESCE(MAX(views.country), '') AS country,
+			        COALESCE(MAX(views.city), '') AS city
 			 FROM video_viewers vv
 			 LEFT JOIN video_views views ON views.video_id = vv.video_id AND views.viewer_hash = vv.viewer_hash
 			 LEFT JOIN view_milestones vm ON vm.video_id = vv.video_id AND vm.viewer_hash = vv.viewer_hash
@@ -368,7 +399,7 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 			for viewerRows.Next() {
 				var vi viewerInfo
 				var createdAt time.Time
-				if err := viewerRows.Scan(&vi.Email, &createdAt, &vi.ViewCount, &vi.Completion); err == nil {
+				if err := viewerRows.Scan(&vi.Email, &createdAt, &vi.ViewCount, &vi.Completion, &vi.Country, &vi.City); err == nil {
 					vi.FirstViewedAt = createdAt.Format(time.RFC3339)
 					viewers = append(viewers, vi)
 				}
@@ -409,11 +440,203 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 		heatmap = segments
 	}
 
+	referrers := make([]referrerData, 0)
+	refRows, err := h.db.Query(r.Context(),
+		`SELECT referrer, COUNT(*) AS cnt
+		 FROM video_views WHERE video_id = $1 AND created_at >= $2
+		 GROUP BY referrer ORDER BY cnt DESC`,
+		videoID, since,
+	)
+	if err == nil {
+		defer refRows.Close()
+		for refRows.Next() {
+			var rd referrerData
+			if err := refRows.Scan(&rd.Source, &rd.Count); err == nil {
+				referrers = append(referrers, rd)
+			}
+		}
+		var total int64
+		for _, rd := range referrers {
+			total += rd.Count
+		}
+		if total > 0 {
+			for i := range referrers {
+				referrers[i].Percentage = float64(referrers[i].Count) / float64(total) * 100
+			}
+		}
+	}
+
+	browsers := make([]breakdownItem, 0)
+	browserRows, err := h.db.Query(r.Context(),
+		`SELECT browser, COUNT(*) AS cnt
+		 FROM video_views WHERE video_id = $1 AND created_at >= $2
+		 GROUP BY browser ORDER BY cnt DESC`,
+		videoID, since,
+	)
+	if err == nil {
+		defer browserRows.Close()
+		var browserTotal int64
+		var rawBrowsers []breakdownItem
+		type countedItem struct {
+			name  string
+			count int64
+		}
+		var browserCounts []countedItem
+		for browserRows.Next() {
+			var name string
+			var count int64
+			if err := browserRows.Scan(&name, &count); err == nil {
+				browserCounts = append(browserCounts, countedItem{name, count})
+				browserTotal += count
+			}
+		}
+		if browserTotal > 0 {
+			for _, bc := range browserCounts {
+				rawBrowsers = append(rawBrowsers, breakdownItem{
+					Name:       bc.name,
+					Percentage: math.Round(float64(bc.count)/float64(browserTotal)*1000) / 10,
+				})
+			}
+		}
+		browsers = rawBrowsers
+	}
+	if browsers == nil {
+		browsers = make([]breakdownItem, 0)
+	}
+
+	devices := make([]breakdownItem, 0)
+	deviceRows, err := h.db.Query(r.Context(),
+		`SELECT device, COUNT(*) AS cnt
+		 FROM video_views WHERE video_id = $1 AND created_at >= $2
+		 GROUP BY device ORDER BY cnt DESC`,
+		videoID, since,
+	)
+	if err == nil {
+		defer deviceRows.Close()
+		var deviceTotal int64
+		var rawDevices []breakdownItem
+		type countedItem struct {
+			name  string
+			count int64
+		}
+		var deviceCounts []countedItem
+		for deviceRows.Next() {
+			var name string
+			var count int64
+			if err := deviceRows.Scan(&name, &count); err == nil {
+				deviceCounts = append(deviceCounts, countedItem{name, count})
+				deviceTotal += count
+			}
+		}
+		if deviceTotal > 0 {
+			for _, dc := range deviceCounts {
+				rawDevices = append(rawDevices, breakdownItem{
+					Name:       dc.name,
+					Percentage: math.Round(float64(dc.count)/float64(deviceTotal)*1000) / 10,
+				})
+			}
+		}
+		devices = rawDevices
+	}
+	if devices == nil {
+		devices = make([]breakdownItem, 0)
+	}
+
+	var trends *trendData
+	if days > 0 && summary.TotalViews > 0 {
+		prevSince := since.AddDate(0, 0, -days)
+		var prevViews, prevUnique int64
+		_ = h.db.QueryRow(r.Context(),
+			`SELECT COUNT(*), COUNT(DISTINCT viewer_hash)
+			 FROM video_views WHERE video_id = $1 AND created_at >= $2 AND created_at < $3`,
+			videoID, prevSince, since,
+		).Scan(&prevViews, &prevUnique)
+
+		trends = &trendData{}
+		if prevViews > 0 {
+			v := (float64(summary.TotalViews) - float64(prevViews)) / float64(prevViews) * 100
+			trends.Views = &v
+		}
+		if prevUnique > 0 {
+			v := (float64(summary.UniqueViews) - float64(prevUnique)) / float64(prevUnique) * 100
+			trends.UniqueViews = &v
+		}
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, analyticsResponse{
 		Summary:    summary,
 		Daily:      daily,
 		Milestones: milestones,
 		Viewers:    viewers,
 		Heatmap:    heatmap,
+		Trends:     trends,
+		Referrers:  referrers,
+		Browsers:   browsers,
+		Devices:    devices,
 	})
+}
+
+func (h *Handler) AnalyticsExport(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	videoID := chi.URLParam(r, "id")
+
+	var id string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
+		videoID, userID,
+	).Scan(&id)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "7d"
+	}
+	var days int
+	switch rangeParam {
+	case "7d":
+		days = 7
+	case "30d":
+		days = 30
+	case "90d":
+		days = 90
+	case "all":
+		days = 0
+	default:
+		httputil.WriteError(w, http.StatusBadRequest, "invalid range")
+		return
+	}
+
+	now := time.Now().UTC().Truncate(24 * time.Hour)
+	var since time.Time
+	if days > 0 {
+		since = now.AddDate(0, 0, -(days - 1))
+	} else {
+		since = time.Time{}
+	}
+
+	rows, err := h.db.Query(r.Context(),
+		`SELECT date_trunc('day', created_at)::date AS day, COUNT(*) AS views, COUNT(DISTINCT viewer_hash) AS unique_views
+		 FROM video_views WHERE video_id = $1 AND created_at >= $2
+		 GROUP BY day ORDER BY day`,
+		videoID, since,
+	)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to query")
+		return
+	}
+	defer rows.Close()
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=analytics.csv")
+	_, _ = fmt.Fprintln(w, "Date,Views,Unique Views")
+	for rows.Next() {
+		var day time.Time
+		var views, uv int64
+		if err := rows.Scan(&day, &views, &uv); err == nil {
+			_, _ = fmt.Fprintf(w, "%s,%d,%d\n", day.Format("2006-01-02"), views, uv)
+		}
+	}
 }

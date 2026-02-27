@@ -52,6 +52,14 @@ cd web && pnpm test         # Frontend tests
 cd web && pnpm typecheck    # Frontend type checking
 ```
 
+### E2E Tests
+
+```bash
+make e2e-up                 # Start e2e Docker stack
+make e2e-test               # Run Playwright e2e tests
+make e2e-down               # Stop e2e Docker stack
+```
+
 ### Building
 
 ```bash
@@ -67,7 +75,7 @@ Interactive API documentation is available at [`/api/docs`](https://app.sendrec.
 1. Fork the repository and create a branch from `main`.
 2. Make your changes. Write tests for new functionality.
 3. If you added or changed API endpoints, update `internal/docs/openapi.yaml`.
-4. Run `make test` and `make build` to verify everything works.
+4. Run `make test`, `cd web && pnpm typecheck`, and `make build` to verify everything works.
 5. Open a pull request against `main`.
 
 Keep PRs focused on a single change. If you're fixing a bug and also refactoring nearby code, split them into separate PRs.

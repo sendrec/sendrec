@@ -36,84 +36,38 @@ export function ConfirmEmail() {
 
   return (
     <main className="auth-container">
-      <div
-        style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 24,
-          textAlign: "center",
-        }}
-      >
+      <div className="auth-brand">
+        <span className="auth-logo">
+          <span className="auth-logo-send">Send</span>
+          <span className="auth-logo-rec">Rec</span>
+        </span>
+      </div>
+      <div className="auth-card auth-centered">
         {status === "loading" && (
-          <>
-            <h1
-              style={{
-                color: "var(--color-text)",
-                fontSize: 24,
-                marginBottom: 16,
-              }}
-            >
-              Confirming your email...
-            </h1>
-          </>
+          <h1>Confirming your email...</h1>
         )}
 
         {status === "success" && (
           <>
-            <h1
-              style={{
-                color: "var(--color-text)",
-                fontSize: 24,
-                marginBottom: 16,
-              }}
-            >
-              Email confirmed
-            </h1>
-            <p
-              style={{
-                color: "var(--color-text-secondary)",
-                fontSize: 14,
-                marginBottom: 24,
-              }}
-            >
+            <h1>Email confirmed</h1>
+            <p className="auth-subtitle">
               Your account is now active. You can sign in.
             </p>
-            <Link
-              to="/login"
-              style={{ color: "var(--color-accent)", fontSize: 14 }}
-            >
-              Sign in
-            </Link>
+            <div className="auth-footer">
+              <Link to="/login">Sign in</Link>
+            </div>
           </>
         )}
 
         {status === "error" && (
           <>
-            <h1
-              style={{
-                color: "var(--color-text)",
-                fontSize: 24,
-                marginBottom: 16,
-              }}
-            >
-              Confirmation failed
-            </h1>
-            <p
-              style={{
-                color: "var(--color-error)",
-                fontSize: 14,
-                marginBottom: 24,
-              }}
-            >
+            <h1>Confirmation failed</h1>
+            <div className="auth-error-banner">
               {errorMessage}
-            </p>
-            <Link
-              to="/register"
-              style={{ color: "var(--color-accent)", fontSize: 14 }}
-            >
-              Try again
-            </Link>
+            </div>
+            <div className="auth-footer">
+              <Link to="/register">Try again</Link>
+            </div>
           </>
         )}
       </div>

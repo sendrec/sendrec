@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Playlists } from "./Playlists";
+
+const mockNavigate = vi.fn();
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual("react-router-dom");
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 
 const mockApiFetch = vi.fn();
 
@@ -24,6 +30,15 @@ function makePlaylist(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const defaultLimits = { maxPlaylists: 0, playlistsUsed: 0 };
+
+function mockFetch(
+  playlists: unknown[],
+  limits: Record<string, unknown> = defaultLimits,
+) {
+  mockApiFetch.mockResolvedValueOnce(playlists).mockResolvedValueOnce(limits);
+}
+
 function renderPlaylists() {
   return render(
     <MemoryRouter>
@@ -35,20 +50,21 @@ function renderPlaylists() {
 describe("Playlists", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
+    mockNavigate.mockReset();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("shows loading state initially", () => {
+  it("shows skeleton cards during loading", () => {
     mockApiFetch.mockReturnValue(new Promise(() => {}));
-    renderPlaylists();
-    expect(screen.getByText("Loading...")).toBeInTheDocument();
+    const { container } = renderPlaylists();
+    expect(container.querySelectorAll(".skeleton-card")).toHaveLength(3);
   });
 
-  it("renders empty state when no playlists", async () => {
-    mockApiFetch.mockResolvedValueOnce([]);
+  it("renders empty state with CTA button", async () => {
+    mockFetch([]);
     renderPlaylists();
 
     await waitFor(() => {
@@ -59,10 +75,36 @@ describe("Playlists", () => {
         "Create a playlist to organize and share collections of videos.",
       ),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Create your first playlist" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders playlists in grid layout", async () => {
+    mockFetch([makePlaylist()]);
+    const { container } = renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding")).toBeInTheDocument();
+    });
+    expect(container.querySelector(".video-grid")).toBeInTheDocument();
+  });
+
+  it("renders stacked thumbnail on card", async () => {
+    mockFetch([makePlaylist()]);
+    const { container } = renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding")).toBeInTheDocument();
+    });
+    expect(container.querySelector(".playlist-thumb-stack")).toBeInTheDocument();
+    expect(
+      container.querySelector(".playlist-thumb--front"),
+    ).toBeInTheDocument();
   });
 
   it("renders playlist list", async () => {
-    mockApiFetch.mockResolvedValueOnce([
+    mockFetch([
       makePlaylist(),
       makePlaylist({
         id: "pl-2",
@@ -77,23 +119,56 @@ describe("Playlists", () => {
     await waitFor(() => {
       expect(screen.getByText("Onboarding")).toBeInTheDocument();
       expect(screen.getByText("Demos")).toBeInTheDocument();
-      expect(screen.getByText("3 videos")).toBeInTheDocument();
-      expect(screen.getByText("5 videos")).toBeInTheDocument();
+      expect(screen.getAllByText("3 videos")).toHaveLength(2); // thumb count + meta
+      expect(screen.getAllByText("5 videos")).toHaveLength(2);
       expect(screen.getByText("Shared")).toBeInTheDocument();
     });
   });
 
   it("shows singular video count", async () => {
-    mockApiFetch.mockResolvedValueOnce([makePlaylist({ videoCount: 1 })]);
+    mockFetch([makePlaylist({ videoCount: 1 })]);
     renderPlaylists();
 
     await waitFor(() => {
-      expect(screen.getByText("1 video")).toBeInTheDocument();
+      expect(screen.getAllByText("1 video")).toHaveLength(2); // thumb count + meta
+    });
+  });
+
+  it("shows Private badge for non-shared playlist", async () => {
+    mockFetch([makePlaylist({ isShared: false })]);
+    const { container } = renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Private")).toBeInTheDocument();
+    });
+    expect(
+      container.querySelector(".playlist-card-badge--private"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows Shared badge for shared playlist", async () => {
+    mockFetch([makePlaylist({ isShared: true })]);
+    const { container } = renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Shared")).toBeInTheDocument();
+    });
+    expect(
+      container.querySelector(".playlist-card-badge--shared"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows creation date on card", async () => {
+    mockFetch([makePlaylist({ createdAt: "2026-02-23T00:00:00Z" })]);
+    renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Created 23/02/2026")).toBeInTheDocument();
     });
   });
 
   it("links playlist titles to detail page", async () => {
-    mockApiFetch.mockResolvedValueOnce([makePlaylist()]);
+    mockFetch([makePlaylist()]);
     renderPlaylists();
 
     await waitFor(() => {
@@ -104,9 +179,97 @@ describe("Playlists", () => {
     expect(link).toHaveAttribute("href", "/playlists/pl-1");
   });
 
+  it("navigates to detail on card click", async () => {
+    const user = userEvent.setup();
+    mockFetch([makePlaylist()]);
+    const { container } = renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding")).toBeInTheDocument();
+    });
+
+    const card = container.querySelector(".playlist-card")!;
+    await user.click(card);
+    expect(mockNavigate).toHaveBeenCalledWith("/playlists/pl-1");
+  });
+
+  it("shows context menu when menu button clicked", async () => {
+    const user = userEvent.setup();
+    mockFetch([makePlaylist()]);
+    renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByLabelText("Playlist options"));
+    expect(screen.getByText("Edit")).toBeInTheDocument();
+    expect(screen.getByText("Delete")).toBeInTheDocument();
+  });
+
+  it("closes context menu on Escape", async () => {
+    const user = userEvent.setup();
+    mockFetch([makePlaylist()]);
+    renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByLabelText("Playlist options"));
+    expect(screen.getByText("Edit")).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByText("Edit")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows usage bar when limits active", async () => {
+    mockFetch(
+      [makePlaylist()],
+      { maxPlaylists: 3, playlistsUsed: 2 },
+    );
+    const { container } = renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding")).toBeInTheDocument();
+    });
+    expect(screen.getByText("of 3 playlists used")).toBeInTheDocument();
+    expect(container.querySelector(".playlist-usage")).toBeInTheDocument();
+  });
+
+  it("hides usage bar when unlimited", async () => {
+    mockFetch(
+      [makePlaylist()],
+      { maxPlaylists: 0, playlistsUsed: 0 },
+    );
+    const { container } = renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding")).toBeInTheDocument();
+    });
+    expect(container.querySelector(".playlist-usage")).not.toBeInTheDocument();
+  });
+
+  it("shows warning usage bar when at limit", async () => {
+    mockFetch(
+      [makePlaylist()],
+      { maxPlaylists: 3, playlistsUsed: 3 },
+    );
+    const { container } = renderPlaylists();
+
+    await waitFor(() => {
+      expect(screen.getByText("Onboarding")).toBeInTheDocument();
+    });
+    expect(
+      container.querySelector(".usage-bar-fill--warning"),
+    ).toBeInTheDocument();
+  });
+
   it("shows create form when button clicked", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockResolvedValueOnce([]);
+    mockFetch([]);
     renderPlaylists();
 
     await waitFor(() => {
@@ -121,7 +284,7 @@ describe("Playlists", () => {
 
   it("hides create form when Cancel clicked", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockResolvedValueOnce([]);
+    mockFetch([]);
     renderPlaylists();
 
     await waitFor(() => {
@@ -141,7 +304,7 @@ describe("Playlists", () => {
 
   it("creates playlist on form submit", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockResolvedValueOnce([]);
+    mockFetch([]);
     renderPlaylists();
 
     await waitFor(() => {
@@ -154,9 +317,9 @@ describe("Playlists", () => {
       "My New Playlist",
     );
 
-    // Mock the create call and subsequent refresh
+    // Mock the create call and subsequent refresh (playlists + limits)
     mockApiFetch.mockResolvedValueOnce(undefined);
-    mockApiFetch.mockResolvedValueOnce([
+    mockFetch([
       makePlaylist({ id: "pl-new", title: "My New Playlist", videoCount: 0 }),
     ]);
 
@@ -172,7 +335,7 @@ describe("Playlists", () => {
 
   it("shows error when create fails", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockResolvedValueOnce([]);
+    mockFetch([]);
     renderPlaylists();
 
     await waitFor(() => {
@@ -196,38 +359,42 @@ describe("Playlists", () => {
 
   it("shows confirm dialog before deleting a playlist", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockResolvedValueOnce([makePlaylist()]);
+    mockFetch([makePlaylist()]);
     renderPlaylists();
 
     await waitFor(() => {
       expect(screen.getByText("Onboarding")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Delete playlist" }));
+    // Open context menu, then click Delete
+    await user.click(screen.getByLabelText("Playlist options"));
+    await user.click(screen.getByText("Delete"));
 
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     expect(screen.getByText("Delete this playlist? Videos will not be deleted.")).toBeInTheDocument();
 
     await user.click(within(screen.getByRole("alertdialog")).getByText("Cancel"));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    // Should not have called delete API (only initial fetch)
-    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+    // Should not have called delete API (only initial playlists + limits fetch)
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
   });
 
   it("deletes playlist when confirmed", async () => {
     const user = userEvent.setup();
-    mockApiFetch.mockResolvedValueOnce([makePlaylist()]);
+    mockFetch([makePlaylist()]);
     renderPlaylists();
 
     await waitFor(() => {
       expect(screen.getByText("Onboarding")).toBeInTheDocument();
     });
 
-    // Mock delete call and subsequent refresh
+    // Mock delete call and subsequent refresh (playlists + limits)
     mockApiFetch.mockResolvedValueOnce(undefined);
-    mockApiFetch.mockResolvedValueOnce([]);
+    mockFetch([]);
 
-    await user.click(screen.getByRole("button", { name: "Delete playlist" }));
+    // Open context menu, then click Delete
+    await user.click(screen.getByLabelText("Playlist options"));
+    await user.click(screen.getByText("Delete"));
 
     const dialog = screen.getByRole("alertdialog");
     await user.click(within(dialog).getByText("Delete"));

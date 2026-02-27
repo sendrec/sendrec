@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 
@@ -37,13 +37,6 @@ export function Upload() {
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
-  const [limits, setLimits] = useState<LimitsResponse | null>(null);
-
-  useEffect(() => {
-    apiFetch<LimitsResponse>("/api/videos/limits")
-      .then((result) => setLimits(result ?? null))
-      .catch(() => {});
-  }, []);
 
   function acceptFiles(selected: File[]) {
     const valid = selected.filter((f) => SUPPORTED_TYPES.includes(f.type));
@@ -274,42 +267,22 @@ export function Upload() {
   if (uploading) {
     const currentFile = files[currentFileIndex];
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
-        <div style={{ width: "100%", maxWidth: 480 }}>
-          <div
-            role="status"
-            aria-live="polite"
-            style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 12,
-            padding: 32,
-            textAlign: "center",
-          }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 16, animation: "pulse 1.5s ease-in-out infinite" }}>
+      <div className="upload-page">
+        <div className="upload-content">
+          <div className="upload-card" role="status" aria-live="polite">
+            <svg className="upload-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <p style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+            <p className="upload-status-title">
               Uploading {currentFileIndex + 1} of {files.length}...
             </p>
-            <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 16 }}>
+            <p className="upload-status-subtitle">
               {currentFile?.file.name}
             </p>
-            <div style={{
-              background: "var(--color-bg)",
-              borderRadius: 4,
-              height: 6,
-              overflow: "hidden",
-            }}>
-              <div style={{
-                background: "var(--color-accent)",
-                height: "100%",
-                width: `${progress}%`,
-                borderRadius: 4,
-                transition: "width 0.3s ease",
-              }} />
+            <div className="progress-bar-track">
+              <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
             </div>
           </div>
         </div>
@@ -322,20 +295,14 @@ export function Upload() {
     const failed = results.filter((r) => r.error);
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
-        <div style={{ width: "100%", maxWidth: 480 }}>
-          <div style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 12,
-            padding: 32,
-            textAlign: "center",
-          }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={failed.length > 0 ? "var(--color-warning, #f59e0b)" : "var(--color-accent)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 16 }}>
+      <div className="upload-page">
+        <div className="upload-content">
+          <div className="upload-card">
+            <svg className="success-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={failed.length > 0 ? "var(--color-warning, #f59e0b)" : "var(--color-accent)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
-            <h2 style={{ color: "var(--color-text)", fontSize: 20, fontWeight: 600, marginBottom: 16 }}>
+            <h2 className="success-title">
               {failed.length === 0
                 ? results.length === 1
                   ? "Upload complete"
@@ -344,30 +311,14 @@ export function Upload() {
             </h2>
 
             {succeeded.map((result, i) => (
-              <div key={i} style={{
-                background: "var(--color-bg)",
-                borderRadius: 8,
-                padding: "10px 16px",
-                marginBottom: 8,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}>
-                <span style={{ color: "var(--color-text-secondary)", fontSize: 13, wordBreak: "break-all", flex: 1, textAlign: "left" }}>
+              <div key={i} className="result-row">
+                <span className="result-url">
                   {result.shareUrl}
                 </span>
                 <button
                   onClick={() => copyShareUrl(result.shareUrl, i)}
                   data-testid={`copy-btn-${i}`}
-                  style={{
-                    background: "var(--color-accent)",
-                    color: "var(--color-text)",
-                    borderRadius: 6,
-                    padding: "6px 14px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                  }}
+                  className="result-copy-btn"
                 >
                   {copiedIndex === i ? "Copied!" : "Copy"}
                 </button>
@@ -375,49 +326,18 @@ export function Upload() {
             ))}
 
             {failed.map((result, i) => (
-              <div key={`err-${i}`} style={{
-                background: "var(--color-bg)",
-                borderRadius: 8,
-                padding: "10px 16px",
-                marginBottom: 8,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}>
-                <span style={{ color: "var(--color-error)", fontSize: 13, flex: 1, textAlign: "left" }}>
+              <div key={`err-${i}`} className="result-row">
+                <span className="result-error">
                   {result.fileName}: {result.error}
                 </span>
               </div>
             ))}
 
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 16 }}>
-              <button
-                onClick={uploadAnother}
-                style={{
-                  background: "var(--color-accent)",
-                  color: "var(--color-text)",
-                  borderRadius: 8,
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                }}
-              >
+            <div className="result-actions">
+              <button onClick={uploadAnother} className="btn-primary">
                 Upload more
               </button>
-
-              <Link
-                to="/library"
-                style={{
-                  background: "transparent",
-                  color: "var(--color-text-secondary)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 8,
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  textDecoration: "none",
-                }}
-              >
+              <Link to="/library" className="btn-ghost">
                 Go to Library
               </Link>
             </div>
@@ -427,42 +347,15 @@ export function Upload() {
     );
   }
 
+  const dropZoneClasses = [
+    "drop-zone",
+    dragging && "drop-zone--dragover",
+    files.length > 0 && "drop-zone--compact",
+  ].filter(Boolean).join(" ");
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
-      <h1 style={{ color: "var(--color-text)", fontSize: 24, fontWeight: 600, marginBottom: 24, textAlign: "center" }}>
-        Upload Video
-      </h1>
-
-      {limits && limits.videosUsedThisMonth === 0 && (
-        <div style={{
-          maxWidth: 400,
-          margin: "0 auto 24px",
-          padding: "20px 24px",
-          background: "var(--color-surface)",
-          borderRadius: 12,
-          textAlign: "left",
-        }}>
-          <p style={{ color: "var(--color-text)", fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
-            Get started in 3 steps
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>1.</span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Record your screen or upload a video</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>2.</span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Share the link with anyone</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>3.</span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Track views and get feedback</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="upload-page">
+      <div className="upload-content">
         <input
           ref={fileInputRef}
           type="file"
@@ -470,7 +363,7 @@ export function Upload() {
           multiple
           onChange={handleFileSelect}
           data-testid="file-input"
-          style={{ display: "none" }}
+          hidden
         />
 
         <div
@@ -482,52 +375,39 @@ export function Upload() {
           role="button"
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
-          style={{
-            border: `2px dashed ${dragging ? "var(--color-accent)" : "var(--color-border)"}`,
-            borderRadius: 12,
-            padding: files.length > 0 ? "20px 24px" : "48px 24px",
-            textAlign: "center",
-            cursor: "pointer",
-            background: dragging ? "var(--color-drag-highlight)" : "var(--color-surface)",
-            transition: "border-color 0.2s, background 0.2s",
-          }}
+          className={dropZoneClasses}
         >
           {files.length > 0 ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div className="drop-zone-compact-row">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="23 7 16 12 23 17 23 7" />
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
-              <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
-                <p style={{ color: "var(--color-text)", fontSize: 14, fontWeight: 500 }}>
+              <div className="drop-zone-compact-info">
+                <p className="drop-zone-compact-title">
                   {files.length} file{files.length !== 1 ? "s" : ""} selected
                 </p>
-                <p style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
+                <p className="drop-zone-compact-subtitle">
                   Click or drop to add more
                 </p>
               </div>
             </div>
           ) : (
             <>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={dragging ? "var(--color-accent)" : "var(--color-text-secondary)"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 16, transition: "stroke 0.2s" }}>
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              <p style={{ color: "var(--color-text)", fontSize: 15, fontWeight: 500, marginBottom: 4 }}>
+              <div className="drop-zone-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </div>
+              <p className="drop-zone-title">
                 Drag and drop your videos here
               </p>
-              <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginBottom: 16 }}>
+              <p className="drop-zone-subtitle">
                 or click to browse (up to {MAX_FILES} files)
               </p>
-              <span style={{
-                display: "inline-block",
-                background: "var(--color-bg)",
-                color: "var(--color-text-secondary)",
-                fontSize: 12,
-                padding: "4px 12px",
-                borderRadius: 4,
-              }}>
+              <span className="drop-zone-formats">
                 MP4, WebM, MOV
               </span>
             </>
@@ -535,60 +415,33 @@ export function Upload() {
         </div>
 
         {error && (
-          <p style={{ color: "var(--color-error)", fontSize: 13, textAlign: "center" }}>
+          <p className="upload-error">
             {error}
           </p>
         )}
 
         {files.length > 0 && (
           <>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="file-list">
               {files.map((entry, i) => (
-                <div key={i} style={{
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                <div key={i} className="file-entry">
+                  <div className="file-entry-body">
                     <input
                       type="text"
                       value={entry.title}
                       onChange={(e) => updateTitle(i, e.target.value)}
                       maxLength={500}
                       aria-label={`Title for ${entry.file.name}`}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "4px 8px",
-                        fontSize: 13,
-                        borderRadius: 4,
-                        border: "1px solid var(--color-border)",
-                        background: "var(--color-bg)",
-                        color: "var(--color-text)",
-                        boxSizing: "border-box",
-                      }}
+                      className="file-entry-input"
                     />
-                    <p style={{ color: "var(--color-text-secondary)", fontSize: 11, marginTop: 2 }}>
+                    <p className="file-entry-meta">
                       {formatFileSize(entry.file.size)} &middot; {formatType(entry.file.type)}
                     </p>
                   </div>
                   <button
                     onClick={() => removeFile(i)}
                     aria-label={`Remove ${entry.file.name}`}
-                    style={{
-                      background: "transparent",
-                      color: "var(--color-text-secondary)",
-                      fontSize: 18,
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      border: "none",
-                      cursor: "pointer",
-                      lineHeight: 1,
-                    }}
+                    className="file-remove-btn"
                   >
                     &times;
                   </button>
@@ -596,19 +449,7 @@ export function Upload() {
               ))}
             </div>
 
-            <button
-              onClick={handleUpload}
-              style={{
-                background: "var(--color-accent)",
-                color: "var(--color-text)",
-                borderRadius: 8,
-                padding: "12px 32px",
-                fontSize: 15,
-                fontWeight: 600,
-                alignSelf: "center",
-                width: "100%",
-              }}
-            >
+            <button onClick={handleUpload} className="btn-upload">
               Upload {files.length} video{files.length !== 1 ? "s" : ""}
             </button>
           </>

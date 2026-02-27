@@ -225,11 +225,12 @@ func TestListPlaylists_Success(t *testing.T) {
 
 	shareToken := "abc123token1"
 
+	thumbToken := "thumb-video-token"
 	mock.ExpectQuery(`SELECT p\.id, p\.title, p\.description, p\.is_shared, p\.share_token, p\.position, p\.created_at, p\.updated_at`).
 		WithArgs(testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "description", "is_shared", "share_token", "position", "created_at", "updated_at", "video_count"}).
-			AddRow("playlist-1", "First Playlist", (*string)(nil), true, &shareToken, 0, earlier, earlier, int64(3)).
-			AddRow("playlist-2", "Second Playlist", (*string)(nil), false, (*string)(nil), 1, now, now, int64(0)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "description", "is_shared", "share_token", "position", "created_at", "updated_at", "video_count", "thumb_share_token"}).
+			AddRow("playlist-1", "First Playlist", (*string)(nil), true, &shareToken, 0, earlier, earlier, int64(3), &thumbToken).
+			AddRow("playlist-2", "Second Playlist", (*string)(nil), false, (*string)(nil), 1, now, now, int64(0), (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/playlists", handler.ListPlaylists)
@@ -270,6 +271,13 @@ func TestListPlaylists_Success(t *testing.T) {
 	if items[1].ShareURL != nil {
 		t.Errorf("expected second playlist shareUrl nil, got %v", items[1].ShareURL)
 	}
+	expectedThumbURL := "/api/watch/" + thumbToken + "/thumbnail"
+	if items[0].ThumbnailURL == nil || *items[0].ThumbnailURL != expectedThumbURL {
+		t.Errorf("expected first playlist thumbnailUrl %q, got %v", expectedThumbURL, items[0].ThumbnailURL)
+	}
+	if items[1].ThumbnailURL != nil {
+		t.Errorf("expected second playlist thumbnailUrl nil, got %v", items[1].ThumbnailURL)
+	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet pgxmock expectations: %v", err)
@@ -288,7 +296,7 @@ func TestListPlaylists_Empty(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT p\.id, p\.title, p\.description, p\.is_shared, p\.share_token, p\.position, p\.created_at, p\.updated_at`).
 		WithArgs(testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "description", "is_shared", "share_token", "position", "created_at", "updated_at", "video_count"}))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "description", "is_shared", "share_token", "position", "created_at", "updated_at", "video_count", "thumb_share_token"}))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/playlists", handler.ListPlaylists)

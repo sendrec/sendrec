@@ -13,18 +13,19 @@ import (
 )
 
 type embedPageData struct {
-	Title        string
-	VideoURL     string
-	ThumbnailURL string
+	Title         string
+	VideoURL      string
+	ThumbnailURL  string
 	TranscriptURL string
-	ShareToken   string
-	Nonce        string
-	BaseURL      string
-	ContentType  string
-	CtaText      string
-	CtaUrl       string
-	Chapters     []Chapter
-	ChaptersJSON template.JS
+	ShareToken    string
+	Nonce         string
+	BaseURL       string
+	ContentType   string
+	CtaText       string
+	CtaUrl        string
+	Chapters      []Chapter
+	ChaptersJSON  template.JS
+	VideoStatus   string
 }
 
 type embedPasswordPageData struct {
@@ -46,6 +47,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAeGVYSWZNTQAqAAAACAAEARoABQAAAAEAAAA+ARsABQAAAAEAAABGASgAAwAAAAEAAgAAh2kABAAAAAEAAABOAAAAAAAAAEgAAAABAAAASAAAAAEAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACfCVbEAAAACXBIWXMAAAsTAAALEwEAmpwYAAAEa0lEQVRYCe1VW2icRRQ+Z+af/xK1kdQlvlhatWC7tamKoIilVrFSjdhoIqZtQBERn7RKXwQJvigUqy8iIQ9KU4Msrq0+eHlJUChiIWLTpFHrgxAkIiE2t+a/zMzxzCYb/t3ECyj4spNsZnbmzPm+850zJwCN0VCgocD/rAD+V/i3fFoqxHHc6ilPo68nR/f1LP4T3/+aQLF88nbjyaNkabew1AKIBqSYJKKSDOUb4w90zfwVkb8lsP2TwSKCuMuQ3miF6P+xvXu66nBb+cRhUOodkN4VNssA7cqJFICBAkrTc5jajonHDl6s3qmf/5TAztKJLZmvXrOCHhZSRSIIwC7MHZt45NBR52Rn+eQdqSeHgCACY4AjB4684p/sMhPh+0BJ8m1zCPd8s//QXD24+758o+6k+NFAWxqqIQjU42ApsmkKZn7BmT+7/cP3is48ldALSkbE4OSA3ceaKbL6EipZ8WiTFDCKbp2N4bnKxjp/1hDYderdqw2I91nWzXYpYaccnJCAygPZvOEqQnFgx8eDrUS4G1LNgXOCUGhp9ItKYdHzqA20KaNSFTjKKjade4Z7vXXwYc1mTN5TGAXFCjirip4HmGVjwsCItXZOePgBoS4KGUTgnDMQ6fTr8Y7Dx1cAfucgXoo17kOJV7Iqbvv6+ZkbCjxPrdisTjUEOkslOYZpFxkLSMTOfUCTDXKJPZN/VjeVB/bKQHD62UYwS8KJVY+8iEnMA1EKwglMTkUv9mlZkrwhr2tS8IMXb7QEN6JmAk52qxcFyVfy4O6+QNziao5/XX7cPOmW1SGF9zSnrAWI/VR+aAaWwnWfY40CRkOIEgJXxS63/LZnm8Xib1XH1dkibHJr6/LP4bHl9zvKAw9SGB7kgi0Ywr3uZTiC7jlCbL4af7TLVfGaUaOAyOQ8a7/AQbFyjoQozKb+zflbe4aHPY5ql0uTG6S5Dsj+zGQewih8Ajz/PkZmXiw9p4CyLGYt38r7yK8rKq5ucEq3nR74HP3wfuInxE0GUOtzYLInizYavQBzzaSil8nzjjjgivxkLjUtia1JqAtGqrPcAbnwHDizkDLFLDky3tHz9ipG3aJGAaelsNjvCrCSYa5yfo5tVnhnRlU6YlX4HTA4OHCHEfggLHwx0t09PdbRM4HW9EluPq4qBHFsxsSC9Gd1mDVfawnwUeH8T6etTk9hU1DhQDpjJIgkE0Epr3PgyPJLfp6QJNOCst6qRyHEMZskU64pkUuhUhsI1KvV8/Xm2hSsWBRLpRbrJwOciv3cVMDyx4W80nQYXPFe9gvZrIflHco75n9Oz0MYvkkpNzH2zqQMarr3fEf3l3m76nqNAu5gvKtrRqTBAUySF7gYL7Ajjd5ye2VlfzU67Rdpdnc9uLsrF22/TZZGXed0BMCTksC+fltfX5M7rx/rKpA3urN0PJoPrt3K+WwliZelsRdHO3rWPM38He6Em43ftEnHS8BpI5FpGYTXnB1pb7+ct2usGwo0FGgo4BT4A0kx06ZKzSjiAAAAAElFTkSuQmCC">
     <title>{{.Title}}</title>
+    {{if eq .VideoStatus "processing"}}<meta http-equiv="refresh" content="15">{{end}}
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { width: 100%; height: 100%; overflow: hidden; background: #0f172a; }
@@ -76,27 +78,79 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             height: 100%;
         }
 ` + playerCSS + `
+        .embed-processing {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .embed-processing-icon { margin-bottom: 16px; }
+        .embed-processing-spinner {
+            animation: spin 1s linear infinite;
+            transform-origin: center;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .embed-processing-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .embed-processing-desc {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 16px;
+        }
+        .embed-processing-bar {
+            width: 120px;
+            height: 3px;
+            background: #1e293b;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .embed-processing-bar-fill {
+            width: 40%;
+            height: 100%;
+            background: #00b67a;
+            border-radius: 2px;
+            animation: indeterminate 1.5s ease-in-out infinite;
+        }
+        @keyframes indeterminate {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(350%); }
+        }
         .footer {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 12px;
-            background: #1e293b;
+            padding: 6px 10px;
+            background: #111d32;
             color: #e2e8f0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 13px;
+            font-size: 12px;
+            flex-shrink: 0;
+            border-top: 1px solid #1e2d45;
         }
         .footer-title {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            margin-right: 12px;
+            margin-right: 8px;
+            font-weight: 500;
         }
         .footer a {
-            color: #94a3b8;
+            color: #8892a4;
             text-decoration: none;
             white-space: nowrap;
-            font-size: 12px;
+            font-size: 11px;
+            transition: color 0.15s;
         }
         .footer a:hover { color: #e2e8f0; }
         .cta-overlay { display: none; position: absolute; bottom: 48px; left: 0; right: 0; padding: 12px; text-align: center; background: rgba(15, 23, 42, 0.9); }
@@ -104,27 +158,52 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .cta-overlay a { display: inline-block; padding: 8px 24px; background: #00b67a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
         .cta-overlay a:hover { opacity: 0.9; color: #fff; }
 ` + safariWarningCSS + `
+        .browser-warning {
+            position: absolute;
+            bottom: 40px;
+            left: 12px;
+            right: 12px;
+            z-index: 5;
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="video-wrapper">
+{{if eq .VideoStatus "processing"}}
+            <div class="embed-processing">
+                <div class="embed-processing-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00b67a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" opacity="0.2"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" class="embed-processing-spinner"/>
+                    </svg>
+                </div>
+                <div class="embed-processing-title">Video is being processed</div>
+                <div class="embed-processing-desc">Please check back in a moment</div>
+                <div class="embed-processing-bar"><div class="embed-processing-bar-fill"></div></div>
+            </div>
+{{else}}
             <div class="player-container" id="player-container">
                 <video id="player" playsinline webkit-playsinline{{if .TranscriptURL}} crossorigin="anonymous"{{end}} controlsList="nodownload" src="{{.VideoURL}}"{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>{{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles">{{end}}</video>
 ` + playerControlsHTML + `
             </div>
+{{end}}
         </div>
+{{if ne .VideoStatus "processing"}}
         {{if and .CtaText .CtaUrl}}
         <div class="cta-overlay" id="cta-overlay">
             <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" id="cta-btn">{{.CtaText}}</a>
         </div>
         {{end}}
+{{end}}
         <div class="footer">
             <span class="footer-title">{{.Title}}</span>
             <a href="{{.BaseURL}}/watch/{{.ShareToken}}" target="_blank" rel="noopener">Watch on SendRec</a>
         </div>
 ` + safariWarningHTML + `
     </div>
+{{if ne .VideoStatus "processing"}}
     <script nonce="{{.Nonce}}">
         (function() {
 ` + safariWarningJS + `
@@ -298,6 +377,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             window.addEventListener('beforeunload', flush);
         })();
     </script>
+{{end}}
 </body>
 </html>`))
 
@@ -332,10 +412,10 @@ var embedPasswordPageTemplate = template.Must(template.New("embed-password").Par
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="password"]:focus { border-color: #22c55e; }
+        input[type="password"]:focus { border-color: #00b67a; }
         button {
             width: 100%;
-            background: #22c55e;
+            background: #00b67a;
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;
@@ -412,10 +492,10 @@ var embedEmailGatePageTemplate = template.Must(template.New("embed-emailgate").P
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="email"]:focus { border-color: #22c55e; }
+        input[type="email"]:focus { border-color: #00b67a; }
         button {
             width: 100%;
-            background: #22c55e;
+            background: #00b67a;
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;
@@ -480,13 +560,14 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	var transcriptKey *string
 	var emailGateEnabled bool
 	var chaptersJSON *string
+	var status string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at,
 		        v.thumbnail_key, v.share_password, v.content_type,
 		        v.user_id, u.email, v.view_notification,
 		        v.cta_text, v.cta_url, v.transcript_key,
-		        v.email_gate_enabled, v.chapters
+		        v.email_gate_enabled, v.chapters, v.status
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
@@ -495,7 +576,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		&thumbnailKey, &sharePassword, &contentType,
 		&ownerID, &ownerEmail, &viewNotification,
 		&ctaText, &ctaUrl, &transcriptKey,
-		&emailGateEnabled, &chaptersJSON)
+		&emailGateEnabled, &chaptersJSON, &status)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -552,14 +633,37 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		ip := clientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
+		ref := categorizeReferrer(r.Header.Get("Referer"))
+		browser := parseBrowser(r.UserAgent())
+		device := parseDevice(r.UserAgent())
+		var country, city string
+		if h.geoResolver != nil {
+			country, city = h.geoResolver.Lookup(ip)
+		}
 		if _, err := h.db.Exec(ctx,
-			`INSERT INTO video_views (video_id, viewer_hash) VALUES ($1, $2)`,
-			videoID, hash,
+			`INSERT INTO video_views (video_id, viewer_hash, referrer, browser, device, country, city)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			videoID, hash, ref, browser, device, country, city,
 		); err != nil {
 			slog.Error("embed-page: failed to record view", "video_id", videoID, "error", err)
 		}
 		h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 	}()
+
+	if status == "processing" {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := embedPageTemplate.Execute(w, embedPageData{
+			Title:       title,
+			VideoStatus: "processing",
+			ShareToken:  shareToken,
+			Nonce:       nonce,
+			BaseURL:     h.baseURL,
+			Chapters:    make([]Chapter, 0),
+		}); err != nil {
+			slog.Error("embed-page: failed to render processing page", "error", err)
+		}
+		return
+	}
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)
 	if err != nil {
@@ -589,18 +693,19 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := embedPageTemplate.Execute(w, embedPageData{
-		Title:        title,
-		VideoURL:     videoURL,
-		ThumbnailURL: thumbnailURL,
+		Title:         title,
+		VideoURL:      videoURL,
+		ThumbnailURL:  thumbnailURL,
 		TranscriptURL: transcriptURL,
-		ShareToken:   shareToken,
-		Nonce:        nonce,
-		BaseURL:      h.baseURL,
-		ContentType:  contentType,
-		CtaText:      derefString(ctaText),
-		CtaUrl:       derefString(ctaUrl),
-		Chapters:     chapterList,
-		ChaptersJSON: template.JS(chaptersJSONBytes),
+		ShareToken:    shareToken,
+		Nonce:         nonce,
+		BaseURL:       h.baseURL,
+		ContentType:   contentType,
+		CtaText:       derefString(ctaText),
+		CtaUrl:        derefString(ctaUrl),
+		Chapters:      chapterList,
+		ChaptersJSON:  template.JS(chaptersJSONBytes),
+		VideoStatus:   status,
 	}); err != nil {
 		slog.Error("embed-page: failed to render embed page", "error", err)
 	}

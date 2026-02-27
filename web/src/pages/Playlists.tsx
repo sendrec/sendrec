@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
@@ -11,13 +11,25 @@ interface Playlist {
   shareToken?: string;
   shareUrl?: string;
   videoCount: number;
+  thumbnailUrl?: string | null;
   position: number;
   createdAt: string;
   updatedAt: string;
 }
 
+interface LimitsResponse {
+  maxPlaylists: number;
+  playlistsUsed: number;
+}
+
+function formatDate(isoDate: string): string {
+  return new Date(isoDate).toLocaleDateString("en-GB");
+}
+
 export function Playlists() {
+  const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -27,11 +39,17 @@ export function Playlists() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const fetchPlaylists = useCallback(async () => {
     try {
-      const data = await apiFetch<Playlist[]>("/api/playlists");
+      const [data, limitsData] = await Promise.all([
+        apiFetch<Playlist[]>("/api/playlists"),
+        apiFetch<LimitsResponse>("/api/videos/limits"),
+      ]);
       setPlaylists(data ?? []);
+      setLimits(limitsData ?? null);
     } catch {
       // ignore
     } finally {
@@ -42,6 +60,24 @@ export function Playlists() {
   useEffect(() => {
     fetchPlaylists();
   }, [fetchPlaylists]);
+
+  useEffect(() => {
+    if (!menuId) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuId(null);
+      }
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuId(null);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [menuId]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,10 +118,25 @@ export function Playlists() {
 
   if (loading) {
     return (
-      <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>
-          Loading...
-        </p>
+      <div className="page-container">
+        <div className="library-header">
+          <h1
+            style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}
+          >
+            Playlists
+          </h1>
+        </div>
+        <div className="video-grid">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="skeleton-card">
+              <div className="skeleton-thumb skeleton" />
+              <div className="skeleton-body">
+                <div className="skeleton-title skeleton" />
+                <div className="skeleton-meta skeleton" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -159,97 +210,142 @@ export function Playlists() {
         </form>
       )}
 
+      {limits && limits.maxPlaylists > 0 && (
+        <div className="playlist-usage">
+          <span>
+            <strong>{limits.playlistsUsed}</strong> of {limits.maxPlaylists}{" "}
+            playlists used
+          </span>
+          <div className="playlist-usage-bar">
+            <div className="usage-bar">
+              <div
+                className={`usage-bar-fill${limits.playlistsUsed >= limits.maxPlaylists ? " usage-bar-fill--warning" : ""}`}
+                style={{
+                  width: `${Math.min(100, (limits.playlistsUsed / limits.maxPlaylists) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+          {limits.playlistsUsed >= limits.maxPlaylists && (
+            <Link to="/settings" className="detail-btn detail-btn--accent" style={{ textDecoration: "none", whiteSpace: "nowrap", fontSize: 12, padding: "4px 12px" }}>
+              Upgrade to Pro
+            </Link>
+          )}
+        </div>
+      )}
+
       {playlists.length === 0 ? (
-        <div className="page-container--centered">
-          <p
-            style={{
-              color: "var(--color-text-secondary)",
-              fontSize: 16,
-              marginBottom: 8,
-            }}
-          >
-            No playlists yet
-          </p>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <path d="M2 20h20" />
+              <path d="M6 20v-3" />
+              <path d="M18 20v-3" />
+              <polygon points="10,7 10,13 15,10" />
+            </svg>
+          </div>
+          <h2 className="empty-state-title">No playlists yet</h2>
+          <p className="empty-state-desc">
             Create a playlist to organize and share collections of videos.
           </p>
+          <button
+            className="detail-btn detail-btn--accent"
+            onClick={() => setShowCreate(true)}
+          >
+            Create your first playlist
+          </button>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="video-grid">
           {playlists.map((playlist) => (
             <div
               key={playlist.id}
-              style={{
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                padding: 16,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}
+              className="playlist-card"
+              onClick={() => navigate(`/playlists/${playlist.id}`)}
             >
-              <Link
-                to={`/playlists/${playlist.id}`}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  textDecoration: "none",
+              <button
+                className="playlist-card-menu"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuId(menuId === playlist.id ? null : playlist.id);
                 }}
+                aria-label="Playlist options"
               >
-                <h3
-                  style={{
-                    color: "var(--color-text)",
-                    fontSize: 15,
-                    fontWeight: 600,
-                    margin: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {playlist.title}
-                </h3>
+                &middot;&middot;&middot;
+              </button>
+              {menuId === playlist.id && (
                 <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginTop: 4,
-                  }}
+                  className="playlist-context-menu"
+                  ref={menuRef}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <span
-                    style={{
-                      color: "var(--color-text-secondary)",
-                      fontSize: 13,
+                  <button
+                    onClick={() => {
+                      navigate(`/playlists/${playlist.id}`);
+                      setMenuId(null);
                     }}
                   >
+                    Edit
+                  </button>
+                  <button
+                    className="playlist-context-menu-danger"
+                    onClick={() => {
+                      handleDelete(playlist.id);
+                      setMenuId(null);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+              <div className="playlist-thumb-stack">
+                <div className="playlist-thumb playlist-thumb--back2" />
+                <div className="playlist-thumb playlist-thumb--back1" />
+                <div className="playlist-thumb playlist-thumb--front">
+                  {playlist.thumbnailUrl ? (
+                    <img src={playlist.thumbnailUrl} alt="" className="playlist-thumb-img" />
+                  ) : (
+                    <span className="playlist-thumb-play" />
+                  )}
+                  <span className="playlist-thumb-count">
                     {playlist.videoCount}{" "}
                     {playlist.videoCount === 1 ? "video" : "videos"}
                   </span>
-                  {playlist.isShared && (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: "1px 6px",
-                        borderRadius: 8,
-                        background: "var(--color-accent)",
-                        color: "var(--color-on-accent)",
-                      }}
-                    >
-                      Shared
-                    </span>
-                  )}
                 </div>
-              </Link>
-              <button
-                className="detail-btn detail-btn--danger"
-                onClick={() => handleDelete(playlist.id)}
-                aria-label="Delete playlist"
-              >
-                Delete
-              </button>
+              </div>
+              <div className="playlist-card-body">
+                <Link
+                  to={`/playlists/${playlist.id}`}
+                  className="playlist-card-title"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {playlist.title}
+                </Link>
+                <div className="playlist-card-meta">
+                  <span className="playlist-card-meta-text">
+                    {playlist.videoCount}{" "}
+                    {playlist.videoCount === 1 ? "video" : "videos"}
+                  </span>
+                  <span
+                    className={`playlist-card-badge ${playlist.isShared ? "playlist-card-badge--shared" : "playlist-card-badge--private"}`}
+                  >
+                    {playlist.isShared ? "Shared" : "Private"}
+                  </span>
+                </div>
+                <div className="playlist-card-date">
+                  Created {formatDate(playlist.createdAt)}
+                </div>
+              </div>
             </div>
           ))}
         </div>

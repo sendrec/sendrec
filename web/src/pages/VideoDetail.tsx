@@ -87,6 +87,32 @@ interface VideoBranding {
   footerText: string | null;
 }
 
+interface TranscriptSegment {
+  start: number;
+  end: number;
+  text: string;
+}
+
+interface TranscriptResponse {
+  status: string;
+  segments: TranscriptSegment[];
+}
+
+interface Comment {
+  id: string;
+  authorName: string;
+  body: string;
+  isPrivate: boolean;
+  isOwner: boolean;
+  createdAt: string;
+  videoTimestamp: number | null;
+}
+
+interface CommentsResponse {
+  comments: Comment[];
+  commentMode: string;
+}
+
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
@@ -127,6 +153,29 @@ function viewCountLabel(viewCount: number, uniqueViewCount: number): string {
   return `${viewCount} views (${uniqueViewCount} unique)`;
 }
 
+function formatTimestamp(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function getInitials(name: string): string {
+  if (!name) return "?";
+  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+}
+
+function relativeTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(isoDate).toLocaleDateString("en-GB");
+}
+
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -140,6 +189,8 @@ export function VideoDetail() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [playlists, setPlaylists] = useState<PlaylistInfo[]>([]);
   const [playlistSearch, setPlaylistSearch] = useState("");
+  const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
 
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,6 +221,7 @@ export function VideoDetail() {
   } | null>(null);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
 
   const titleIsDirty = editingTitle && video !== null && editTitle !== video.title;
@@ -209,6 +261,18 @@ export function VideoDetail() {
         setPlaylists(playlistsData ?? []);
         if (!found) {
           setNotFound(true);
+        }
+
+        if (found) {
+          apiFetch<CommentsResponse>(`/api/videos/${found.id}/comments`)
+            .then((data) => setComments(data?.comments ?? []))
+            .catch(() => {});
+
+          if (found.transcriptStatus === "ready") {
+            apiFetch<TranscriptResponse>(`/api/videos/${found.id}/transcript`)
+              .then((data) => setTranscriptSegments(data?.segments ?? []))
+              .catch(() => {});
+          }
         }
       } catch {
         if (!video) {
@@ -409,6 +473,7 @@ export function VideoDetail() {
     setVideo((prev) =>
       prev ? { ...prev, transcriptStatus: "pending" } : prev,
     );
+    setTranscriptSegments([]);
     showToast("Transcription queued");
   }
 
@@ -441,13 +506,14 @@ export function VideoDetail() {
 
   useEffect(() => {
     if (
+      video?.status === "processing" ||
       video?.documentStatus === "pending" ||
       video?.documentStatus === "processing"
     ) {
       const interval = setInterval(() => refetchVideo(), 3000);
       return () => clearInterval(interval);
     }
-  }, [video?.documentStatus]);
+  }, [video?.status, video?.documentStatus]);
 
   async function acceptSuggestedTitle() {
     if (!video || !video.suggestedTitle) return;
@@ -659,12 +725,49 @@ export function VideoDetail() {
     });
   }
 
+  async function handleDeleteComment(commentId: string) {
+    if (!video) return;
+    try {
+      await apiFetch(`/api/videos/${video.id}/comments/${commentId}`, { method: "DELETE" });
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch {
+      // ignore
+    }
+  }
+
   if (loading) {
     return (
-      <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>
-          Loading...
-        </p>
+      <div className="page-container">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <div className="skeleton" style={{ height: 16, width: 80, borderRadius: 4 }} />
+        </div>
+        <div className="video-detail-hero">
+          <div className="skeleton skeleton-thumb" style={{ aspectRatio: "16/9" }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="skeleton skeleton-title" style={{ width: "60%", marginBottom: 12 }} />
+            <div className="skeleton skeleton-meta" style={{ width: "40%" }} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 16, marginBottom: 24 }}>
+          <div className="skeleton skeleton-btn" />
+          <div className="skeleton skeleton-btn" />
+          <div className="skeleton skeleton-btn" />
+        </div>
+        <div className="skeleton-section">
+          <div className="skeleton skeleton-section-title" />
+          <div className="skeleton skeleton-row" />
+          <div className="skeleton skeleton-row" />
+        </div>
+        <div className="skeleton-section">
+          <div className="skeleton skeleton-section-title" />
+          <div className="skeleton skeleton-row" />
+        </div>
+        <div className="skeleton-section">
+          <div className="skeleton skeleton-section-title" />
+          <div className="skeleton skeleton-row" />
+          <div className="skeleton skeleton-row" />
+          <div className="skeleton skeleton-row" />
+        </div>
       </div>
     );
   }
@@ -703,14 +806,7 @@ export function VideoDetail() {
           marginBottom: 24,
         }}
       >
-        <Link
-          to="/library"
-          style={{
-            color: "var(--color-text-secondary)",
-            textDecoration: "none",
-            fontSize: 14,
-          }}
-        >
+        <Link to="/library" className="back-link">
           &larr; Library
         </Link>
         <a
@@ -728,20 +824,49 @@ export function VideoDetail() {
       </div>
 
       <div className="video-detail-hero">
-        {videoUrl ? (
-          <video
-            src={videoUrl}
-            controls
-            className="video-detail-thumbnail"
-            poster={video.thumbnailUrl}
-          />
-        ) : video.thumbnailUrl ? (
-          <img
-            src={video.thumbnailUrl}
-            alt="Video thumbnail"
-            className="video-detail-thumbnail"
-          />
-        ) : null}
+        <div style={{ position: "relative" }}>
+          {videoUrl ? (
+            videoError ? (
+              <div className="video-detail-thumbnail video-error-placeholder">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+                <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginTop: 12 }}>
+                  Video failed to load
+                </p>
+              </div>
+            ) : (
+              <video
+                src={videoUrl}
+                controls
+                className="video-detail-thumbnail"
+                poster={video.thumbnailUrl}
+                onError={() => setVideoError(true)}
+              />
+            )
+          ) : video.thumbnailUrl ? (
+            <img
+              src={video.thumbnailUrl}
+              alt="Video thumbnail"
+              className="video-detail-thumbnail"
+            />
+          ) : (
+            <div className="video-detail-thumbnail video-thumbnail-placeholder">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+              </svg>
+            </div>
+          )}
+          {video.status === "processing" && (
+            <div className="hero-processing-overlay">
+              <p className="hero-processing-pulse">Processing video...</p>
+              <p className="hero-processing-sub">This usually takes a minute or two</p>
+            </div>
+          )}
+        </div>
 
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -826,6 +951,13 @@ export function VideoDetail() {
             </span>
           </p>
 
+          {video.status === "processing" && (
+            <span className="status-badge status-badge--processing">
+              <span className="status-badge-dot" />
+              Processing
+            </span>
+          )}
+
           {video.tags.length > 0 && (
             <div
               style={{
@@ -868,33 +1000,67 @@ export function VideoDetail() {
         </div>
       </div>
 
-      {/* Section 1: Sharing */}
+      {/* Primary Actions Bar */}
+      <div className="detail-actions">
+        <button
+          className="detail-btn detail-btn--accent"
+          onClick={copyLink}
+          disabled={video.status === "processing"}
+          style={{ opacity: video.status === "processing" ? 0.5 : undefined }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Copy share link
+        </button>
+        <button
+          className="detail-btn"
+          onClick={() => navigate(`/videos/${video.id}/analytics`)}
+          disabled={video.status === "processing"}
+          style={{ opacity: video.status === "processing" ? 0.5 : undefined }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+          View analytics
+        </button>
+        {video.status === "ready" && videoUrl && (
+          <a href={videoUrl} download className="detail-btn" style={{ textDecoration: "none" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download
+          </a>
+        )}
+      </div>
+
+      {/* Share Settings */}
       <div className="video-detail-section">
-        <h2 className="video-detail-section-title">Sharing</h2>
+        <h2 className="video-detail-section-title">Share Settings</h2>
 
         <div className="detail-setting-row">
           <span className="detail-setting-label">Share link</span>
-          <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}>
-            <input
-              type="text"
-              readOnly
-              value={video.shareUrl}
-              aria-label="Share link"
-              style={{
-                flex: 1,
-                minWidth: 0,
-                padding: "6px 10px",
-                fontSize: 13,
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 4,
-                color: "var(--color-text)",
-              }}
-            />
-            <button onClick={copyLink} className="detail-btn">
-              Copy link
-            </button>
-          </div>
+          {video.status === "processing" ? (
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+              Available once processing completes
+            </span>
+          ) : (
+            <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}>
+              <input
+                type="text"
+                readOnly
+                value={video.shareUrl}
+                aria-label="Share link"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "6px 10px",
+                  fontSize: 13,
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 4,
+                  color: "var(--color-text)",
+                }}
+              />
+              <button onClick={copyLink} className="detail-btn">
+                Copy link
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="detail-setting-row">
@@ -1002,98 +1168,72 @@ export function VideoDetail() {
         </div>
 
         <div className="detail-setting-row">
-          <span className="detail-setting-label">Call to action</span>
+          <span className="detail-setting-label">Thumbnail</span>
           <div className="detail-setting-value">
-            <span>{video.ctaText ?? "None"}</span>
-            <button
-              onClick={() => {
-                setCtaFormOpen(true);
-                setCtaText(video.ctaText ?? "");
-                setCtaUrl(video.ctaUrl ?? "https://");
-              }}
-              className="detail-btn"
-            >
-              {video.ctaText ? "Edit CTA" : "Add CTA"}
-            </button>
+            <label style={{ cursor: uploadingThumbnail ? "default" : "pointer" }}>
+              <span className="detail-btn" role="button" tabIndex={0}>
+                {uploadingThumbnail ? "Uploading..." : "Upload"}
+              </span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: "none" }}
+                disabled={uploadingThumbnail}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadThumbnail(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {video.thumbnailUrl && (
+              <button
+                onClick={resetThumbnail}
+                disabled={uploadingThumbnail}
+                className="detail-btn"
+              >
+                Reset thumbnail
+              </button>
+            )}
           </div>
         </div>
 
-        {ctaFormOpen && (
-          <div
+        <div className="detail-setting-row">
+          <span className="detail-setting-label">Notifications</span>
+          <select
+            aria-label="View notifications"
+            value={video.viewNotification ?? ""}
+            onChange={(e) => changeNotification(e.target.value)}
             style={{
-              padding: 12,
               background: "var(--color-surface)",
-              borderRadius: 8,
               border: "1px solid var(--color-border)",
-              marginTop: 8,
+              borderRadius: 4,
+              color: "var(--color-text-secondary)",
+              fontSize: 13,
+              padding: "4px 8px",
+              cursor: "pointer",
             }}
           >
-            <input
-              type="text"
-              placeholder="Button text (e.g. Book a demo)"
-              value={ctaText}
-              onChange={(e) => setCtaText(e.target.value)}
-              maxLength={100}
-              aria-label="CTA text"
-              style={{
-                width: "100%",
-                padding: "8px 10px",
-                marginBottom: 8,
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 6,
-                color: "var(--color-text)",
-                fontSize: 13,
-              }}
-            />
-            <input
-              type="url"
-              placeholder="URL (e.g. https://example.com/demo)"
-              value={ctaUrl}
-              onChange={(e) => setCtaUrl(e.target.value)}
-              maxLength={2000}
-              aria-label="CTA URL"
-              style={{
-                width: "100%",
-                padding: "8px 10px",
-                marginBottom: 8,
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 6,
-                color: "var(--color-text)",
-                fontSize: 13,
-              }}
-            />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={saveCTA}
-                disabled={!ctaText.trim() || !ctaUrl.trim()}
-                className="detail-btn detail-btn--accent"
-              >
-                Save
-              </button>
-              {video.ctaText && (
-                <button
-                  onClick={clearCTA}
-                  className="detail-btn detail-btn--danger"
-                >
-                  Remove
-                </button>
-              )}
-              <button
-                onClick={() => setCtaFormOpen(false)}
-                className="detail-btn"
-              >
-                Cancel
-              </button>
-            </div>
+            <option value="">Account default</option>
+            <option value="off">Off</option>
+            <option value="every">Every view</option>
+            <option value="digest">Daily digest</option>
+          </select>
+        </div>
+
+        {limits?.brandingEnabled && (
+          <div className="detail-setting-row">
+            <span className="detail-setting-label">Branding</span>
+            <button onClick={openBranding} className="detail-btn">
+              Customize
+            </button>
           </div>
         )}
       </div>
 
-      {/* Section 2: Editing */}
+      {/* AI */}
       <div className="video-detail-section">
-        <h2 className="video-detail-section-title">Editing</h2>
+        <h2 className="video-detail-section-title">AI</h2>
 
         <div className="detail-setting-row">
           <span className="detail-setting-label">Transcript</span>
@@ -1128,6 +1268,19 @@ export function VideoDetail() {
             )}
           </div>
         </div>
+
+        {video.transcriptStatus === "ready" && transcriptSegments.length > 0 && (
+          <div className="transcript-segments">
+            {transcriptSegments.map((seg, i) => (
+              <div key={i} className="transcript-segment">
+                <span className="transcript-segment-time">
+                  {formatTimestamp(seg.start)}
+                </span>
+                <span className="transcript-segment-text">{seg.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {limits?.aiEnabled && (
           <div className="detail-setting-row">
@@ -1217,6 +1370,11 @@ export function VideoDetail() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Editing */}
+      <div className="video-detail-section">
+        <h2 className="video-detail-section-title">Editing</h2>
 
         {video.suggestedTitle && (
           <div className="detail-setting-row">
@@ -1250,22 +1408,11 @@ export function VideoDetail() {
           <button
             onClick={() => setShowTrimModal(true)}
             className="detail-btn"
+            disabled={video.status === "processing"}
           >
             Trim video
           </button>
         </div>
-
-        {video.transcriptStatus === "ready" && (
-          <div className="detail-setting-row">
-            <span className="detail-setting-label">Fillers</span>
-            <button
-              onClick={() => setShowFillerModal(true)}
-              className="detail-btn"
-            >
-              Remove fillers
-            </button>
-          </div>
-        )}
 
         {video.status === "ready" && (
           <div className="detail-setting-row">
@@ -1278,77 +1425,22 @@ export function VideoDetail() {
             </button>
           </div>
         )}
-      </div>
 
-      {/* Section 3: Customization */}
-      <div className="video-detail-section">
-        <h2 className="video-detail-section-title">Customization</h2>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Thumbnail</span>
-          <div className="detail-setting-value">
-            <label style={{ cursor: uploadingThumbnail ? "default" : "pointer" }}>
-              <span className="detail-btn" role="button" tabIndex={0}>
-                {uploadingThumbnail ? "Uploading..." : "Upload"}
-              </span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                style={{ display: "none" }}
-                disabled={uploadingThumbnail}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) uploadThumbnail(file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            {video.thumbnailUrl && (
-              <button
-                onClick={resetThumbnail}
-                disabled={uploadingThumbnail}
-                className="detail-btn"
-              >
-                Reset thumbnail
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Notifications</span>
-          <select
-            aria-label="View notifications"
-            value={video.viewNotification ?? ""}
-            onChange={(e) => changeNotification(e.target.value)}
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              color: "var(--color-text-secondary)",
-              fontSize: 13,
-              padding: "4px 8px",
-              cursor: "pointer",
-            }}
-          >
-            <option value="">Account default</option>
-            <option value="off">Off</option>
-            <option value="every">Every view</option>
-            <option value="digest">Daily digest</option>
-          </select>
-        </div>
-
-        {limits?.brandingEnabled && (
+        {video.transcriptStatus === "ready" && (
           <div className="detail-setting-row">
-            <span className="detail-setting-label">Branding</span>
-            <button onClick={openBranding} className="detail-btn">
-              Customize
+            <span className="detail-setting-label">Fillers</span>
+            <button
+              onClick={() => setShowFillerModal(true)}
+              className="detail-btn"
+              disabled={video.status === "processing"}
+            >
+              Remove fillers
             </button>
           </div>
         )}
       </div>
 
-      {/* Section 4: Organization */}
+      {/* Organization */}
       <div className="video-detail-section">
         <h2 className="video-detail-section-title">Organization</h2>
 
@@ -1478,8 +1570,148 @@ export function VideoDetail() {
         )}
       </div>
 
-      {/* Footer: Delete */}
-      <div style={{ marginTop: 32, paddingTop: 16, borderTop: "1px solid var(--color-border)" }}>
+      {/* Call to Action */}
+      <div className="video-detail-section">
+        <h2 className="video-detail-section-title">Call to Action</h2>
+
+        <div className="detail-setting-row">
+          <span className="detail-setting-label">Call to action</span>
+          <div className="detail-setting-value">
+            <span>{video.ctaText ?? "None"}</span>
+            <button
+              onClick={() => {
+                setCtaFormOpen(true);
+                setCtaText(video.ctaText ?? "");
+                setCtaUrl(video.ctaUrl ?? "https://");
+              }}
+              className="detail-btn"
+            >
+              {video.ctaText ? "Edit CTA" : "Add CTA"}
+            </button>
+          </div>
+        </div>
+
+        {ctaFormOpen && (
+          <div
+            style={{
+              padding: 12,
+              background: "var(--color-surface)",
+              borderRadius: 8,
+              border: "1px solid var(--color-border)",
+              marginTop: 8,
+            }}
+          >
+            <input
+              type="text"
+              placeholder="Button text (e.g. Book a demo)"
+              value={ctaText}
+              onChange={(e) => setCtaText(e.target.value)}
+              maxLength={100}
+              aria-label="CTA text"
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                marginBottom: 8,
+                background: "var(--color-bg)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 6,
+                color: "var(--color-text)",
+                fontSize: 13,
+              }}
+            />
+            <input
+              type="url"
+              placeholder="URL (e.g. https://example.com/demo)"
+              value={ctaUrl}
+              onChange={(e) => setCtaUrl(e.target.value)}
+              maxLength={2000}
+              aria-label="CTA URL"
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                marginBottom: 8,
+                background: "var(--color-bg)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 6,
+                color: "var(--color-text)",
+                fontSize: 13,
+              }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={saveCTA}
+                disabled={!ctaText.trim() || !ctaUrl.trim()}
+                className="detail-btn detail-btn--accent"
+              >
+                Save
+              </button>
+              {video.ctaText && (
+                <button
+                  onClick={clearCTA}
+                  className="detail-btn detail-btn--danger"
+                >
+                  Remove
+                </button>
+              )}
+              <button
+                onClick={() => setCtaFormOpen(false)}
+                className="detail-btn"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Comments */}
+      <div className="video-detail-section">
+        <h2 className="video-detail-section-title">
+          Comments ({comments.length})
+        </h2>
+        {comments.length === 0 ? (
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+            No comments yet.
+          </p>
+        ) : (
+          comments.map((comment) => (
+            <div key={comment.id} className="comment-item">
+              <div className="comment-avatar">
+                {getInitials(comment.authorName)}
+              </div>
+              <div className="comment-content">
+                <div className="comment-header">
+                  <span className="comment-author">
+                    {comment.authorName || "Anonymous"}
+                  </span>
+                  <span className="comment-date">
+                    {relativeTime(comment.createdAt)}
+                  </span>
+                  {comment.videoTimestamp !== null && (
+                    <span className="comment-timestamp">
+                      @{formatTimestamp(comment.videoTimestamp)}
+                    </span>
+                  )}
+                  {comment.isPrivate && (
+                    <span className="comment-private">Private</span>
+                  )}
+                </div>
+                <div className="comment-body">{comment.body}</div>
+              </div>
+              <button
+                className="comment-delete"
+                onClick={() => handleDeleteComment(comment.id)}
+                aria-label="Delete comment"
+              >
+                Delete
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Danger Zone */}
+      <div className="danger-zone">
         <button
           onClick={deleteVideo}
           className="detail-btn detail-btn--danger"

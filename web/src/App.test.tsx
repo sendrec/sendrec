@@ -47,6 +47,10 @@ vi.mock("./pages/Settings", () => ({
   Settings: () => <div>Settings Page</div>,
 }));
 
+vi.mock("./pages/Playlists", () => ({
+  Playlists: () => <div>Playlists Page</div>,
+}));
+
 vi.mock("./pages/Analytics", () => ({
   Analytics: () => <div>Analytics Page</div>,
 }));
@@ -110,12 +114,39 @@ describe("App", () => {
     expect(screen.getByText("Record Page")).toBeInTheDocument();
   });
 
-  it("renders analytics page for authenticated users", () => {
+  it("renders per-video analytics page for authenticated users", () => {
     mockGetAccessToken.mockReturnValue("valid-token");
 
     renderApp("/videos/v1/analytics");
 
     expect(screen.getByTestId("layout")).toBeInTheDocument();
     expect(screen.getByText("Analytics Page")).toBeInTheDocument();
+  });
+
+  it("renders analytics dashboard at /analytics", () => {
+    mockGetAccessToken.mockReturnValue("valid-token");
+
+    renderApp("/analytics");
+
+    expect(screen.getByTestId("layout")).toBeInTheDocument();
+    expect(screen.getByText("Analytics Page")).toBeInTheDocument();
+  });
+
+  it("redirects /upload to Record page", () => {
+    mockGetAccessToken.mockReturnValue("valid-token");
+
+    renderApp("/upload");
+
+    expect(screen.getByTestId("layout")).toBeInTheDocument();
+    expect(screen.getByText("Record Page")).toBeInTheDocument();
+  });
+
+  it("renders Playlists page at /playlists", () => {
+    mockGetAccessToken.mockReturnValue("valid-token");
+
+    renderApp("/playlists");
+
+    expect(screen.getByTestId("layout")).toBeInTheDocument();
+    expect(screen.getByText("Playlists Page")).toBeInTheDocument();
   });
 });
