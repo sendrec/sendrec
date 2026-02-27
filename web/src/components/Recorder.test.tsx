@@ -60,6 +60,9 @@ const mockScreenStream = {
   getTracks: vi.fn().mockReturnValue([{ stop: vi.fn() }]),
 };
 
+// A chunk larger than MIN_RECORDING_BYTES (1024) so validation passes
+const LARGE_CHUNK = new Blob([new Uint8Array(2048)], { type: "video/webm" });
+
 class MockMediaRecorder {
   static isTypeSupported = vi.fn().mockReturnValue(true);
   state = "inactive";
@@ -69,7 +72,7 @@ class MockMediaRecorder {
     this.state = "recording";
     // Simulate a data chunk being available after a microtask
     setTimeout(() => {
-      this.ondataavailable?.({ data: new Blob(["chunk"], { type: "video/webm" }) });
+      this.ondataavailable?.({ data: LARGE_CHUNK });
     }, 0);
   });
   stop = vi.fn().mockImplementation(() => {
@@ -313,11 +316,16 @@ describe("Recorder", () => {
   });
 
   it("transitions to stopped state when Stop is clicked", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const onComplete = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<Recorder onRecordingComplete={onComplete} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
     await user.click(screen.getByTestId("countdown-overlay"));
+
+    // Advance past MIN_RECORDING_SECONDS so validation passes
+    await act(() => { vi.advanceTimersByTime(1500); });
+
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     // After stop, compositing is cleaned up
@@ -326,14 +334,20 @@ describe("Recorder", () => {
     await vi.waitFor(() => {
       expect(onComplete).toHaveBeenCalledTimes(1);
     });
+    vi.useRealTimers();
   });
 
   it("calls onRecordingComplete when recording stops", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const onComplete = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<Recorder onRecordingComplete={onComplete} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
     await user.click(screen.getByTestId("countdown-overlay"));
+
+    // Advance past MIN_RECORDING_SECONDS so validation passes
+    await act(() => { vi.advanceTimersByTime(1500); });
+
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     // The onstop handler fires asynchronously via setTimeout
@@ -345,6 +359,7 @@ describe("Recorder", () => {
       expect.any(Number),
       undefined,
     );
+    vi.useRealTimers();
   });
 
   it("calls stopCompositing when recording stops", async () => {
@@ -506,6 +521,7 @@ describe("Recorder", () => {
   });
 
   it("sets up webcam recorder when webcam is enabled before recording starts", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     // Return a proper mock stream from getUserMedia
     const webcamStop = vi.fn();
     const mockWebcamStream = new MockMediaStream();
@@ -513,7 +529,7 @@ describe("Recorder", () => {
     (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue(mockWebcamStream);
 
     const onComplete = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<Recorder onRecordingComplete={onComplete} />);
 
     // Enable webcam first
@@ -529,6 +545,9 @@ describe("Recorder", () => {
       screen.getByRole("button", { name: "Stop recording" }),
     ).toBeInTheDocument();
 
+    // Advance past MIN_RECORDING_SECONDS so validation passes
+    await act(() => { vi.advanceTimersByTime(1500); });
+
     // Stop and verify onRecordingComplete is called with webcamBlob
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
     await vi.waitFor(() => {
@@ -540,6 +559,7 @@ describe("Recorder", () => {
       expect.any(Number),
       expect.any(Blob),
     );
+    vi.useRealTimers();
   });
 
   it("stops recording when screen share track ends", async () => {
@@ -685,6 +705,23 @@ describe("Recorder", () => {
         suppressLocalAudioPlayback: true,
       }),
     );
+  });
+
+  it("calls onRecordingError when recording is shorter than 1 second", async () => {
+    const onComplete = vi.fn();
+    const onError = vi.fn();
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={onComplete} onRecordingError={onError} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    // Stop immediately — elapsed will be 0 seconds and blob will be tiny
+    await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledWith("Recording too short. Please record for at least 1 second.");
+    });
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
   it("calls getDisplayMedia with audio disabled when system audio is off", async () => {

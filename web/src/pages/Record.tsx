@@ -124,6 +124,10 @@ export function Record() {
     }
   }
 
+  function handleRecordingError(message: string) {
+    setError(message);
+  }
+
   useEffect(() => {
     if (!uploading) return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -344,11 +348,13 @@ export function Record() {
         screenRecordingSupported && !useCameraOnly ? (
           <Recorder
             onRecordingComplete={handleRecordingComplete}
+            onRecordingError={handleRecordingError}
             maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
           />
         ) : (
           <CameraRecorder
             onRecordingComplete={handleRecordingComplete}
+            onRecordingError={handleRecordingError}
             maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
           />
         )

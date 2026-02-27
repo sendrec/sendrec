@@ -11,13 +11,15 @@ vi.mock("../api/client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
-// Store the onRecordingComplete callback so tests can trigger it
+// Store the onRecordingComplete and onRecordingError callbacks so tests can trigger them
 let capturedOnRecordingComplete: ((blob: Blob, duration: number, webcamBlob?: Blob) => void) | null = null;
+let capturedOnRecordingError: ((message: string) => void) | null = null;
 
 // Mock Recorder to avoid browser API dependencies
 vi.mock("../components/Recorder", () => ({
-  Recorder: ({ maxDurationSeconds, onRecordingComplete }: { maxDurationSeconds?: number; onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void }) => {
+  Recorder: ({ maxDurationSeconds, onRecordingComplete, onRecordingError }: { maxDurationSeconds?: number; onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void; onRecordingError?: (message: string) => void }) => {
     capturedOnRecordingComplete = onRecordingComplete;
+    capturedOnRecordingError = onRecordingError ?? null;
     return (
       <div data-testid="recorder" data-max-duration={maxDurationSeconds ?? ""}>
         Mock Recorder
@@ -26,12 +28,14 @@ vi.mock("../components/Recorder", () => ({
   },
 }));
 
-// Store the CameraRecorder onRecordingComplete callback
+// Store the CameraRecorder onRecordingComplete and onRecordingError callbacks
 let capturedCameraOnRecordingComplete: ((blob: Blob, duration: number) => void) | null = null;
+let capturedCameraOnRecordingError: ((message: string) => void) | null = null;
 
 vi.mock("../components/CameraRecorder", () => ({
-  CameraRecorder: ({ maxDurationSeconds, onRecordingComplete }: { maxDurationSeconds?: number; onRecordingComplete: (blob: Blob, duration: number) => void }) => {
+  CameraRecorder: ({ maxDurationSeconds, onRecordingComplete, onRecordingError }: { maxDurationSeconds?: number; onRecordingComplete: (blob: Blob, duration: number) => void; onRecordingError?: (message: string) => void }) => {
     capturedCameraOnRecordingComplete = onRecordingComplete;
+    capturedCameraOnRecordingError = onRecordingError ?? null;
     return (
       <div data-testid="camera-recorder" data-max-duration={maxDurationSeconds ?? ""}>
         Mock Camera Recorder
@@ -1369,6 +1373,56 @@ describe("Record", () => {
     const fill = document.querySelector(".usage-bar-fill--warning");
     expect(fill).toBeInTheDocument();
     expect(fill).toHaveStyle({ width: "100%" });
+  });
+
+  it("shows error message when recording is too short", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      capturedOnRecordingError!("Recording too short. Please record for at least 1 second.");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Recording too short. Please record for at least 1 second.")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Try again")).toBeInTheDocument();
+  });
+
+  it("shows error from CameraRecorder onRecordingError", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      value: { getUserMedia: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("camera-recorder")).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      capturedCameraOnRecordingError!("Recording too short. Please record for at least 1 second.");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Recording too short. Please record for at least 1 second.")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Try again")).toBeInTheDocument();
   });
 
   it("auto-copies share link when share card appears", async () => {

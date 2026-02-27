@@ -13,6 +13,9 @@ class MockMediaStream {
 }
 globalThis.MediaStream = MockMediaStream as unknown as typeof MediaStream;
 
+// A chunk larger than MIN_RECORDING_BYTES (1024) so validation passes
+const LARGE_CHUNK = new Blob([new Uint8Array(2048)], { type: "video/webm" });
+
 class MockMediaRecorder {
   state = "inactive";
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
@@ -20,7 +23,7 @@ class MockMediaRecorder {
   start = vi.fn().mockImplementation(() => {
     this.state = "recording";
     setTimeout(() => {
-      this.ondataavailable?.({ data: new Blob(["chunk"], { type: "video/webm" }) });
+      this.ondataavailable?.({ data: LARGE_CHUNK });
     }, 0);
   });
   stop = vi.fn().mockImplementation(() => {
@@ -252,8 +255,9 @@ describe("CameraRecorder", () => {
   });
 
   it("calls onRecordingComplete when recording stops", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const onComplete = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<CameraRecorder onRecordingComplete={onComplete} />);
 
     await vi.waitFor(() => {
@@ -262,6 +266,10 @@ describe("CameraRecorder", () => {
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
     await user.click(screen.getByTestId("countdown-overlay"));
+
+    // Advance past MIN_RECORDING_SECONDS so validation passes
+    await act(() => { vi.advanceTimersByTime(1500); });
+
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     await vi.waitFor(() => {
@@ -271,6 +279,7 @@ describe("CameraRecorder", () => {
       expect.any(Blob),
       expect.any(Number),
     );
+    vi.useRealTimers();
   });
 
   it("shows remaining time during recording when maxDuration is set", async () => {
@@ -356,11 +365,12 @@ describe("CameraRecorder", () => {
   });
 
   it("prefers mp4 mimeType for maximum compatibility", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     // isTypeSupported returns true for everything (default mock)
     MockMediaRecorder.isTypeSupported = vi.fn().mockReturnValue(true);
 
     const onComplete = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<CameraRecorder onRecordingComplete={onComplete} />);
 
     await vi.waitFor(() => {
@@ -369,6 +379,10 @@ describe("CameraRecorder", () => {
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
     await user.click(screen.getByTestId("countdown-overlay"));
+
+    // Advance past MIN_RECORDING_SECONDS so validation passes
+    await act(() => { vi.advanceTimersByTime(1500); });
+
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     await vi.waitFor(() => {
@@ -377,15 +391,17 @@ describe("CameraRecorder", () => {
 
     const blob = onComplete.mock.calls[0][0] as Blob;
     expect(blob.type).toBe("video/mp4");
+    vi.useRealTimers();
   });
 
   it("falls back to webm when mp4 is not supported", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     MockMediaRecorder.isTypeSupported = vi.fn().mockImplementation((type: string) => {
       return type.includes("webm");
     });
 
     const onComplete = vi.fn();
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<CameraRecorder onRecordingComplete={onComplete} />);
 
     await vi.waitFor(() => {
@@ -394,6 +410,10 @@ describe("CameraRecorder", () => {
 
     await user.click(screen.getByRole("button", { name: "Start recording" }));
     await user.click(screen.getByTestId("countdown-overlay"));
+
+    // Advance past MIN_RECORDING_SECONDS so validation passes
+    await act(() => { vi.advanceTimersByTime(1500); });
+
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
     await vi.waitFor(() => {
@@ -402,6 +422,7 @@ describe("CameraRecorder", () => {
 
     const blob = onComplete.mock.calls[0][0] as Blob;
     expect(blob.type).toBe("video/webm");
+    vi.useRealTimers();
   });
 
   it("shows countdown after clicking start recording", async () => {
@@ -433,6 +454,28 @@ describe("CameraRecorder", () => {
 
     expect(screen.queryByTestId("countdown-overlay")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause recording" })).toBeInTheDocument();
+  });
+
+  it("calls onRecordingError when recording is shorter than 1 second", async () => {
+    const onComplete = vi.fn();
+    const onError = vi.fn();
+    const user = userEvent.setup();
+    render(<CameraRecorder onRecordingComplete={onComplete} onRecordingError={onError} />);
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    // Stop immediately — elapsed will be 0 seconds and blob will be tiny
+    await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+    await vi.waitFor(() => {
+      expect(onError).toHaveBeenCalledWith("Recording too short. Please record for at least 1 second.");
+    });
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
   it("shows click to start hint during countdown", async () => {
