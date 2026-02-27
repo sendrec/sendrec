@@ -32,6 +32,8 @@ WORKDIR /app
 COPY --from=backend /app/sendrec .
 COPY --from=whisper /build/build/bin/whisper-cli /usr/local/bin/whisper-cli
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN mkdir -p /app/models && \
+    wget -q -O /app/models/std.rnnn https://github.com/richardpl/arnndn-models/raw/master/std.rnnn
 USER sendrec
 EXPOSE 8080
 ENTRYPOINT ["docker-entrypoint.sh"]
