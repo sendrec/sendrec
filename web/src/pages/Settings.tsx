@@ -704,45 +704,41 @@ export function Settings() {
 
       <RecordingDefaults />
 
-      {transcriptionEnabled && (
+      {(transcriptionEnabled || noiseReductionEnabled) && (
         <div className="card settings-section">
-          <h2>Transcription</h2>
+          <h2>Audio</h2>
           <p className="card-description">
-            Choose the default language for video transcription.
+            Configure transcription and audio processing for new recordings.
           </p>
-          <div className="form-field">
-            <label className="form-label" htmlFor="transcription-language">Default transcription language</label>
-            <select
-              id="transcription-language"
-              className="form-input"
-              value={transcriptionLanguage}
-              onChange={(e) => handleTranscriptionLanguageChange(e.target.value)}
-            >
-              {TRANSCRIPTION_LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code}>{lang.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      )}
-
-      {noiseReductionEnabled && (
-        <div className="card settings-section">
-          <h2>Audio Processing</h2>
-          <p className="card-description">
-            Configure audio processing for new recordings.
-          </p>
-          <div className="form-field">
-            <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={noiseReduction}
-                onChange={(e) => handleNoiseReductionChange(e.target.checked)}
-              />
-              Noise reduction
-            </label>
-            <p className="form-hint">Automatically reduce background noise in new recordings.</p>
-          </div>
+          {transcriptionEnabled && (
+            <div className="form-field">
+              <label className="form-label" htmlFor="transcription-language">Default transcription language</label>
+              <select
+                id="transcription-language"
+                className="form-input"
+                value={transcriptionLanguage}
+                onChange={(e) => handleTranscriptionLanguageChange(e.target.value)}
+              >
+                {TRANSCRIPTION_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>{lang.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {noiseReductionEnabled && (
+            <div className="form-field">
+              <label className="form-label" htmlFor="noise-reduction">Noise reduction</label>
+              <select
+                id="noise-reduction"
+                className="form-input"
+                value={noiseReduction ? "on" : "off"}
+                onChange={(e) => handleNoiseReductionChange(e.target.value === "on")}
+              >
+                <option value="on">Enabled — reduce background noise in new recordings</option>
+                <option value="off">Disabled</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
 

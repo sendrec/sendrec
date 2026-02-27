@@ -1125,7 +1125,7 @@ describe("Settings", () => {
     });
   });
 
-  it("renders noise reduction toggle when enabled", async () => {
+  it("renders noise reduction select when enabled", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", noiseReduction: true })
       .mockResolvedValueOnce({ notificationMode: "off" })
@@ -1137,10 +1137,10 @@ describe("Settings", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Noise reduction")).toBeInTheDocument();
     });
-    expect(screen.getByLabelText("Noise reduction")).toBeChecked();
+    expect(screen.getByLabelText("Noise reduction")).toHaveValue("on");
   });
 
-  it("hides noise reduction toggle when server feature disabled", async () => {
+  it("hides noise reduction select when server feature disabled", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ notificationMode: "off" })
@@ -1155,7 +1155,7 @@ describe("Settings", () => {
     expect(screen.queryByLabelText("Noise reduction")).not.toBeInTheDocument();
   });
 
-  it("toggling noise reduction calls PATCH /api/user", async () => {
+  it("changing noise reduction calls PATCH /api/user", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", noiseReduction: true })
       .mockResolvedValueOnce({ notificationMode: "off" })
@@ -1169,7 +1169,7 @@ describe("Settings", () => {
       expect(screen.getByLabelText("Noise reduction")).toBeInTheDocument();
     });
 
-    await userEvent.click(screen.getByLabelText("Noise reduction"));
+    await userEvent.selectOptions(screen.getByLabelText("Noise reduction"), "off");
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/user", expect.objectContaining({
