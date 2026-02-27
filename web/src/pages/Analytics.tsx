@@ -730,7 +730,7 @@ function DashboardView({ data, range }: { data: DashboardData; range: Range }) {
         />
         <StatCard
           label="Avg Completion"
-          value={`${data.summary.avgCompletion}%`}
+          value={`${Math.round(data.summary.avgCompletion)}%`}
         />
       </div>
 

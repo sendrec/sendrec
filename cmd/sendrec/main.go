@@ -93,8 +93,10 @@ func main() {
 		CommentTemplateID: int(getEnvInt64("LISTMONK_COMMENT_TEMPLATE_ID", 0)),
 		ViewTemplateID:    int(getEnvInt64("LISTMONK_VIEW_TEMPLATE_ID", 0)),
 		ConfirmTemplateID: int(getEnvInt64("LISTMONK_CONFIRM_TEMPLATE_ID", 0)),
-		WelcomeTemplateID: int(getEnvInt64("LISTMONK_WELCOME_TEMPLATE_ID", 0)),
-		Allowlist:         email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
+		WelcomeTemplateID:        int(getEnvInt64("LISTMONK_WELCOME_TEMPLATE_ID", 0)),
+		OnboardingDay2TemplateID: int(getEnvInt64("LISTMONK_ONBOARDING_DAY2_TEMPLATE_ID", 0)),
+		OnboardingDay7TemplateID: int(getEnvInt64("LISTMONK_ONBOARDING_DAY7_TEMPLATE_ID", 0)),
+		Allowlist:                email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
 	})
 
 	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
@@ -167,6 +169,7 @@ func main() {
 	video.StartDocumentWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
 	video.StartDigestWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 	video.StartTranscodeWorker(cleanupCtx, db.Pool, store, 2*time.Minute)
+	video.StartOnboardingWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),

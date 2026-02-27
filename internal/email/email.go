@@ -20,8 +20,10 @@ type Config struct {
 	CommentTemplateID int
 	ViewTemplateID    int
 	ConfirmTemplateID int
-	WelcomeTemplateID int
-	Allowlist         []string
+	WelcomeTemplateID        int
+	OnboardingDay2TemplateID int
+	OnboardingDay7TemplateID int
+	Allowlist                []string
 }
 
 type Client struct {
@@ -276,6 +278,61 @@ func (c *Client) SendWelcome(ctx context.Context, toEmail, toName, dashboardURL 
 	body := txRequest{
 		SubscriberEmail: toEmail,
 		TemplateID:      c.config.WelcomeTemplateID,
+		Data: map[string]any{
+			"name":         toName,
+			"dashboardURL": dashboardURL,
+		},
+		ContentType: "html",
+	}
+
+	return c.sendTx(ctx, body)
+}
+
+func (c *Client) SendOnboardingDay2(ctx context.Context, toEmail, toName, dashboardURL string) error {
+	if c.config.BaseURL == "" {
+		slog.Warn("email not configured, onboarding day 2 email skipped", "recipient", toEmail)
+		return nil
+	}
+
+	if c.config.OnboardingDay2TemplateID == 0 {
+		slog.Warn("onboarding day 2 template ID not set, skipping", "recipient", toEmail)
+		return nil
+	}
+
+	// Onboarding emails bypass the allowlist — they are part of the core
+	// onboarding flow and must always be sent.
+	c.ensureSubscriber(ctx, toEmail, toName)
+
+	body := txRequest{
+		SubscriberEmail: toEmail,
+		TemplateID:      c.config.OnboardingDay2TemplateID,
+		Data: map[string]any{
+			"name":         toName,
+			"dashboardURL": dashboardURL,
+		},
+		ContentType: "html",
+	}
+
+	return c.sendTx(ctx, body)
+}
+
+func (c *Client) SendOnboardingDay7(ctx context.Context, toEmail, toName, dashboardURL string) error {
+	if c.config.BaseURL == "" {
+		slog.Warn("email not configured, onboarding day 7 email skipped", "recipient", toEmail)
+		return nil
+	}
+
+	if c.config.OnboardingDay7TemplateID == 0 {
+		slog.Warn("onboarding day 7 template ID not set, skipping", "recipient", toEmail)
+		return nil
+	}
+
+	// Onboarding emails bypass the allowlist.
+	c.ensureSubscriber(ctx, toEmail, toName)
+
+	body := txRequest{
+		SubscriberEmail: toEmail,
+		TemplateID:      c.config.OnboardingDay7TemplateID,
 		Data: map[string]any{
 			"name":         toName,
 			"dashboardURL": dashboardURL,
