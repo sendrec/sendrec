@@ -41,6 +41,7 @@ type Config struct {
 	BrandingEnabled         bool
 	AiEnabled               bool
 	TranscriptionEnabled    bool
+	NoiseReductionFilter    string
 	AllowedFrameAncestors   string
 	AnalyticsScript         string
 	EmailSender             auth.EmailSender
@@ -112,6 +113,9 @@ func New(cfg Config) *Server {
 		}
 		if cfg.TranscriptionEnabled {
 			s.videoHandler.SetTranscriptionEnabled(true)
+		}
+		if cfg.NoiseReductionFilter != "" {
+			s.videoHandler.SetNoiseReductionFilter(cfg.NoiseReductionFilter)
 		}
 		if cfg.SlackNotifier != nil {
 			s.videoHandler.SetSlackNotifier(cfg.SlackNotifier)
