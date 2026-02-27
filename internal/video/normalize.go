@@ -136,7 +136,18 @@ func transcodeToIOSCompatible(inputPath, outputPath, audioFilter string) error {
 }
 
 func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, audioFilter string) {
-	slog.Info("normalize: starting", "video_id", videoID)
+	// Check if video is already normalized (another normalize may have completed)
+	var normalized bool
+	if err := db.QueryRow(ctx, "SELECT ios_normalized FROM videos WHERE id = $1", videoID).Scan(&normalized); err != nil {
+		slog.Error("normalize: failed to check status", "video_id", videoID, "error", err)
+		return
+	}
+	if normalized {
+		slog.Info("normalize: skipped, already normalized", "video_id", videoID)
+		return
+	}
+
+	slog.Info("normalize: starting", "video_id", videoID, "audio_filter", audioFilter)
 
 	tmpInput, err := os.CreateTemp("", "sendrec-normalize-in-*.mp4")
 	if err != nil {

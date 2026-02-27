@@ -41,7 +41,18 @@ func transcodeToMP4(inputPath, outputPath, audioFilter string) error {
 }
 
 func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, audioFilter string) {
-	slog.Info("transcode: starting", "video_id", videoID)
+	// Check if video is still WebM (another transcode may have already completed)
+	var contentType string
+	if err := db.QueryRow(ctx, "SELECT content_type FROM videos WHERE id = $1", videoID).Scan(&contentType); err != nil {
+		slog.Error("transcode: failed to check content type", "video_id", videoID, "error", err)
+		return
+	}
+	if contentType != "video/webm" {
+		slog.Info("transcode: skipped, already transcoded", "video_id", videoID, "content_type", contentType)
+		return
+	}
+
+	slog.Info("transcode: starting", "video_id", videoID, "audio_filter", audioFilter)
 
 	tmpInput, err := os.CreateTemp("", "sendrec-transcode-in-*.webm")
 	if err != nil {
@@ -104,6 +115,7 @@ func transcodeExistingWebM(ctx context.Context, db database.DBTX, storage Object
 	rows, err := db.Query(ctx,
 		`SELECT id, file_key FROM videos
 		 WHERE content_type = 'video/webm' AND status = 'ready'
+		   AND created_at < now() - interval '5 minutes'
 		 ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		slog.Error("transcode-worker: failed to query", "error", err)
@@ -126,6 +138,7 @@ func normalizeExistingVideos(ctx context.Context, db database.DBTX, storage Obje
 		`SELECT id, file_key FROM videos
 		 WHERE content_type IN ('video/mp4', 'video/quicktime')
 		   AND status = 'ready' AND ios_normalized = false
+		   AND created_at < now() - interval '5 minutes'
 		 ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		slog.Error("normalize-worker: failed to query", "error", err)
