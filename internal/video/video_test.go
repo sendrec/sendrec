@@ -128,13 +128,13 @@ func expectPlanQuery(mock pgxmock.PgxPoolIface, plan string) {
 
 // --- generateShareToken Tests ---
 
-func TestGenerateShareToken_Returns12CharacterString(t *testing.T) {
+func TestGenerateShareToken_Returns22CharacterString(t *testing.T) {
 	token, err := generateShareToken()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(token) != 12 {
-		t.Errorf("expected 12-character token, got %d characters: %q", len(token), token)
+	if len(token) != 22 {
+		t.Errorf("expected 22-character token, got %d characters: %q", len(token), token)
 	}
 }
 
@@ -266,8 +266,8 @@ func TestCreate_Success(t *testing.T) {
 	if resp.ShareToken == "" {
 		t.Error("expected non-empty share token")
 	}
-	if len(resp.ShareToken) != 12 {
-		t.Errorf("expected 12-character share token, got %d: %q", len(resp.ShareToken), resp.ShareToken)
+	if len(resp.ShareToken) != 22 {
+		t.Errorf("expected 22-character share token, got %d: %q", len(resp.ShareToken), resp.ShareToken)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

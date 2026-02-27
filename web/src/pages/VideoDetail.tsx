@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { TrimModal } from "../components/TrimModal";
 import { FillerRemovalModal } from "../components/FillerRemovalModal";
 import { SilenceRemovalModal } from "../components/SilenceRemovalModal";
 import { DocumentModal } from "../components/DocumentModal";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PromptDialog } from "../components/PromptDialog";
 
 interface VideoTag {
   id: string;
@@ -153,9 +156,24 @@ export function VideoDetail() {
   const [showSilenceModal, setShowSilenceModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [documentContent, setDocumentContent] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+    confirmLabel?: string;
+    danger?: boolean;
+  } | null>(null);
+  const [promptDialog, setPromptDialog] = useState<{
+    title: string;
+    onSubmit: (value: string) => void;
+    placeholder?: string;
+    submitLabel?: string;
+  } | null>(null);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+
+  const titleIsDirty = editingTitle && video !== null && editTitle !== video.title;
+  useUnsavedChanges(titleIsDirty);
 
   const [brandingOpen, setBrandingOpen] = useState(false);
   const [videoBranding, setVideoBranding] = useState<VideoBranding>({
@@ -290,25 +308,38 @@ export function VideoDetail() {
     showToast("Link extended");
   }
 
-  async function addPassword() {
+  function addPassword() {
     if (!video) return;
-    const password = window.prompt("Enter a password for this video:");
-    if (!password) return;
-    await apiFetch(`/api/videos/${video.id}/password`, {
-      method: "PUT",
-      body: JSON.stringify({ password }),
+    setPromptDialog({
+      title: "Enter a password for this video:",
+      placeholder: "Password",
+      submitLabel: "Set password",
+      onSubmit: async (password) => {
+        setPromptDialog(null);
+        await apiFetch(`/api/videos/${video.id}/password`, {
+          method: "PUT",
+          body: JSON.stringify({ password }),
+        });
+        setVideo((prev) => (prev ? { ...prev, hasPassword: true } : prev));
+      },
     });
-    setVideo((prev) => (prev ? { ...prev, hasPassword: true } : prev));
   }
 
-  async function removePassword() {
+  function removePassword() {
     if (!video) return;
-    if (!window.confirm("Remove the password from this video?")) return;
-    await apiFetch(`/api/videos/${video.id}/password`, {
-      method: "PUT",
-      body: JSON.stringify({ password: "" }),
+    setConfirmDialog({
+      message: "Remove the password from this video?",
+      confirmLabel: "Remove",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await apiFetch(`/api/videos/${video.id}/password`, {
+          method: "PUT",
+          body: JSON.stringify({ password: "" }),
+        });
+        setVideo((prev) => (prev ? { ...prev, hasPassword: false } : prev));
+      },
     });
-    setVideo((prev) => (prev ? { ...prev, hasPassword: false } : prev));
   }
 
   async function changeCommentMode(mode: string) {
@@ -614,12 +645,18 @@ export function VideoDetail() {
     }
   }
 
-  async function deleteVideo() {
+  function deleteVideo() {
     if (!video) return;
-    if (!window.confirm("Delete this recording? This cannot be undone."))
-      return;
-    await apiFetch(`/api/videos/${video.id}`, { method: "DELETE" });
-    navigate("/library");
+    setConfirmDialog({
+      message: "Delete this recording? This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await apiFetch(`/api/videos/${video.id}`, { method: "DELETE" });
+        navigate("/library");
+      },
+    });
   }
 
   if (loading) {
@@ -1757,6 +1794,26 @@ export function VideoDetail() {
         >
           {toast}
         </div>
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          danger={confirmDialog.danger}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {promptDialog && (
+        <PromptDialog
+          title={promptDialog.title}
+          placeholder={promptDialog.placeholder}
+          submitLabel={promptDialog.submitLabel}
+          onSubmit={promptDialog.onSubmit}
+          onCancel={() => setPromptDialog(null)}
+        />
       )}
     </div>
   );

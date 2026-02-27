@@ -25,6 +25,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   const [captureHeight, setCaptureHeight] = useState(1080);
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
+  const [mediaError, setMediaError] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -183,6 +184,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
   }, [stopAllStreams, stopCompositing]);
 
   async function toggleWebcam() {
+    setMediaError(null);
     if (webcamEnabled) {
       stopWebcamStream();
       setWebcamEnabled(false);
@@ -197,11 +199,12 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       setWebcamEnabled(true);
     } catch (err) {
       console.error("Webcam access failed", err);
-      alert("Could not access your camera. Please allow camera access and try again.");
+      setMediaError("Could not access your camera. Please allow camera access and try again.");
     }
   }
 
   async function startRecording() {
+    setMediaError(null);
     try {
       const displayMediaOptions: DisplayMediaStreamOptions & Record<string, unknown> = {
         video: true,
@@ -291,7 +294,18 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       const handleStop = async () => {
         const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeTypeRef.current) });
         const elapsed = elapsedSeconds();
-        const webcamBlob = webcamBlobPromiseRef.current ? await webcamBlobPromiseRef.current : undefined;
+
+        let webcamBlob: Blob | undefined;
+        if (webcamBlobPromiseRef.current) {
+          const timeout = new Promise<undefined>((resolve) => {
+            setTimeout(() => {
+              console.warn("Webcam blob promise timed out after 10s");
+              resolve(undefined);
+            }, 10_000);
+          });
+          webcamBlob = await Promise.race([webcamBlobPromiseRef.current, timeout]);
+        }
+
         stopAllStreams();
         onRecordingComplete(blob, elapsed, webcamBlob);
       };
@@ -338,7 +352,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       setRecordingState("countdown");
     } catch (err) {
       console.error("Screen capture failed", err);
-      alert("Screen recording was blocked or failed. Please allow screen capture and try again.");
+      setMediaError("Screen recording was blocked or failed. Please allow screen capture and try again.");
       stopAllStreams();
     }
   }
@@ -480,6 +494,40 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
       {/* Idle UI */}
       {isIdle && (
         <>
+          {mediaError && (
+            <div
+              role="alert"
+              style={{
+                background: "rgba(239, 68, 68, 0.1)",
+                border: "1px solid var(--color-error)",
+                borderRadius: 8,
+                padding: "12px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                width: "100%",
+                maxWidth: 480,
+              }}
+            >
+              <span style={{ color: "var(--color-error)", fontSize: 13 }}>{mediaError}</span>
+              <button
+                onClick={() => setMediaError(null)}
+                aria-label="Dismiss error"
+                style={{
+                  background: "transparent",
+                  color: "var(--color-error)",
+                  border: "none",
+                  fontSize: 16,
+                  cursor: "pointer",
+                  padding: "2px 6px",
+                  lineHeight: 1,
+                }}
+              >
+                &times;
+              </button>
+            </div>
+          )}
           {maxDurationSeconds > 0 && (
             <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: 0 }}>
               Maximum recording length: {formatDuration(maxDurationSeconds)}
@@ -536,7 +584,7 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
 
       {/* Recording controls — always above preview */}
       {isRecording && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center", order: -1 }}>
+        <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center", order: -1 }}>
           <div
             style={{
               display: "flex",

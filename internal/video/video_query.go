@@ -85,7 +85,7 @@ type watchResponse struct {
 }
 
 func generateShareToken() (string, error) {
-	b := make([]byte, 9)
+	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("generate random bytes: %w", err)
 	}

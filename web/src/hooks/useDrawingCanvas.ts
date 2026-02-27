@@ -31,6 +31,8 @@ export function useDrawingCanvas({
   const [lineWidth, setLineWidth] = useState(2);
   const isDrawing = useRef(false);
   const lastPosition = useRef({ x: 0, y: 0 });
+  const pendingPointerRef = useRef<PointerEvent | null>(null);
+  const rafIdRef = useRef<number>(0);
 
   const scalePointerToCanvas = useCallback(
     (e: PointerEvent) => {
@@ -70,31 +72,46 @@ export function useDrawingCanvas({
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
       if (!drawMode || !isDrawing.current) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      pendingPointerRef.current = e;
+      if (rafIdRef.current) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = 0;
+        const pending = pendingPointerRef.current;
+        if (!pending || !isDrawing.current) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
 
-      const pos = scalePointerToCanvas(e);
-      ctx.lineWidth = lineWidth;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = drawColor;
-      ctx.beginPath();
-      ctx.moveTo(lastPosition.current.x, lastPosition.current.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-      lastPosition.current = pos;
+        const pos = scalePointerToCanvas(pending);
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = drawColor;
+        ctx.beginPath();
+        ctx.moveTo(lastPosition.current.x, lastPosition.current.y);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        lastPosition.current = pos;
+      });
     },
     [drawMode, drawColor, lineWidth, canvasRef, scalePointerToCanvas],
   );
 
   const handlePointerUp = useCallback(() => {
     isDrawing.current = false;
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = 0;
+    }
   }, []);
 
   const handlePointerLeave = useCallback(() => {
     isDrawing.current = false;
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = 0;
+    }
   }, []);
 
   return {

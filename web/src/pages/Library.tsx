@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 interface Video {
   id: string;
@@ -112,6 +113,12 @@ export function Library() {
   const [sidebarMenuId, setSidebarMenuId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+    confirmLabel?: string;
+    danger?: boolean;
+  } | null>(null);
 
   const fetchVideosAndLimits = useCallback(async (query = "", filter = "all") => {
     const params = new URLSearchParams();
@@ -213,18 +220,23 @@ export function Library() {
     toastTimer.current = setTimeout(() => setToast(null), 2000);
   }
 
-  async function deleteVideo(id: string) {
-    if (!window.confirm("Delete this recording? This cannot be undone.")) {
-      return;
-    }
-    setDeletingId(id);
-    try {
-      await apiFetch(`/api/videos/${id}`, { method: "DELETE" });
-      setVideos((prev) => prev.filter((v) => v.id !== id));
-      setLimits((prev) => prev ? { ...prev, videosUsedThisMonth: Math.max(0, prev.videosUsedThisMonth - 1) } : prev);
-    } finally {
-      setDeletingId(null);
-    }
+  function deleteVideo(id: string) {
+    setConfirmDialog({
+      message: "Delete this recording? This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setDeletingId(id);
+        try {
+          await apiFetch(`/api/videos/${id}`, { method: "DELETE" });
+          setVideos((prev) => prev.filter((v) => v.id !== id));
+          setLimits((prev) => prev ? { ...prev, videosUsedThisMonth: Math.max(0, prev.videosUsedThisMonth - 1) } : prev);
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   }
 
   async function copyLink(shareUrl: string) {
@@ -279,14 +291,21 @@ export function Library() {
     await fetchFoldersAndTags();
   }
 
-  async function deleteSidebarItem(type: "folder" | "tag", id: string) {
+  function deleteSidebarItem(type: "folder" | "tag", id: string) {
     const msg = type === "folder" ? "Delete this folder? Videos will become unfiled." : "Delete this tag? It will be removed from all videos.";
-    if (!window.confirm(msg)) return;
-    const url = type === "folder" ? `/api/folders/${id}` : `/api/tags/${id}`;
-    await apiFetch(url, { method: "DELETE" });
-    if (activeFilter === `${type}:${id}`) setActiveFilter("all");
-    await fetchFoldersAndTags();
-    await fetchVideosAndLimits(searchQuery, activeFilter === `${type}:${id}` ? "all" : activeFilter);
+    setConfirmDialog({
+      message: msg,
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        const url = type === "folder" ? `/api/folders/${id}` : `/api/tags/${id}`;
+        await apiFetch(url, { method: "DELETE" });
+        if (activeFilter === `${type}:${id}`) setActiveFilter("all");
+        await fetchFoldersAndTags();
+        await fetchVideosAndLimits(searchQuery, activeFilter === `${type}:${id}` ? "all" : activeFilter);
+      },
+    });
   }
 
   function toggleSelect(id: string) {
@@ -306,22 +325,30 @@ export function Library() {
     setSelectedIds(new Set());
   }
 
-  async function batchDelete() {
-    if (!window.confirm(`Delete ${selectedIds.size} video(s)? This cannot be undone.`)) return;
-    setBatchLoading(true);
-    try {
-      await apiFetch("/api/videos/batch/delete", {
-        method: "POST",
-        body: JSON.stringify({ videoIds: Array.from(selectedIds) }),
-      });
-      showToast(`Deleted ${selectedIds.size} video(s)`);
-      setSelectedIds(new Set());
-      fetchVideosAndLimits(searchQuery, activeFilter);
-    } catch {
-      showToast("Failed to delete videos");
-    } finally {
-      setBatchLoading(false);
-    }
+  function batchDelete() {
+    const count = selectedIds.size;
+    setConfirmDialog({
+      message: `Delete ${count} video(s)? This cannot be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setBatchLoading(true);
+        try {
+          await apiFetch("/api/videos/batch/delete", {
+            method: "POST",
+            body: JSON.stringify({ videoIds: Array.from(selectedIds) }),
+          });
+          showToast(`Deleted ${count} video(s)`);
+          setSelectedIds(new Set());
+          fetchVideosAndLimits(searchQuery, activeFilter);
+        } catch {
+          showToast("Failed to delete videos");
+        } finally {
+          setBatchLoading(false);
+        }
+      },
+    });
   }
 
   async function batchSetFolder(folderId: string | null) {
@@ -852,6 +879,16 @@ export function Library() {
         >
           {toast}
         </div>
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          danger={confirmDialog.danger}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

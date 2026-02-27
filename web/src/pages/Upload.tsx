@@ -94,7 +94,7 @@ export function Upload() {
   function handleDragLeave(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
-    dragCounter.current--;
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
     if (dragCounter.current === 0) {
       setDragging(false);
     }
@@ -186,17 +186,22 @@ export function Upload() {
         videoId = result.id;
         setProgress(20);
 
-        const uploadResp = await fetch(result.uploadUrl, {
-          method: "PUT",
-          body: entry.file,
-          headers: { "Content-Type": fileContentType },
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", result.uploadUrl);
+          xhr.setRequestHeader("Content-Type", fileContentType);
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              setProgress(20 + Math.round((e.loaded / e.total) * 60));
+            }
+          };
+          xhr.onload = () =>
+            xhr.status >= 200 && xhr.status < 300
+              ? resolve()
+              : reject(new Error("Upload failed"));
+          xhr.onerror = () => reject(new Error("Upload failed"));
+          xhr.send(entry.file);
         });
-
-        if (!uploadResp.ok) {
-          throw new Error("Upload failed");
-        }
-
-        setProgress(80);
 
         await apiFetch(`/api/videos/${result.id}`, {
           method: "PATCH",
@@ -271,7 +276,10 @@ export function Upload() {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minHeight: "calc(100vh - 56px)", padding: 24 }}>
         <div style={{ width: "100%", maxWidth: 480 }}>
-          <div style={{
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
             background: "var(--color-surface)",
             border: "1px solid var(--color-border)",
             borderRadius: 12,

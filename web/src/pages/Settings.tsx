@@ -1,7 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 interface UserProfile {
   name: string;
@@ -99,9 +101,16 @@ export function Settings() {
   const [billingEnabled, setBillingEnabled] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
   const [billingMessage, setBillingMessage] = useState("");
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
   const [transcriptionLanguage, setTranscriptionLanguage] = useState("auto");
+
+  const nameIsDirty = profile !== null && name !== profile.name;
+  useUnsavedChanges(nameIsDirty);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -471,8 +480,17 @@ export function Settings() {
     }
   }
 
-  async function handleCancelSubscription() {
-    if (!confirm("Cancel your Pro subscription? You'll keep access until the end of your billing period.")) return;
+  function handleCancelSubscription() {
+    setConfirmDialog({
+      message: "Cancel your Pro subscription? You'll keep access until the end of your billing period.",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        handleCancelSubscriptionConfirmed();
+      },
+    });
+  }
+
+  async function handleCancelSubscriptionConfirmed() {
     setCanceling(true);
     setBillingMessage("");
     try {
@@ -1693,6 +1711,16 @@ h1                /* Video title */
           {savingPassword ? "Updating..." : "Change password"}
         </button>
       </form>
+
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          confirmLabel="Cancel subscription"
+          danger
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
     </div>
   );
 }

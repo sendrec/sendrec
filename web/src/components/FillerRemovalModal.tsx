@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 interface TranscriptSegment {
   start: number;
@@ -30,6 +31,9 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(contentRef);
 
   useEffect(() => {
     fetch(`/api/watch/${shareToken}`)
@@ -114,7 +118,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
           display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
         }}
       >
-        <div style={{
+        <div role="dialog" aria-modal="true" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
@@ -133,7 +137,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
         }}
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div style={{
+        <div role="dialog" aria-modal="true" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
@@ -165,7 +169,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
         }}
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div style={{
+        <div role="dialog" aria-modal="true" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
@@ -196,7 +200,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{
+      <div ref={contentRef} role="dialog" aria-modal="true" style={{
         background: "var(--color-surface)", border: "1px solid var(--color-border)",
         borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
       }}>

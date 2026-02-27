@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Playlists } from "./Playlists";
@@ -194,9 +194,8 @@ describe("Playlists", () => {
     });
   });
 
-  it("confirms before deleting a playlist", async () => {
+  it("shows confirm dialog before deleting a playlist", async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     mockApiFetch.mockResolvedValueOnce([makePlaylist()]);
     renderPlaylists();
 
@@ -206,16 +205,17 @@ describe("Playlists", () => {
 
     await user.click(screen.getByRole("button", { name: "Delete playlist" }));
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      "Delete this playlist? Videos will not be deleted.",
-    );
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByText("Delete this playlist? Videos will not be deleted.")).toBeInTheDocument();
+
+    await user.click(within(screen.getByRole("alertdialog")).getByText("Cancel"));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     // Should not have called delete API (only initial fetch)
     expect(mockApiFetch).toHaveBeenCalledTimes(1);
   });
 
   it("deletes playlist when confirmed", async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     mockApiFetch.mockResolvedValueOnce([makePlaylist()]);
     renderPlaylists();
 
@@ -228,6 +228,9 @@ describe("Playlists", () => {
     mockApiFetch.mockResolvedValueOnce([]);
 
     await user.click(screen.getByRole("button", { name: "Delete playlist" }));
+
+    const dialog = screen.getByRole("alertdialog");
+    await user.click(within(dialog).getByText("Delete"));
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/playlists/pl-1", {

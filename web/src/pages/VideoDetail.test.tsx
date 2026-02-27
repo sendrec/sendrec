@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { VideoDetail } from "./VideoDetail";
 
@@ -1223,10 +1223,8 @@ describe("VideoDetail", () => {
   });
 
   it("deletes video and navigates to library on confirm", async () => {
-    const video = makeVideo();
     setupDefaultMocks();
     mockApiFetch.mockResolvedValueOnce(undefined);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderVideoDetail("v1");
 
@@ -1235,6 +1233,9 @@ describe("VideoDetail", () => {
     });
 
     fireEvent.click(screen.getByText("Delete video"));
+
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByText("Delete"));
 
     await waitFor(() => {
       expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/v1", {
@@ -1248,9 +1249,7 @@ describe("VideoDetail", () => {
   });
 
   it("does not delete when confirm is cancelled", async () => {
-    const video = makeVideo();
     setupDefaultMocks();
-    vi.spyOn(window, "confirm").mockReturnValue(false);
 
     renderVideoDetail("v1");
 
@@ -1260,7 +1259,11 @@ describe("VideoDetail", () => {
 
     fireEvent.click(screen.getByText("Delete video"));
 
-    // Should not have called delete API (only the initial 5 setup calls)
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByText("Cancel"));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    // Should not have called delete API (only the initial 6 setup calls)
     expect(mockApiFetch).toHaveBeenCalledTimes(6);
   });
 

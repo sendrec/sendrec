@@ -48,6 +48,11 @@ describe("useDrawingCanvas", () => {
     ctx = createMockContext();
     canvas = createMockCanvas(ctx, 640, 360);
     canvasRef = { current: canvas };
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
   });
 
   it("has drawMode false and drawColor red initially", () => {

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PromptDialog } from "../components/PromptDialog";
 
 interface PlaylistVideo {
   id: string;
@@ -70,6 +72,18 @@ export function PlaylistDetail() {
 
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+    confirmLabel?: string;
+    danger?: boolean;
+  } | null>(null);
+  const [promptDialog, setPromptDialog] = useState<{
+    title: string;
+    onSubmit: (value: string) => void;
+    placeholder?: string;
+    submitLabel?: string;
+  } | null>(null);
 
   const fetchPlaylist = useCallback(async () => {
     try {
@@ -164,27 +178,40 @@ export function PlaylistDetail() {
     );
   }
 
-  async function setSharePassword() {
+  function setSharePassword() {
     if (!playlist) return;
-    const password = window.prompt("Enter a password for this playlist:");
-    if (!password) return;
-    await apiFetch(`/api/playlists/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ sharePassword: password }),
+    setPromptDialog({
+      title: "Enter a password for this playlist:",
+      placeholder: "Password",
+      submitLabel: "Set password",
+      onSubmit: async (password) => {
+        setPromptDialog(null);
+        await apiFetch(`/api/playlists/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ sharePassword: password }),
+        });
+        setPlaylist((prev) => (prev ? { ...prev, hasPassword: true } : prev));
+        showToast("Password set");
+      },
     });
-    setPlaylist((prev) => (prev ? { ...prev, hasPassword: true } : prev));
-    showToast("Password set");
   }
 
-  async function removeSharePassword() {
+  function removeSharePassword() {
     if (!playlist) return;
-    if (!window.confirm("Remove the password from this playlist?")) return;
-    await apiFetch(`/api/playlists/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ sharePassword: "" }),
+    setConfirmDialog({
+      message: "Remove the password from this playlist?",
+      confirmLabel: "Remove",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await apiFetch(`/api/playlists/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ sharePassword: "" }),
+        });
+        setPlaylist((prev) => (prev ? { ...prev, hasPassword: false } : prev));
+        showToast("Password removed");
+      },
     });
-    setPlaylist((prev) => (prev ? { ...prev, hasPassword: false } : prev));
-    showToast("Password removed");
   }
 
   async function removeVideo(videoId: string) {
@@ -269,16 +296,18 @@ export function PlaylistDetail() {
     });
   }
 
-  async function deletePlaylist() {
+  function deletePlaylist() {
     if (!playlist) return;
-    if (
-      !window.confirm(
-        "Delete this playlist? Videos will not be deleted.",
-      )
-    )
-      return;
-    await apiFetch(`/api/playlists/${id}`, { method: "DELETE" });
-    navigate("/playlists");
+    setConfirmDialog({
+      message: "Delete this playlist? Videos will not be deleted.",
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await apiFetch(`/api/playlists/${id}`, { method: "DELETE" });
+        navigate("/playlists");
+      },
+    });
   }
 
   if (loading) {
@@ -958,6 +987,26 @@ export function PlaylistDetail() {
         >
           {toast}
         </div>
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          danger={confirmDialog.danger}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {promptDialog && (
+        <PromptDialog
+          title={promptDialog.title}
+          placeholder={promptDialog.placeholder}
+          submitLabel={promptDialog.submitLabel}
+          onSubmit={promptDialog.onSubmit}
+          onCancel={() => setPromptDialog(null)}
+        />
       )}
     </div>
   );

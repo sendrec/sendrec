@@ -9,6 +9,7 @@ class ApiError extends Error {
 }
 
 let accessToken: string | null = null;
+let refreshPromise: Promise<string> | null = null;
 
 function setAccessToken(token: string | null): void {
   accessToken = token;
@@ -49,7 +50,12 @@ async function apiFetch<T>(
 
   if (response.status === 401 && accessToken) {
     try {
-      const newToken = await refreshToken();
+      if (!refreshPromise) {
+        refreshPromise = refreshToken().finally(() => {
+          refreshPromise = null;
+        });
+      }
+      const newToken = await refreshPromise;
       setAccessToken(newToken);
       headers.set("Authorization", `Bearer ${newToken}`);
       response = await fetch(path, { ...options, headers });
@@ -82,7 +88,12 @@ async function apiFetch<T>(
 
 async function tryRefreshToken(): Promise<boolean> {
   try {
-    const token = await refreshToken();
+    if (!refreshPromise) {
+      refreshPromise = refreshToken().finally(() => {
+        refreshPromise = null;
+      });
+    }
+    const token = await refreshPromise;
     setAccessToken(token);
     return true;
   } catch {

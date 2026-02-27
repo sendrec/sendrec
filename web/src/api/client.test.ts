@@ -137,6 +137,48 @@ describe("apiFetch", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("deduplicates concurrent 401 refresh calls", async () => {
+    setAccessToken("expired-token");
+
+    let refreshCallCount = 0;
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/auth/refresh") {
+        refreshCallCount++;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ accessToken: "new-token" }),
+        });
+      }
+      // First two calls: both return 401
+      if (fetchMock.mock.calls.filter((c: string[]) => c[0] !== "/api/auth/refresh").length <= 2) {
+        return Promise.resolve({
+          ok: false,
+          status: 401,
+          statusText: "Unauthorized",
+          json: () => Promise.resolve({ error: "token expired" }),
+        });
+      }
+      // Retry calls: success
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ data: "ok" }),
+      });
+    });
+
+    globalThis.fetch = fetchMock;
+
+    const [result1, result2] = await Promise.all([
+      apiFetch("/api/test1"),
+      apiFetch("/api/test2"),
+    ]);
+
+    expect(result1).toEqual({ data: "ok" });
+    expect(result2).toEqual({ data: "ok" });
+    expect(refreshCallCount).toBe(1);
+  });
+
   it("redirects to /login when refresh fails", async () => {
     setAccessToken("expired-token");
 
