@@ -3,10 +3,14 @@ import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
 import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 
+const MIN_RECORDING_SECONDS = 1;
+const MIN_RECORDING_BYTES = 1024;
+
 type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 
 interface RecorderProps {
   onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void;
+  onRecordingError?: (message: string) => void;
   maxDurationSeconds?: number;
 }
 
@@ -16,7 +20,7 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${String(remaining).padStart(2, "0")}`;
 }
 
-export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: RecorderProps) {
+export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSeconds = 0 }: RecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [duration, setDuration] = useState(0);
   const [countdownValue, setCountdownValue] = useState(3);
@@ -294,6 +298,12 @@ export function Recorder({ onRecordingComplete, maxDurationSeconds = 0 }: Record
         const elapsed = elapsedSeconds();
         const webcamBlob = webcamBlobPromiseRef.current ? await webcamBlobPromiseRef.current : undefined;
         stopAllStreams();
+
+        if (elapsed < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES) {
+          onRecordingError?.("Recording too short. Please record for at least 1 second.");
+          return;
+        }
+
         onRecordingComplete(blob, elapsed, webcamBlob);
       };
 

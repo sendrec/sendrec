@@ -18,6 +18,30 @@ interface LimitsResponse {
   videosUsedThisMonth: number;
 }
 
+function uploadWithProgress(
+  url: string,
+  blob: Blob,
+  contentType: string,
+  onProgress: (pct: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", contentType);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error("Upload failed"));
+    };
+    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.send(blob);
+  });
+}
+
 export function Record() {
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<"record" | "upload">(() =>
@@ -25,6 +49,7 @@ export function Record() {
   );
   const [uploading, setUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState("");
+  const [uploadPercent, setUploadPercent] = useState(0);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
@@ -73,27 +98,13 @@ export function Record() {
       videoId = result.id;
 
       setUploadStep("Uploading recording...");
-      const uploadResp = await fetch(result.uploadUrl, {
-        method: "PUT",
-        body: blob,
-        headers: { "Content-Type": contentType },
-      });
-
-      if (!uploadResp.ok) {
-        throw new Error("Upload failed");
-      }
+      setUploadPercent(0);
+      await uploadWithProgress(result.uploadUrl, blob, contentType, setUploadPercent);
 
       if (webcamBlob && result.webcamUploadUrl) {
         setUploadStep("Uploading camera...");
-        const webcamResp = await fetch(result.webcamUploadUrl, {
-          method: "PUT",
-          body: webcamBlob,
-          headers: { "Content-Type": webcamBlob.type || "video/webm" },
-        });
-
-        if (!webcamResp.ok) {
-          throw new Error("Webcam upload failed");
-        }
+        setUploadPercent(0);
+        await uploadWithProgress(result.webcamUploadUrl, webcamBlob, webcamBlob.type || "video/webm", setUploadPercent);
       }
 
       setUploadStep("Finalizing...");
@@ -113,6 +124,10 @@ export function Record() {
     }
   }
 
+  function handleRecordingError(message: string) {
+    setError(message);
+  }
+
   useEffect(() => {
     if (!uploading) return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -123,6 +138,14 @@ export function Record() {
   }, [uploading]);
 
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (shareUrl) {
+      navigator.clipboard.writeText(shareUrl).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [shareUrl]);
 
   async function copyShareUrl() {
     if (!shareUrl) return;
@@ -160,6 +183,14 @@ export function Record() {
       <div className="page-container page-container--centered">
         <div style={{ textAlign: "center" }}>
           <p className="max-duration-label" style={{ marginBottom: 8 }}>{uploadStep || "Uploading..."}</p>
+          {uploadStep.includes("Uploading") && (
+            <>
+              <div className="upload-progress-bar">
+                <div className="upload-progress-fill" style={{ width: `${uploadPercent}%` }} />
+              </div>
+              <p className="upload-progress-percent">{uploadPercent}%</p>
+            </>
+          )}
           <p className="max-duration-label" style={{ opacity: 0.7 }}>Please don't close this page</p>
         </div>
       </div>
@@ -203,6 +234,9 @@ export function Record() {
   if (quotaReached) {
     return (
       <div className="page-container page-container--centered">
+        <div className="usage-bar" style={{ maxWidth: 300, margin: "0 auto 16px" }}>
+          <div className="usage-bar-fill usage-bar-fill--warning" style={{ width: "100%" }} />
+        </div>
         <p className="quota-message">
           You've reached your limit of {limits!.maxVideosPerMonth} videos this month.
         </p>
@@ -219,9 +253,21 @@ export function Record() {
     return (
       <div className="page-container page-container--centered">
         <div className="share-container">
-          <h2 className="share-heading">Recording complete</h2>
+          <div className="share-checkmark">
+            <svg viewBox="0 0 48 48" fill="none">
+              <circle cx="24" cy="24" r="24" fill="rgba(0, 182, 122, 0.12)" />
+              <path d="M15 25l6 6 12-12" stroke="#00b67a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <h2 className="share-heading">Your video is ready!</h2>
           <div className="share-link-row">
-            <span className="share-link-input">{shareUrl}</span>
+            <input
+              type="text"
+              readOnly
+              className="share-link-input"
+              value={shareUrl}
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+            />
             <button className="btn-copy" onClick={copyShareUrl}>
               {copied ? "Copied!" : "Copy link"}
             </button>
@@ -302,11 +348,13 @@ export function Record() {
         screenRecordingSupported && !useCameraOnly ? (
           <Recorder
             onRecordingComplete={handleRecordingComplete}
+            onRecordingError={handleRecordingError}
             maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
           />
         ) : (
           <CameraRecorder
             onRecordingComplete={handleRecordingComplete}
+            onRecordingError={handleRecordingError}
             maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
           />
         )

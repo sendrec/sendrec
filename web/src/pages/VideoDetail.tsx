@@ -206,6 +206,7 @@ export function VideoDetail() {
   const [documentContent, setDocumentContent] = useState<string | null>(null);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
 
   const [brandingOpen, setBrandingOpen] = useState(false);
@@ -474,13 +475,14 @@ export function VideoDetail() {
 
   useEffect(() => {
     if (
+      video?.status === "processing" ||
       video?.documentStatus === "pending" ||
       video?.documentStatus === "processing"
     ) {
       const interval = setInterval(() => refetchVideo(), 3000);
       return () => clearInterval(interval);
     }
-  }, [video?.documentStatus]);
+  }, [video?.status, video?.documentStatus]);
 
   async function acceptSuggestedTitle() {
     if (!video || !video.suggestedTitle) return;
@@ -698,10 +700,37 @@ export function VideoDetail() {
 
   if (loading) {
     return (
-      <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>
-          Loading...
-        </p>
+      <div className="page-container">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <div className="skeleton" style={{ height: 16, width: 80, borderRadius: 4 }} />
+        </div>
+        <div className="video-detail-hero">
+          <div className="skeleton skeleton-thumb" style={{ aspectRatio: "16/9" }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="skeleton skeleton-title" style={{ width: "60%", marginBottom: 12 }} />
+            <div className="skeleton skeleton-meta" style={{ width: "40%" }} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 16, marginBottom: 24 }}>
+          <div className="skeleton skeleton-btn" />
+          <div className="skeleton skeleton-btn" />
+          <div className="skeleton skeleton-btn" />
+        </div>
+        <div className="skeleton-section">
+          <div className="skeleton skeleton-section-title" />
+          <div className="skeleton skeleton-row" />
+          <div className="skeleton skeleton-row" />
+        </div>
+        <div className="skeleton-section">
+          <div className="skeleton skeleton-section-title" />
+          <div className="skeleton skeleton-row" />
+        </div>
+        <div className="skeleton-section">
+          <div className="skeleton skeleton-section-title" />
+          <div className="skeleton skeleton-row" />
+          <div className="skeleton skeleton-row" />
+          <div className="skeleton skeleton-row" />
+        </div>
       </div>
     );
   }
@@ -758,20 +787,49 @@ export function VideoDetail() {
       </div>
 
       <div className="video-detail-hero">
-        {videoUrl ? (
-          <video
-            src={videoUrl}
-            controls
-            className="video-detail-thumbnail"
-            poster={video.thumbnailUrl}
-          />
-        ) : video.thumbnailUrl ? (
-          <img
-            src={video.thumbnailUrl}
-            alt="Video thumbnail"
-            className="video-detail-thumbnail"
-          />
-        ) : null}
+        <div style={{ position: "relative" }}>
+          {videoUrl ? (
+            videoError ? (
+              <div className="video-detail-thumbnail video-error-placeholder">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+                <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginTop: 12 }}>
+                  Video failed to load
+                </p>
+              </div>
+            ) : (
+              <video
+                src={videoUrl}
+                controls
+                className="video-detail-thumbnail"
+                poster={video.thumbnailUrl}
+                onError={() => setVideoError(true)}
+              />
+            )
+          ) : video.thumbnailUrl ? (
+            <img
+              src={video.thumbnailUrl}
+              alt="Video thumbnail"
+              className="video-detail-thumbnail"
+            />
+          ) : (
+            <div className="video-detail-thumbnail video-thumbnail-placeholder">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+              </svg>
+            </div>
+          )}
+          {video.status === "processing" && (
+            <div className="hero-processing-overlay">
+              <p className="hero-processing-pulse">Processing video...</p>
+              <p className="hero-processing-sub">This usually takes a minute or two</p>
+            </div>
+          )}
+        </div>
 
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -856,6 +914,13 @@ export function VideoDetail() {
             </span>
           </p>
 
+          {video.status === "processing" && (
+            <span className="status-badge status-badge--processing">
+              <span className="status-badge-dot" />
+              Processing
+            </span>
+          )}
+
           {video.tags.length > 0 && (
             <div
               style={{
@@ -900,15 +965,25 @@ export function VideoDetail() {
 
       {/* Primary Actions Bar */}
       <div className="detail-actions">
-        <button className="detail-btn detail-btn--accent" onClick={copyLink}>
+        <button
+          className="detail-btn detail-btn--accent"
+          onClick={copyLink}
+          disabled={video.status === "processing"}
+          style={{ opacity: video.status === "processing" ? 0.5 : undefined }}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           Copy share link
         </button>
-        <button className="detail-btn" onClick={() => navigate(`/videos/${video.id}/analytics`)}>
+        <button
+          className="detail-btn"
+          onClick={() => navigate(`/videos/${video.id}/analytics`)}
+          disabled={video.status === "processing"}
+          style={{ opacity: video.status === "processing" ? 0.5 : undefined }}
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
           View analytics
         </button>
-        {videoUrl && (
+        {video.status === "ready" && videoUrl && (
           <a href={videoUrl} download className="detail-btn" style={{ textDecoration: "none" }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download
@@ -922,27 +997,33 @@ export function VideoDetail() {
 
         <div className="detail-setting-row">
           <span className="detail-setting-label">Share link</span>
-          <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}>
-            <input
-              type="text"
-              readOnly
-              value={video.shareUrl}
-              aria-label="Share link"
-              style={{
-                flex: 1,
-                minWidth: 0,
-                padding: "6px 10px",
-                fontSize: 13,
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 4,
-                color: "var(--color-text)",
-              }}
-            />
-            <button onClick={copyLink} className="detail-btn">
-              Copy link
-            </button>
-          </div>
+          {video.status === "processing" ? (
+            <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
+              Available once processing completes
+            </span>
+          ) : (
+            <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}>
+              <input
+                type="text"
+                readOnly
+                value={video.shareUrl}
+                aria-label="Share link"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "6px 10px",
+                  fontSize: 13,
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 4,
+                  color: "var(--color-text)",
+                }}
+              />
+              <button onClick={copyLink} className="detail-btn">
+                Copy link
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="detail-setting-row">
@@ -1290,6 +1371,7 @@ export function VideoDetail() {
           <button
             onClick={() => setShowTrimModal(true)}
             className="detail-btn"
+            disabled={video.status === "processing"}
           >
             Trim video
           </button>
@@ -1313,6 +1395,7 @@ export function VideoDetail() {
             <button
               onClick={() => setShowFillerModal(true)}
               className="detail-btn"
+              disabled={video.status === "processing"}
             >
               Remove fillers
             </button>

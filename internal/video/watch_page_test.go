@@ -27,6 +27,7 @@ var watchPageColumns = []string{
 	"summary", "chapters", "summary_status",
 	"duration",
 	"subscription_plan",
+	"status",
 }
 
 func watchPageRequest(shareToken string) *http.Request {
@@ -116,6 +117,7 @@ func TestWatchPage_Expired_Returns410(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -159,6 +161,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -216,6 +219,7 @@ func TestWatchPage_Success_RendersSpeedButtons(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -274,6 +278,7 @@ func TestWatchPage_WithThumbnail_RendersPosterAndOGImage(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -320,6 +325,7 @@ func TestWatchPage_WithoutThumbnail_NoPosterOrOGImage(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -366,6 +372,7 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -444,6 +451,7 @@ func TestWatchPage_CommentsDisabled_NoCommentForm(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -493,6 +501,7 @@ func TestWatchPage_NameRequired_RendersNameField(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -539,6 +548,7 @@ func TestWatchPage_NameEmailRequired_RendersBothFields(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -592,6 +602,7 @@ func TestWatchPage_TranscriptReady_RendersSegments(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -651,6 +662,7 @@ func TestWatchPage_TranscriptPending_ShowsQueueMessage(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -694,6 +706,7 @@ func TestWatchPage_TranscriptProcessing_ShowsProgressMessage(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -737,6 +750,7 @@ func TestWatchPage_TranscriptFailed_ShowsFailedMessage(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -780,6 +794,7 @@ func TestWatchPage_StorageError_Returns500(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -819,6 +834,7 @@ func TestWatchPage_PasswordProtected_NoCookie_ShowsPasswordForm(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -870,6 +886,7 @@ func TestWatchPage_PasswordProtected_ValidCookie_ShowsPlayer(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -923,6 +940,7 @@ func TestWatchPage_OGMetaTags(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -974,6 +992,7 @@ func TestWatchPage_CrossOriginAttribute(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1017,6 +1036,7 @@ func TestWatchPage_PlaysInlineAttribute(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1060,6 +1080,7 @@ func TestWatchPage_CSPNonce(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1108,6 +1129,7 @@ func TestWatchPage_TitleInHTMLTitle(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1151,6 +1173,7 @@ func TestWatchPage_AutoplayScript(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1195,6 +1218,7 @@ func TestWatchPage_BrandingLogoLinksToSendrec(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1266,6 +1290,7 @@ func TestWatchPage_RecordsView(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1362,6 +1387,7 @@ func TestWatchPage_AnalyticsScriptRendered(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1410,6 +1436,7 @@ func TestWatchPage_NoAnalyticsWhenEmpty(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1454,6 +1481,7 @@ func TestWatchPage_ResponsiveCSS(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1500,6 +1528,7 @@ func TestWatchPage_SafariWebMWarningElement(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1546,6 +1575,7 @@ func TestWatchPage_DownloadEnabled_ShowsButton(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1592,6 +1622,7 @@ func TestWatchPage_DownloadDisabled_HidesButton(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1647,6 +1678,7 @@ func TestWatchPage_CustomCSS_Injected(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1692,6 +1724,7 @@ func TestWatchPage_NoCustomCSS(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -1736,6 +1769,7 @@ func TestWatchPage_NeverExpires(t *testing.T) {
 				(*string)(nil), (*string)(nil), "none",
 				0,
 				"free",
+				"ready",
 			),
 		)
 	expectViewRecording(mock, "vid-1")
@@ -1783,6 +1817,7 @@ func TestWatchPage_RendersCtaCard(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "video-001")
 
@@ -1831,6 +1866,7 @@ func TestWatchPage_NoCtaWhenNotSet(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "video-001")
 
@@ -1873,6 +1909,7 @@ func TestWatchPage_MilestoneTrackingScript(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "video-001")
 
@@ -1920,6 +1957,7 @@ func TestWatchPage_EmailGate_ShowsForm(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 
 	rec := serveWatchPage(handler, watchPageRequest(shareToken))
@@ -1981,6 +2019,7 @@ func TestWatchPage_SummaryTab(t *testing.T) {
 			&summaryText, &chaptersJSON, "ready",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2047,6 +2086,7 @@ func TestWatchPage_ChaptersBar(t *testing.T) {
 			&summaryText, &chaptersJSON, "ready",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2102,6 +2142,7 @@ func TestWatchPage_NoChaptersBar_WhenEmpty(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2146,6 +2187,7 @@ func TestWatchPage_OGDescription_WithSummary(t *testing.T) {
 			&summaryText, (*string)(nil), "ready",
 			154,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2192,6 +2234,7 @@ func TestWatchPage_OGDescription_FallbackToCreator(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			90,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2243,6 +2286,7 @@ func TestWatchPage_TwitterCardTags(t *testing.T) {
 			&summaryText, (*string)(nil), "ready",
 			120,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2297,6 +2341,7 @@ func TestWatchPage_OGImageUsesProxyURL(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2352,6 +2397,7 @@ func TestWatchPage_OGUrl(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2545,6 +2591,7 @@ func TestWatchPage_JSONLDVideoObject(t *testing.T) {
 			&summaryText, (*string)(nil), "ready",
 			154,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2599,6 +2646,7 @@ func TestWatchPage_JSONLDVideoObject_WithDownload(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			60,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2642,6 +2690,7 @@ func TestWatchPage_JSONLDVideoObject_NoDownload(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			60,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2684,6 +2733,7 @@ func TestWatchPage_CanonicalURL(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2727,6 +2777,7 @@ func TestWatchPage_MetaDescription(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			90,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "vid-1")
 
@@ -2769,6 +2820,7 @@ func TestWatchPageFreeUserAlwaysShowsSendRecBadge(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"free",
+			"ready",
 		))
 	expectViewRecording(mock, "video-id")
 
@@ -2814,6 +2866,7 @@ func TestWatchPageProUserCanRemoveSendRecBadge(t *testing.T) {
 			(*string)(nil), (*string)(nil), "none",
 			0,
 			"pro",
+			"ready",
 		))
 	expectViewRecording(mock, "video-id")
 
@@ -2831,4 +2884,86 @@ func TestWatchPageProUserCanRemoveSendRecBadge(t *testing.T) {
 	if strings.Contains(body, "Shared via") {
 		t.Error("pro user with custom footer should NOT show 'Shared via SendRec'")
 	}
+}
+
+func TestWatchPage_ProcessingStatus_ShowsProcessingState(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{downloadURL: "https://s3.example.com/video.webm"}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "proctoken123"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-1", "Processing Video", "recordings/u1/abc.webm", "Bob", createdAt, (*time.Time)(nil),
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+			false,
+			(*string)(nil), (*string)(nil), "none",
+			0,
+			"free",
+			"processing",
+		))
+	expectViewRecording(mock, "vid-1")
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Video is being processed") {
+		t.Error("expected processing message in response")
+	}
+	if strings.Contains(body, "<video") {
+		t.Error("should NOT render video element when processing")
+	}
+	waitAndCheckExpectations(t, mock)
+}
+
+func TestWatchPage_ProcessingStatus_HasMetaRefresh(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{downloadURL: "https://s3.example.com/video.webm"}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "proctoken456"
+	createdAt := time.Date(2026, 2, 5, 14, 0, 0, 0, time.UTC)
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"vid-2", "Processing Video 2", "recordings/u1/def.webm", "Alice", createdAt, (*time.Time)(nil),
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"owner-user-id", "owner@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+			false,
+			(*string)(nil), (*string)(nil), "none",
+			0,
+			"free",
+			"processing",
+		))
+	expectViewRecording(mock, "vid-2")
+
+	rec := serveWatchPage(handler, watchPageRequest(shareToken))
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `meta http-equiv="refresh"`) {
+		t.Error("expected meta refresh tag when processing")
+	}
+	waitAndCheckExpectations(t, mock)
 }

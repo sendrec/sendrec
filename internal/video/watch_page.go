@@ -110,6 +110,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
     <meta name="twitter:description" content="{{.Description}}">
     {{if .HasThumbnail}}<meta name="twitter:image" content="{{.BaseURL}}/api/watch/{{.ShareToken}}/thumbnail">{{end}}
     <script type="application/ld+json">{{.JSONLD}}</script>
+    {{if eq .VideoStatus "processing"}}<meta http-equiv="refresh" content="15">{{end}}
     <style nonce="{{.Nonce}}">
         :root {
             --brand-bg: {{.Branding.ColorBackground}};
@@ -146,6 +147,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             background: #000;
             border-radius: 8px;
             overflow: hidden;
+            aspect-ratio: 16/9;
             --player-accent: var(--brand-accent, #00b67a);
         }
 ` + playerCSS + `
@@ -708,6 +710,56 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             font-style: italic;
         }
 ` + safariWarningCSS + `
+        .processing-page {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+        }
+        .processing-container {
+            text-align: center;
+            max-width: 400px;
+        }
+        .processing-icon {
+            margin: 0 auto 1.5rem;
+        }
+        .processing-spinner {
+            animation: spin 1s linear infinite;
+            transform-origin: center;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .processing-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .processing-desc {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+        .processing-bar {
+            width: 200px;
+            height: 4px;
+            background: var(--brand-surface);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 0 auto;
+        }
+        .processing-bar-fill {
+            width: 40%;
+            height: 100%;
+            background: var(--brand-accent);
+            border-radius: 2px;
+            animation: indeterminate 1.5s ease-in-out infinite;
+        }
+        @keyframes indeterminate {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(350%); }
+        }
         @media (max-width: 640px) {
             .container { padding: 1rem 0.75rem; }
             .video-title { font-size: 20px; }
@@ -733,6 +785,21 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
 <body>
     <div class="container">
         <a href="{{.BaseURL}}" class="logo">{{if .Branding.LogoURL}}<img src="{{.Branding.LogoURL}}" alt="{{.Branding.CompanyName}}" width="20" height="20">{{end}}{{.Branding.CompanyName}}</a>
+        {{if eq .VideoStatus "processing"}}
+        <div class="processing-page">
+            <div class="processing-container">
+                <div class="processing-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--brand-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" opacity="0.2"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" class="processing-spinner"/>
+                    </svg>
+                </div>
+                <h1 class="processing-title">Video is being processed</h1>
+                <p class="processing-desc">This usually takes a minute or two. The page will automatically refresh when ready.</p>
+                <div class="processing-bar"><div class="processing-bar-fill"></div></div>
+            </div>
+        </div>
+        {{else}}
         <div class="player-container" id="player-container">
             <video id="player" playsinline webkit-playsinline{{if .TranscriptURL}} crossorigin="anonymous"{{end}}{{if not .DownloadEnabled}} controlsList="nodownload" oncontextmenu="return false;"{{end}}{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
                 <source src="{{.VideoURL}}" type="{{.ContentType}}">
@@ -1586,6 +1653,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         })();
         {{end}}
         </script>
+        {{end}}
         {{if eq .SubscriptionPlan "pro"}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Shared via <a href="https://sendrec.eu">SendRec</a>{{if not .Branding.FooterText}} — open-source video messaging{{end}}</p>{{end}}
     </div>
 {{.AnalyticsScript}}
@@ -1711,6 +1779,7 @@ type watchPageData struct {
 	HasThumbnail       bool
 	JSONLD             template.JS
 	SubscriptionPlan   string
+	VideoStatus        string
 }
 
 type expiredPageData struct {
@@ -1967,6 +2036,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 	var summaryStatus string
 	var duration int
 	var subscriptionPlan string
+	var status string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.comment_mode,
@@ -1976,7 +2046,8 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
 		        v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled,
 		        v.summary, v.chapters, v.summary_status, v.duration,
-		        u.subscription_plan
+		        u.subscription_plan,
+		        v.status
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
@@ -1989,7 +2060,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
 		&downloadEnabled,
 		&ctaText, &ctaUrl, &emailGateEnabled,
-		&summaryText, &chaptersJSON, &summaryStatus, &duration, &subscriptionPlan)
+		&summaryText, &chaptersJSON, &summaryStatus, &duration, &subscriptionPlan, &status)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -2078,6 +2149,25 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
 	}()
 
+	if status == "processing" {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := watchPageTemplate.Execute(w, watchPageData{
+			Title:            title,
+			VideoStatus:      status,
+			Nonce:            nonce,
+			Branding:         branding,
+			ShareToken:       shareToken,
+			BaseURL:          h.baseURL,
+			Segments:         make([]TranscriptSegment, 0),
+			Chapters:         make([]Chapter, 0),
+			AnalyticsScript:  injectScriptNonce(h.analyticsScript, nonce),
+			SubscriptionPlan: subscriptionPlan,
+		}); err != nil {
+			slog.Error("watch-page: failed to render processing page", "error", err)
+		}
+		return
+	}
+
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -2163,6 +2253,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		HasThumbnail:       thumbnailKey != nil,
 		JSONLD:             template.JS(jsonLD),
 		SubscriptionPlan:   subscriptionPlan,
+		VideoStatus:        status,
 	}); err != nil {
 		slog.Error("watch-page: failed to render watch page", "error", err)
 	}
