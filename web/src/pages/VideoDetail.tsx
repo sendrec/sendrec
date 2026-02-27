@@ -43,6 +43,7 @@ interface Video {
   documentStatus: string;
   folderId: string | null;
   transcriptionLanguage: string | null;
+  noiseReduction: boolean;
   tags: VideoTag[];
   playlists: { id: string; title: string }[];
 }
@@ -949,6 +950,12 @@ export function VideoDetail() {
             >
               {expiry.text}
             </span>
+            {video.noiseReduction && (
+              <>
+                <span>&middot;</span>
+                <span style={{ color: "var(--color-accent)" }}>Noise reduced</span>
+              </>
+            )}
           </p>
 
           {video.status === "processing" && (

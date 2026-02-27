@@ -48,6 +48,7 @@ type listItem struct {
 	SuggestedTitle        *string            `json:"suggestedTitle"`
 	FolderID              *string            `json:"folderId"`
 	TranscriptionLanguage *string            `json:"transcriptionLanguage"`
+	NoiseReduction        bool               `json:"noiseReduction"`
 	Tags                  []listItemTag      `json:"tags"`
 	Playlists             []listItemPlaylist `json:"playlists"`
 }
@@ -174,7 +175,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
 		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled, v.summary_status, v.document_status,
-		    v.suggested_title, v.folder_id, v.transcription_language,
+		    v.suggested_title, v.folder_id, v.transcription_language, v.noise_reduction,
 		    COALESCE((SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY t.name)
 		      FROM video_tags vt JOIN tags t ON t.id = vt.tag_id
 		      WHERE vt.video_id = v.id), '[]'::json) AS tags_json,
@@ -236,7 +237,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var sharePassword *string
 		var tagsJSON string
 		var playlistsJSON string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.DocumentStatus, &item.SuggestedTitle, &item.FolderID, &item.TranscriptionLanguage, &tagsJSON, &playlistsJSON); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.DocumentStatus, &item.SuggestedTitle, &item.FolderID, &item.TranscriptionLanguage, &item.NoiseReduction, &tagsJSON, &playlistsJSON); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}

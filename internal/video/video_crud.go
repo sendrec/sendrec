@@ -350,6 +350,14 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		if audioFilter != "" {
+			if _, err := h.db.Exec(r.Context(),
+				"UPDATE videos SET noise_reduction = true WHERE id = $1", videoID,
+			); err != nil {
+				slog.Error("failed to set noise_reduction on video", "video_id", videoID, "error", err)
+			}
+		}
+
 		if webcamKey != nil {
 			h.EnqueueJob(r.Context(), JobTypeComposite, videoID, map[string]any{
 				"fileKey":      fileKey,

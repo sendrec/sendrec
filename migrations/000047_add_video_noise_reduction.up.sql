@@ -1,0 +1,1 @@
+ALTER TABLE videos ADD COLUMN noise_reduction BOOLEAN NOT NULL DEFAULT false;
