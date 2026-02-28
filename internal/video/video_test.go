@@ -242,6 +242,7 @@ func TestCreate_Success(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"My Recording",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -304,6 +305,7 @@ func TestCreate_DefaultTitleWhenEmpty(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Untitled Recording",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -377,6 +379,7 @@ func TestCreate_DatabaseError(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Test Video",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -427,6 +430,7 @@ func TestCreate_StorageError(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Test Video",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -516,6 +520,7 @@ func TestCreate_AllowsDurationOfOneSecond(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Untitled Recording",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -598,6 +603,7 @@ func TestCreate_AllowsDurationWithinLimit(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Short Video",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -643,6 +649,7 @@ func TestCreate_AllowsAnyDurationWhenLimitIsZero(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Very Long Video",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -735,6 +742,7 @@ func TestCreate_AllowsWhenBelowMonthlyLimit(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Video 25",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -781,6 +789,7 @@ func TestCreate_SkipsMonthlyCheckWhenLimitIsZero(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Unlimited Video",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -867,6 +876,7 @@ func TestCreate_WithWebcam_ReturnsWebcamUploadURL(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Webcam Recording",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -924,6 +934,7 @@ func TestCreate_WithoutWebcam_OmitsWebcamUploadURL(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"No Webcam",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -977,6 +988,7 @@ func TestCreate_WithContentTypeMp4(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Camera Recording",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -1067,6 +1079,7 @@ func TestUpload_Success(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"My Video",
 			int(0),
 			int64(5000000),
@@ -2251,6 +2264,7 @@ func TestCreate_FileKeyContainsUserIDAndShareToken(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Test Video",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -3710,6 +3724,7 @@ func TestCreate_ProUserNoLimitCheck(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Pro User Video",
 			pgxmock.AnyArg(),
 			pgxmock.AnyArg(),
@@ -3756,6 +3771,7 @@ func TestUpload_ProUserNoLimitCheck(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO videos`).
 		WithArgs(
 			testUserID,
+			pgxmock.AnyArg(), // organization_id
 			"Pro Upload",
 			int(0),
 			int64(5000000),

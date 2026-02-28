@@ -110,7 +110,13 @@ type limitsResponse struct {
 func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
-	plan, _ := h.getUserPlan(r.Context(), userID)
+	orgID := auth.OrgIDFromContext(r.Context())
+	var plan string
+	if orgID != "" {
+		plan, _ = h.getOrgPlan(r.Context(), orgID)
+	} else {
+		plan, _ = h.getUserPlan(r.Context(), userID)
+	}
 
 	maxVideos := h.maxVideosPerMonth
 	maxDuration := h.maxVideoDurationSeconds
@@ -122,7 +128,11 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 	var videosUsed int
 	if maxVideos > 0 {
 		var err error
-		videosUsed, err = h.countVideosThisMonth(r.Context(), userID)
+		if orgID != "" {
+			videosUsed, err = h.countOrgVideosThisMonth(r.Context(), orgID)
+		} else {
+			videosUsed, err = h.countVideosThisMonth(r.Context(), userID)
+		}
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to check video limit")
 			return
@@ -191,8 +201,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	var args []any
 	paramIdx := 1
 
-	baseQuery += fmt.Sprintf(` AND v.user_id = $%d`, paramIdx)
-	args = append(args, userID)
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID != "" {
+		baseQuery += fmt.Sprintf(` AND v.organization_id = $%d`, paramIdx)
+		args = append(args, orgID)
+	} else {
+		baseQuery += fmt.Sprintf(` AND v.user_id = $%d`, paramIdx)
+		args = append(args, userID)
+	}
 	paramIdx++
 
 	if query != "" {
@@ -456,6 +472,24 @@ func (h *Handler) countVideosThisMonth(ctx context.Context, userID string) (int,
 	err := h.db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM videos WHERE user_id = $1 AND created_at >= date_trunc('month', now()) AND status != 'deleted'`,
 		userID,
+	).Scan(&count)
+	return count, err
+}
+
+func (h *Handler) getOrgPlan(ctx context.Context, orgID string) (string, error) {
+	var plan string
+	err := h.db.QueryRow(ctx, `SELECT subscription_plan FROM organizations WHERE id = $1`, orgID).Scan(&plan)
+	if err != nil {
+		return "free", err
+	}
+	return plan, nil
+}
+
+func (h *Handler) countOrgVideosThisMonth(ctx context.Context, orgID string) (int, error) {
+	var count int
+	err := h.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM videos WHERE organization_id = $1 AND status != 'deleted' AND created_at >= date_trunc('month', now())`,
+		orgID,
 	).Scan(&count)
 	return count, err
 }
