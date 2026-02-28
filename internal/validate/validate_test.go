@@ -209,6 +209,42 @@ func TestAPIKeyName(t *testing.T) {
 	}
 }
 
+func TestOrgName(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"valid", "Acme Corp", ""},
+		{"empty", "", ""},
+		{"at limit", string(make([]byte, MaxOrgNameLength)), ""},
+		{"over limit", string(make([]byte, MaxOrgNameLength+1)), "organization name must be 200 characters or fewer"},
+	}
+	for _, tt := range tests {
+		if got := OrgName(tt.input); got != tt.want {
+			t.Errorf("OrgName(%q [len=%d]) = %q, want %q", tt.name, len(tt.input), got, tt.want)
+		}
+	}
+}
+
+func TestOrgSlug(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"valid", "acme-corp", ""},
+		{"empty", "", ""},
+		{"at limit", string(make([]byte, MaxOrgSlugLength)), ""},
+		{"over limit", string(make([]byte, MaxOrgSlugLength+1)), "organization slug must be 100 characters or fewer"},
+	}
+	for _, tt := range tests {
+		if got := OrgSlug(tt.input); got != tt.want {
+			t.Errorf("OrgSlug(%q [len=%d]) = %q, want %q", tt.name, len(tt.input), got, tt.want)
+		}
+	}
+}
+
 func TestFieldLimits(t *testing.T) {
 	fl := FieldLimits()
 	if fl["title"] != MaxTitleLength {
@@ -217,7 +253,7 @@ func TestFieldLimits(t *testing.T) {
 	if fl["folderName"] != MaxFolderNameLength {
 		t.Errorf("FieldLimits()[folderName] = %d, want %d", fl["folderName"], MaxFolderNameLength)
 	}
-	if len(fl) < 10 {
-		t.Errorf("FieldLimits() returned %d entries, expected at least 10", len(fl))
+	if len(fl) < 13 {
+		t.Errorf("FieldLimits() returned %d entries, expected at least 13", len(fl))
 	}
 }
