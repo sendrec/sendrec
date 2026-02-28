@@ -245,7 +245,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		baseQuery += fmt.Sprintf(` AND v.organization_id = $%d`, paramIdx)
 		args = append(args, orgID)
 	} else {
-		baseQuery += fmt.Sprintf(` AND v.user_id = $%d`, paramIdx)
+		baseQuery += fmt.Sprintf(` AND v.user_id = $%d AND v.organization_id IS NULL`, paramIdx)
 		args = append(args, userID)
 	}
 	paramIdx++
