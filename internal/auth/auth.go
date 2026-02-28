@@ -25,6 +25,8 @@ import (
 type contextKey string
 
 const userIDKey contextKey = "userID"
+const orgIDKey contextKey = "orgID"
+const orgRoleKey contextKey = "orgRole"
 
 type EmailSender interface {
 	SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error
@@ -708,6 +710,22 @@ func UserIDFromContext(ctx context.Context) string {
 
 func ContextWithUserID(ctx context.Context, userID string) context.Context {
 	return context.WithValue(ctx, userIDKey, userID)
+}
+
+func OrgIDFromContext(ctx context.Context) string {
+	orgID, _ := ctx.Value(orgIDKey).(string)
+	return orgID
+}
+
+func OrgRoleFromContext(ctx context.Context) string {
+	role, _ := ctx.Value(orgRoleKey).(string)
+	return role
+}
+
+func ContextWithOrg(ctx context.Context, orgID, role string) context.Context {
+	ctx = context.WithValue(ctx, orgIDKey, orgID)
+	ctx = context.WithValue(ctx, orgRoleKey, role)
+	return ctx
 }
 
 func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
