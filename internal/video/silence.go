@@ -57,8 +57,8 @@ func (h *Handler) DetectSilence(w http.ResponseWriter, r *http.Request) {
 	var fileKey string
 	var status string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT duration, file_key, status FROM videos WHERE id = $1 AND user_id = $2`,
-		videoID, userID,
+		`SELECT duration, file_key, status FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&duration, &fileKey, &status)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")

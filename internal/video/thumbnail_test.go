@@ -129,8 +129,8 @@ func TestUploadThumbnail_ValidJPEG(t *testing.T) {
 	videoID := "video-thumb-1"
 	shareToken := "abc123thumb"
 
-	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
-		WithArgs(videoID, testUserID).
+	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status = 'ready'`).
+		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"share_token"}).AddRow(shareToken))
 
 	mock.ExpectExec(`UPDATE videos SET thumbnail_key = \$1, updated_at = now\(\) WHERE id = \$2`).
@@ -181,8 +181,8 @@ func TestUploadThumbnail_ValidPNG(t *testing.T) {
 	videoID := "video-thumb-2"
 	shareToken := "def456thumb"
 
-	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
-		WithArgs(videoID, testUserID).
+	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status = 'ready'`).
+		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"share_token"}).AddRow(shareToken))
 
 	mock.ExpectExec(`UPDATE videos SET thumbnail_key = \$1, updated_at = now\(\) WHERE id = \$2`).
@@ -233,8 +233,8 @@ func TestUploadThumbnail_ValidWebP(t *testing.T) {
 	videoID := "video-thumb-3"
 	shareToken := "ghi789thumb"
 
-	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
-		WithArgs(videoID, testUserID).
+	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status = 'ready'`).
+		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"share_token"}).AddRow(shareToken))
 
 	mock.ExpectExec(`UPDATE videos SET thumbnail_key = \$1, updated_at = now\(\) WHERE id = \$2`).
@@ -339,8 +339,8 @@ func TestUploadThumbnail_VideoNotFound(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
-		WithArgs("nonexistent-video", testUserID).
+	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status = 'ready'`).
+		WithArgs("nonexistent-video", testUserID, (*string)(nil)).
 		WillReturnError(pgx.ErrNoRows)
 
 	body, _ := json.Marshal(struct {
@@ -388,8 +388,8 @@ func TestResetThumbnail_Success(t *testing.T) {
 	fileKey := "recordings/" + testUserID + "/resettoken123.webm"
 	thumbKey := "recordings/" + testUserID + "/resettoken123.jpg"
 
-	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
-		WithArgs(videoID, testUserID).
+	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status = 'ready'`).
+		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"share_token", "file_key", "thumbnail_key"}).AddRow(shareToken, fileKey, &thumbKey))
 
 	r := chi.NewRouter()
@@ -416,8 +416,8 @@ func TestResetThumbnail_VideoNotFound(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
-		WithArgs("nonexistent-video", testUserID).
+	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status = 'ready'`).
+		WithArgs("nonexistent-video", testUserID, (*string)(nil)).
 		WillReturnError(pgx.ErrNoRows)
 
 	r := chi.NewRouter()

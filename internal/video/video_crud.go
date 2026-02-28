@@ -444,7 +444,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 				titleArgs = []any{req.Title, videoID, userID, orgID}
 			}
 		} else {
-			titleQuery = `UPDATE videos SET title = $1, updated_at = now() WHERE id = $2 AND user_id = $3 AND status != 'deleted'`
+			titleQuery = `UPDATE videos SET title = $1, updated_at = now() WHERE id = $2 AND user_id = $3 AND organization_id IS NULL AND status != 'deleted'`
 			titleArgs = []any{req.Title, videoID, userID}
 		}
 
@@ -492,8 +492,8 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 	var status string
 	var contentType string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = $1 AND user_id = $2`,
-		videoID, userID,
+		`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&duration, &fileKey, &shareToken, &status, &contentType)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -514,8 +514,8 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET status = 'processing', updated_at = now() WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		`UPDATE videos SET status = 'processing', updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status = 'ready'`,
+		videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video status")
@@ -552,7 +552,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 			deleteArgs = []any{videoID, userID, orgID}
 		}
 	} else {
-		deleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted' RETURNING file_key, thumbnail_key, webcam_key, transcript_key, title`
+		deleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id IS NULL AND status != 'deleted' RETURNING file_key, thumbnail_key, webcam_key, transcript_key, title`
 		deleteArgs = []any{videoID, userID}
 	}
 

@@ -46,8 +46,8 @@ func (h *Handler) UploadThumbnail(w http.ResponseWriter, r *http.Request) {
 
 	var shareToken string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT share_token FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		`SELECT share_token FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status = 'ready'`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&shareToken)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -80,8 +80,8 @@ func (h *Handler) ResetThumbnail(w http.ResponseWriter, r *http.Request) {
 	var shareToken, fileKey string
 	var thumbKey *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status = 'ready'`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&shareToken, &fileKey, &thumbKey)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")

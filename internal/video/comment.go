@@ -75,8 +75,8 @@ func (h *Handler) SetCommentMode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET comment_mode = $1 WHERE id = $2 AND user_id = $3`,
-		req.CommentMode, videoID, userID,
+		`UPDATE videos SET comment_mode = $1 WHERE id = $2 AND user_id = $3 AND organization_id IS NOT DISTINCT FROM $4`,
+		req.CommentMode, videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update comment mode")
@@ -403,8 +403,8 @@ func (h *Handler) ListOwnerComments(w http.ResponseWriter, r *http.Request) {
 
 	var ownerID, commentMode string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.user_id, v.comment_mode FROM videos WHERE id = $1 AND user_id = $2`,
-		videoID, userID,
+		`SELECT v.user_id, v.comment_mode FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&ownerID, &commentMode)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -430,8 +430,8 @@ func (h *Handler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 
 	tag, err := h.db.Exec(r.Context(),
 		`DELETE FROM video_comments c USING videos v
-		 WHERE c.id = $1 AND c.video_id = $2 AND v.id = c.video_id AND v.user_id = $3`,
-		commentID, videoID, userID,
+		 WHERE c.id = $1 AND c.video_id = $2 AND v.id = c.video_id AND v.user_id = $3 AND v.organization_id IS NOT DISTINCT FROM $4`,
+		commentID, videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not delete comment")

@@ -29,7 +29,7 @@ func TestSetCommentMode_ValidMode(t *testing.T) {
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET comment_mode = \$1 WHERE id = \$2 AND user_id = \$3`).
-		WithArgs("anonymous", videoID, testUserID).
+		WithArgs("anonymous", videoID, testUserID, (*string)(nil)).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	body, _ := json.Marshal(setCommentModeRequest{CommentMode: "anonymous"})
@@ -85,7 +85,7 @@ func TestSetCommentMode_NotOwner(t *testing.T) {
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET comment_mode = \$1 WHERE id = \$2 AND user_id = \$3`).
-		WithArgs("anonymous", videoID, testUserID).
+		WithArgs("anonymous", videoID, testUserID, (*string)(nil)).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	body, _ := json.Marshal(setCommentModeRequest{CommentMode: "anonymous"})
@@ -120,7 +120,7 @@ func TestSetCommentMode_AllValidModes(t *testing.T) {
 			handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 			mock.ExpectExec(`UPDATE videos SET comment_mode = \$1 WHERE id = \$2 AND user_id = \$3`).
-				WithArgs(mode, "video-123", testUserID).
+				WithArgs(mode, "video-123", testUserID, (*string)(nil)).
 				WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 			body, _ := json.Marshal(setCommentModeRequest{CommentMode: mode})
@@ -1317,7 +1317,7 @@ func TestListOwnerComments_ReturnsAllComments(t *testing.T) {
 	commenterID := "commenter-1"
 
 	mock.ExpectQuery(`SELECT v\.user_id, v\.comment_mode FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID).
+		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"user_id", "comment_mode"}).AddRow(testUserID, "anonymous"))
 
 	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 ORDER BY c\.created_at ASC`).
@@ -1362,7 +1362,7 @@ func TestListOwnerComments_NotOwner_Returns404(t *testing.T) {
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT v\.user_id, v\.comment_mode FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID).
+		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"user_id", "comment_mode"}))
 
 	r := chi.NewRouter()
@@ -1392,7 +1392,7 @@ func TestDeleteComment_Success(t *testing.T) {
 	commentID := "comment-1"
 
 	mock.ExpectExec(`DELETE FROM video_comments c USING videos v WHERE c\.id = \$1 AND c\.video_id = \$2 AND v\.id = c\.video_id AND v\.user_id = \$3`).
-		WithArgs(commentID, videoID, testUserID).
+		WithArgs(commentID, videoID, testUserID, (*string)(nil)).
 		WillReturnResult(pgxmock.NewResult("DELETE", 1))
 
 	r := chi.NewRouter()
@@ -1424,7 +1424,7 @@ func TestDeleteComment_NotFound(t *testing.T) {
 	commentID := "nonexistent"
 
 	mock.ExpectExec(`DELETE FROM video_comments c USING videos v WHERE c\.id = \$1 AND c\.video_id = \$2 AND v\.id = c\.video_id AND v\.user_id = \$3`).
-		WithArgs(commentID, videoID, testUserID).
+		WithArgs(commentID, videoID, testUserID, (*string)(nil)).
 		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	r := chi.NewRouter()

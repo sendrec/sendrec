@@ -48,8 +48,8 @@ func (h *Handler) SetDownloadEnabled(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET download_enabled = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
-		req.DownloadEnabled, videoID, userID,
+		`UPDATE videos SET download_enabled = $1 WHERE id = $2 AND user_id = $3 AND organization_id IS NOT DISTINCT FROM $4 AND status != 'deleted'`,
+		req.DownloadEnabled, videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update download setting")
@@ -74,8 +74,8 @@ func (h *Handler) SetEmailGate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET email_gate_enabled = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
-		req.Enabled, videoID, userID,
+		`UPDATE videos SET email_gate_enabled = $1 WHERE id = $2 AND user_id = $3 AND organization_id IS NOT DISTINCT FROM $4 AND status != 'deleted'`,
+		req.Enabled, videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update email gate setting")
@@ -101,12 +101,12 @@ func (h *Handler) SetLinkExpiry(w http.ResponseWriter, r *http.Request) {
 
 	var query string
 	if req.NeverExpires {
-		query = `UPDATE videos SET share_expires_at = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+		query = `UPDATE videos SET share_expires_at = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted'`
 	} else {
-		query = `UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+		query = `UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted'`
 	}
 
-	tag, err := h.db.Exec(r.Context(), query, videoID, userID)
+	tag, err := h.db.Exec(r.Context(), query, videoID, userID, orgScope(r.Context()))
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update link expiry")
 		return
@@ -145,8 +145,8 @@ func (h *Handler) SetCTA(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET cta_text = $1, cta_url = $2 WHERE id = $3 AND user_id = $4 AND status != 'deleted'`,
-		req.Text, req.URL, videoID, userID,
+		`UPDATE videos SET cta_text = $1, cta_url = $2 WHERE id = $3 AND user_id = $4 AND organization_id IS NOT DISTINCT FROM $5 AND status != 'deleted'`,
+		req.Text, req.URL, videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update CTA")
@@ -177,8 +177,8 @@ func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
 
 	if req.Password == "" {
 		tag, err := h.db.Exec(r.Context(),
-			`UPDATE videos SET share_password = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-			videoID, userID,
+			`UPDATE videos SET share_password = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted'`,
+			videoID, userID, orgScope(r.Context()),
 		)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update password")
@@ -199,8 +199,8 @@ func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET share_password = $1, updated_at = now() WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
-		hash, videoID, userID,
+		`UPDATE videos SET share_password = $1, updated_at = now() WHERE id = $2 AND user_id = $3 AND organization_id IS NOT DISTINCT FROM $4 AND status != 'deleted'`,
+		hash, videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update password")
@@ -229,8 +229,8 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 	var exists bool
 	err := h.db.QueryRow(r.Context(),
 		`SELECT true FROM videos
-		 WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		 WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status = 'ready'`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&exists)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -243,8 +243,8 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if _, err := h.db.Exec(r.Context(),
-			`UPDATE videos SET transcription_language = $1, updated_at = now() WHERE id = $2 AND user_id = $3`,
-			req.Language, videoID, userID,
+			`UPDATE videos SET transcription_language = $1, updated_at = now() WHERE id = $2 AND user_id = $3 AND organization_id IS NOT DISTINCT FROM $4`,
+			req.Language, videoID, userID, orgScope(r.Context()),
 		); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to set language")
 			return
@@ -265,8 +265,8 @@ func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 
 	var shareExpiresAt *time.Time
 	err := h.db.QueryRow(r.Context(),
-		`SELECT share_expires_at FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		`SELECT share_expires_at FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted'`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&shareExpiresAt)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -280,8 +280,8 @@ func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now()
-		 WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		 WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted'`,
+		videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to extend share link")
@@ -306,8 +306,8 @@ func (h *Handler) Summarize(w http.ResponseWriter, r *http.Request) {
 
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET summary_status = 'pending', summary = NULL, chapters = NULL, updated_at = now()
-		 WHERE id = $1 AND user_id = $2 AND status != 'deleted' AND transcript_status = 'ready'`,
-		videoID, userID,
+		 WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted' AND transcript_status = 'ready'`,
+		videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not enqueue summary")
@@ -332,8 +332,8 @@ func (h *Handler) GenerateDocument(w http.ResponseWriter, r *http.Request) {
 
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET document_status = 'pending', document = NULL, updated_at = now()
-		 WHERE id = $1 AND user_id = $2 AND status != 'deleted' AND transcript_status = 'ready'`,
-		videoID, userID,
+		 WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted' AND transcript_status = 'ready'`,
+		videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not enqueue document generation")
@@ -351,8 +351,8 @@ func (h *Handler) DismissTitle(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET suggested_title = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		`UPDATE videos SET suggested_title = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted'`,
+		videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to dismiss title")

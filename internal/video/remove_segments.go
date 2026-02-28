@@ -75,8 +75,8 @@ func (h *Handler) RemoveSegments(w http.ResponseWriter, r *http.Request) {
 	var status string
 	var contentType string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = $1 AND user_id = $2`,
-		videoID, userID,
+		`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&duration, &fileKey, &shareToken, &status, &contentType)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -105,8 +105,8 @@ func (h *Handler) RemoveSegments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET status = 'processing', updated_at = now() WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		`UPDATE videos SET status = 'processing', updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status = 'ready'`,
+		videoID, userID, orgScope(r.Context()),
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video status")

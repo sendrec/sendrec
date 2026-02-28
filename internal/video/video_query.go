@@ -552,6 +552,14 @@ func (h *Handler) getOrgPlan(ctx context.Context, orgID string) (string, error) 
 	return orgPlan, nil
 }
 
+func orgScope(ctx context.Context) *string {
+	orgID := auth.OrgIDFromContext(ctx)
+	if orgID == "" {
+		return nil
+	}
+	return &orgID
+}
+
 func (h *Handler) countOrgVideosThisMonth(ctx context.Context, orgID string) (int, error) {
 	var count int
 	err := h.db.QueryRow(ctx,
@@ -595,8 +603,8 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	var fileKey string
 	var contentType string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT title, file_key, content_type FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		`SELECT title, file_key, content_type FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status = 'ready'`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&title, &fileKey, &contentType)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -620,8 +628,8 @@ func (h *Handler) GetTranscript(w http.ResponseWriter, r *http.Request) {
 	var status string
 	var segmentsJSON *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT transcript_status, transcript_json FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		`SELECT transcript_status, transcript_json FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted'`,
+		videoID, userID, orgScope(r.Context()),
 	).Scan(&status, &segmentsJSON)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
