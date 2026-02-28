@@ -44,7 +44,6 @@ func (h *Handler) ListFolders(w http.ResponseWriter, r *http.Request) {
 		query += fmt.Sprintf(` AND f.user_id = $%d`, paramIdx)
 		args = append(args, userID)
 	}
-	paramIdx++
 
 	query += ` ORDER BY f.position, f.created_at`
 

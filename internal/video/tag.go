@@ -47,7 +47,6 @@ func (h *Handler) ListTags(w http.ResponseWriter, r *http.Request) {
 		query += fmt.Sprintf(` AND t.user_id = $%d`, paramIdx)
 		args = append(args, userID)
 	}
-	paramIdx++
 
 	query += ` ORDER BY t.name`
 
