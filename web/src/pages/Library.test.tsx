@@ -542,7 +542,7 @@ describe("Library", () => {
       expect(screen.getByText("Delete")).toBeInTheDocument();
 
       // Should NOT have these old overflow menu items
-      expect(screen.queryByText("Organization")).not.toBeInTheDocument();
+      expect(screen.queryByText("Organize")).not.toBeInTheDocument();
       expect(screen.queryByText("Sharing")).not.toBeInTheDocument();
       expect(screen.queryByText("Customization")).not.toBeInTheDocument();
       expect(screen.queryByText("Editing")).not.toBeInTheDocument();

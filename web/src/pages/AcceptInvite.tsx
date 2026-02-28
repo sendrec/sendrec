@@ -67,7 +67,7 @@ export function AcceptInvite() {
           <>
             <h1>You've been invited</h1>
             <p className="auth-subtitle">
-              You've been invited to join an organization. Sign in or create an account to accept.
+              You've been invited to join a workspace. Sign in or create an account to accept.
             </p>
             <div className="auth-footer" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <Link to={`/login?redirect=${encodeURIComponent(redirectPath)}`} className="btn btn--primary" style={{ display: "block", textAlign: "center" }}>
@@ -88,7 +88,7 @@ export function AcceptInvite() {
           <>
             <h1>Invite accepted</h1>
             <p className="auth-subtitle">
-              You have joined the organization. Redirecting...
+              You have joined the workspace. Redirecting...
             </p>
           </>
         )}

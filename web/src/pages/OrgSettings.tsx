@@ -102,7 +102,7 @@ export function OrgSettings() {
           setCurrentUserRole(currentMember.role);
         }
       })
-      .catch(() => setError("Failed to load organization"))
+      .catch(() => setError("Failed to load workspace"))
       .finally(() => setLoading(false));
   }, [orgId]);
 
@@ -116,7 +116,7 @@ export function OrgSettings() {
     setNameMessage("");
 
     if (!orgName.trim()) {
-      setNameError("Organization name is required");
+      setNameError("Workspace name is required");
       return;
     }
 
@@ -126,10 +126,10 @@ export function OrgSettings() {
         method: "PATCH",
         body: JSON.stringify({ name: orgName.trim(), slug: orgSlug.trim() }),
       });
-      setNameMessage("Organization updated");
+      setNameMessage("Workspace updated");
       setOrg((prev) => prev ? { ...prev, name: orgName.trim(), slug: orgSlug.trim() } : prev);
     } catch (err) {
-      setNameError(err instanceof Error ? err.message : "Failed to update organization");
+      setNameError(err instanceof Error ? err.message : "Failed to update workspace");
     } finally {
       setSavingName(false);
     }
@@ -137,7 +137,7 @@ export function OrgSettings() {
 
   async function handleRemoveMember(userId: string, memberName: string) {
     setConfirmDialog({
-      message: `Remove ${memberName} from this organization?`,
+      message: `Remove ${memberName} from this workspace?`,
       confirmLabel: "Remove",
       danger: true,
       onConfirm: async () => {
@@ -231,7 +231,7 @@ export function OrgSettings() {
 
   function handleCancelSubscription() {
     setConfirmDialog({
-      message: "Cancel the organization's Pro subscription? Access continues until the end of the billing period.",
+      message: "Cancel this workspace's Pro subscription? Access continues until the end of the billing period.",
       onConfirm: async () => {
         setConfirmDialog(null);
         setCanceling(true);
@@ -253,8 +253,8 @@ export function OrgSettings() {
 
   function handleDeleteOrg() {
     setConfirmDialog({
-      message: "Are you sure you want to delete this organization? This action cannot be undone. All organization data will be permanently deleted.",
-      confirmLabel: "Delete organization",
+      message: "Are you sure you want to delete this workspace? This action cannot be undone. All workspace data will be permanently deleted.",
+      confirmLabel: "Delete workspace",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -264,7 +264,7 @@ export function OrgSettings() {
           await apiFetch(`/api/organizations/${orgId}`, { method: "DELETE" });
           navigate("/settings");
         } catch (err) {
-          setDeleteError(err instanceof Error ? err.message : "Failed to delete organization");
+          setDeleteError(err instanceof Error ? err.message : "Failed to delete workspace");
         } finally {
           setDeleting(false);
         }
@@ -291,14 +291,14 @@ export function OrgSettings() {
   if (!org) {
     return (
       <div className="page-container page-container--centered">
-        <p className="status-message status-message--error">Organization not found</p>
+        <p className="status-message status-message--error">Workspace not found</p>
       </div>
     );
   }
 
   return (
     <div className="page-container">
-      <h1 className="page-title">Organization Settings</h1>
+      <h1 className="page-title">Workspace Settings</h1>
 
       {error && (
         <p className="status-message status-message--error">{error}</p>
@@ -308,7 +308,7 @@ export function OrgSettings() {
         <h2>General</h2>
 
         <div className="form-field">
-          <label className="form-label" htmlFor="org-name">Organization name</label>
+          <label className="form-label" htmlFor="org-name">Workspace name</label>
           <input
             id="org-name"
             type="text"
@@ -356,7 +356,7 @@ export function OrgSettings() {
       <div className="card settings-section">
         <h2>Members</h2>
         <p className="card-description">
-          {members.length} {members.length === 1 ? "member" : "members"} in this organization.
+          {members.length} {members.length === 1 ? "member" : "members"} in this workspace.
         </p>
 
         <div className="key-list">
@@ -403,7 +403,7 @@ export function OrgSettings() {
         <div className="card settings-section">
           <h2>Invites</h2>
           <p className="card-description">
-            Invite new members to this organization by email.
+            Invite new members to this workspace by email.
           </p>
 
           <form onSubmit={handleSendInvite} className="api-key-form-row">
@@ -549,8 +549,8 @@ export function OrgSettings() {
 
           <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <p className="form-label" style={{ margin: 0 }}>Delete organization</p>
-              <p className="form-hint">Permanently delete this organization and all its data.</p>
+              <p className="form-label" style={{ margin: 0 }}>Delete workspace</p>
+              <p className="form-hint">Permanently delete this workspace and all its data.</p>
             </div>
             <button
               type="button"
@@ -559,7 +559,7 @@ export function OrgSettings() {
               onClick={handleDeleteOrg}
               disabled={deleting}
             >
-              {deleting ? "Deleting..." : "Delete organization"}
+              {deleting ? "Deleting..." : "Delete workspace"}
             </button>
           </div>
           {deleteError && (

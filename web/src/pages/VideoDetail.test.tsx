@@ -361,7 +361,7 @@ describe("VideoDetail", () => {
       expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     });
 
-    // Tags appear as header chips and as Organization toggle buttons
+    // Tags appear as header chips and as Organize toggle buttons
     expect(screen.getAllByText("Demo").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Internal").length).toBeGreaterThanOrEqual(1);
   });
@@ -1120,9 +1120,9 @@ describe("VideoDetail", () => {
     });
   });
 
-  // ─── Organization section ─────────────────────────────────────
+  // ─── Organize section ─────────────────────────────────────
 
-  it("shows Organization section heading", async () => {
+  it("shows Organize section heading", async () => {
     const video = makeVideo();
     setupDefaultMocks();
 
@@ -1130,7 +1130,7 @@ describe("VideoDetail", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { level: 2, name: "Organization" }),
+        screen.getByRole("heading", { level: 2, name: "Organize" }),
       ).toBeInTheDocument();
     });
   });

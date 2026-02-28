@@ -282,7 +282,7 @@ export function Layout({ children }: LayoutProps) {
               className="nav-link"
               onClick={handleNavClick}
             >
-              Org Settings
+              Workspace Settings
             </Link>
           )}
 

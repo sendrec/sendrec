@@ -269,7 +269,7 @@ describe("Layout", () => {
     expect(mockSwitchOrg).toHaveBeenCalledWith(null);
   });
 
-  it("shows Org Settings link when an org is selected", () => {
+  it("shows Workspace Settings link when an org is selected", () => {
     mockUseOrganization.mockReturnValue({
       orgs: [
         { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
@@ -282,13 +282,13 @@ describe("Layout", () => {
       loading: false,
     });
     renderLayout();
-    const orgSettingsLink = screen.getByRole("link", { name: "Org Settings" });
+    const orgSettingsLink = screen.getByRole("link", { name: "Workspace Settings" });
     expect(orgSettingsLink).toHaveAttribute("href", "/organizations/org-1/settings");
   });
 
-  it("hides Org Settings link when no org is selected", () => {
+  it("hides Workspace Settings link when no org is selected", () => {
     renderLayout();
-    expect(screen.queryByRole("link", { name: "Org Settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Workspace Settings" })).not.toBeInTheDocument();
   });
 
   it("closes org dropdown on click outside", async () => {

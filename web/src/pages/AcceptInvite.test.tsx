@@ -102,7 +102,7 @@ describe("AcceptInvite", () => {
       expect(screen.getByRole("heading", { name: "Invite accepted" })).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/You have joined the organization/)).toBeInTheDocument();
+    expect(screen.getByText(/You have joined the workspace/)).toBeInTheDocument();
   });
 
   it("shows error when token is missing", () => {

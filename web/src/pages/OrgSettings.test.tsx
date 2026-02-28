@@ -121,7 +121,7 @@ describe("OrgSettings", () => {
       expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: "Delete organization" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete workspace" })).toBeInTheDocument();
     expect(screen.getByText("Danger Zone")).toBeInTheDocument();
 
     const roleSelects = screen.getAllByRole("combobox").filter(
@@ -139,7 +139,7 @@ describe("OrgSettings", () => {
     });
 
     expect(screen.queryByText("Danger Zone")).not.toBeInTheDocument();
-    expect(screen.queryByText("Delete organization")).not.toBeInTheDocument();
+    expect(screen.queryByText("Delete workspace")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
     expect(screen.queryByText("Send invite")).not.toBeInTheDocument();
   });
@@ -211,11 +211,11 @@ describe("OrgSettings", () => {
     mockApiFetch.mockResolvedValueOnce(undefined);
 
     await user.clear(screen.getByDisplayValue("Acme Corp"));
-    await user.type(screen.getByLabelText("Organization name"), "New Corp");
+    await user.type(screen.getByLabelText("Workspace name"), "New Corp");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Organization updated")).toBeInTheDocument();
+      expect(screen.getByText("Workspace updated")).toBeInTheDocument();
     });
 
     expect(mockApiFetch).toHaveBeenCalledWith("/api/organizations/org-1", {
