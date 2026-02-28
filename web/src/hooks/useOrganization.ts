@@ -58,7 +58,7 @@ export function useOrganization() {
       setOrgs((prev) => [...prev, result]);
       setCurrentOrgId(result.id);
     }
-    return result;
+    return result ?? null;
   }, []);
 
   const refreshOrgs = useCallback(() => {
