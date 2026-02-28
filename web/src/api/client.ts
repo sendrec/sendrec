@@ -1,3 +1,5 @@
+import { getCurrentOrgId } from "./orgContext";
+
 class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -44,6 +46,11 @@ async function apiFetch<T>(
 
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  const orgId = getCurrentOrgId();
+  if (orgId) {
+    headers.set("X-Organization-Id", orgId);
   }
 
   let response = await fetch(path, { ...options, headers });

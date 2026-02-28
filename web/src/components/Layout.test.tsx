@@ -18,6 +18,18 @@ vi.mock("../api/client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
+const mockSwitchOrg = vi.fn();
+const mockUseOrganization = vi.fn().mockReturnValue({
+  orgs: [],
+  selectedOrg: null,
+  selectedOrgId: null,
+  switchOrg: mockSwitchOrg,
+  loading: false,
+});
+vi.mock("../hooks/useOrganization", () => ({
+  useOrganization: (...args: unknown[]) => mockUseOrganization(...args),
+}));
+
 function renderLayout(path = "/") {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -34,6 +46,14 @@ describe("Layout", () => {
     mockSetAccessToken.mockReset();
     mockApiFetch.mockReset();
     mockApiFetch.mockRejectedValue(new Error("not available"));
+    mockSwitchOrg.mockReset();
+    mockUseOrganization.mockReturnValue({
+      orgs: [],
+      selectedOrg: null,
+      selectedOrgId: null,
+      switchOrg: mockSwitchOrg,
+      loading: false,
+    });
     globalThis.fetch = vi.fn().mockResolvedValue({});
   });
 
@@ -171,6 +191,81 @@ describe("Layout", () => {
       expect(screen.getByText("Free")).toBeInTheDocument();
     });
     expect(screen.queryByText("Pro")).not.toBeInTheDocument();
+  });
+
+  it("does not render org switcher when no orgs exist", () => {
+    renderLayout();
+    expect(screen.queryByLabelText("Switch workspace")).not.toBeInTheDocument();
+  });
+
+  it("renders org switcher when orgs exist", () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      ],
+      selectedOrg: null,
+      selectedOrgId: null,
+      switchOrg: mockSwitchOrg,
+      loading: false,
+    });
+    renderLayout();
+    const switcher = screen.getByLabelText("Switch workspace");
+    expect(switcher).toBeInTheDocument();
+    expect(switcher).toHaveValue("personal");
+  });
+
+  it("calls switchOrg when selecting an organization", async () => {
+    const user = userEvent.setup();
+    mockUseOrganization.mockReturnValue({
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      ],
+      selectedOrg: null,
+      selectedOrgId: null,
+      switchOrg: mockSwitchOrg,
+      loading: false,
+    });
+    renderLayout();
+
+    await user.selectOptions(screen.getByLabelText("Switch workspace"), "org-1");
+    expect(mockSwitchOrg).toHaveBeenCalledWith("org-1");
+  });
+
+  it("calls switchOrg with null when selecting personal", async () => {
+    const user = userEvent.setup();
+    mockUseOrganization.mockReturnValue({
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      ],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: mockSwitchOrg,
+      loading: false,
+    });
+    renderLayout();
+
+    await user.selectOptions(screen.getByLabelText("Switch workspace"), "personal");
+    expect(mockSwitchOrg).toHaveBeenCalledWith(null);
+  });
+
+  it("shows Org Settings link when an org is selected", () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      ],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: mockSwitchOrg,
+      loading: false,
+    });
+    renderLayout();
+    const orgSettingsLink = screen.getByRole("link", { name: "Org Settings" });
+    expect(orgSettingsLink).toHaveAttribute("href", "/organizations/org-1/settings");
+  });
+
+  it("hides Org Settings link when no org is selected", () => {
+    renderLayout();
+    expect(screen.queryByRole("link", { name: "Org Settings" })).not.toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {

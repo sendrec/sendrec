@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiFetch, setAccessToken } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
+import { useOrganization } from "../hooks/useOrganization";
 
 interface BillingResponse {
   plan: string;
@@ -17,6 +18,7 @@ export function Layout({ children }: LayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
   const { resolvedTheme, setTheme } = useTheme();
+  const { orgs, selectedOrgId, switchOrg } = useOrganization();
 
   function toggleTheme() {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
@@ -57,6 +59,24 @@ export function Layout({ children }: LayoutProps) {
             </span>
           )}
         </Link>
+
+        {orgs.length > 0 && (
+          <select
+            className="org-switcher"
+            value={selectedOrgId ?? "personal"}
+            onChange={(e) =>
+              switchOrg(e.target.value === "personal" ? null : e.target.value)
+            }
+            aria-label="Switch workspace"
+          >
+            <option value="personal">Personal</option>
+            {orgs.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name}
+              </option>
+            ))}
+          </select>
+        )}
 
         <div className={`nav-links${menuOpen ? " nav-links--open" : ""}`}>
           <Link
@@ -99,6 +119,16 @@ export function Layout({ children }: LayoutProps) {
             Settings
           </Link>
 
+          {selectedOrgId && (
+            <Link
+              to={`/organizations/${selectedOrgId}/settings`}
+              className="nav-link"
+              onClick={handleNavClick}
+            >
+              Org Settings
+            </Link>
+          )}
+
           <button
             className="nav-theme-toggle"
             onClick={toggleTheme}
@@ -135,7 +165,7 @@ export function Layout({ children }: LayoutProps) {
         </button>
       </nav>
 
-      <main>{children}</main>
+      <main key={selectedOrgId ?? "personal"}>{children}</main>
     </>
   );
 }
