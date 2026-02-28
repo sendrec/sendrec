@@ -31,7 +31,7 @@ func TestCreateFolder_Success(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
 
 	mock.ExpectQuery(`INSERT INTO folders`).
-		WithArgs(testUserID, "My Folder").
+		WithArgs(testUserID, pgxmock.AnyArg(), "My Folder").
 		WillReturnRows(pgxmock.NewRows([]string{"id", "position", "created_at"}).
 			AddRow("folder-1", 2, now))
 
@@ -172,7 +172,7 @@ func TestCreateFolder_DuplicateName(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
 
 	mock.ExpectQuery(`INSERT INTO folders`).
-		WithArgs(testUserID, "Existing Folder").
+		WithArgs(testUserID, pgxmock.AnyArg(), "Existing Folder").
 		WillReturnError(&pgconn.PgError{Code: "23505"})
 
 	body, _ := json.Marshal(createFolderRequest{Name: "Existing Folder"})

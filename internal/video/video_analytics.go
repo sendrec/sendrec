@@ -255,12 +255,20 @@ func (h *Handler) Analytics(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	orgID := auth.OrgIDFromContext(r.Context())
+	var verifyQuery string
+	var verifyArgs []any
+	if orgID != "" {
+		verifyQuery = `SELECT id, email_gate_enabled FROM videos WHERE id = $1 AND organization_id = $2 AND status != 'deleted'`
+		verifyArgs = []any{videoID, orgID}
+	} else {
+		verifyQuery = `SELECT id, email_gate_enabled FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+		verifyArgs = []any{videoID, userID}
+	}
+
 	var id string
 	var emailGateEnabled bool
-	err := h.db.QueryRow(r.Context(),
-		`SELECT id, email_gate_enabled FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
-	).Scan(&id, &emailGateEnabled)
+	err := h.db.QueryRow(r.Context(), verifyQuery, verifyArgs...).Scan(&id, &emailGateEnabled)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -580,11 +588,19 @@ func (h *Handler) AnalyticsExport(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	orgID := auth.OrgIDFromContext(r.Context())
+	var exportVerifyQuery string
+	var exportVerifyArgs []any
+	if orgID != "" {
+		exportVerifyQuery = `SELECT id FROM videos WHERE id = $1 AND organization_id = $2 AND status != 'deleted'`
+		exportVerifyArgs = []any{videoID, orgID}
+	} else {
+		exportVerifyQuery = `SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+		exportVerifyArgs = []any{videoID, userID}
+	}
+
 	var id string
-	err := h.db.QueryRow(r.Context(),
-		`SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
-	).Scan(&id)
+	err := h.db.QueryRow(r.Context(), exportVerifyQuery, exportVerifyArgs...).Scan(&id)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return

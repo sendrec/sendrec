@@ -72,13 +72,25 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 		since = time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
 
+	orgID := auth.OrgIDFromContext(r.Context())
+
+	var ownerFilter string
+	var ownerArg any
+	if orgID != "" {
+		ownerFilter = `v.organization_id = $1`
+		ownerArg = orgID
+	} else {
+		ownerFilter = `v.user_id = $1`
+		ownerArg = userID
+	}
+
 	var totalViews, uniqueViews int64
 	err := h.db.QueryRow(r.Context(),
-		`SELECT COUNT(*) AS views, COUNT(DISTINCT viewer_hash) AS unique_views
+		fmt.Sprintf(`SELECT COUNT(*) AS views, COUNT(DISTINCT viewer_hash) AS unique_views
 		 FROM video_views vv
 		 JOIN videos v ON v.id = vv.video_id
-		 WHERE v.user_id = $1 AND vv.created_at >= $2`,
-		userID, since,
+		 WHERE %s AND vv.created_at >= $2`, ownerFilter),
+		ownerArg, since,
 	).Scan(&totalViews, &uniqueViews)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to query view summary")
@@ -87,8 +99,8 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 
 	var totalVideos int64
 	err = h.db.QueryRow(r.Context(),
-		`SELECT COUNT(*) FROM videos WHERE user_id = $1`,
-		userID,
+		fmt.Sprintf(`SELECT COUNT(*) FROM videos v WHERE %s`, ownerFilter),
+		ownerArg,
 	).Scan(&totalVideos)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to count videos")
@@ -97,11 +109,11 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 
 	var totalWatchTimeSeconds int64
 	err = h.db.QueryRow(r.Context(),
-		`SELECT COALESCE(SUM(v.duration), 0)
+		fmt.Sprintf(`SELECT COALESCE(SUM(v.duration), 0)
 		 FROM video_views vv
 		 JOIN videos v ON v.id = vv.video_id
-		 WHERE v.user_id = $1 AND vv.created_at >= $2`,
-		userID, since,
+		 WHERE %s AND vv.created_at >= $2`, ownerFilter),
+		ownerArg, since,
 	).Scan(&totalWatchTimeSeconds)
 	if err != nil {
 		totalWatchTimeSeconds = 0
@@ -109,7 +121,7 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 
 	var avgCompletion float64
 	_ = h.db.QueryRow(r.Context(),
-		`SELECT COALESCE(AVG(
+		fmt.Sprintf(`SELECT COALESCE(AVG(
 			CASE WHEN m.max_milestone IS NOT NULL THEN m.max_milestone ELSE 0 END
 		), 0)
 		 FROM videos v
@@ -118,8 +130,8 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 			 FROM view_milestones
 			 GROUP BY video_id
 		 ) m ON m.video_id = v.id
-		 WHERE v.user_id = $1 AND v.status != 'deleted'`,
-		userID,
+		 WHERE %s AND v.status != 'deleted'`, ownerFilter),
+		ownerArg,
 	).Scan(&avgCompletion)
 
 	daysInRange := days
@@ -132,14 +144,14 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 	avgDailyViews := math.Round(float64(totalViews)/float64(daysInRange)*10) / 10
 
 	rows, err := h.db.Query(r.Context(),
-		`SELECT date_trunc('day', vv.created_at)::date AS day,
+		fmt.Sprintf(`SELECT date_trunc('day', vv.created_at)::date AS day,
 		        COUNT(*) AS views,
 		        COUNT(DISTINCT vv.viewer_hash) AS unique_views
 		 FROM video_views vv
 		 JOIN videos v ON v.id = vv.video_id
-		 WHERE v.user_id = $1 AND vv.created_at >= $2
-		 GROUP BY day ORDER BY day`,
-		userID, since,
+		 WHERE %s AND vv.created_at >= $2
+		 GROUP BY day ORDER BY day`, ownerFilter),
+		ownerArg, since,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to query daily views")
@@ -186,7 +198,7 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	topRows, err := h.db.Query(r.Context(),
-		`SELECT v.id, v.title, COUNT(vv.id) AS views,
+		fmt.Sprintf(`SELECT v.id, v.title, COUNT(vv.id) AS views,
 		        COUNT(DISTINCT vv.viewer_hash) AS unique_views,
 		        v.share_token,
 		        CASE WHEN v.thumbnail_key IS NOT NULL AND v.thumbnail_key != '' THEN true ELSE false END AS has_thumbnail,
@@ -194,11 +206,11 @@ func (h *Handler) AnalyticsDashboard(w http.ResponseWriter, r *http.Request) {
 		 FROM videos v
 		 LEFT JOIN video_views vv ON vv.video_id = v.id AND vv.created_at >= $2
 		 LEFT JOIN view_milestones vm ON vm.video_id = v.id
-		 WHERE v.user_id = $1 AND v.status != 'deleted'
+		 WHERE %s AND v.status != 'deleted'
 		 GROUP BY v.id, v.title, v.share_token, v.thumbnail_key
 		 ORDER BY views DESC
-		 LIMIT 10`,
-		userID, since,
+		 LIMIT 10`, ownerFilter),
+		ownerArg, since,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to query top videos")
@@ -284,15 +296,27 @@ func (h *Handler) DashboardExport(w http.ResponseWriter, r *http.Request) {
 		since = time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
 
+	orgID := auth.OrgIDFromContext(r.Context())
+
+	var exportOwnerFilter string
+	var exportOwnerArg any
+	if orgID != "" {
+		exportOwnerFilter = `v.organization_id = $1`
+		exportOwnerArg = orgID
+	} else {
+		exportOwnerFilter = `v.user_id = $1`
+		exportOwnerArg = userID
+	}
+
 	rows, err := h.db.Query(r.Context(),
-		`SELECT date_trunc('day', vv.created_at)::date AS day,
+		fmt.Sprintf(`SELECT date_trunc('day', vv.created_at)::date AS day,
 		        COUNT(*) AS views,
 		        COUNT(DISTINCT vv.viewer_hash) AS unique_views
 		 FROM video_views vv
 		 JOIN videos v ON v.id = vv.video_id
-		 WHERE v.user_id = $1 AND vv.created_at >= $2
-		 GROUP BY day ORDER BY day`,
-		userID, since,
+		 WHERE %s AND vv.created_at >= $2
+		 GROUP BY day ORDER BY day`, exportOwnerFilter),
+		exportOwnerArg, since,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to query")

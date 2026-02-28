@@ -150,11 +150,18 @@ func (h *Handler) BatchSetFolder(w http.ResponseWriter, r *http.Request) {
 
 	var folderID *string
 	if req.FolderID != nil && *req.FolderID != "" {
+		var folderVerifyQuery string
+		var folderVerifyArgs []any
+		if orgID != "" {
+			folderVerifyQuery = `SELECT id FROM folders WHERE id = $1 AND organization_id = $2`
+			folderVerifyArgs = []any{*req.FolderID, orgID}
+		} else {
+			folderVerifyQuery = `SELECT id FROM folders WHERE id = $1 AND user_id = $2`
+			folderVerifyArgs = []any{*req.FolderID, userID}
+		}
+
 		var id string
-		err := h.db.QueryRow(r.Context(),
-			`SELECT id FROM folders WHERE id = $1 AND user_id = $2`,
-			*req.FolderID, userID,
-		).Scan(&id)
+		err := h.db.QueryRow(r.Context(), folderVerifyQuery, folderVerifyArgs...).Scan(&id)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httputil.WriteError(w, http.StatusNotFound, "folder not found")
@@ -218,12 +225,21 @@ func (h *Handler) BatchSetTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	orgID := auth.OrgIDFromContext(r.Context())
+
 	if len(req.TagIDs) > 0 {
+		var tagVerifyQuery string
+		var tagVerifyArgs []any
+		if orgID != "" {
+			tagVerifyQuery = `SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND organization_id = $2`
+			tagVerifyArgs = []any{req.TagIDs, orgID}
+		} else {
+			tagVerifyQuery = `SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND user_id = $2`
+			tagVerifyArgs = []any{req.TagIDs, userID}
+		}
+
 		var count int
-		err := h.db.QueryRow(r.Context(),
-			`SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND user_id = $2`,
-			req.TagIDs, userID,
-		).Scan(&count)
+		err := h.db.QueryRow(r.Context(), tagVerifyQuery, tagVerifyArgs...).Scan(&count)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to verify tags")
 			return
@@ -233,8 +249,6 @@ func (h *Handler) BatchSetTags(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	orgID := auth.OrgIDFromContext(r.Context())
 
 	var verifyQuery string
 	var verifyArgs []any
