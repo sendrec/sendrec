@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiFetch, setAccessToken } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
@@ -19,6 +19,13 @@ export function Layout({ children }: LayoutProps) {
   const [plan, setPlan] = useState<string | null>(null);
   const { resolvedTheme, setTheme } = useTheme();
   const { orgs, selectedOrgId, switchOrg, createOrg } = useOrganization();
+  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const orgDropdownRef = useRef<HTMLDivElement>(null);
+  const createInputRef = useRef<HTMLInputElement>(null);
 
   function toggleTheme() {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
@@ -47,6 +54,76 @@ export function Layout({ children }: LayoutProps) {
     setMenuOpen(false);
   }
 
+  async function handleCreateWorkspace() {
+    const name = newWorkspaceName.trim();
+    if (!name) return;
+    try {
+      await createOrg(name);
+      setCreatingWorkspace(false);
+      setNewWorkspaceName("");
+      setCreateError(null);
+      setOrgDropdownOpen(false);
+    } catch {
+      setCreateError("Failed to create workspace. Free plan allows 1 workspace.");
+    }
+  }
+
+  function handleDropdownKeyDown(e: React.KeyboardEvent) {
+    if (!orgDropdownOpen) {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setOrgDropdownOpen(true);
+        setActiveIndex(0);
+      }
+      return;
+    }
+    const totalItems = orgs.length + 2;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev + 1) % totalItems);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((prev) => (prev - 1 + totalItems) % totalItems);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeIndex === 0) { switchOrg(null); setOrgDropdownOpen(false); }
+      else if (activeIndex <= orgs.length) { switchOrg(orgs[activeIndex - 1].id); setOrgDropdownOpen(false); }
+      else if (activeIndex === orgs.length + 1) { setCreatingWorkspace(true); setCreateError(null); }
+    }
+  }
+
+  useEffect(() => {
+    if (!orgDropdownOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (orgDropdownRef.current && !orgDropdownRef.current.contains(e.target as Node)) {
+        setOrgDropdownOpen(false);
+        setCreatingWorkspace(false);
+        setNewWorkspaceName("");
+        setCreateError(null);
+      }
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOrgDropdownOpen(false);
+        setCreatingWorkspace(false);
+        setNewWorkspaceName("");
+        setCreateError(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [orgDropdownOpen]);
+
+  useEffect(() => {
+    if (creatingWorkspace && createInputRef.current) {
+      createInputRef.current.focus();
+    }
+  }, [creatingWorkspace]);
+
   return (
     <>
       <nav className="nav-bar">
@@ -60,32 +137,103 @@ export function Layout({ children }: LayoutProps) {
           )}
         </Link>
 
-        <select
-          className="org-switcher"
-          value={selectedOrgId ?? "personal"}
-          onChange={(e) => {
-            if (e.target.value === "__create__") {
-              e.target.value = selectedOrgId ?? "personal";
-              const name = window.prompt("Workspace name:");
-              if (name?.trim()) {
-                createOrg(name.trim()).catch(() => {
-                  window.alert("Failed to create workspace. Free plan allows 1 workspace.");
-                });
-              }
-            } else {
-              switchOrg(e.target.value === "personal" ? null : e.target.value);
-            }
-          }}
-          aria-label="Switch workspace"
-        >
-          <option value="personal">Personal</option>
-          {orgs.map((org) => (
-            <option key={org.id} value={org.id}>
-              {org.name}
-            </option>
-          ))}
-          <option value="__create__">+ New Workspace</option>
-        </select>
+        <div className="org-switcher" ref={orgDropdownRef} onKeyDown={handleDropdownKeyDown}>
+          <button
+            className="org-switcher-trigger"
+            onClick={() => {
+              setOrgDropdownOpen((prev) => !prev);
+              setCreatingWorkspace(false);
+              setNewWorkspaceName("");
+              setCreateError(null);
+              setActiveIndex(-1);
+            }}
+            aria-haspopup="listbox"
+            aria-expanded={orgDropdownOpen}
+            aria-label="Switch workspace"
+          >
+            <span className="org-switcher-label">
+              {selectedOrgId
+                ? orgs.find((o) => o.id === selectedOrgId)?.name ?? "Personal"
+                : "Personal"}
+            </span>
+            <svg className="org-switcher-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 6l4 4 4-4" />
+            </svg>
+          </button>
+
+          {orgDropdownOpen && (
+            <>
+              <div className="org-switcher-backdrop" onClick={() => setOrgDropdownOpen(false)} />
+              <div className="org-switcher-menu" role="listbox" aria-label="Workspaces">
+                {/* Personal */}
+                <button
+                  className={`org-switcher-item${!selectedOrgId ? " org-switcher-item--active" : ""}${activeIndex === 0 ? " org-switcher-item--focused" : ""}`}
+                  role="option"
+                  aria-selected={!selectedOrgId}
+                  onClick={() => { switchOrg(null); setOrgDropdownOpen(false); }}
+                >
+                  <svg className="org-switcher-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="8" cy="5" r="3" />
+                    <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+                  </svg>
+                  <span className="org-switcher-item-name">Personal</span>
+                </button>
+
+                {/* Orgs */}
+                {orgs.map((org, i) => (
+                  <button
+                    key={org.id}
+                    className={`org-switcher-item${selectedOrgId === org.id ? " org-switcher-item--active" : ""}${activeIndex === i + 1 ? " org-switcher-item--focused" : ""}`}
+                    role="option"
+                    aria-selected={selectedOrgId === org.id}
+                    onClick={() => { switchOrg(org.id); setOrgDropdownOpen(false); }}
+                  >
+                    <svg className="org-switcher-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="1" y="4" width="14" height="11" rx="1" />
+                      <path d="M4 4V2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                    </svg>
+                    <span className="org-switcher-item-name">{org.name}</span>
+                    <span className="org-switcher-role-badge">{org.role}</span>
+                  </button>
+                ))}
+
+                <div className="org-switcher-divider" />
+
+                {!creatingWorkspace ? (
+                  <button
+                    className={`org-switcher-item org-switcher-item--action${activeIndex === orgs.length + 1 ? " org-switcher-item--focused" : ""}`}
+                    onClick={() => { setCreatingWorkspace(true); setCreateError(null); }}
+                  >
+                    <svg className="org-switcher-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="8" y1="3" x2="8" y2="13" />
+                      <line x1="3" y1="8" x2="13" y2="8" />
+                    </svg>
+                    <span className="org-switcher-item-name">New Workspace</span>
+                  </button>
+                ) : (
+                  <div className="org-switcher-create">
+                    <input
+                      ref={createInputRef}
+                      className="org-switcher-create-input"
+                      type="text"
+                      placeholder="Workspace name"
+                      value={newWorkspaceName}
+                      onChange={(e) => { setNewWorkspaceName(e.target.value); setCreateError(null); }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newWorkspaceName.trim()) handleCreateWorkspace();
+                        if (e.key === "Escape") { setCreatingWorkspace(false); setNewWorkspaceName(""); setCreateError(null); }
+                        e.stopPropagation();
+                      }}
+                      autoFocus
+                      maxLength={200}
+                    />
+                    {createError && <span className="org-switcher-create-error">{createError}</span>}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         <div className={`nav-links${menuOpen ? " nav-links--open" : ""}`}>
           <Link

@@ -201,15 +201,17 @@ describe("Layout", () => {
     expect(screen.queryByText("Pro")).not.toBeInTheDocument();
   });
 
-  it("always renders org switcher with New Workspace option", () => {
+  it("always renders org switcher with New Workspace option", async () => {
+    const user = userEvent.setup();
     renderLayout();
-    const switcher = screen.getByLabelText("Switch workspace");
-    expect(switcher).toBeInTheDocument();
-    expect(switcher).toHaveValue("personal");
-    expect(screen.getByText("+ New Workspace")).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Switch workspace" });
+    expect(trigger).toBeInTheDocument();
+    await user.click(trigger);
+    expect(screen.getByText("New Workspace")).toBeInTheDocument();
   });
 
-  it("renders org switcher with orgs listed", () => {
+  it("renders org switcher with orgs listed", async () => {
+    const user = userEvent.setup();
     mockUseOrganization.mockReturnValue({
       orgs: [
         { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
@@ -222,10 +224,9 @@ describe("Layout", () => {
       loading: false,
     });
     renderLayout();
-    const switcher = screen.getByLabelText("Switch workspace");
-    expect(switcher).toBeInTheDocument();
-    expect(switcher).toHaveValue("personal");
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
     expect(screen.getByText("Acme Corp")).toBeInTheDocument();
+    expect(screen.getByText("owner")).toBeInTheDocument();
   });
 
   it("calls switchOrg when selecting an organization", async () => {
@@ -243,7 +244,8 @@ describe("Layout", () => {
     });
     renderLayout();
 
-    await user.selectOptions(screen.getByLabelText("Switch workspace"), "org-1");
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
+    await user.click(screen.getByText("Acme Corp"));
     expect(mockSwitchOrg).toHaveBeenCalledWith("org-1");
   });
 
@@ -262,7 +264,8 @@ describe("Layout", () => {
     });
     renderLayout();
 
-    await user.selectOptions(screen.getByLabelText("Switch workspace"), "personal");
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
+    await user.click(screen.getByRole("option", { name: /Personal/ }));
     expect(mockSwitchOrg).toHaveBeenCalledWith(null);
   });
 
@@ -286,6 +289,116 @@ describe("Layout", () => {
   it("hides Org Settings link when no org is selected", () => {
     renderLayout();
     expect(screen.queryByRole("link", { name: "Org Settings" })).not.toBeInTheDocument();
+  });
+
+  it("closes org dropdown on click outside", async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
+    expect(screen.getByRole("listbox", { name: "Workspaces" })).toBeInTheDocument();
+    await user.click(document.body);
+    expect(screen.queryByRole("listbox", { name: "Workspaces" })).not.toBeInTheDocument();
+  });
+
+  it("closes org dropdown on Escape key", async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
+    expect(screen.getByRole("listbox", { name: "Workspaces" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("listbox", { name: "Workspaces" })).not.toBeInTheDocument();
+  });
+
+  it("shows inline create form when clicking New Workspace", async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
+    await user.click(screen.getByText("New Workspace"));
+    const input = screen.getByPlaceholderText("Workspace name");
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveFocus();
+  });
+
+  it("creates workspace on Enter in inline form", async () => {
+    const user = userEvent.setup();
+    mockCreateOrg.mockResolvedValueOnce({});
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
+    await user.click(screen.getByText("New Workspace"));
+    await user.type(screen.getByPlaceholderText("Workspace name"), "My Team");
+    await user.keyboard("{Enter}");
+    expect(mockCreateOrg).toHaveBeenCalledWith("My Team");
+  });
+
+  it("shows error when workspace creation fails", async () => {
+    const user = userEvent.setup();
+    mockCreateOrg.mockRejectedValueOnce(new Error("limit"));
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
+    await user.click(screen.getByText("New Workspace"));
+    await user.type(screen.getByPlaceholderText("Workspace name"), "My Team");
+    await user.keyboard("{Enter}");
+    await waitFor(() => {
+      expect(screen.getByText("Failed to create workspace. Free plan allows 1 workspace.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows selected org name in trigger", () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      ],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
+      loading: false,
+    });
+    renderLayout();
+    const trigger = screen.getByRole("button", { name: "Switch workspace" });
+    expect(trigger).toHaveTextContent("Acme Corp");
+  });
+
+  it("navigates org dropdown with arrow keys", async () => {
+    const user = userEvent.setup();
+    mockUseOrganization.mockReturnValue({
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      ],
+      selectedOrg: null,
+      selectedOrgId: null,
+      switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
+      loading: false,
+    });
+    renderLayout();
+    const trigger = screen.getByRole("button", { name: "Switch workspace" });
+    trigger.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("listbox", { name: "Workspaces" })).toBeInTheDocument();
+    await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Enter}");
+    expect(mockSwitchOrg).toHaveBeenCalledWith("org-1");
+  });
+
+  it("shows role badges for org members", async () => {
+    const user = userEvent.setup();
+    mockUseOrganization.mockReturnValue({
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "admin", memberCount: 3 },
+      ],
+      selectedOrg: null,
+      selectedOrgId: null,
+      switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
+      loading: false,
+    });
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
+    expect(screen.getByText("admin")).toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {
