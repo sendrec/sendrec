@@ -317,30 +317,37 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var documentText *string
 	var documentStatus string
 	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
+	var obCompanyName, obLogoKey, obColorBg, obColorSurface, obColorText, obColorAccent, obFooterText, obCustomCSS *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
+	var videoOrgID *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password,
 		        v.transcript_key, v.transcript_json, v.transcript_status,
 		        v.user_id, u.email, v.view_notification, v.content_type,
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
+		        ob.company_name, ob.logo_key, ob.color_background, ob.color_surface, ob.color_text, ob.color_accent, ob.footer_text, ob.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
 		        v.cta_text, v.cta_url,
 		        v.summary, v.chapters, v.summary_status,
-		        v.document, v.document_status
+		        v.document, v.document_status,
+		        v.organization_id
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
-		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
+		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id AND ub.organization_id IS NULL
+		 LEFT JOIN user_branding ob ON ob.organization_id = v.organization_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword,
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
 		&ownerID, &ownerEmail, &viewNotification, &contentType,
 		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
+		&obCompanyName, &obLogoKey, &obColorBg, &obColorSurface, &obColorText, &obColorAccent, &obFooterText, &obCustomCSS,
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
 		&ctaText, &ctaUrl,
 		&summaryText, &chaptersJSON, &summaryStatus,
-		&documentText, &documentStatus)
+		&documentText, &documentStatus,
+		&videoOrgID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -358,13 +365,22 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	baseBranding := brandingSettingsResponse{
+		CompanyName: ubCompanyName, LogoKey: ubLogoKey,
+		ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
+		ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
+		CustomCSS: ubCustomCSS,
+	}
+	if videoOrgID != nil {
+		baseBranding = brandingSettingsResponse{
+			CompanyName: obCompanyName, LogoKey: obLogoKey,
+			ColorBackground: obColorBg, ColorSurface: obColorSurface,
+			ColorText: obColorText, ColorAccent: obColorAccent, FooterText: obFooterText,
+			CustomCSS: obCustomCSS,
+		}
+	}
 	branding := resolveBranding(r.Context(), h.storage,
-		brandingSettingsResponse{
-			CompanyName: ubCompanyName, LogoKey: ubLogoKey,
-			ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
-			ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
-			CustomCSS: ubCustomCSS,
-		},
+		baseBranding,
 		brandingSettingsResponse{
 			CompanyName: vbCompanyName, LogoKey: vbLogoKey,
 			ColorBackground: vbColorBg, ColorSurface: vbColorSurface,
