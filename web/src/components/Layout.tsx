@@ -18,7 +18,7 @@ export function Layout({ children }: LayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
   const { resolvedTheme, setTheme } = useTheme();
-  const { orgs, selectedOrgId, switchOrg } = useOrganization();
+  const { orgs, selectedOrgId, switchOrg, createOrg } = useOrganization();
 
   function toggleTheme() {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
@@ -60,23 +60,32 @@ export function Layout({ children }: LayoutProps) {
           )}
         </Link>
 
-        {orgs.length > 0 && (
-          <select
-            className="org-switcher"
-            value={selectedOrgId ?? "personal"}
-            onChange={(e) =>
-              switchOrg(e.target.value === "personal" ? null : e.target.value)
+        <select
+          className="org-switcher"
+          value={selectedOrgId ?? "personal"}
+          onChange={(e) => {
+            if (e.target.value === "__create__") {
+              e.target.value = selectedOrgId ?? "personal";
+              const name = window.prompt("Workspace name:");
+              if (name?.trim()) {
+                createOrg(name.trim()).catch(() => {
+                  window.alert("Failed to create workspace. Free plan allows 1 workspace.");
+                });
+              }
+            } else {
+              switchOrg(e.target.value === "personal" ? null : e.target.value);
             }
-            aria-label="Switch workspace"
-          >
-            <option value="personal">Personal</option>
-            {orgs.map((org) => (
-              <option key={org.id} value={org.id}>
-                {org.name}
-              </option>
-            ))}
-          </select>
-        )}
+          }}
+          aria-label="Switch workspace"
+        >
+          <option value="personal">Personal</option>
+          {orgs.map((org) => (
+            <option key={org.id} value={org.id}>
+              {org.name}
+            </option>
+          ))}
+          <option value="__create__">+ New Workspace</option>
+        </select>
 
         <div className={`nav-links${menuOpen ? " nav-links--open" : ""}`}>
           <Link

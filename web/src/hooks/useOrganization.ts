@@ -48,5 +48,31 @@ export function useOrganization() {
 
   const selectedOrg = orgs.find((o) => o.id === selectedOrgId) ?? null;
 
-  return { orgs, selectedOrg, selectedOrgId, switchOrg, loading };
+  const createOrg = useCallback(async (name: string): Promise<Organization | null> => {
+    const result = await apiFetch<Organization>("/api/organizations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (result) {
+      setOrgs((prev) => [...prev, result]);
+      setCurrentOrgId(result.id);
+    }
+    return result;
+  }, []);
+
+  const refreshOrgs = useCallback(() => {
+    apiFetch<Organization[]>("/api/organizations")
+      .then((result) => {
+        const list = result ?? [];
+        setOrgs(list);
+        const stored = getCurrentOrgId();
+        if (stored && !list.some((o) => o.id === stored)) {
+          setCurrentOrgId(null);
+        }
+      })
+      .catch(() => setOrgs([]));
+  }, []);
+
+  return { orgs, selectedOrg, selectedOrgId, switchOrg, createOrg, refreshOrgs, loading };
 }

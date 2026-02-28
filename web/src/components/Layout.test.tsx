@@ -19,11 +19,15 @@ vi.mock("../api/client", () => ({
 }));
 
 const mockSwitchOrg = vi.fn();
+const mockCreateOrg = vi.fn();
+const mockRefreshOrgs = vi.fn();
 const mockUseOrganization = vi.fn().mockReturnValue({
   orgs: [],
   selectedOrg: null,
   selectedOrgId: null,
   switchOrg: mockSwitchOrg,
+  createOrg: mockCreateOrg,
+  refreshOrgs: mockRefreshOrgs,
   loading: false,
 });
 vi.mock("../hooks/useOrganization", () => ({
@@ -47,11 +51,15 @@ describe("Layout", () => {
     mockApiFetch.mockReset();
     mockApiFetch.mockRejectedValue(new Error("not available"));
     mockSwitchOrg.mockReset();
+    mockCreateOrg.mockReset();
+    mockRefreshOrgs.mockReset();
     mockUseOrganization.mockReturnValue({
       orgs: [],
       selectedOrg: null,
       selectedOrgId: null,
       switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
       loading: false,
     });
     globalThis.fetch = vi.fn().mockResolvedValue({});
@@ -193,12 +201,15 @@ describe("Layout", () => {
     expect(screen.queryByText("Pro")).not.toBeInTheDocument();
   });
 
-  it("does not render org switcher when no orgs exist", () => {
+  it("always renders org switcher with New Workspace option", () => {
     renderLayout();
-    expect(screen.queryByLabelText("Switch workspace")).not.toBeInTheDocument();
+    const switcher = screen.getByLabelText("Switch workspace");
+    expect(switcher).toBeInTheDocument();
+    expect(switcher).toHaveValue("personal");
+    expect(screen.getByText("+ New Workspace")).toBeInTheDocument();
   });
 
-  it("renders org switcher when orgs exist", () => {
+  it("renders org switcher with orgs listed", () => {
     mockUseOrganization.mockReturnValue({
       orgs: [
         { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
@@ -206,12 +217,15 @@ describe("Layout", () => {
       selectedOrg: null,
       selectedOrgId: null,
       switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
       loading: false,
     });
     renderLayout();
     const switcher = screen.getByLabelText("Switch workspace");
     expect(switcher).toBeInTheDocument();
     expect(switcher).toHaveValue("personal");
+    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
   });
 
   it("calls switchOrg when selecting an organization", async () => {
@@ -223,6 +237,8 @@ describe("Layout", () => {
       selectedOrg: null,
       selectedOrgId: null,
       switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
       loading: false,
     });
     renderLayout();
@@ -240,6 +256,8 @@ describe("Layout", () => {
       selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
       selectedOrgId: "org-1",
       switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
       loading: false,
     });
     renderLayout();
@@ -256,6 +274,8 @@ describe("Layout", () => {
       selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
       selectedOrgId: "org-1",
       switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
       loading: false,
     });
     renderLayout();
