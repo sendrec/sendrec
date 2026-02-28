@@ -97,10 +97,13 @@ export function OrgSettings() {
         setInvites((inviteData as Invite[]) ?? []);
         setBilling(billingData as OrgBilling | null);
 
-        const me = (memberData ?? []).find((m) => m.role === "owner") ?? null;
         const currentMember = findCurrentUser(memberData ?? []);
         if (currentMember) {
           setCurrentUserRole(currentMember.role);
+          if (currentMember.role !== "owner" && currentMember.role !== "admin") {
+            navigate("/", { replace: true });
+            return;
+          }
         }
       })
       .catch(() => setError("Failed to load workspace"))

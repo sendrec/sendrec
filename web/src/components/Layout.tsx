@@ -18,7 +18,7 @@ export function Layout({ children }: LayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
   const { resolvedTheme, setTheme } = useTheme();
-  const { orgs, selectedOrgId, switchOrg, createOrg } = useOrganization();
+  const { orgs, selectedOrg, selectedOrgId, switchOrg, createOrg } = useOrganization();
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
@@ -276,7 +276,7 @@ export function Layout({ children }: LayoutProps) {
             Settings
           </Link>
 
-          {selectedOrgId && (
+          {selectedOrg && (selectedOrg.role === "owner" || selectedOrg.role === "admin") && (
             <Link
               to={`/organizations/${selectedOrgId}/settings`}
               className="nav-link"
