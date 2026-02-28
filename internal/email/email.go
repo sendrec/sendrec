@@ -23,6 +23,7 @@ type Config struct {
 	WelcomeTemplateID        int
 	OnboardingDay2TemplateID int
 	OnboardingDay7TemplateID int
+	OrgInviteTemplateID      int
 	Allowlist                []string
 }
 
@@ -376,6 +377,35 @@ func (c *Client) SendDigestNotification(ctx context.Context, toEmail, toName str
 			"totalViews":    strconv.Itoa(totalViews),
 			"totalComments": strconv.Itoa(totalComments),
 			"videos":        videos,
+		},
+		ContentType: "html",
+	}
+
+	return c.sendTx(ctx, body)
+}
+
+func (c *Client) SendOrgInvite(ctx context.Context, toEmail, orgName, inviterName, acceptLink string) error {
+	if c.config.BaseURL == "" {
+		slog.Warn("email not configured, org invite email skipped", "recipient", toEmail)
+		return nil
+	}
+
+	if c.config.OrgInviteTemplateID == 0 {
+		slog.Warn("org invite template ID not set, skipping org invite email", "recipient", toEmail)
+		return nil
+	}
+
+	// Invite emails bypass the allowlist — they must always be sent
+	// so invited users can join the organization.
+	c.ensureSubscriber(ctx, toEmail, "")
+
+	body := txRequest{
+		SubscriberEmail: toEmail,
+		TemplateID:      c.config.OrgInviteTemplateID,
+		Data: map[string]any{
+			"orgName":     orgName,
+			"inviterName": inviterName,
+			"acceptLink":  acceptLink,
 		},
 		ContentType: "html",
 	}
