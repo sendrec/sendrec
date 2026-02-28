@@ -1,9 +1,10 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
 
 export function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   async function handleRegister(data: {
     email: string;
@@ -25,6 +26,9 @@ export function Register() {
     navigate("/check-email", { state: { email: data.email } });
   }
 
+  const redirect = searchParams.get("redirect");
+  const loginPath = redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : "/login";
+
   return (
     <AuthForm
       title="Create account"
@@ -34,7 +38,7 @@ export function Register() {
       onSubmit={handleRegister}
       footer={
         <>
-          Already have an account? <Link to="/login">Sign in</Link>
+          Already have an account? <Link to={loginPath}>Sign in</Link>
         </>
       }
     />

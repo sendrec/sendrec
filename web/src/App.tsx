@@ -17,6 +17,7 @@ import { VideoDetail } from "./pages/VideoDetail";
 import { Playlists } from "./pages/Playlists";
 import { PlaylistDetail } from "./pages/PlaylistDetail";
 import { OrgSettings } from "./pages/OrgSettings";
+import { AcceptInvite } from "./pages/AcceptInvite";
 import { useTheme } from "./hooks/useTheme";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -53,6 +54,7 @@ export function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/check-email" element={<CheckEmail />} />
       <Route path="/confirm-email" element={<ConfirmEmail />} />
+      <Route path="/invites/accept" element={<AcceptInvite />} />
       <Route
         path="/"
         element={
