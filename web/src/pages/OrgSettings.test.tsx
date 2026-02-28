@@ -235,4 +235,51 @@ describe("OrgSettings", () => {
     expect(screen.getByText("Pending invites")).toBeInTheDocument();
     expect(screen.getByText(/Revoke/)).toBeInTheDocument();
   });
+
+  it("shows Pro badge and owner plan message when effective plan comes from owner", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(mockOrg)
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "free", effectivePlan: "pro" });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Pro")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Pro features through your personal subscription/)).toBeInTheDocument();
+    expect(screen.queryByText("Upgrade to Pro")).not.toBeInTheDocument();
+  });
+
+  it("shows upgrade CTA when both workspace and effective plan are free", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(mockOrg)
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "free", effectivePlan: "free" });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Upgrade to Pro")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/personal subscription/)).not.toBeInTheDocument();
+  });
+
+  it("shows manage subscription when workspace has its own Pro plan", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(mockOrg)
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "pro", effectivePlan: "pro", portalUrl: "https://portal.example.com" });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Manage subscription")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Cancel subscription")).toBeInTheDocument();
+    expect(screen.queryByText(/personal subscription/)).not.toBeInTheDocument();
+  });
 });

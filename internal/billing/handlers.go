@@ -15,6 +15,7 @@ import (
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/plans"
 )
 
 const maxWebhookBodyBytes = 64 * 1024
@@ -70,6 +71,7 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 
 type billingResponse struct {
 	Plan               string  `json:"plan"`
+	EffectivePlan      string  `json:"effectivePlan,omitempty"`
 	SubscriptionID     *string `json:"subscriptionId"`
 	SubscriptionStatus *string `json:"subscriptionStatus"`
 	PortalURL          *string `json:"portalUrl"`
@@ -212,8 +214,25 @@ func (h *Handlers) GetOrgBilling(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var ownerPlan string
+	_ = h.db.QueryRow(r.Context(),
+		`SELECT COALESCE(u.subscription_plan, 'free')
+		 FROM organization_members om
+		 JOIN users u ON u.id = om.user_id
+		 WHERE om.organization_id = $1 AND om.role = 'owner'
+		 ORDER BY CASE u.subscription_plan WHEN 'business' THEN 2 WHEN 'pro' THEN 1 ELSE 0 END DESC
+		 LIMIT 1`,
+		orgID,
+	).Scan(&ownerPlan)
+
+	effectivePlan := plan
+	if plans.Rank(ownerPlan) > plans.Rank(plan) {
+		effectivePlan = ownerPlan
+	}
+
 	resp := billingResponse{
 		Plan:           plan,
+		EffectivePlan:  effectivePlan,
 		SubscriptionID: subscriptionID,
 	}
 

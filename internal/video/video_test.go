@@ -6578,3 +6578,159 @@ func TestRetranscribe_InvalidLanguage(t *testing.T) {
 		t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
 	}
 }
+
+// --- Effective Organization Plan Tests ---
+
+const testOrgID = "org-550e8400-e29b-41d4-a716-446655440000"
+
+func authenticatedOrgRequest(t *testing.T, method, target string, body []byte) *http.Request {
+	t.Helper()
+	req := authenticatedRequest(t, method, target, body)
+	ctx := auth.ContextWithOrg(req.Context(), testOrgID, "member")
+	return req.WithContext(ctx)
+}
+
+func expectOrgPlanQuery(mock pgxmock.PgxPoolIface, orgPlan, ownerPlan string) {
+	mock.ExpectQuery(`SELECT o.subscription_plan`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"subscription_plan", "subscription_plan"}).
+			AddRow(orgPlan, ownerPlan))
+}
+
+func TestLimits_OrgFreeWithProOwner(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
+
+	expectOrgPlanQuery(mock, "free", "pro")
+	// Pro effective plan → unlimited videos, playlists
+	// getUserPlan for org member limits
+	expectPlanQuery(mock, "free")
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedOrgRequest(t, http.MethodGet, "/api/videos/limits", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp limitsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.MaxVideosPerMonth != 0 {
+		t.Errorf("expected unlimited videos (0), got %d", resp.MaxVideosPerMonth)
+	}
+	if resp.MaxVideoDurationSeconds != 0 {
+		t.Errorf("expected unlimited duration (0), got %d", resp.MaxVideoDurationSeconds)
+	}
+	if resp.MaxOrgMembers != 0 {
+		t.Errorf("expected unlimited members (0), got %d", resp.MaxOrgMembers)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestLimits_OrgProWithFreeOwner(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
+
+	expectOrgPlanQuery(mock, "pro", "free")
+	// Pro effective plan → unlimited
+	expectPlanQuery(mock, "free")
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedOrgRequest(t, http.MethodGet, "/api/videos/limits", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp limitsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.MaxVideosPerMonth != 0 {
+		t.Errorf("expected unlimited videos (0), got %d", resp.MaxVideosPerMonth)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestLimits_OrgFreeWithFreeOwner(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
+
+	expectOrgPlanQuery(mock, "free", "free")
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos WHERE organization_id`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(5))
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
+	expectPlanQuery(mock, "free")
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE user_id`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedOrgRequest(t, http.MethodGet, "/api/videos/limits", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp limitsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.MaxVideosPerMonth != 25 {
+		t.Errorf("expected maxVideosPerMonth 25, got %d", resp.MaxVideosPerMonth)
+	}
+	if resp.VideosUsedThisMonth != 5 {
+		t.Errorf("expected videosUsedThisMonth 5, got %d", resp.VideosUsedThisMonth)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}

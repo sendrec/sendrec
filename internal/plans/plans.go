@@ -24,3 +24,14 @@ func init() {
 		log.Fatalf("failed to parse free.json: %v", err)
 	}
 }
+
+func Rank(plan string) int {
+	switch plan {
+	case "business":
+		return 2
+	case "pro":
+		return 1
+	default:
+		return 0
+	}
+}

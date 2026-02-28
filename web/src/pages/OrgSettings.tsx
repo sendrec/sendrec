@@ -29,6 +29,7 @@ interface Invite {
 
 interface OrgBilling {
   plan: string;
+  effectivePlan: string;
   subscriptionStatus?: string;
   portalUrl?: string;
 }
@@ -478,12 +479,18 @@ export function OrgSettings() {
         <div className="card settings-section">
           <div className="card-header">
             <h2>Billing</h2>
-            <span className={`plan-badge ${billing.plan === "pro" ? "plan-badge--pro" : ""}`}>
-              {billing.plan === "pro" ? "Pro" : "Free"}
+            <span className={`plan-badge ${billing.effectivePlan === "pro" || billing.effectivePlan === "business" ? "plan-badge--pro" : ""}`}>
+              {billing.effectivePlan === "pro" || billing.effectivePlan === "business" ? "Pro" : "Free"}
             </span>
           </div>
 
-          {billing.plan === "free" && !billing.subscriptionStatus && (
+          {billing.plan === "free" && billing.effectivePlan !== billing.plan && (
+            <p className="card-description">
+              This workspace has Pro features through your personal subscription. No separate workspace upgrade needed.
+            </p>
+          )}
+
+          {billing.plan === "free" && billing.effectivePlan === billing.plan && !billing.subscriptionStatus && (
             <>
               <p className="card-description">
                 Upgrade to Pro for unlimited videos and recording duration.
