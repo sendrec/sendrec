@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/validate"
 )
 
@@ -112,8 +113,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to check organization limit")
 			return
 		}
-		if ownerCount >= 1 {
-			httputil.WriteError(w, http.StatusForbidden, "free plan allows 1 organization")
+		if ownerCount >= plans.Free.MaxOrgsOwned {
+			httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("free plan allows %d organization", plans.Free.MaxOrgsOwned))
 			return
 		}
 	}

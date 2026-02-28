@@ -12,4 +12,10 @@ func TestFreePlanValues(t *testing.T) {
 	if Free.MaxPlaylists != 3 {
 		t.Errorf("expected MaxPlaylists=3, got %d", Free.MaxPlaylists)
 	}
+	if Free.MaxOrgsOwned != 1 {
+		t.Errorf("expected MaxOrgsOwned=1, got %d", Free.MaxOrgsOwned)
+	}
+	if Free.MaxOrgMembers != 3 {
+		t.Errorf("expected MaxOrgMembers=3, got %d", Free.MaxOrgMembers)
+	}
 }

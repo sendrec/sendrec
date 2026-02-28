@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/validate"
 )
 
@@ -104,6 +105,10 @@ type limitsResponse struct {
 	NoiseReductionEnabled   bool           `json:"noiseReductionEnabled"`
 	MaxPlaylists            int            `json:"maxPlaylists"`
 	PlaylistsUsed           int            `json:"playlistsUsed"`
+	MaxOrgsOwned            int            `json:"maxOrgsOwned"`
+	OrgsUsed                int            `json:"orgsUsed"`
+	MaxOrgMembers           int            `json:"maxOrgMembers"`
+	OrgMembersUsed          int            `json:"orgMembersUsed"`
 	FieldLimits             map[string]int `json:"fieldLimits"`
 }
 
@@ -150,6 +155,36 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		).Scan(&playlistsUsed)
 	}
 
+	var userPlan string
+	if orgID != "" {
+		userPlan, _ = h.getUserPlan(r.Context(), userID)
+	} else {
+		userPlan = plan
+	}
+
+	maxOrgsOwned := plans.Free.MaxOrgsOwned
+	maxOrgMembers := plans.Free.MaxOrgMembers
+	var orgsUsed, orgMembersUsed int
+	if userPlan == "pro" || userPlan == "business" {
+		maxOrgsOwned = 0
+		maxOrgMembers = 0
+	} else {
+		_ = h.db.QueryRow(r.Context(),
+			`SELECT COUNT(*) FROM organization_members WHERE user_id = $1 AND role = 'owner'`,
+			userID,
+		).Scan(&orgsUsed)
+	}
+
+	if orgID != "" {
+		if plan == "pro" || plan == "business" {
+			maxOrgMembers = 0
+		}
+		_ = h.db.QueryRow(r.Context(),
+			`SELECT COUNT(*) FROM organization_members WHERE organization_id = $1`,
+			orgID,
+		).Scan(&orgMembersUsed)
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, limitsResponse{
 		MaxVideosPerMonth:       maxVideos,
 		MaxVideoDurationSeconds: maxDuration,
@@ -160,6 +195,10 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		NoiseReductionEnabled:   h.noiseReductionFilter != "",
 		MaxPlaylists:            maxPlaylists,
 		PlaylistsUsed:           playlistsUsed,
+		MaxOrgsOwned:            maxOrgsOwned,
+		OrgsUsed:                orgsUsed,
+		MaxOrgMembers:           maxOrgMembers,
+		OrgMembersUsed:          orgMembersUsed,
 		FieldLimits:             validate.FieldLimits(),
 	})
 }
