@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
@@ -19,20 +20,22 @@ import (
 const maxWebhookBodyBytes = 64 * 1024
 
 type Handlers struct {
-	db            database.DBTX
-	creem         *Client
-	baseURL       string
-	proProductID  string
-	webhookSecret string
+	db              database.DBTX
+	creem           *Client
+	baseURL         string
+	proProductID    string
+	orgProProductID string
+	webhookSecret   string
 }
 
-func NewHandlers(db database.DBTX, creem *Client, baseURL, proProductID, webhookSecret string) *Handlers {
+func NewHandlers(db database.DBTX, creem *Client, baseURL, proProductID, orgProProductID, webhookSecret string) *Handlers {
 	return &Handlers{
-		db:            db,
-		creem:         creem,
-		baseURL:       baseURL,
-		proProductID:  proProductID,
-		webhookSecret: webhookSecret,
+		db:              db,
+		creem:           creem,
+		baseURL:         baseURL,
+		proProductID:    proProductID,
+		orgProProductID: orgProProductID,
+		webhookSecret:   webhookSecret,
 	}
 }
 
@@ -139,6 +142,137 @@ func (h *Handlers) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handlers) CreateOrgCheckout(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	orgID := chi.URLParam(r, "orgId")
+
+	var role string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+		orgID, userID,
+	).Scan(&role)
+	if err != nil || role != "owner" {
+		httputil.WriteError(w, http.StatusForbidden, "only org owners can manage billing")
+		return
+	}
+
+	var req checkoutPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Plan != "pro" {
+		httputil.WriteError(w, http.StatusBadRequest, "unsupported plan")
+		return
+	}
+
+	if h.orgProProductID == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "org billing not configured")
+		return
+	}
+
+	successURL := h.baseURL + "/organizations/" + orgID + "/settings?billing=success"
+	metadata := map[string]string{"userId": userID, "orgId": orgID}
+	checkoutURL, err := h.creem.CreateCheckoutWithMetadata(r.Context(), h.orgProProductID, successURL, metadata)
+	if err != nil {
+		slog.Error("failed to create org checkout", "error", err, "org_id", orgID)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to create checkout")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"checkoutUrl": checkoutURL})
+}
+
+func (h *Handlers) GetOrgBilling(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	orgID := chi.URLParam(r, "orgId")
+
+	var memberRole string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+		orgID, userID,
+	).Scan(&memberRole)
+	if err != nil {
+		httputil.WriteError(w, http.StatusForbidden, "not a member of this organization")
+		return
+	}
+
+	var plan string
+	var subscriptionID *string
+	var customerID *string
+
+	err = h.db.QueryRow(r.Context(),
+		"SELECT subscription_plan, creem_subscription_id, creem_customer_id FROM organizations WHERE id = $1",
+		orgID,
+	).Scan(&plan, &subscriptionID, &customerID)
+	if err != nil {
+		slog.Error("failed to get org billing info", "error", err, "org_id", orgID)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to get billing info")
+		return
+	}
+
+	resp := billingResponse{
+		Plan:           plan,
+		SubscriptionID: subscriptionID,
+	}
+
+	if subscriptionID != nil {
+		info, err := h.creem.GetSubscription(r.Context(), *subscriptionID)
+		if err != nil {
+			slog.Error("failed to get org subscription info", "error", err, "org_id", orgID)
+		} else {
+			if info.Customer.PortalURL != "" {
+				resp.PortalURL = &info.Customer.PortalURL
+			}
+			if info.Status != "" {
+				resp.SubscriptionStatus = &info.Status
+			}
+		}
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handlers) CancelOrgSubscription(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	orgID := chi.URLParam(r, "orgId")
+
+	var role string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+		orgID, userID,
+	).Scan(&role)
+	if err != nil || role != "owner" {
+		httputil.WriteError(w, http.StatusForbidden, "only org owners can manage billing")
+		return
+	}
+
+	var subscriptionID *string
+	err = h.db.QueryRow(r.Context(),
+		"SELECT creem_subscription_id FROM organizations WHERE id = $1",
+		orgID,
+	).Scan(&subscriptionID)
+	if err != nil {
+		slog.Error("failed to get org subscription for cancel", "error", err, "org_id", orgID)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to get subscription")
+		return
+	}
+
+	if subscriptionID == nil {
+		httputil.WriteError(w, http.StatusBadRequest, "no active subscription")
+		return
+	}
+
+	if err := h.creem.CancelSubscription(r.Context(), *subscriptionID); err != nil {
+		slog.Error("failed to cancel org subscription", "error", err, "org_id", orgID)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to cancel subscription")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 type webhookPayload struct {
 	ID        string        `json:"id"`
 	EventType string        `json:"eventType"`
@@ -163,6 +297,7 @@ type webhookCustomer struct {
 
 type webhookMetadata struct {
 	UserID string `json:"userId"`
+	OrgID  string `json:"orgId"`
 }
 
 func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
@@ -203,27 +338,29 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := payload.Object.Metadata.UserID
-	if userID == "" {
-		slog.Warn("webhook: missing userId in metadata", "event_type", payload.EventType, "event_id", payload.ID)
+	orgID := payload.Object.Metadata.OrgID
+
+	if userID == "" && orgID == "" {
+		slog.Warn("webhook: missing userId and orgId in metadata", "event_type", payload.EventType, "event_id", payload.ID)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
 	switch payload.EventType {
 	case "subscription.active", "subscription.paid":
-		h.handleSubscriptionActivated(r, w, payload, userID)
+		h.handleSubscriptionActivated(r, w, payload, userID, orgID)
 	case "subscription.canceled", "subscription.scheduled_cancel":
-		slog.Info("webhook: subscription cancel requested, keeping plan until expiry", "user_id", userID, "event_id", payload.ID)
+		slog.Info("webhook: subscription cancel requested, keeping plan until expiry", "user_id", userID, "org_id", orgID, "event_id", payload.ID)
 		w.WriteHeader(http.StatusOK)
 	case "subscription.expired":
-		h.handleSubscriptionCanceled(r, w, userID)
+		h.handleSubscriptionCanceled(r, w, userID, orgID)
 	case "subscription.past_due":
-		slog.Warn("webhook: subscription past due, payment retrying", "user_id", userID, "event_id", payload.ID)
+		slog.Warn("webhook: subscription past due, payment retrying", "user_id", userID, "org_id", orgID, "event_id", payload.ID)
 		w.WriteHeader(http.StatusOK)
 	case "refund.created":
-		h.handleSubscriptionCanceled(r, w, userID)
+		h.handleSubscriptionCanceled(r, w, userID, orgID)
 	case "dispute.created":
-		slog.Error("webhook: dispute created, manual review needed", "user_id", userID, "event_id", payload.ID)
+		slog.Error("webhook: dispute created, manual review needed", "user_id", userID, "org_id", orgID, "event_id", payload.ID)
 		w.WriteHeader(http.StatusOK)
 	default:
 		slog.Warn("webhook: unhandled event", "event_type", payload.EventType, "event_id", payload.ID)
@@ -231,7 +368,7 @@ func (h *Handlers) Webhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseWriter, payload webhookPayload, userID string) {
+func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseWriter, payload webhookPayload, userID, orgID string) {
 	plan := h.planFromProductID(payload.Object.Product.ID)
 	if plan == "" {
 		slog.Warn("webhook: unknown product ID", "product_id", payload.Object.Product.ID)
@@ -239,14 +376,26 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 		return
 	}
 
-	_, err := h.db.Exec(r.Context(),
-		"UPDATE users SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3 WHERE id = $4",
-		plan, payload.Object.ID, payload.Object.Customer.ID, userID,
-	)
-	if err != nil {
-		slog.Error("failed to update subscription", "error", err)
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
-		return
+	if orgID != "" {
+		_, err := h.db.Exec(r.Context(),
+			"UPDATE organizations SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3, updated_at = now() WHERE id = $4",
+			plan, payload.Object.ID, payload.Object.Customer.ID, orgID,
+		)
+		if err != nil {
+			slog.Error("failed to update org subscription", "error", err, "org_id", orgID)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
+			return
+		}
+	} else {
+		_, err := h.db.Exec(r.Context(),
+			"UPDATE users SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3 WHERE id = $4",
+			plan, payload.Object.ID, payload.Object.Customer.ID, userID,
+		)
+		if err != nil {
+			slog.Error("failed to update subscription", "error", err)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -254,15 +403,27 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 
 // handleSubscriptionCanceled downgrades to free but preserves creem_subscription_id
 // and creem_customer_id for audit trail and potential re-subscription.
-func (h *Handlers) handleSubscriptionCanceled(r *http.Request, w http.ResponseWriter, userID string) {
-	_, err := h.db.Exec(r.Context(),
-		"UPDATE users SET subscription_plan = $1 WHERE id = $2",
-		"free", userID,
-	)
-	if err != nil {
-		slog.Error("failed to cancel subscription", "error", err)
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
-		return
+func (h *Handlers) handleSubscriptionCanceled(r *http.Request, w http.ResponseWriter, userID, orgID string) {
+	if orgID != "" {
+		_, err := h.db.Exec(r.Context(),
+			"UPDATE organizations SET subscription_plan = $1, updated_at = now() WHERE id = $2",
+			"free", orgID,
+		)
+		if err != nil {
+			slog.Error("failed to cancel org subscription", "error", err, "org_id", orgID)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
+			return
+		}
+	} else {
+		_, err := h.db.Exec(r.Context(),
+			"UPDATE users SET subscription_plan = $1 WHERE id = $2",
+			"free", userID,
+		)
+		if err != nil {
+			slog.Error("failed to cancel subscription", "error", err)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -276,7 +437,7 @@ func (h *Handlers) verifySignature(body []byte, signature string) bool {
 }
 
 func (h *Handlers) planFromProductID(productID string) string {
-	if productID == h.proProductID {
+	if productID == h.proProductID || (h.orgProProductID != "" && productID == h.orgProProductID) {
 		return "pro"
 	}
 	return ""

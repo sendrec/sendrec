@@ -107,6 +107,7 @@ func main() {
 	creemAPIKey := os.Getenv("CREEM_API_KEY")
 	creemWebhookSecret := os.Getenv("CREEM_WEBHOOK_SECRET")
 	creemProProductID := os.Getenv("CREEM_PRO_PRODUCT_ID")
+	creemOrgProProductID := os.Getenv("CREEM_ORG_PRO_PRODUCT_ID")
 
 	slog.Info("sendrec starting", "version", version)
 
@@ -138,6 +139,7 @@ func main() {
 		CreemAPIKey:             creemAPIKey,
 		CreemWebhookSecret:      creemWebhookSecret,
 		CreemProProductID:       creemProProductID,
+		CreemOrgProProductID:    creemOrgProProductID,
 	})
 
 	if creemAPIKey != "" {

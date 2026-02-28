@@ -52,6 +52,7 @@ type Config struct {
 	CreemAPIKey             string
 	CreemWebhookSecret      string
 	CreemProProductID       string
+	CreemOrgProProductID    string
 	GeoIPDBPath             string
 }
 
@@ -132,7 +133,7 @@ func New(cfg Config) *Server {
 
 		if cfg.CreemAPIKey != "" {
 			creemClient := billing.New(cfg.CreemAPIKey, "")
-			s.billingHandlers = billing.NewHandlers(cfg.DB, creemClient, baseURL, cfg.CreemProProductID, cfg.CreemWebhookSecret)
+			s.billingHandlers = billing.NewHandlers(cfg.DB, creemClient, baseURL, cfg.CreemProProductID, cfg.CreemOrgProProductID, cfg.CreemWebhookSecret)
 		}
 	}
 

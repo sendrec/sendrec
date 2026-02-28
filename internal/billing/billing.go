@@ -43,10 +43,14 @@ type checkoutResponse struct {
 }
 
 func (c *Client) CreateCheckout(ctx context.Context, productID, userID, successURL string) (string, error) {
+	return c.CreateCheckoutWithMetadata(ctx, productID, successURL, map[string]string{"userId": userID})
+}
+
+func (c *Client) CreateCheckoutWithMetadata(ctx context.Context, productID, successURL string, metadata map[string]string) (string, error) {
 	body, err := json.Marshal(checkoutRequest{
 		ProductID:  productID,
 		SuccessURL: successURL,
-		Metadata:   map[string]string{"userId": userID},
+		Metadata:   metadata,
 	})
 	if err != nil {
 		return "", fmt.Errorf("marshal checkout request: %w", err)

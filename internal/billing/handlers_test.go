@@ -63,7 +63,7 @@ func TestCheckoutHandler(t *testing.T) {
 	defer creemServer.Close()
 
 	client := New("test-key", creemServer.URL)
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	body := `{"plan":"pro"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/settings/billing/checkout", strings.NewReader(body))
@@ -93,7 +93,7 @@ func TestCheckoutHandlerInvalidPlan(t *testing.T) {
 	defer mock.Close()
 
 	client := New("test-key", "https://api.creem.io")
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	body := `{"plan":"enterprise"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/settings/billing/checkout", strings.NewReader(body))
@@ -128,7 +128,7 @@ func TestGetBillingFreeUser(t *testing.T) {
 			AddRow("free", nil, nil))
 
 	client := New("test-key", "https://api.creem.io")
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/settings/billing", nil)
 	req = req.WithContext(auth.ContextWithUserID(req.Context(), "user-123"))
@@ -175,7 +175,7 @@ func TestWebhookSubscriptionActive(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	client := New("test-key", "https://api.creem.io")
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	payload := map[string]interface{}{
 		"id":         "evt_001",
@@ -222,7 +222,7 @@ func TestWebhookSubscriptionCanceled_GracePeriod(t *testing.T) {
 
 	// No DB update expected — canceled keeps Pro until expiry
 	client := New("test-key", "https://api.creem.io")
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	payload := map[string]interface{}{
 		"id":         "evt_002",
@@ -272,7 +272,7 @@ func TestWebhookSubscriptionExpired(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	client := New("test-key", "https://api.creem.io")
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	payload := map[string]interface{}{
 		"id":         "evt_003",
@@ -314,7 +314,7 @@ func TestWebhookInvalidSignature(t *testing.T) {
 	defer mock.Close()
 
 	client := New("test-key", "https://api.creem.io")
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	payload := `{"eventType":"subscription.active","object":{"id":"sub_001"}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/webhooks/creem", strings.NewReader(payload))
@@ -342,7 +342,7 @@ func TestWebhookDuplicateEventIgnored(t *testing.T) {
 	// No UPDATE expected — duplicate event is silently ignored
 
 	client := New("test-key", "https://api.creem.io")
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	payload := map[string]interface{}{
 		"id":         "evt_dup",
@@ -392,7 +392,7 @@ func TestWebhookRefundCreated(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	client := New("test-key", "https://api.creem.io")
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	payload := map[string]interface{}{
 		"id":         "evt_refund",
@@ -440,7 +440,7 @@ func TestWebhookDisputeCreated(t *testing.T) {
 	// No UPDATE expected — dispute only logs, no plan change
 
 	client := New("test-key", "https://api.creem.io")
-	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "webhook-secret")
+	handlers := NewHandlers(mock, client, "https://app.sendrec.eu", "prod_pro", "", "webhook-secret")
 
 	payload := map[string]interface{}{
 		"id":         "evt_dispute",
