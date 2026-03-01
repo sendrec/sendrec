@@ -2607,12 +2607,12 @@ func TestExtend_Success(t *testing.T) {
 
 	expiresAt := time.Now().Add(3 * 24 * time.Hour)
 	mock.ExpectQuery(`SELECT share_expires_at FROM videos`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"share_expires_at"}).
 			AddRow(&expiresAt))
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	r := chi.NewRouter()
@@ -2642,7 +2642,7 @@ func TestExtend_VideoNotFound(t *testing.T) {
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT share_expires_at FROM videos`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
 	r := chi.NewRouter()
@@ -2678,12 +2678,12 @@ func TestExtend_DatabaseError(t *testing.T) {
 
 	expiresAt := time.Now().Add(3 * 24 * time.Hour)
 	mock.ExpectQuery(`SELECT share_expires_at FROM videos`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"share_expires_at"}).
 			AddRow(&expiresAt))
 
 	mock.ExpectExec(`UPDATE videos SET share_expires_at`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnError(errors.New("database timeout"))
 
 	r := chi.NewRouter()
@@ -2718,7 +2718,7 @@ func TestExtend_AlreadyNeverExpires(t *testing.T) {
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT share_expires_at FROM videos`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"share_expires_at"}).
 			AddRow((*time.Time)(nil)))
 
@@ -2755,13 +2755,13 @@ func TestTrim_Success(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
 	mock.ExpectExec(`UPDATE videos SET status = 'processing'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	r := chi.NewRouter()
@@ -2791,8 +2791,8 @@ func TestTrim_VideoNotFound(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
 	r := chi.NewRouter()
@@ -2822,10 +2822,10 @@ func TestTrim_VideoNotReady(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(120, "recordings/user/video.webm", "abc123defghi", "processing", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(120, "recordings/user/video.webm", "abc123defghi", "processing", "video/webm", testUserID))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/trim", handler.Trim)
@@ -2919,10 +2919,10 @@ func TestTrim_EndBeyondDuration(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(60, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(60, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/trim", handler.Trim)
@@ -2947,10 +2947,10 @@ func TestTrim_TrimTooShort(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(60, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(60, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/trim", handler.Trim)
@@ -2975,13 +2975,13 @@ func TestTrim_RaceCondition(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
 	mock.ExpectExec(`UPDATE videos SET status = 'processing'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	r := chi.NewRouter()
@@ -3818,8 +3818,8 @@ func TestDownload_Success(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT title, file_key, content_type FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status = 'ready'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+	mock.ExpectQuery(`SELECT title, file_key, content_type FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "content_type"}).
 			AddRow("Demo Recording", "recordings/user-1/abc.webm", "video/webm"))
 
@@ -3859,8 +3859,8 @@ func TestDownload_VideoNotFound(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
-	mock.ExpectQuery(`SELECT title, file_key, content_type FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status = 'ready'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+	mock.ExpectQuery(`SELECT title, file_key, content_type FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
 	r := chi.NewRouter()
@@ -3894,8 +3894,8 @@ func TestDownload_StorageError(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT title, file_key, content_type FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status = 'ready'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+	mock.ExpectQuery(`SELECT title, file_key, content_type FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "content_type"}).
 			AddRow("Demo Recording", "recordings/user-1/abc.webm", "video/webm"))
 
@@ -4049,8 +4049,8 @@ func TestSetDownloadEnabled_Success(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectExec(`UPDATE videos SET download_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND organization_id IS NOT DISTINCT FROM \$4 AND status != 'deleted'`).
-		WithArgs(false, videoID, testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET download_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(false, videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	body := []byte(`{"downloadEnabled":false}`)
@@ -4079,8 +4079,8 @@ func TestSetDownloadEnabled_NotFound(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectExec(`UPDATE videos SET download_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND organization_id IS NOT DISTINCT FROM \$4 AND status != 'deleted'`).
-		WithArgs(true, "video-999", testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET download_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(true, "video-999", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	body := []byte(`{"downloadEnabled":true}`)
@@ -4151,8 +4151,8 @@ func TestSetLinkExpiry_NeverExpires(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectExec(`UPDATE videos SET share_expires_at = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status != 'deleted'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET share_expires_at = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	body := []byte(`{"neverExpires":true}`)
@@ -4182,8 +4182,8 @@ func TestSetLinkExpiry_SevenDays(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-456"
 
-	mock.ExpectExec(`UPDATE videos SET share_expires_at = now\(\) \+ INTERVAL '7 days', updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status != 'deleted'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET share_expires_at = now\(\) \+ INTERVAL '7 days', updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	body := []byte(`{"neverExpires":false}`)
@@ -4212,8 +4212,8 @@ func TestSetLinkExpiry_NotFound(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectExec(`UPDATE videos SET share_expires_at = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status != 'deleted'`).
-		WithArgs("video-999", testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET share_expires_at = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs("video-999", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	body := []byte(`{"neverExpires":true}`)
@@ -4246,8 +4246,8 @@ func TestSetPassword_SetNewPassword(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "550e8400-e29b-41d4-a716-446655440099"
 
-	mock.ExpectExec(`UPDATE videos SET share_password = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3 AND organization_id IS NOT DISTINCT FROM \$4 AND status != 'deleted'`).
-		WithArgs(pgxmock.AnyArg(), videoID, testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET share_password = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(pgxmock.AnyArg(), videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	body := `{"password":"secret123"}`
@@ -4277,8 +4277,8 @@ func TestSetPassword_RemovePassword(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "550e8400-e29b-41d4-a716-446655440099"
 
-	mock.ExpectExec(`UPDATE videos SET share_password = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status != 'deleted'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET share_password = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	body := `{"password":""}`
@@ -4308,8 +4308,8 @@ func TestSetPassword_VideoNotFound(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "550e8400-e29b-41d4-a716-446655440099"
 
-	mock.ExpectExec(`UPDATE videos SET share_password = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3 AND organization_id IS NOT DISTINCT FROM \$4 AND status != 'deleted'`).
-		WithArgs(pgxmock.AnyArg(), videoID, testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET share_password = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(pgxmock.AnyArg(), videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	body := `{"password":"secret123"}`
@@ -5995,7 +5995,7 @@ func TestSetCTA_Success(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE videos SET cta_text`).
-		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), "video-001", testUserID, (*string)(nil)).
+		WithArgs(pgxmock.AnyArg(), pgxmock.AnyArg(), "video-001", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	body := `{"text":"Book a demo","url":"https://example.com/demo"}`
@@ -6027,7 +6027,7 @@ func TestSetCTA_Clear(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectExec(`UPDATE videos SET cta_text`).
-		WithArgs((*string)(nil), (*string)(nil), "video-001", testUserID, (*string)(nil)).
+		WithArgs((*string)(nil), (*string)(nil), "video-001", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	body := `{"text":null,"url":null}`
@@ -6242,8 +6242,8 @@ func TestSetEmailGate_Success(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectExec(`UPDATE videos SET email_gate_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND organization_id IS NOT DISTINCT FROM \$4 AND status != 'deleted'`).
-		WithArgs(true, videoID, testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET email_gate_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(true, videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	body := []byte(`{"enabled":true}`)
@@ -6272,8 +6272,8 @@ func TestSetEmailGate_NotFound(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectExec(`UPDATE videos SET email_gate_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND organization_id IS NOT DISTINCT FROM \$4 AND status != 'deleted'`).
-		WithArgs(false, "video-999", testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET email_gate_enabled = \$1 WHERE id = \$2 AND user_id = \$3 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(false, "video-999", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	body := []byte(`{"enabled":false}`)
@@ -6305,7 +6305,7 @@ func TestSummarize_Success(t *testing.T) {
 	videoID := "video-123"
 
 	mock.ExpectExec(`UPDATE videos SET summary_status = 'pending'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	r := chi.NewRouter()
@@ -6354,7 +6354,7 @@ func TestSummarize_NotFound(t *testing.T) {
 	handler.SetAIEnabled(true)
 
 	mock.ExpectExec(`UPDATE videos SET summary_status = 'pending'`).
-		WithArgs("video-999", testUserID, (*string)(nil)).
+		WithArgs("video-999", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	r := chi.NewRouter()
@@ -6384,8 +6384,8 @@ func TestDismissTitle_Success(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectExec(`UPDATE videos SET suggested_title = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status != 'deleted'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET suggested_title = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	r := chi.NewRouter()
@@ -6412,8 +6412,8 @@ func TestDismissTitle_NotFound(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectExec(`UPDATE videos SET suggested_title = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NOT DISTINCT FROM \$3 AND status != 'deleted'`).
-		WithArgs("video-999", testUserID, (*string)(nil)).
+	mock.ExpectExec(`UPDATE videos SET suggested_title = NULL, updated_at = now\(\) WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs("video-999", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	r := chi.NewRouter()
@@ -6493,11 +6493,11 @@ func TestRetranscribe_WithLanguage(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT true FROM videos`).
-		WithArgs("video-123", testUserID, (*string)(nil)).
+		WithArgs("video-123", testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
 
 	mock.ExpectExec(`UPDATE videos SET transcription_language = \$1, updated_at = now\(\) WHERE id = \$2 AND user_id = \$3`).
-		WithArgs("de", "video-123", testUserID, (*string)(nil)).
+		WithArgs("de", "video-123", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	mock.ExpectExec(`UPDATE videos SET transcript_status = 'pending'`).
@@ -6531,7 +6531,7 @@ func TestRetranscribe_NoBody(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT true FROM videos`).
-		WithArgs("video-123", testUserID, (*string)(nil)).
+		WithArgs("video-123", testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
 
 	mock.ExpectExec(`UPDATE videos SET transcript_status = 'pending'`).
@@ -6563,7 +6563,7 @@ func TestRetranscribe_InvalidLanguage(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
 	mock.ExpectQuery(`SELECT true FROM videos`).
-		WithArgs("video-123", testUserID, (*string)(nil)).
+		WithArgs("video-123", testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
 
 	body := []byte(`{"language":"invalid"}`)

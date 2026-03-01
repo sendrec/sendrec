@@ -20,7 +20,7 @@ func TestGenerateDocument_Success(t *testing.T) {
 	handler.SetAIEnabled(true)
 
 	mock.ExpectExec(`UPDATE videos SET document_status = 'pending'`).
-		WithArgs("vid-1", testUserID, (*string)(nil)).
+		WithArgs("vid-1", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	r := chi.NewRouter()
@@ -73,7 +73,7 @@ func TestGenerateDocument_VideoNotFound(t *testing.T) {
 	handler.SetAIEnabled(true)
 
 	mock.ExpectExec(`UPDATE videos SET document_status = 'pending'`).
-		WithArgs("vid-missing", testUserID, (*string)(nil)).
+		WithArgs("vid-missing", testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	r := chi.NewRouter()

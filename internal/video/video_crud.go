@@ -468,7 +468,6 @@ type trimRequest struct {
 }
 
 func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req trimRequest
@@ -486,15 +485,16 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "")
 	var duration int
 	var fileKey string
 	var shareToken string
 	var status string
 	var contentType string
+	var videoOwnerID string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3`,
-		videoID, userID, orgScope(r.Context()),
-	).Scan(&duration, &fileKey, &shareToken, &status, &contentType)
+		`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE `+where, args...,
+	).Scan(&duration, &fileKey, &shareToken, &status, &contentType, &videoOwnerID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -513,9 +513,9 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	updateWhere, updateArgs := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET status = 'processing', updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status = 'ready'`,
-		videoID, userID, orgScope(r.Context()),
+		`UPDATE videos SET status = 'processing', updated_at = now() WHERE `+updateWhere, updateArgs...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video status")
@@ -529,7 +529,7 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		TrimVideoAsync(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken), contentType, req.StartSeconds, req.EndSeconds)
+		TrimVideoAsync(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(videoOwnerID, shareToken), contentType, req.StartSeconds, req.EndSeconds)
 	}()
 
 	w.WriteHeader(http.StatusAccepted)

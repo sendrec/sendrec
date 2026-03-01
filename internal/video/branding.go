@@ -456,15 +456,14 @@ func (h *Handler) GetVideoBranding(w http.ResponseWriter, r *http.Request) {
 	if !h.requireBrandingEnabled(w) {
 		return
 	}
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 	var resp brandingSettingsResponse
 	err := h.db.QueryRow(r.Context(),
 		`SELECT branding_company_name, branding_logo_key, branding_color_background, branding_color_surface,
 		        branding_color_text, branding_color_accent, branding_footer_text
-		 FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		 FROM videos WHERE `+where, args...,
 	).Scan(&resp.CompanyName, &resp.LogoKey, &resp.ColorBackground, &resp.ColorSurface, &resp.ColorText, &resp.ColorAccent, &resp.FooterText)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -482,7 +481,6 @@ func (h *Handler) SetVideoBranding(w http.ResponseWriter, r *http.Request) {
 	if !h.requireBrandingEnabled(w) {
 		return
 	}
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req setVideoBrandingRequest
@@ -508,12 +506,15 @@ func (h *Handler) SetVideoBranding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID,
+		[]any{req.CompanyName, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText},
+		"AND status != 'deleted'",
+	)
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET
 		   branding_company_name = $1, branding_color_background = $2, branding_color_surface = $3,
 		   branding_color_text = $4, branding_color_accent = $5, branding_footer_text = $6
-		 WHERE id = $7 AND user_id = $8 AND status != 'deleted'`,
-		req.CompanyName, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText, videoID, userID,
+		 WHERE `+where, args...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to save video branding")

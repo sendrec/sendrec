@@ -560,6 +560,38 @@ func orgScope(ctx context.Context) *string {
 	return &orgID
 }
 
+// orgVideoFilter builds a WHERE clause and args for video access queries that
+// respect the caller's org role. Owner/admin can act on any org video (filter
+// by organization_id only), members can only act on their own video (filter by
+// user_id + organization_id), and personal context filters by user_id +
+// organization_id IS NULL.
+//
+// baseArgs are the leading positional parameters (e.g. SET values in an UPDATE).
+// The returned clause uses $N placeholders starting after len(baseArgs).
+// An optional suffix (e.g. "AND status != 'deleted'") is appended when non-empty.
+func orgVideoFilter(ctx context.Context, videoID string, baseArgs []any, suffix string) (string, []any) {
+	userID := auth.UserIDFromContext(ctx)
+	orgID := auth.OrgIDFromContext(ctx)
+	sfx := ""
+	if suffix != "" {
+		sfx = " " + suffix
+	}
+	if orgID != "" {
+		role := auth.OrgRoleFromContext(ctx)
+		if role == "owner" || role == "admin" {
+			n := len(baseArgs)
+			return fmt.Sprintf("id = $%d AND organization_id = $%d%s", n+1, n+2, sfx),
+				append(baseArgs, videoID, orgID)
+		}
+		n := len(baseArgs)
+		return fmt.Sprintf("id = $%d AND user_id = $%d AND organization_id = $%d%s", n+1, n+2, n+3, sfx),
+			append(baseArgs, videoID, userID, orgID)
+	}
+	n := len(baseArgs)
+	return fmt.Sprintf("id = $%d AND user_id = $%d AND organization_id IS NULL%s", n+1, n+2, sfx),
+		append(baseArgs, videoID, userID)
+}
+
 func (h *Handler) countOrgVideosThisMonth(ctx context.Context, orgID string) (int, error) {
 	var count int
 	err := h.db.QueryRow(ctx,
@@ -596,15 +628,14 @@ func sortDailyViews(daily []dailyViews) {
 }
 
 func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	var title string
 	var fileKey string
 	var contentType string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT title, file_key, content_type FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status = 'ready'`,
-		videoID, userID, orgScope(r.Context()),
+		`SELECT title, file_key, content_type FROM videos WHERE `+where, args...,
 	).Scan(&title, &fileKey, &contentType)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -622,14 +653,13 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetTranscript(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 	var status string
 	var segmentsJSON *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT transcript_status, transcript_json FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3 AND status != 'deleted'`,
-		videoID, userID, orgScope(r.Context()),
+		`SELECT transcript_status, transcript_json FROM videos WHERE `+where, args...,
 	).Scan(&status, &segmentsJSON)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")

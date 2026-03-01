@@ -22,13 +22,13 @@ func TestRemoveSegments_Success(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
 	mock.ExpectExec(`UPDATE videos SET status = 'processing'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 	r := chi.NewRouter()
@@ -102,10 +102,10 @@ func TestRemoveSegments_SegmentsExceedDuration(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(60, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(60, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/remove-segments", handler.RemoveSegments)
@@ -164,10 +164,10 @@ func TestRemoveSegments_ResultDurationTooShort(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(10, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(10, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/remove-segments", handler.RemoveSegments)
@@ -192,8 +192,8 @@ func TestRemoveSegments_VideoNotFound(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
 	r := chi.NewRouter()
@@ -223,10 +223,10 @@ func TestRemoveSegments_VideoNotReady(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(120, "recordings/user/video.webm", "abc123defghi", "processing", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(120, "recordings/user/video.webm", "abc123defghi", "processing", "video/webm", testUserID))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/remove-segments", handler.RemoveSegments)
@@ -255,13 +255,13 @@ func TestRemoveSegments_ConcurrentProcessing(t *testing.T) {
 	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
-		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type"}).
-			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm"))
+	mock.ExpectQuery(`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
+			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
 	mock.ExpectExec(`UPDATE videos SET status = 'processing'`).
-		WithArgs(videoID, testUserID, (*string)(nil)).
+		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 
 	r := chi.NewRouter()
