@@ -40,7 +40,7 @@ const ROLES = ["member", "admin", "owner"] as const;
 export function OrgSettings() {
   const { id: orgId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { orgs, loading: orgsLoading } = useOrganization();
+  const { orgs, selectedOrgId, loading: orgsLoading } = useOrganization();
 
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -83,13 +83,13 @@ export function OrgSettings() {
 
   useEffect(() => {
     if (orgsLoading) return;
-    if (!canManage) {
+    if (!canManage || selectedOrgId !== orgId) {
       navigate("/", { replace: true });
     }
-  }, [orgsLoading, canManage, navigate]);
+  }, [orgsLoading, canManage, selectedOrgId, orgId, navigate]);
 
   useEffect(() => {
-    if (!orgId || !canManage) return;
+    if (!orgId || !canManage || selectedOrgId !== orgId) return;
 
     Promise.all([
       apiFetch<OrgDetail>(`/api/organizations/${orgId}`),

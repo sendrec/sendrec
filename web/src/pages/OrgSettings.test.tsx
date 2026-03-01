@@ -161,6 +161,23 @@ describe("OrgSettings", () => {
     });
   });
 
+  it("redirects when switched to personal context", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "free", role: "owner", memberCount: 3 }],
+      selectedOrg: null,
+      selectedOrgId: null,
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+    });
+  });
+
   it("send invite form submits correctly", async () => {
     const user = userEvent.setup();
     mockOwnerResponses();
