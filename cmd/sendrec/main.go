@@ -96,6 +96,7 @@ func main() {
 		WelcomeTemplateID:        int(getEnvInt64("LISTMONK_WELCOME_TEMPLATE_ID", 0)),
 		OnboardingDay2TemplateID: int(getEnvInt64("LISTMONK_ONBOARDING_DAY2_TEMPLATE_ID", 0)),
 		OnboardingDay7TemplateID: int(getEnvInt64("LISTMONK_ONBOARDING_DAY7_TEMPLATE_ID", 0)),
+		OrgInviteTemplateID:      int(getEnvInt64("LISTMONK_ORG_INVITE_TEMPLATE_ID", 0)),
 		Allowlist:                email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
 	})
 
@@ -107,6 +108,7 @@ func main() {
 	creemAPIKey := os.Getenv("CREEM_API_KEY")
 	creemWebhookSecret := os.Getenv("CREEM_WEBHOOK_SECRET")
 	creemProProductID := os.Getenv("CREEM_PRO_PRODUCT_ID")
+	creemOrgProProductID := os.Getenv("CREEM_ORG_PRO_PRODUCT_ID")
 
 	slog.Info("sendrec starting", "version", version)
 
@@ -138,6 +140,7 @@ func main() {
 		CreemAPIKey:             creemAPIKey,
 		CreemWebhookSecret:      creemWebhookSecret,
 		CreemProProductID:       creemProProductID,
+		CreemOrgProProductID:    creemOrgProProductID,
 	})
 
 	if creemAPIKey != "" {

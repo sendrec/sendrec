@@ -75,7 +75,7 @@ func TestDetectSilence_VideoNotFound(t *testing.T) {
 	videoID := "nonexistent-id"
 
 	mock.ExpectQuery(`SELECT duration, file_key, status FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID).
+		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnError(pgx.ErrNoRows)
 
 	r := chi.NewRouter()
@@ -106,7 +106,7 @@ func TestDetectSilence_VideoNotReady(t *testing.T) {
 	videoID := "video-123"
 
 	mock.ExpectQuery(`SELECT duration, file_key, status FROM videos WHERE id = \$1 AND user_id = \$2`).
-		WithArgs(videoID, testUserID).
+		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "status"}).
 			AddRow(120, "recordings/user/video.webm", "processing"))
 

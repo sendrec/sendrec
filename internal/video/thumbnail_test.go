@@ -129,9 +129,9 @@ func TestUploadThumbnail_ValidJPEG(t *testing.T) {
 	videoID := "video-thumb-1"
 	shareToken := "abc123thumb"
 
-	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_token, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"share_token"}).AddRow(shareToken))
+		WillReturnRows(pgxmock.NewRows([]string{"share_token", "user_id"}).AddRow(shareToken, testUserID))
 
 	mock.ExpectExec(`UPDATE videos SET thumbnail_key = \$1, updated_at = now\(\) WHERE id = \$2`).
 		WithArgs("recordings/"+testUserID+"/"+shareToken+".jpg", videoID).
@@ -181,9 +181,9 @@ func TestUploadThumbnail_ValidPNG(t *testing.T) {
 	videoID := "video-thumb-2"
 	shareToken := "def456thumb"
 
-	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_token, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"share_token"}).AddRow(shareToken))
+		WillReturnRows(pgxmock.NewRows([]string{"share_token", "user_id"}).AddRow(shareToken, testUserID))
 
 	mock.ExpectExec(`UPDATE videos SET thumbnail_key = \$1, updated_at = now\(\) WHERE id = \$2`).
 		WithArgs("recordings/"+testUserID+"/"+shareToken+".jpg", videoID).
@@ -233,9 +233,9 @@ func TestUploadThumbnail_ValidWebP(t *testing.T) {
 	videoID := "video-thumb-3"
 	shareToken := "ghi789thumb"
 
-	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_token, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"share_token"}).AddRow(shareToken))
+		WillReturnRows(pgxmock.NewRows([]string{"share_token", "user_id"}).AddRow(shareToken, testUserID))
 
 	mock.ExpectExec(`UPDATE videos SET thumbnail_key = \$1, updated_at = now\(\) WHERE id = \$2`).
 		WithArgs("recordings/"+testUserID+"/"+shareToken+".jpg", videoID).
@@ -339,7 +339,7 @@ func TestUploadThumbnail_VideoNotFound(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectQuery(`SELECT share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_token, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
 		WithArgs("nonexistent-video", testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -388,9 +388,9 @@ func TestResetThumbnail_Success(t *testing.T) {
 	fileKey := "recordings/" + testUserID + "/resettoken123.webm"
 	thumbKey := "recordings/" + testUserID + "/resettoken123.jpg"
 
-	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
 		WithArgs(videoID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"share_token", "file_key", "thumbnail_key"}).AddRow(shareToken, fileKey, &thumbKey))
+		WillReturnRows(pgxmock.NewRows([]string{"share_token", "file_key", "thumbnail_key", "user_id"}).AddRow(shareToken, fileKey, &thumbKey, testUserID))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Delete("/api/videos/{id}/thumbnail", handler.ResetThumbnail)
@@ -416,7 +416,7 @@ func TestResetThumbnail_VideoNotFound(t *testing.T) {
 
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 
-	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = \$1 AND user_id = \$2 AND status = 'ready'`).
+	mock.ExpectQuery(`SELECT share_token, file_key, thumbnail_key, user_id FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
 		WithArgs("nonexistent-video", testUserID).
 		WillReturnError(pgx.ErrNoRows)
 

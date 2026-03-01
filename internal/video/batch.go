@@ -37,12 +37,30 @@ func (h *Handler) BatchDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Query(r.Context(),
-		`UPDATE videos SET status = 'deleted', updated_at = now()
+	orgID := auth.OrgIDFromContext(r.Context())
+	var batchDeleteQuery string
+	var batchDeleteArgs []any
+	if orgID != "" {
+		role := auth.OrgRoleFromContext(r.Context())
+		if role == "owner" || role == "admin" {
+			batchDeleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now()
+			 WHERE id = ANY($1) AND organization_id = $2 AND status != 'deleted'
+			 RETURNING id, file_key, thumbnail_key, webcam_key, transcript_key, title`
+			batchDeleteArgs = []any{req.VideoIDs, orgID}
+		} else {
+			batchDeleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now()
+			 WHERE id = ANY($1) AND user_id = $2 AND organization_id = $3 AND status != 'deleted'
+			 RETURNING id, file_key, thumbnail_key, webcam_key, transcript_key, title`
+			batchDeleteArgs = []any{req.VideoIDs, userID, orgID}
+		}
+	} else {
+		batchDeleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now()
 		 WHERE id = ANY($1) AND user_id = $2 AND status != 'deleted'
-		 RETURNING id, file_key, thumbnail_key, webcam_key, transcript_key, title`,
-		req.VideoIDs, userID,
-	)
+		 RETURNING id, file_key, thumbnail_key, webcam_key, transcript_key, title`
+		batchDeleteArgs = []any{req.VideoIDs, userID}
+	}
+
+	rows, err := h.db.Query(r.Context(), batchDeleteQuery, batchDeleteArgs...)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to delete videos")
 		return
@@ -128,13 +146,22 @@ func (h *Handler) BatchSetFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	orgID := auth.OrgIDFromContext(r.Context())
+
 	var folderID *string
 	if req.FolderID != nil && *req.FolderID != "" {
+		var folderVerifyQuery string
+		var folderVerifyArgs []any
+		if orgID != "" {
+			folderVerifyQuery = `SELECT id FROM folders WHERE id = $1 AND organization_id = $2`
+			folderVerifyArgs = []any{*req.FolderID, orgID}
+		} else {
+			folderVerifyQuery = `SELECT id FROM folders WHERE id = $1 AND user_id = $2`
+			folderVerifyArgs = []any{*req.FolderID, userID}
+		}
+
 		var id string
-		err := h.db.QueryRow(r.Context(),
-			`SELECT id FROM folders WHERE id = $1 AND user_id = $2`,
-			*req.FolderID, userID,
-		).Scan(&id)
+		err := h.db.QueryRow(r.Context(), folderVerifyQuery, folderVerifyArgs...).Scan(&id)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httputil.WriteError(w, http.StatusNotFound, "folder not found")
@@ -146,11 +173,23 @@ func (h *Handler) BatchSetFolder(w http.ResponseWriter, r *http.Request) {
 		folderID = req.FolderID
 	}
 
-	_, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET folder_id = $1, updated_at = now()
-		 WHERE id = ANY($2) AND user_id = $3 AND status != 'deleted'`,
-		folderID, req.VideoIDs, userID,
-	)
+	var folderQuery string
+	var folderArgs []any
+	if orgID != "" {
+		role := auth.OrgRoleFromContext(r.Context())
+		if role == "owner" || role == "admin" {
+			folderQuery = `UPDATE videos SET folder_id = $1, updated_at = now() WHERE id = ANY($2) AND organization_id = $3 AND status != 'deleted'`
+			folderArgs = []any{folderID, req.VideoIDs, orgID}
+		} else {
+			folderQuery = `UPDATE videos SET folder_id = $1, updated_at = now() WHERE id = ANY($2) AND user_id = $3 AND organization_id = $4 AND status != 'deleted'`
+			folderArgs = []any{folderID, req.VideoIDs, userID, orgID}
+		}
+	} else {
+		folderQuery = `UPDATE videos SET folder_id = $1, updated_at = now() WHERE id = ANY($2) AND user_id = $3 AND status != 'deleted'`
+		folderArgs = []any{folderID, req.VideoIDs, userID}
+	}
+
+	_, err := h.db.Exec(r.Context(), folderQuery, folderArgs...)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video folders")
 		return
@@ -186,12 +225,21 @@ func (h *Handler) BatchSetTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	orgID := auth.OrgIDFromContext(r.Context())
+
 	if len(req.TagIDs) > 0 {
+		var tagVerifyQuery string
+		var tagVerifyArgs []any
+		if orgID != "" {
+			tagVerifyQuery = `SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND organization_id = $2`
+			tagVerifyArgs = []any{req.TagIDs, orgID}
+		} else {
+			tagVerifyQuery = `SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND user_id = $2`
+			tagVerifyArgs = []any{req.TagIDs, userID}
+		}
+
 		var count int
-		err := h.db.QueryRow(r.Context(),
-			`SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND user_id = $2`,
-			req.TagIDs, userID,
-		).Scan(&count)
+		err := h.db.QueryRow(r.Context(), tagVerifyQuery, tagVerifyArgs...).Scan(&count)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to verify tags")
 			return
@@ -202,11 +250,24 @@ func (h *Handler) BatchSetTags(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var verifyQuery string
+	var verifyArgs []any
+	if orgID != "" {
+		role := auth.OrgRoleFromContext(r.Context())
+		if role == "owner" || role == "admin" {
+			verifyQuery = `SELECT COUNT(*) FROM videos WHERE id = ANY($1) AND organization_id = $2 AND status != 'deleted'`
+			verifyArgs = []any{req.VideoIDs, orgID}
+		} else {
+			verifyQuery = `SELECT COUNT(*) FROM videos WHERE id = ANY($1) AND user_id = $2 AND organization_id = $3 AND status != 'deleted'`
+			verifyArgs = []any{req.VideoIDs, userID, orgID}
+		}
+	} else {
+		verifyQuery = `SELECT COUNT(*) FROM videos WHERE id = ANY($1) AND user_id = $2 AND status != 'deleted'`
+		verifyArgs = []any{req.VideoIDs, userID}
+	}
+
 	var videoCount int
-	err := h.db.QueryRow(r.Context(),
-		`SELECT COUNT(*) FROM videos WHERE id = ANY($1) AND user_id = $2 AND status != 'deleted'`,
-		req.VideoIDs, userID,
-	).Scan(&videoCount)
+	err := h.db.QueryRow(r.Context(), verifyQuery, verifyArgs...).Scan(&videoCount)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to verify videos")
 		return

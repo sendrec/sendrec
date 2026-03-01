@@ -33,7 +33,7 @@ func TestCreateTag_Success(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
 
 	mock.ExpectQuery(`INSERT INTO tags`).
-		WithArgs(testUserID, "Important", &color).
+		WithArgs(testUserID, pgxmock.AnyArg(), "Important", &color).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).
 			AddRow("tag-1", now))
 
@@ -91,7 +91,7 @@ func TestCreateTag_WithoutColor(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
 
 	mock.ExpectQuery(`INSERT INTO tags`).
-		WithArgs(testUserID, "No Color Tag", (*string)(nil)).
+		WithArgs(testUserID, pgxmock.AnyArg(), "No Color Tag", (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).
 			AddRow("tag-2", now))
 
@@ -224,7 +224,7 @@ func TestCreateTag_DuplicateName(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
 
 	mock.ExpectQuery(`INSERT INTO tags`).
-		WithArgs(testUserID, "Existing Tag", (*string)(nil)).
+		WithArgs(testUserID, pgxmock.AnyArg(), "Existing Tag", (*string)(nil)).
 		WillReturnError(&pgconn.PgError{Code: "23505"})
 
 	body, _ := json.Marshal(createTagRequest{Name: "Existing Tag"})

@@ -1,16 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { apiFetch, setAccessToken, ApiError } from "./client";
+import { setCurrentOrgId } from "./orgContext";
 
 describe("apiFetch", () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
     setAccessToken(null);
+    setCurrentOrgId(null);
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     setAccessToken(null);
+    setCurrentOrgId(null);
   });
 
   it("returns parsed JSON on success", async () => {
@@ -177,6 +180,36 @@ describe("apiFetch", () => {
     expect(result1).toEqual({ data: "ok" });
     expect(result2).toEqual({ data: "ok" });
     expect(refreshCallCount).toBe(1);
+  });
+
+  it("sets X-Organization-Id header when org is selected", async () => {
+    setCurrentOrgId("org-123");
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+    });
+
+    await apiFetch("/api/test");
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const headers = call[1].headers as Headers;
+    expect(headers.get("X-Organization-Id")).toBe("org-123");
+  });
+
+  it("does not set X-Organization-Id header when no org is selected", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+    });
+
+    await apiFetch("/api/test");
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const headers = call[1].headers as Headers;
+    expect(headers.get("X-Organization-Id")).toBeNull();
   });
 
   it("redirects to /login when refresh fails", async () => {

@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/validate"
 )
 
@@ -104,13 +105,23 @@ type limitsResponse struct {
 	NoiseReductionEnabled   bool           `json:"noiseReductionEnabled"`
 	MaxPlaylists            int            `json:"maxPlaylists"`
 	PlaylistsUsed           int            `json:"playlistsUsed"`
+	MaxOrgsOwned            int            `json:"maxOrgsOwned"`
+	OrgsUsed                int            `json:"orgsUsed"`
+	MaxOrgMembers           int            `json:"maxOrgMembers"`
+	OrgMembersUsed          int            `json:"orgMembersUsed"`
 	FieldLimits             map[string]int `json:"fieldLimits"`
 }
 
 func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
-	plan, _ := h.getUserPlan(r.Context(), userID)
+	orgID := auth.OrgIDFromContext(r.Context())
+	var plan string
+	if orgID != "" {
+		plan, _ = h.getOrgPlan(r.Context(), orgID)
+	} else {
+		plan, _ = h.getUserPlan(r.Context(), userID)
+	}
 
 	maxVideos := h.maxVideosPerMonth
 	maxDuration := h.maxVideoDurationSeconds
@@ -122,7 +133,11 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 	var videosUsed int
 	if maxVideos > 0 {
 		var err error
-		videosUsed, err = h.countVideosThisMonth(r.Context(), userID)
+		if orgID != "" {
+			videosUsed, err = h.countOrgVideosThisMonth(r.Context(), orgID)
+		} else {
+			videosUsed, err = h.countVideosThisMonth(r.Context(), userID)
+		}
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to check video limit")
 			return
@@ -140,6 +155,36 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		).Scan(&playlistsUsed)
 	}
 
+	var userPlan string
+	if orgID != "" {
+		userPlan, _ = h.getUserPlan(r.Context(), userID)
+	} else {
+		userPlan = plan
+	}
+
+	maxOrgsOwned := plans.Free.MaxOrgsOwned
+	maxOrgMembers := plans.Free.MaxOrgMembers
+	var orgsUsed, orgMembersUsed int
+	if userPlan == "pro" || userPlan == "business" {
+		maxOrgsOwned = 0
+		maxOrgMembers = 0
+	} else {
+		_ = h.db.QueryRow(r.Context(),
+			`SELECT COUNT(*) FROM organization_members WHERE user_id = $1 AND role = 'owner'`,
+			userID,
+		).Scan(&orgsUsed)
+	}
+
+	if orgID != "" {
+		if plan == "pro" || plan == "business" {
+			maxOrgMembers = 0
+		}
+		_ = h.db.QueryRow(r.Context(),
+			`SELECT COUNT(*) FROM organization_members WHERE organization_id = $1`,
+			orgID,
+		).Scan(&orgMembersUsed)
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, limitsResponse{
 		MaxVideosPerMonth:       maxVideos,
 		MaxVideoDurationSeconds: maxDuration,
@@ -150,6 +195,10 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		NoiseReductionEnabled:   h.noiseReductionFilter != "",
 		MaxPlaylists:            maxPlaylists,
 		PlaylistsUsed:           playlistsUsed,
+		MaxOrgsOwned:            maxOrgsOwned,
+		OrgsUsed:                orgsUsed,
+		MaxOrgMembers:           maxOrgMembers,
+		OrgMembersUsed:          orgMembersUsed,
 		FieldLimits:             validate.FieldLimits(),
 	})
 }
@@ -191,8 +240,14 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	var args []any
 	paramIdx := 1
 
-	baseQuery += fmt.Sprintf(` AND v.user_id = $%d`, paramIdx)
-	args = append(args, userID)
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID != "" {
+		baseQuery += fmt.Sprintf(` AND v.organization_id = $%d`, paramIdx)
+		args = append(args, orgID)
+	} else {
+		baseQuery += fmt.Sprintf(` AND v.user_id = $%d AND v.organization_id IS NULL`, paramIdx)
+		args = append(args, userID)
+	}
 	paramIdx++
 
 	if query != "" {
@@ -301,30 +356,37 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var documentText *string
 	var documentStatus string
 	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
+	var obCompanyName, obLogoKey, obColorBg, obColorSurface, obColorText, obColorAccent, obFooterText, obCustomCSS *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
+	var videoOrgID *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password,
 		        v.transcript_key, v.transcript_json, v.transcript_status,
 		        v.user_id, u.email, v.view_notification, v.content_type,
 		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
+		        ob.company_name, ob.logo_key, ob.color_background, ob.color_surface, ob.color_text, ob.color_accent, ob.footer_text, ob.custom_css,
 		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
 		        v.cta_text, v.cta_url,
 		        v.summary, v.chapters, v.summary_status,
-		        v.document, v.document_status
+		        v.document, v.document_status,
+		        v.organization_id
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
-		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id
+		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id AND ub.organization_id IS NULL
+		 LEFT JOIN user_branding ob ON ob.organization_id = v.organization_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &duration, &fileKey, &creator, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword,
 		&transcriptKey, &transcriptJSON, &transcriptStatus,
 		&ownerID, &ownerEmail, &viewNotification, &contentType,
 		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
+		&obCompanyName, &obLogoKey, &obColorBg, &obColorSurface, &obColorText, &obColorAccent, &obFooterText, &obCustomCSS,
 		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
 		&ctaText, &ctaUrl,
 		&summaryText, &chaptersJSON, &summaryStatus,
-		&documentText, &documentStatus)
+		&documentText, &documentStatus,
+		&videoOrgID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -342,13 +404,22 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	baseBranding := brandingSettingsResponse{
+		CompanyName: ubCompanyName, LogoKey: ubLogoKey,
+		ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
+		ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
+		CustomCSS: ubCustomCSS,
+	}
+	if videoOrgID != nil {
+		baseBranding = brandingSettingsResponse{
+			CompanyName: obCompanyName, LogoKey: obLogoKey,
+			ColorBackground: obColorBg, ColorSurface: obColorSurface,
+			ColorText: obColorText, ColorAccent: obColorAccent, FooterText: obFooterText,
+			CustomCSS: obCustomCSS,
+		}
+	}
 	branding := resolveBranding(r.Context(), h.storage,
-		brandingSettingsResponse{
-			CompanyName: ubCompanyName, LogoKey: ubLogoKey,
-			ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
-			ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
-			CustomCSS: ubCustomCSS,
-		},
+		baseBranding,
 		brandingSettingsResponse{
 			CompanyName: vbCompanyName, LogoKey: vbLogoKey,
 			ColorBackground: vbColorBg, ColorSurface: vbColorSurface,
@@ -460,6 +531,76 @@ func (h *Handler) countVideosThisMonth(ctx context.Context, userID string) (int,
 	return count, err
 }
 
+func (h *Handler) getOrgPlan(ctx context.Context, orgID string) (string, error) {
+	var orgPlan, ownerPlan string
+	err := h.db.QueryRow(ctx,
+		`SELECT o.subscription_plan, COALESCE(u.subscription_plan, 'free')
+		 FROM organizations o
+		 LEFT JOIN organization_members om ON om.organization_id = o.id AND om.role = 'owner'
+		 LEFT JOIN users u ON u.id = om.user_id
+		 WHERE o.id = $1
+		 ORDER BY CASE u.subscription_plan WHEN 'business' THEN 2 WHEN 'pro' THEN 1 ELSE 0 END DESC
+		 LIMIT 1`,
+		orgID,
+	).Scan(&orgPlan, &ownerPlan)
+	if err != nil {
+		return "free", err
+	}
+	if plans.Rank(ownerPlan) > plans.Rank(orgPlan) {
+		return ownerPlan, nil
+	}
+	return orgPlan, nil
+}
+
+func orgScope(ctx context.Context) *string {
+	orgID := auth.OrgIDFromContext(ctx)
+	if orgID == "" {
+		return nil
+	}
+	return &orgID
+}
+
+// orgVideoFilter builds a WHERE clause and args for video access queries that
+// respect the caller's org role. Owner/admin can act on any org video (filter
+// by organization_id only), members can only act on their own video (filter by
+// user_id + organization_id), and personal context filters by user_id +
+// organization_id IS NULL.
+//
+// baseArgs are the leading positional parameters (e.g. SET values in an UPDATE).
+// The returned clause uses $N placeholders starting after len(baseArgs).
+// An optional suffix (e.g. "AND status != 'deleted'") is appended when non-empty.
+func orgVideoFilter(ctx context.Context, videoID string, baseArgs []any, suffix string) (string, []any) {
+	userID := auth.UserIDFromContext(ctx)
+	orgID := auth.OrgIDFromContext(ctx)
+	sfx := ""
+	if suffix != "" {
+		sfx = " " + suffix
+	}
+	if orgID != "" {
+		role := auth.OrgRoleFromContext(ctx)
+		if role == "owner" || role == "admin" {
+			n := len(baseArgs)
+			return fmt.Sprintf("id = $%d AND organization_id = $%d%s", n+1, n+2, sfx),
+				append(baseArgs, videoID, orgID)
+		}
+		n := len(baseArgs)
+		return fmt.Sprintf("id = $%d AND user_id = $%d AND organization_id = $%d%s", n+1, n+2, n+3, sfx),
+			append(baseArgs, videoID, userID, orgID)
+	}
+	n := len(baseArgs)
+	return fmt.Sprintf("id = $%d AND user_id = $%d AND organization_id IS NULL%s", n+1, n+2, sfx),
+		append(baseArgs, videoID, userID)
+}
+
+func (h *Handler) countOrgVideosThisMonth(ctx context.Context, orgID string) (int, error) {
+	var count int
+	err := h.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM videos WHERE organization_id = $1 AND status != 'deleted' AND created_at >= date_trunc('month', now())`,
+		orgID,
+	).Scan(&count)
+	return count, err
+}
+
 func computeSummary(daily []dailyViews, todayStr string) analyticsSummary {
 	var summary analyticsSummary
 	for _, d := range daily {
@@ -487,15 +628,14 @@ func sortDailyViews(daily []dailyViews) {
 }
 
 func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	var title string
 	var fileKey string
 	var contentType string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT title, file_key, content_type FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		`SELECT title, file_key, content_type FROM videos WHERE `+where, args...,
 	).Scan(&title, &fileKey, &contentType)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -513,14 +653,13 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetTranscript(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 	var status string
 	var segmentsJSON *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT transcript_status, transcript_json FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		`SELECT transcript_status, transcript_json FROM videos WHERE `+where, args...,
 	).Scan(&status, &segmentsJSON)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")

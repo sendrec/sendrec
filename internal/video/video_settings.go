@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
 	"github.com/sendrec/sendrec/internal/languages"
 )
@@ -38,7 +37,6 @@ type retranscribeRequest struct {
 }
 
 func (h *Handler) SetDownloadEnabled(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req setDownloadEnabledRequest
@@ -47,9 +45,9 @@ func (h *Handler) SetDownloadEnabled(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, []any{req.DownloadEnabled}, "AND status != 'deleted'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET download_enabled = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
-		req.DownloadEnabled, videoID, userID,
+		`UPDATE videos SET download_enabled = $1 WHERE `+where, args...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update download setting")
@@ -64,7 +62,6 @@ func (h *Handler) SetDownloadEnabled(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SetEmailGate(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req setEmailGateRequest
@@ -73,9 +70,9 @@ func (h *Handler) SetEmailGate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, []any{req.Enabled}, "AND status != 'deleted'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET email_gate_enabled = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
-		req.Enabled, videoID, userID,
+		`UPDATE videos SET email_gate_enabled = $1 WHERE `+where, args...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update email gate setting")
@@ -90,7 +87,6 @@ func (h *Handler) SetEmailGate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SetLinkExpiry(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req setLinkExpiryRequest
@@ -99,14 +95,15 @@ func (h *Handler) SetLinkExpiry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 	var query string
 	if req.NeverExpires {
-		query = `UPDATE videos SET share_expires_at = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+		query = `UPDATE videos SET share_expires_at = NULL, updated_at = now() WHERE ` + where
 	} else {
-		query = `UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+		query = `UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now() WHERE ` + where
 	}
 
-	tag, err := h.db.Exec(r.Context(), query, videoID, userID)
+	tag, err := h.db.Exec(r.Context(), query, args...)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update link expiry")
 		return
@@ -120,7 +117,6 @@ func (h *Handler) SetLinkExpiry(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SetCTA(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req setCTARequest
@@ -144,9 +140,9 @@ func (h *Handler) SetCTA(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, []any{req.Text, req.URL}, "AND status != 'deleted'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET cta_text = $1, cta_url = $2 WHERE id = $3 AND user_id = $4 AND status != 'deleted'`,
-		req.Text, req.URL, videoID, userID,
+		`UPDATE videos SET cta_text = $1, cta_url = $2 WHERE `+where, args...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not update CTA")
@@ -161,7 +157,6 @@ func (h *Handler) SetCTA(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req setPasswordRequest
@@ -176,9 +171,9 @@ func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Password == "" {
+		where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 		tag, err := h.db.Exec(r.Context(),
-			`UPDATE videos SET share_password = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-			videoID, userID,
+			`UPDATE videos SET share_password = NULL, updated_at = now() WHERE `+where, args...,
 		)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update password")
@@ -198,9 +193,9 @@ func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, []any{hash}, "AND status != 'deleted'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET share_password = $1, updated_at = now() WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
-		hash, videoID, userID,
+		`UPDATE videos SET share_password = $1, updated_at = now() WHERE `+where, args...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update password")
@@ -215,7 +210,6 @@ func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req retranscribeRequest
@@ -226,11 +220,10 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	var exists bool
 	err := h.db.QueryRow(r.Context(),
-		`SELECT true FROM videos
-		 WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		`SELECT true FROM videos WHERE `+where, args...,
 	).Scan(&exists)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -242,9 +235,9 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusBadRequest, "invalid transcription language")
 			return
 		}
+		langWhere, langArgs := orgVideoFilter(r.Context(), videoID, []any{req.Language}, "")
 		if _, err := h.db.Exec(r.Context(),
-			`UPDATE videos SET transcription_language = $1, updated_at = now() WHERE id = $2 AND user_id = $3`,
-			req.Language, videoID, userID,
+			`UPDATE videos SET transcription_language = $1, updated_at = now() WHERE `+langWhere, langArgs...,
 		); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to set language")
 			return
@@ -260,13 +253,12 @@ func (h *Handler) Retranscribe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 	var shareExpiresAt *time.Time
 	err := h.db.QueryRow(r.Context(),
-		`SELECT share_expires_at FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		`SELECT share_expires_at FROM videos WHERE `+where, args...,
 	).Scan(&shareExpiresAt)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -278,10 +270,10 @@ func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_, updateArgs := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now()
-		 WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		 WHERE `+where, updateArgs...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to extend share link")
@@ -301,13 +293,12 @@ func (h *Handler) Summarize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted' AND transcript_status = 'ready'")
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET summary_status = 'pending', summary = NULL, chapters = NULL, updated_at = now()
-		 WHERE id = $1 AND user_id = $2 AND status != 'deleted' AND transcript_status = 'ready'`,
-		videoID, userID,
+		 WHERE `+where, args...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not enqueue summary")
@@ -327,13 +318,12 @@ func (h *Handler) GenerateDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted' AND transcript_status = 'ready'")
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET document_status = 'pending', document = NULL, updated_at = now()
-		 WHERE id = $1 AND user_id = $2 AND status != 'deleted' AND transcript_status = 'ready'`,
-		videoID, userID,
+		 WHERE `+where, args...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "could not enqueue document generation")
@@ -348,11 +338,10 @@ func (h *Handler) GenerateDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DismissTitle(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET suggested_title = NULL, updated_at = now() WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		`UPDATE videos SET suggested_title = NULL, updated_at = now() WHERE `+where, args...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to dismiss title")

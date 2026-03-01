@@ -22,5 +22,9 @@ export interface LimitsResponse {
   noiseReductionEnabled: boolean;
   maxPlaylists: number;
   playlistsUsed: number;
+  maxOrgsOwned: number;
+  orgsUsed: number;
+  maxOrgMembers: number;
+  orgMembersUsed: number;
   fieldLimits: FieldLimits;
 }

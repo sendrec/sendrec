@@ -1440,9 +1440,9 @@ export function VideoDetail() {
         )}
       </div>
 
-      {/* Organization */}
+      {/* Organize */}
       <div className="video-detail-section">
-        <h2 className="video-detail-section-title">Organization</h2>
+        <h2 className="video-detail-section-title">Organize</h2>
 
         <div className="detail-setting-row">
           <span className="detail-setting-label">Folder</span>

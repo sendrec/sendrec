@@ -19,7 +19,7 @@ func expectDashboardQueries(t *testing.T, mock pgxmock.PgxPoolIface, totalViews,
 		WithArgs(testUserID, pgxmock.AnyArg()).
 		WillReturnRows(pgxmock.NewRows([]string{"views", "unique_views"}).AddRow(totalViews, uniqueViews))
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos WHERE user_id`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos v WHERE v\.user_id`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(totalVideos))
 

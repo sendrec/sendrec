@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
 )
@@ -29,7 +28,6 @@ type segmentRange struct {
 const maxSegments = 200
 
 func (h *Handler) RemoveSegments(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req removeSegmentsRequest
@@ -69,15 +67,16 @@ func (h *Handler) RemoveSegments(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "")
 	var duration int
 	var fileKey string
 	var shareToken string
 	var status string
 	var contentType string
+	var videoOwnerID string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = $1 AND user_id = $2`,
-		videoID, userID,
-	).Scan(&duration, &fileKey, &shareToken, &status, &contentType)
+		`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE `+where, args...,
+	).Scan(&duration, &fileKey, &shareToken, &status, &contentType, &videoOwnerID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -104,9 +103,9 @@ func (h *Handler) RemoveSegments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	updateWhere, updateArgs := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET status = 'processing', updated_at = now() WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		`UPDATE videos SET status = 'processing', updated_at = now() WHERE `+updateWhere, updateArgs...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video status")
@@ -120,7 +119,7 @@ func (h *Handler) RemoveSegments(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		RemoveSegmentsAsync(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken), contentType, req.Segments, duration)
+		RemoveSegmentsAsync(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(videoOwnerID, shareToken), contentType, req.Segments, duration)
 	}()
 
 	w.WriteHeader(http.StatusAccepted)

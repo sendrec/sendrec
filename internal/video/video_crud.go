@@ -45,7 +45,13 @@ type uploadRequest struct {
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
-	plan, _ := h.getUserPlan(r.Context(), userID)
+	orgID := auth.OrgIDFromContext(r.Context())
+	var plan string
+	if orgID != "" {
+		plan, _ = h.getOrgPlan(r.Context(), orgID)
+	} else {
+		plan, _ = h.getUserPlan(r.Context(), userID)
+	}
 	maxVideos := h.maxVideosPerMonth
 	maxDuration := h.maxVideoDurationSeconds
 	if plan == "pro" || plan == "business" {
@@ -80,7 +86,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if maxVideos > 0 {
-		count, err := h.countVideosThisMonth(r.Context(), userID)
+		var count int
+		var err error
+		if orgID != "" {
+			count, err = h.countOrgVideosThisMonth(r.Context(), orgID)
+		} else {
+			count, err = h.countVideosThisMonth(r.Context(), userID)
+		}
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to check video limit")
 			return
@@ -128,11 +140,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		webcamKey = &k
 	}
 
+	var orgIDArg *string
+	if orgID != "" {
+		orgIDArg = &orgID
+	}
+
 	var videoID string
 	err = h.db.QueryRow(r.Context(),
-		`INSERT INTO videos (user_id, title, duration, file_size, file_key, share_token, webcam_key, content_type)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-		userID, title, req.Duration, req.FileSize, fileKey, shareToken, webcamKey, contentType,
+		`INSERT INTO videos (user_id, organization_id, title, duration, file_size, file_key, share_token, webcam_key, content_type)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+		userID, orgIDArg, title, req.Duration, req.FileSize, fileKey, shareToken, webcamKey, contentType,
 	).Scan(&videoID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create video")
@@ -176,7 +193,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
-	plan, _ := h.getUserPlan(r.Context(), userID)
+	orgID := auth.OrgIDFromContext(r.Context())
+	var plan string
+	if orgID != "" {
+		plan, _ = h.getOrgPlan(r.Context(), orgID)
+	} else {
+		plan, _ = h.getUserPlan(r.Context(), userID)
+	}
 	maxVideos := h.maxVideosPerMonth
 	if plan == "pro" || plan == "business" {
 		maxVideos = 0
@@ -204,7 +227,13 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if maxVideos > 0 {
-		count, err := h.countVideosThisMonth(r.Context(), userID)
+		var count int
+		var err error
+		if orgID != "" {
+			count, err = h.countOrgVideosThisMonth(r.Context(), orgID)
+		} else {
+			count, err = h.countVideosThisMonth(r.Context(), userID)
+		}
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to check video limit")
 			return
@@ -232,11 +261,16 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	fileKey := videoFileKey(userID, shareToken, req.ContentType)
 
+	var orgIDArg *string
+	if orgID != "" {
+		orgIDArg = &orgID
+	}
+
 	var videoID string
 	err = h.db.QueryRow(r.Context(),
-		`INSERT INTO videos (user_id, title, duration, file_size, file_key, share_token, content_type)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-		userID, title, 0, req.FileSize, fileKey, shareToken, req.ContentType,
+		`INSERT INTO videos (user_id, organization_id, title, duration, file_size, file_key, share_token, content_type)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		userID, orgIDArg, title, 0, req.FileSize, fileKey, shareToken, req.ContentType,
 	).Scan(&videoID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create video")
@@ -396,11 +430,25 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
-		tag, err := h.db.Exec(r.Context(),
-			`UPDATE videos SET title = $1, updated_at = now()
-			 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
-			req.Title, videoID, userID,
-		)
+
+		orgID := auth.OrgIDFromContext(r.Context())
+		var titleQuery string
+		var titleArgs []any
+		if orgID != "" {
+			role := auth.OrgRoleFromContext(r.Context())
+			if role == "owner" || role == "admin" {
+				titleQuery = `UPDATE videos SET title = $1, updated_at = now() WHERE id = $2 AND organization_id = $3 AND status != 'deleted'`
+				titleArgs = []any{req.Title, videoID, orgID}
+			} else {
+				titleQuery = `UPDATE videos SET title = $1, updated_at = now() WHERE id = $2 AND user_id = $3 AND organization_id = $4 AND status != 'deleted'`
+				titleArgs = []any{req.Title, videoID, userID, orgID}
+			}
+		} else {
+			titleQuery = `UPDATE videos SET title = $1, updated_at = now() WHERE id = $2 AND user_id = $3 AND organization_id IS NULL AND status != 'deleted'`
+			titleArgs = []any{req.Title, videoID, userID}
+		}
+
+		tag, err := h.db.Exec(r.Context(), titleQuery, titleArgs...)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update video")
 			return
@@ -420,7 +468,6 @@ type trimRequest struct {
 }
 
 func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req trimRequest
@@ -438,15 +485,16 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "")
 	var duration int
 	var fileKey string
 	var shareToken string
 	var status string
 	var contentType string
+	var videoOwnerID string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT duration, file_key, share_token, status, content_type FROM videos WHERE id = $1 AND user_id = $2`,
-		videoID, userID,
-	).Scan(&duration, &fileKey, &shareToken, &status, &contentType)
+		`SELECT duration, file_key, share_token, status, content_type, user_id FROM videos WHERE `+where, args...,
+	).Scan(&duration, &fileKey, &shareToken, &status, &contentType, &videoOwnerID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -465,9 +513,9 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	updateWhere, updateArgs := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET status = 'processing', updated_at = now() WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
+		`UPDATE videos SET status = 'processing', updated_at = now() WHERE `+updateWhere, updateArgs...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video status")
@@ -481,7 +529,7 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		TrimVideoAsync(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(userID, shareToken), contentType, req.StartSeconds, req.EndSeconds)
+		TrimVideoAsync(ctx, h.db, h.storage, videoID, fileKey, thumbnailFileKey(videoOwnerID, shareToken), contentType, req.StartSeconds, req.EndSeconds)
 	}()
 
 	w.WriteHeader(http.StatusAccepted)
@@ -491,17 +539,29 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	orgID := auth.OrgIDFromContext(r.Context())
+	var deleteQuery string
+	var deleteArgs []any
+	if orgID != "" {
+		role := auth.OrgRoleFromContext(r.Context())
+		if role == "owner" || role == "admin" {
+			deleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now() WHERE id = $1 AND organization_id = $2 AND status != 'deleted' RETURNING file_key, thumbnail_key, webcam_key, transcript_key, title`
+			deleteArgs = []any{videoID, orgID}
+		} else {
+			deleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id = $3 AND status != 'deleted' RETURNING file_key, thumbnail_key, webcam_key, transcript_key, title`
+			deleteArgs = []any{videoID, userID, orgID}
+		}
+	} else {
+		deleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now() WHERE id = $1 AND user_id = $2 AND organization_id IS NULL AND status != 'deleted' RETURNING file_key, thumbnail_key, webcam_key, transcript_key, title`
+		deleteArgs = []any{videoID, userID}
+	}
+
 	var fileKey string
 	var thumbnailKey *string
 	var webcamKey *string
 	var transcriptKey *string
 	var title string
-	err := h.db.QueryRow(r.Context(),
-		`UPDATE videos SET status = 'deleted', updated_at = now()
-		 WHERE id = $1 AND user_id = $2 AND status != 'deleted'
-		 RETURNING file_key, thumbnail_key, webcam_key, transcript_key, title`,
-		videoID, userID,
-	).Scan(&fileKey, &thumbnailKey, &webcamKey, &transcriptKey, &title)
+	err := h.db.QueryRow(r.Context(), deleteQuery, deleteArgs...).Scan(&fileKey, &thumbnailKey, &webcamKey, &transcriptKey, &title)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return

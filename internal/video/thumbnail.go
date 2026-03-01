@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
 )
@@ -23,7 +22,6 @@ type thumbnailUploadResponse struct {
 }
 
 func (h *Handler) UploadThumbnail(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req struct {
@@ -44,17 +42,18 @@ func (h *Handler) UploadThumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	var shareToken string
+	var videoOwnerID string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT share_token FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
-	).Scan(&shareToken)
+		`SELECT share_token, user_id FROM videos WHERE `+where, args...,
+	).Scan(&shareToken, &videoOwnerID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
 
-	thumbKey := thumbnailFileKey(userID, shareToken)
+	thumbKey := thumbnailFileKey(videoOwnerID, shareToken)
 
 	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), thumbKey, req.ContentType, req.ContentLength, 15*time.Minute)
 	if err != nil {
@@ -74,21 +73,21 @@ func (h *Handler) UploadThumbnail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ResetThumbnail(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	var shareToken, fileKey string
 	var thumbKey *string
+	var videoOwnerID string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT share_token, file_key, thumbnail_key FROM videos WHERE id = $1 AND user_id = $2 AND status = 'ready'`,
-		videoID, userID,
-	).Scan(&shareToken, &fileKey, &thumbKey)
+		`SELECT share_token, file_key, thumbnail_key, user_id FROM videos WHERE `+where, args...,
+	).Scan(&shareToken, &fileKey, &thumbKey, &videoOwnerID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
 
-	thumbnailKey := thumbnailFileKey(userID, shareToken)
+	thumbnailKey := thumbnailFileKey(videoOwnerID, shareToken)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	go func() {

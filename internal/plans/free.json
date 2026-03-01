@@ -1,5 +1,7 @@
 {
   "maxVideosPerMonth": 25,
   "maxVideoDurationSeconds": 300,
-  "maxPlaylists": 3
+  "maxPlaylists": 3,
+  "maxOrgsOwned": 1,
+  "maxOrgMembers": 3
 }

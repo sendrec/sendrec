@@ -16,6 +16,8 @@ const (
 	MaxSlackWebhookURLLength     = 500
 	MaxWebhookURLLength          = 500
 	MaxAPIKeyNameLength          = 100
+	MaxOrgNameLength             = 200
+	MaxOrgSlugLength             = 100
 )
 
 func checkLen(value string, max int, field string) string {
@@ -41,6 +43,8 @@ func SlackWebhookURL(s string) string {
 }
 func WebhookURL(s string) string  { return checkLen(s, MaxWebhookURLLength, "webhook URL") }
 func APIKeyName(s string) string  { return checkLen(s, MaxAPIKeyNameLength, "API key name") }
+func OrgName(s string) string     { return checkLen(s, MaxOrgNameLength, "organization name") }
+func OrgSlug(s string) string     { return checkLen(s, MaxOrgSlugLength, "organization slug") }
 
 // FieldLimits returns a map of field names to max lengths for the /api/limits endpoint.
 func FieldLimits() map[string]int {
@@ -56,5 +60,7 @@ func FieldLimits() map[string]int {
 		"customCSS":           MaxCustomCSSLength,
 		"webhookURL":          MaxWebhookURLLength,
 		"apiKeyName":          MaxAPIKeyNameLength,
+		"orgName":             MaxOrgNameLength,
+		"orgSlug":             MaxOrgSlugLength,
 	}
 }

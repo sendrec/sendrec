@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/organization"
 	"github.com/sendrec/sendrec/internal/validate"
 )
 
@@ -189,14 +190,25 @@ func (h *Handler) GetBrandingSettings(w http.ResponseWriter, r *http.Request) {
 	if !h.requireBrandingEnabled(w) {
 		return
 	}
-	userID := auth.UserIDFromContext(r.Context())
 
 	var resp brandingSettingsResponse
-	err := h.db.QueryRow(r.Context(),
-		`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css
-		 FROM user_branding WHERE user_id = $1`,
-		userID,
-	).Scan(&resp.CompanyName, &resp.LogoKey, &resp.ColorBackground, &resp.ColorSurface, &resp.ColorText, &resp.ColorAccent, &resp.FooterText, &resp.CustomCSS)
+	var err error
+
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID != "" {
+		err = h.db.QueryRow(r.Context(),
+			`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css
+			 FROM user_branding WHERE organization_id = $1`,
+			orgID,
+		).Scan(&resp.CompanyName, &resp.LogoKey, &resp.ColorBackground, &resp.ColorSurface, &resp.ColorText, &resp.ColorAccent, &resp.FooterText, &resp.CustomCSS)
+	} else {
+		userID := auth.UserIDFromContext(r.Context())
+		err = h.db.QueryRow(r.Context(),
+			`SELECT company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css
+			 FROM user_branding WHERE user_id = $1`,
+			userID,
+		).Scan(&resp.CompanyName, &resp.LogoKey, &resp.ColorBackground, &resp.ColorSurface, &resp.ColorText, &resp.ColorAccent, &resp.FooterText, &resp.CustomCSS)
+	}
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.WriteJSON(w, http.StatusOK, brandingSettingsResponse{})
@@ -213,7 +225,6 @@ func (h *Handler) PutBrandingSettings(w http.ResponseWriter, r *http.Request) {
 	if !h.requireBrandingEnabled(w) {
 		return
 	}
-	userID := auth.UserIDFromContext(r.Context())
 
 	var req setBrandingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -244,26 +255,61 @@ func (h *Handler) PutBrandingSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if _, err := h.db.Exec(r.Context(),
-		`INSERT INTO user_branding (user_id, company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		 ON CONFLICT (user_id) DO UPDATE SET
-		   company_name = $2, logo_key = $3, color_background = $4, color_surface = $5,
-		   color_text = $6, color_accent = $7, footer_text = $8, custom_css = $9, updated_at = now()`,
-		userID, req.CompanyName, req.LogoKey, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText, req.CustomCSS,
-	); err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to save branding settings")
-		return
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID != "" {
+		if organization.RequireRole(w, r, "owner", "admin") == "" {
+			return
+		}
+		if err := h.upsertOrgBranding(r.Context(), orgID, req); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to save branding settings")
+			return
+		}
+	} else {
+		userID := auth.UserIDFromContext(r.Context())
+		if _, err := h.db.Exec(r.Context(),
+			`INSERT INTO user_branding (user_id, company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			 ON CONFLICT (user_id) DO UPDATE SET
+			   company_name = $2, logo_key = $3, color_background = $4, color_surface = $5,
+			   color_text = $6, color_accent = $7, footer_text = $8, custom_css = $9, updated_at = now()`,
+			userID, req.CompanyName, req.LogoKey, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText, req.CustomCSS,
+		); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to save branding settings")
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) upsertOrgBranding(ctx context.Context, orgID string, req setBrandingRequest) error {
+	tag, err := h.db.Exec(ctx,
+		`UPDATE user_branding SET
+		   company_name = $1, logo_key = $2, color_background = $3, color_surface = $4,
+		   color_text = $5, color_accent = $6, footer_text = $7, custom_css = $8, updated_at = now()
+		 WHERE organization_id = $9`,
+		req.CompanyName, req.LogoKey, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText, req.CustomCSS, orgID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		_, err = h.db.Exec(ctx,
+			`INSERT INTO user_branding (organization_id, company_name, logo_key, color_background, color_surface, color_text, color_accent, footer_text, custom_css)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			orgID, req.CompanyName, req.LogoKey, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText, req.CustomCSS,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (h *Handler) UploadBrandingLogo(w http.ResponseWriter, r *http.Request) {
 	if !h.requireBrandingEnabled(w) {
 		return
 	}
-	userID := auth.UserIDFromContext(r.Context())
 
 	var req struct {
 		ContentType   string `json:"contentType"`
@@ -287,6 +333,33 @@ func (h *Handler) UploadBrandingLogo(w http.ResponseWriter, r *http.Request) {
 	if req.ContentType == "image/svg+xml" {
 		ext = ".svg"
 	}
+
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID != "" {
+		if organization.RequireRole(w, r, "owner", "admin") == "" {
+			return
+		}
+		logoKey := "branding/org-" + orgID + "/logo" + ext
+
+		uploadURL, err := h.storage.GenerateUploadURL(r.Context(), logoKey, req.ContentType, req.ContentLength, 15*time.Minute)
+		if err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to generate upload URL")
+			return
+		}
+
+		if err := h.upsertOrgLogoKey(r.Context(), orgID, logoKey); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to save logo key")
+			return
+		}
+
+		httputil.WriteJSON(w, http.StatusOK, logoUploadResponse{
+			UploadURL: uploadURL,
+			LogoKey:   logoKey,
+		})
+		return
+	}
+
+	userID := auth.UserIDFromContext(r.Context())
 	logoKey := "branding/" + userID + "/logo" + ext
 
 	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), logoKey, req.ContentType, req.ContentLength, 15*time.Minute)
@@ -311,16 +384,49 @@ func (h *Handler) UploadBrandingLogo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) upsertOrgLogoKey(ctx context.Context, orgID, logoKey string) error {
+	tag, err := h.db.Exec(ctx,
+		`UPDATE user_branding SET logo_key = $1, updated_at = now() WHERE organization_id = $2`,
+		logoKey, orgID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		_, err = h.db.Exec(ctx,
+			`INSERT INTO user_branding (organization_id, logo_key) VALUES ($1, $2)`,
+			orgID, logoKey,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (h *Handler) DeleteBrandingLogo(w http.ResponseWriter, r *http.Request) {
 	if !h.requireBrandingEnabled(w) {
 		return
 	}
-	userID := auth.UserIDFromContext(r.Context())
 
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID != "" {
+		if organization.RequireRole(w, r, "owner", "admin") == "" {
+			return
+		}
+		h.deleteLogoByFilter(w, r, "organization_id = $1", orgID)
+		return
+	}
+
+	userID := auth.UserIDFromContext(r.Context())
+	h.deleteLogoByFilter(w, r, "user_id = $1", userID)
+}
+
+func (h *Handler) deleteLogoByFilter(w http.ResponseWriter, r *http.Request, filter, filterValue string) {
 	var logoKey *string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT logo_key FROM user_branding WHERE user_id = $1`,
-		userID,
+		`SELECT logo_key FROM user_branding WHERE `+filter,
+		filterValue,
 	).Scan(&logoKey)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -336,8 +442,8 @@ func (h *Handler) DeleteBrandingLogo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := h.db.Exec(r.Context(),
-		`UPDATE user_branding SET logo_key = NULL, updated_at = now() WHERE user_id = $1`,
-		userID,
+		`UPDATE user_branding SET logo_key = NULL, updated_at = now() WHERE `+filter,
+		filterValue,
 	); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to remove logo")
 		return
@@ -350,15 +456,14 @@ func (h *Handler) GetVideoBranding(w http.ResponseWriter, r *http.Request) {
 	if !h.requireBrandingEnabled(w) {
 		return
 	}
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 	var resp brandingSettingsResponse
 	err := h.db.QueryRow(r.Context(),
 		`SELECT branding_company_name, branding_logo_key, branding_color_background, branding_color_surface,
 		        branding_color_text, branding_color_accent, branding_footer_text
-		 FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
+		 FROM videos WHERE `+where, args...,
 	).Scan(&resp.CompanyName, &resp.LogoKey, &resp.ColorBackground, &resp.ColorSurface, &resp.ColorText, &resp.ColorAccent, &resp.FooterText)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -376,7 +481,6 @@ func (h *Handler) SetVideoBranding(w http.ResponseWriter, r *http.Request) {
 	if !h.requireBrandingEnabled(w) {
 		return
 	}
-	userID := auth.UserIDFromContext(r.Context())
 	videoID := chi.URLParam(r, "id")
 
 	var req setVideoBrandingRequest
@@ -402,12 +506,15 @@ func (h *Handler) SetVideoBranding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	where, args := orgVideoFilter(r.Context(), videoID,
+		[]any{req.CompanyName, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText},
+		"AND status != 'deleted'",
+	)
 	tag, err := h.db.Exec(r.Context(),
 		`UPDATE videos SET
 		   branding_company_name = $1, branding_color_background = $2, branding_color_surface = $3,
 		   branding_color_text = $4, branding_color_accent = $5, branding_footer_text = $6
-		 WHERE id = $7 AND user_id = $8 AND status != 'deleted'`,
-		req.CompanyName, req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent, req.FooterText, videoID, userID,
+		 WHERE `+where, args...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to save video branding")

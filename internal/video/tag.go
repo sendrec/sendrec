@@ -32,14 +32,25 @@ var colorRegex = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 func (h *Handler) ListTags(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
-	rows, err := h.db.Query(r.Context(),
-		`SELECT t.id, t.name, t.color, t.created_at,
+	query := `SELECT t.id, t.name, t.color, t.created_at,
 		        (SELECT COUNT(*) FROM video_tags vt JOIN videos v ON v.id = vt.video_id WHERE vt.tag_id = t.id AND v.status != 'deleted') AS video_count
 		 FROM tags t
-		 WHERE t.user_id = $1
-		 ORDER BY t.name`,
-		userID,
-	)
+		 WHERE 1=1`
+	args := []any{}
+	paramIdx := 1
+
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID != "" {
+		query += fmt.Sprintf(` AND t.organization_id = $%d`, paramIdx)
+		args = append(args, orgID)
+	} else {
+		query += fmt.Sprintf(` AND t.user_id = $%d`, paramIdx)
+		args = append(args, userID)
+	}
+
+	query += ` ORDER BY t.name`
+
+	rows, err := h.db.Query(r.Context(), query, args...)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to list tags")
 		return
@@ -90,11 +101,20 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	orgID := auth.OrgIDFromContext(r.Context())
+
+	var countQuery string
+	var countArgs []any
+	if orgID != "" {
+		countQuery = `SELECT COUNT(*) FROM tags WHERE organization_id = $1`
+		countArgs = []any{orgID}
+	} else {
+		countQuery = `SELECT COUNT(*) FROM tags WHERE user_id = $1`
+		countArgs = []any{userID}
+	}
+
 	var count int
-	if err := h.db.QueryRow(r.Context(),
-		`SELECT COUNT(*) FROM tags WHERE user_id = $1`,
-		userID,
-	).Scan(&count); err != nil {
+	if err := h.db.QueryRow(r.Context(), countQuery, countArgs...).Scan(&count); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to check tag limit")
 		return
 	}
@@ -103,13 +123,18 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var orgIDArg *string
+	if orgID != "" {
+		orgIDArg = &orgID
+	}
+
 	var item tagItem
 	var createdAt time.Time
 	err := h.db.QueryRow(r.Context(),
-		`INSERT INTO tags (user_id, name, color)
-		 VALUES ($1, $2, $3)
+		`INSERT INTO tags (user_id, organization_id, name, color)
+		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, created_at`,
-		userID, name, req.Color,
+		userID, orgIDArg, name, req.Color,
 	).Scan(&item.ID, &createdAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -181,9 +206,17 @@ func (h *Handler) UpdateTag(w http.ResponseWriter, r *http.Request) {
 		paramIdx++
 	}
 
-	query := fmt.Sprintf("UPDATE tags SET %s WHERE id = $%d AND user_id = $%d",
-		strings.Join(setClauses, ", "), paramIdx, paramIdx+1)
-	args = append(args, tagID, userID)
+	orgID := auth.OrgIDFromContext(r.Context())
+	var query string
+	if orgID != "" {
+		query = fmt.Sprintf("UPDATE tags SET %s WHERE id = $%d AND organization_id = $%d",
+			strings.Join(setClauses, ", "), paramIdx, paramIdx+1)
+		args = append(args, tagID, orgID)
+	} else {
+		query = fmt.Sprintf("UPDATE tags SET %s WHERE id = $%d AND user_id = $%d",
+			strings.Join(setClauses, ", "), paramIdx, paramIdx+1)
+		args = append(args, tagID, userID)
+	}
 
 	result, err := h.db.Exec(r.Context(), query, args...)
 	if err != nil {
@@ -207,10 +240,18 @@ func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	tagID := chi.URLParam(r, "id")
 
-	result, err := h.db.Exec(r.Context(),
-		`DELETE FROM tags WHERE id = $1 AND user_id = $2`,
-		tagID, userID,
-	)
+	orgID := auth.OrgIDFromContext(r.Context())
+	var deleteQuery string
+	var deleteArgs []any
+	if orgID != "" {
+		deleteQuery = `DELETE FROM tags WHERE id = $1 AND organization_id = $2`
+		deleteArgs = []any{tagID, orgID}
+	} else {
+		deleteQuery = `DELETE FROM tags WHERE id = $1 AND user_id = $2`
+		deleteArgs = []any{tagID, userID}
+	}
+
+	result, err := h.db.Exec(r.Context(), deleteQuery, deleteArgs...)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to delete tag")
 		return
@@ -248,11 +289,20 @@ func (h *Handler) SetVideoTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	orgID := auth.OrgIDFromContext(r.Context())
+
+	var videoVerifyQuery string
+	var videoVerifyArgs []any
+	if orgID != "" {
+		videoVerifyQuery = `SELECT id FROM videos WHERE id = $1 AND organization_id = $2 AND status != 'deleted'`
+		videoVerifyArgs = []any{videoID, orgID}
+	} else {
+		videoVerifyQuery = `SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`
+		videoVerifyArgs = []any{videoID, userID}
+	}
+
 	var id string
-	err := h.db.QueryRow(r.Context(),
-		`SELECT id FROM videos WHERE id = $1 AND user_id = $2 AND status != 'deleted'`,
-		videoID, userID,
-	).Scan(&id)
+	err := h.db.QueryRow(r.Context(), videoVerifyQuery, videoVerifyArgs...).Scan(&id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.WriteError(w, http.StatusNotFound, "video not found")
@@ -263,11 +313,18 @@ func (h *Handler) SetVideoTags(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.TagIDs) > 0 {
+		var tagVerifyQuery string
+		var tagVerifyArgs []any
+		if orgID != "" {
+			tagVerifyQuery = `SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND organization_id = $2`
+			tagVerifyArgs = []any{req.TagIDs, orgID}
+		} else {
+			tagVerifyQuery = `SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND user_id = $2`
+			tagVerifyArgs = []any{req.TagIDs, userID}
+		}
+
 		var count int
-		err := h.db.QueryRow(r.Context(),
-			`SELECT COUNT(*) FROM tags WHERE id = ANY($1) AND user_id = $2`,
-			req.TagIDs, userID,
-		).Scan(&count)
+		err := h.db.QueryRow(r.Context(), tagVerifyQuery, tagVerifyArgs...).Scan(&count)
 		if err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to verify tags")
 			return

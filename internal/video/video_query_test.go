@@ -22,7 +22,7 @@ func TestGetTranscript_ReturnsSegments(t *testing.T) {
 	videoID := "video-123"
 
 	segmentsJSON := `[{"start":0.0,"end":2.5,"text":"Hello world"},{"start":2.5,"end":5.0,"text":"Second segment"}]`
-	mock.ExpectQuery(`SELECT transcript_status, transcript_json FROM videos WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+	mock.ExpectQuery(`SELECT transcript_status, transcript_json FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
 		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"transcript_status", "transcript_json"}).
 			AddRow("ready", &segmentsJSON))
@@ -73,7 +73,7 @@ func TestGetTranscript_NotFound(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "nonexistent-id"
 
-	mock.ExpectQuery(`SELECT transcript_status, transcript_json FROM videos WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+	mock.ExpectQuery(`SELECT transcript_status, transcript_json FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
 		WithArgs(videoID, testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -102,7 +102,7 @@ func TestGetTranscript_NullSegments(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
 	videoID := "video-456"
 
-	mock.ExpectQuery(`SELECT transcript_status, transcript_json FROM videos WHERE id = \$1 AND user_id = \$2 AND status != 'deleted'`).
+	mock.ExpectQuery(`SELECT transcript_status, transcript_json FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
 		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"transcript_status", "transcript_json"}).
 			AddRow("pending", (*string)(nil)))

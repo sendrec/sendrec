@@ -29,14 +29,25 @@ const maxFoldersPerUser = 50
 func (h *Handler) ListFolders(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
-	rows, err := h.db.Query(r.Context(),
-		`SELECT f.id, f.name, f.position, f.created_at,
+	query := `SELECT f.id, f.name, f.position, f.created_at,
 		        (SELECT COUNT(*) FROM videos v WHERE v.folder_id = f.id AND v.status != 'deleted') AS video_count
 		 FROM folders f
-		 WHERE f.user_id = $1
-		 ORDER BY f.position, f.created_at`,
-		userID,
-	)
+		 WHERE 1=1`
+	args := []any{}
+	paramIdx := 1
+
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID != "" {
+		query += fmt.Sprintf(` AND f.organization_id = $%d`, paramIdx)
+		args = append(args, orgID)
+	} else {
+		query += fmt.Sprintf(` AND f.user_id = $%d`, paramIdx)
+		args = append(args, userID)
+	}
+
+	query += ` ORDER BY f.position, f.created_at`
+
+	rows, err := h.db.Query(r.Context(), query, args...)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to list folders")
 		return
@@ -81,11 +92,20 @@ func (h *Handler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	orgID := auth.OrgIDFromContext(r.Context())
+
+	var countQuery string
+	var countArgs []any
+	if orgID != "" {
+		countQuery = `SELECT COUNT(*) FROM folders WHERE organization_id = $1`
+		countArgs = []any{orgID}
+	} else {
+		countQuery = `SELECT COUNT(*) FROM folders WHERE user_id = $1`
+		countArgs = []any{userID}
+	}
+
 	var count int
-	if err := h.db.QueryRow(r.Context(),
-		`SELECT COUNT(*) FROM folders WHERE user_id = $1`,
-		userID,
-	).Scan(&count); err != nil {
+	if err := h.db.QueryRow(r.Context(), countQuery, countArgs...).Scan(&count); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to check folder limit")
 		return
 	}
@@ -94,14 +114,28 @@ func (h *Handler) CreateFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var orgIDArg *string
+	if orgID != "" {
+		orgIDArg = &orgID
+	}
+
 	var item folderItem
 	var createdAt time.Time
-	err := h.db.QueryRow(r.Context(),
-		`INSERT INTO folders (user_id, name, position)
-		 VALUES ($1, $2, (SELECT COALESCE(MAX(position), -1) + 1 FROM folders WHERE user_id = $1))
-		 RETURNING id, position, created_at`,
-		userID, name,
-	).Scan(&item.ID, &item.Position, &createdAt)
+	var insertQuery string
+	var insertArgs []any
+	if orgID != "" {
+		insertQuery = `INSERT INTO folders (user_id, organization_id, name, position)
+		 VALUES ($1, $2, $3, (SELECT COALESCE(MAX(position), -1) + 1 FROM folders WHERE organization_id = $2))
+		 RETURNING id, position, created_at`
+		insertArgs = []any{userID, orgIDArg, name}
+	} else {
+		insertQuery = `INSERT INTO folders (user_id, organization_id, name, position)
+		 VALUES ($1, $2, $3, (SELECT COALESCE(MAX(position), -1) + 1 FROM folders WHERE user_id = $1))
+		 RETURNING id, position, created_at`
+		insertArgs = []any{userID, orgIDArg, name}
+	}
+
+	err := h.db.QueryRow(r.Context(), insertQuery, insertArgs...).Scan(&item.ID, &item.Position, &createdAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -166,9 +200,17 @@ func (h *Handler) UpdateFolder(w http.ResponseWriter, r *http.Request) {
 		paramIdx++
 	}
 
-	query := fmt.Sprintf("UPDATE folders SET %s WHERE id = $%d AND user_id = $%d",
-		strings.Join(setClauses, ", "), paramIdx, paramIdx+1)
-	args = append(args, folderID, userID)
+	orgID := auth.OrgIDFromContext(r.Context())
+	var query string
+	if orgID != "" {
+		query = fmt.Sprintf("UPDATE folders SET %s WHERE id = $%d AND organization_id = $%d",
+			strings.Join(setClauses, ", "), paramIdx, paramIdx+1)
+		args = append(args, folderID, orgID)
+	} else {
+		query = fmt.Sprintf("UPDATE folders SET %s WHERE id = $%d AND user_id = $%d",
+			strings.Join(setClauses, ", "), paramIdx, paramIdx+1)
+		args = append(args, folderID, userID)
+	}
 
 	tag, err := h.db.Exec(r.Context(), query, args...)
 	if err != nil {
@@ -192,10 +234,18 @@ func (h *Handler) DeleteFolder(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	folderID := chi.URLParam(r, "id")
 
-	tag, err := h.db.Exec(r.Context(),
-		`DELETE FROM folders WHERE id = $1 AND user_id = $2`,
-		folderID, userID,
-	)
+	orgID := auth.OrgIDFromContext(r.Context())
+	var deleteQuery string
+	var deleteArgs []any
+	if orgID != "" {
+		deleteQuery = `DELETE FROM folders WHERE id = $1 AND organization_id = $2`
+		deleteArgs = []any{folderID, orgID}
+	} else {
+		deleteQuery = `DELETE FROM folders WHERE id = $1 AND user_id = $2`
+		deleteArgs = []any{folderID, userID}
+	}
+
+	tag, err := h.db.Exec(r.Context(), deleteQuery, deleteArgs...)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to delete folder")
 		return
@@ -222,13 +272,22 @@ func (h *Handler) SetVideoFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	orgID := auth.OrgIDFromContext(r.Context())
+
 	var folderID *string
 	if req.FolderID != nil && *req.FolderID != "" {
+		var folderVerifyQuery string
+		var folderVerifyArgs []any
+		if orgID != "" {
+			folderVerifyQuery = `SELECT id FROM folders WHERE id = $1 AND organization_id = $2`
+			folderVerifyArgs = []any{*req.FolderID, orgID}
+		} else {
+			folderVerifyQuery = `SELECT id FROM folders WHERE id = $1 AND user_id = $2`
+			folderVerifyArgs = []any{*req.FolderID, userID}
+		}
+
 		var id string
-		err := h.db.QueryRow(r.Context(),
-			`SELECT id FROM folders WHERE id = $1 AND user_id = $2`,
-			*req.FolderID, userID,
-		).Scan(&id)
+		err := h.db.QueryRow(r.Context(), folderVerifyQuery, folderVerifyArgs...).Scan(&id)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httputil.WriteError(w, http.StatusNotFound, "folder not found")
@@ -240,10 +299,17 @@ func (h *Handler) SetVideoFolder(w http.ResponseWriter, r *http.Request) {
 		folderID = req.FolderID
 	}
 
-	result, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET folder_id = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`,
-		folderID, videoID, userID,
-	)
+	var updateQuery string
+	var updateArgs []any
+	if orgID != "" {
+		updateQuery = `UPDATE videos SET folder_id = $1 WHERE id = $2 AND organization_id = $3 AND status != 'deleted'`
+		updateArgs = []any{folderID, videoID, orgID}
+	} else {
+		updateQuery = `UPDATE videos SET folder_id = $1 WHERE id = $2 AND user_id = $3 AND status != 'deleted'`
+		updateArgs = []any{folderID, videoID, userID}
+	}
+
+	result, err := h.db.Exec(r.Context(), updateQuery, updateArgs...)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video folder")
 		return

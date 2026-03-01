@@ -15,6 +15,7 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/docs"
 	"github.com/sendrec/sendrec/internal/geoip"
+	"github.com/sendrec/sendrec/internal/organization"
 	"github.com/sendrec/sendrec/internal/ratelimit"
 	"github.com/sendrec/sendrec/internal/video"
 	"github.com/sendrec/sendrec/internal/webhook"
@@ -52,6 +53,7 @@ type Config struct {
 	CreemAPIKey             string
 	CreemWebhookSecret      string
 	CreemProProductID       string
+	CreemOrgProProductID    string
 	GeoIPDBPath             string
 }
 
@@ -61,6 +63,7 @@ type Server struct {
 	pinger          Pinger
 	authHandler     *auth.Handler
 	videoHandler    *video.Handler
+	orgHandler      *organization.Handler
 	db              database.DBTX
 	billingHandlers *billing.Handlers
 	webFS           fs.FS
@@ -132,7 +135,12 @@ func New(cfg Config) *Server {
 
 		if cfg.CreemAPIKey != "" {
 			creemClient := billing.New(cfg.CreemAPIKey, "")
-			s.billingHandlers = billing.NewHandlers(cfg.DB, creemClient, baseURL, cfg.CreemProProductID, cfg.CreemWebhookSecret)
+			s.billingHandlers = billing.NewHandlers(cfg.DB, creemClient, baseURL, cfg.CreemProProductID, cfg.CreemOrgProProductID, cfg.CreemWebhookSecret)
+		}
+
+		s.orgHandler = organization.NewHandler(cfg.DB, baseURL)
+		if sender, ok := cfg.EmailSender.(organization.EmailSender); ok {
+			s.orgHandler.SetEmailSender(sender)
 		}
 	}
 
@@ -206,6 +214,39 @@ func (s *Server) routes() {
 		})
 	}
 
+	if s.orgHandler != nil {
+		s.router.Route("/api/organizations", func(r chi.Router) {
+			r.Use(s.authHandler.Middleware)
+			r.Use(maxBodySize(64 * 1024))
+			r.Get("/", s.orgHandler.List)
+			r.Post("/", s.orgHandler.Create)
+			r.Route("/{orgId}", func(r chi.Router) {
+				r.Get("/", s.orgHandler.Get)
+				r.Patch("/", s.orgHandler.Update)
+				r.Delete("/", s.orgHandler.Delete)
+				r.Get("/members", s.orgHandler.ListMembers)
+				r.Delete("/members/{userId}", s.orgHandler.RemoveMember)
+				r.Patch("/members/{userId}", s.orgHandler.UpdateMemberRole)
+				r.Post("/invites", s.orgHandler.SendInvite)
+				r.Get("/invites", s.orgHandler.ListInvites)
+				r.Delete("/invites/{inviteId}", s.orgHandler.RevokeInvite)
+				if s.billingHandlers != nil {
+					r.Route("/billing", func(r chi.Router) {
+						r.Get("/", s.billingHandlers.GetOrgBilling)
+						r.Post("/checkout", s.billingHandlers.CreateOrgCheckout)
+						r.Delete("/", s.billingHandlers.CancelOrgSubscription)
+					})
+				}
+			})
+		})
+
+		s.router.Route("/api/invites", func(r chi.Router) {
+			r.Use(s.authHandler.Middleware)
+			r.Use(maxBodySize(64 * 1024))
+			r.Post("/accept", s.orgHandler.AcceptInvite)
+		})
+	}
+
 	if s.videoHandler != nil {
 		s.router.Route("/api/settings", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
@@ -235,10 +276,11 @@ func (s *Server) routes() {
 			r.Use(videoLimiter.Middleware)
 			r.Use(maxBodySize(64 * 1024))
 			// List accepts API key OR JWT
-			r.With(apiKeyOrJWTMiddleware(s.db, s.authHandler.Middleware)).Get("/", s.videoHandler.List)
+			r.With(apiKeyOrJWTMiddleware(s.db, s.authHandler.Middleware), organization.Middleware(s.db)).Get("/", s.videoHandler.List)
 			// All other endpoints require JWT
 			r.Group(func(r chi.Router) {
 				r.Use(s.authHandler.Middleware)
+				r.Use(organization.Middleware(s.db))
 				r.Post("/", s.videoHandler.Create)
 				r.Post("/upload", s.videoHandler.Upload)
 				r.Get("/limits", s.videoHandler.Limits)
@@ -279,12 +321,14 @@ func (s *Server) routes() {
 
 		s.router.Route("/api/analytics", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
+			r.Use(organization.Middleware(s.db))
 			r.Get("/dashboard", s.videoHandler.AnalyticsDashboard)
 			r.Get("/dashboard/export", s.videoHandler.DashboardExport)
 		})
 
 		s.router.Route("/api/folders", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
+			r.Use(organization.Middleware(s.db))
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/", s.videoHandler.ListFolders)
 			r.Post("/", s.videoHandler.CreateFolder)
@@ -294,6 +338,7 @@ func (s *Server) routes() {
 
 		s.router.Route("/api/tags", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
+			r.Use(organization.Middleware(s.db))
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/", s.videoHandler.ListTags)
 			r.Post("/", s.videoHandler.CreateTag)
