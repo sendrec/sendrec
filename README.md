@@ -61,6 +61,7 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 - **SEO** — OpenGraph tags, Twitter Cards, VideoObject JSON-LD, canonical URLs, robots.txt
 - **Subscription billing** — optional Creem integration for free/Pro tiers, webhook-based plan activation, customer portal
 - **Integrations** — Nextcloud (oEmbed + API keys), per-user API keys, OpenAPI docs
+- **Team workspaces** — shared video libraries with role-based access (owner/admin/member), email invites, workspace-level branding and billing
 - **Self-hostable** — single Go binary, Docker Compose, PostgreSQL, S3-compatible storage
 
 ## Quick Start
