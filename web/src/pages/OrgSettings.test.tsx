@@ -17,6 +17,11 @@ vi.mock("../api/client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
+const mockUseOrganization = vi.fn();
+vi.mock("../hooks/useOrganization", () => ({
+  useOrganization: () => mockUseOrganization(),
+}));
+
 const mockOrg = {
   id: "org-1",
   name: "Acme Corp",
@@ -87,6 +92,15 @@ describe("OrgSettings", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
     mockNavigate.mockReset();
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "free", role: "owner", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "free", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
   });
 
   afterEach(() => {
@@ -130,18 +144,21 @@ describe("OrgSettings", () => {
     expect(roleSelects.length).toBeGreaterThan(0);
   });
 
-  it("member cannot see invite form or delete section", async () => {
-    mockMemberResponses();
+  it("member is redirected away from settings", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "free", role: "member", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "free", role: "member", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
     renderOrgSettings();
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
     });
-
-    expect(screen.queryByText("Danger Zone")).not.toBeInTheDocument();
-    expect(screen.queryByText("Delete workspace")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
-    expect(screen.queryByText("Send invite")).not.toBeInTheDocument();
   });
 
   it("send invite form submits correctly", async () => {

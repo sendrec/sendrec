@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { useOrganization } from "../hooks/useOrganization";
 
 interface OrgDetail {
   id: string;
@@ -39,14 +40,20 @@ const ROLES = ["member", "admin", "owner"] as const;
 export function OrgSettings() {
   const { id: orgId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { orgs, loading: orgsLoading } = useOrganization();
 
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [billing, setBilling] = useState<OrgBilling | null>(null);
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const myOrg = orgs.find((o) => o.id === orgId);
+  const currentUserRole = myOrg?.role ?? null;
+  const isOwner = currentUserRole === "owner";
+  const isAdmin = currentUserRole === "admin";
+  const canManage = isOwner || isAdmin;
 
   const [orgName, setOrgName] = useState("");
   const [orgSlug, setOrgSlug] = useState("");
@@ -74,12 +81,15 @@ export function OrgSettings() {
     onConfirm: () => void;
   } | null>(null);
 
-  const isOwner = currentUserRole === "owner";
-  const isAdmin = currentUserRole === "admin";
-  const canManage = isOwner || isAdmin;
+  useEffect(() => {
+    if (orgsLoading) return;
+    if (!canManage) {
+      navigate("/", { replace: true });
+    }
+  }, [orgsLoading, canManage, navigate]);
 
   useEffect(() => {
-    if (!orgId) return;
+    if (!orgId || !canManage) return;
 
     Promise.all([
       apiFetch<OrgDetail>(`/api/organizations/${orgId}`),
@@ -96,23 +106,10 @@ export function OrgSettings() {
         setMembers(memberData ?? []);
         setInvites((inviteData as Invite[]) ?? []);
         setBilling(billingData as OrgBilling | null);
-
-        const currentMember = findCurrentUser(memberData ?? []);
-        if (currentMember) {
-          setCurrentUserRole(currentMember.role);
-          if (currentMember.role !== "owner" && currentMember.role !== "admin") {
-            navigate("/", { replace: true });
-            return;
-          }
-        }
       })
       .catch(() => setError("Failed to load workspace"))
       .finally(() => setLoading(false));
-  }, [orgId]);
-
-  function findCurrentUser(memberList: Member[]): Member | null {
-    return memberList.length > 0 ? memberList[0] : null;
-  }
+  }, [orgId, canManage]);
 
   async function handleGeneralSave(event: FormEvent) {
     event.preventDefault();
@@ -276,7 +273,7 @@ export function OrgSettings() {
     });
   }
 
-  if (loading) {
+  if (orgsLoading || !canManage || loading) {
     return (
       <div className="page-container page-container--centered">
         <p className="status-message status-message--success">Loading...</p>
