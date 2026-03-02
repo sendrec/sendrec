@@ -13,6 +13,7 @@ concurrency:
 
 env:
   PR_NUMBER: ${{ github.event.pull_request.number }}
+  PREVIEW_DOMAIN: pr-${{ github.event.pull_request.number }}.app.sendrec.eu
 
 jobs:
   deploy:
@@ -24,16 +25,104 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Update preview app branch
+      - name: Find or create preview app
+        id: app
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_GITHUB_APP_UUID: ${{ secrets.COOLIFY_GITHUB_APP_UUID }}
+          COOLIFY_PROJECT_UUID: ${{ secrets.COOLIFY_PROJECT_UUID }}
+          COOLIFY_SERVER_UUID: ${{ secrets.COOLIFY_SERVER_UUID }}
+          COOLIFY_DESTINATION_UUID: ${{ secrets.COOLIFY_DESTINATION_UUID }}
+          COOLIFY_SENDREC_STAGING_UUID: ${{ secrets.COOLIFY_SENDREC_STAGING_UUID }}
         run: |
-          curl -sf -X PATCH "${{ secrets.COOLIFY_API_URL }}/applications/${{ secrets.COOLIFY_SENDREC_PREVIEW_UUID }}" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"git_branch": "${{ github.head_ref }}"}'
+          APP_NAME="sendrec-pr-${{ env.PR_NUMBER }}"
+
+          # Check if app already exists
+          EXISTING=$(curl -sf "$COOLIFY_API_URL/applications" \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN" | \
+            python3 -c "
+          import json, sys
+          apps = json.load(sys.stdin)
+          for a in apps:
+              if a['name'] == '$APP_NAME':
+                  print(a['uuid'])
+                  break
+          ")
+
+          if [ -n "$EXISTING" ]; then
+            echo "uuid=$EXISTING" >> "$GITHUB_OUTPUT"
+            echo "Found existing app: $EXISTING"
+
+            # Update branch
+            curl -sf -X PATCH "$COOLIFY_API_URL/applications/$EXISTING" \
+              -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"git_branch\": \"${{ github.head_ref }}\"}"
+          else
+            echo "Creating new preview app: $APP_NAME"
+
+            # Create app
+            UUID=$(curl -sf -X POST "$COOLIFY_API_URL/applications/private-github-app" \
+              -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"project_uuid\": \"$COOLIFY_PROJECT_UUID\",
+                \"environment_name\": \"development\",
+                \"server_uuid\": \"$COOLIFY_SERVER_UUID\",
+                \"destination_uuid\": \"$COOLIFY_DESTINATION_UUID\",
+                \"build_pack\": \"dockerfile\",
+                \"github_app_uuid\": \"$COOLIFY_GITHUB_APP_UUID\",
+                \"git_repository\": \"sendrec/sendrec\",
+                \"git_branch\": \"${{ github.head_ref }}\",
+                \"name\": \"$APP_NAME\",
+                \"description\": \"PR #${{ env.PR_NUMBER }} preview\",
+                \"domains\": \"https://${{ env.PREVIEW_DOMAIN }}\",
+                \"ports_exposes\": \"8080\"
+              }" | python3 -c "import json,sys; print(json.load(sys.stdin)['uuid'])")
+
+            echo "uuid=$UUID" >> "$GITHUB_OUTPUT"
+            echo "Created app: $UUID"
+
+            # Configure dockerfile location and model volume
+            curl -sf -X PATCH "$COOLIFY_API_URL/applications/$UUID" \
+              -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"dockerfile_location": "/Dockerfile", "custom_docker_run_options": "-v /opt/sendrec/models:/models:ro"}'
+
+            # Copy env vars from staging app, override BASE_URL for this preview
+            python3 << PYEOF
+          import json, urllib.request
+
+          API = "$COOLIFY_API_URL"
+          TOKEN = "$COOLIFY_API_TOKEN"
+          STAGING = "$COOLIFY_SENDREC_STAGING_UUID"
+          APP = "$UUID"
+          DOMAIN = "${{ env.PREVIEW_DOMAIN }}"
+          headers = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json", "User-Agent": "github-actions"}
+
+          # Fetch staging env vars
+          req = urllib.request.Request(f"{API}/applications/{STAGING}/envs", headers=headers)
+          envs = json.loads(urllib.request.urlopen(req).read())
+
+          # Add each env var to the new app
+          for env in envs:
+              if env.get("is_preview"):
+                  continue
+              value = env["value"]
+              if env["key"] == "BASE_URL":
+                  value = f"https://{DOMAIN}"
+              payload = json.dumps({"key": env["key"], "value": value, "is_preview": False}).encode()
+              req = urllib.request.Request(f"{API}/applications/{APP}/envs", data=payload, headers=headers, method="POST")
+              urllib.request.urlopen(req)
+
+          print(f"Copied {len([e for e in envs if not e.get('is_preview')])} env vars")
+          PYEOF
+          fi
 
       - name: Deploy preview via Coolify
         run: |
-          curl -sf -X GET "${{ secrets.COOLIFY_API_URL }}/deploy?uuid=${{ secrets.COOLIFY_SENDREC_PREVIEW_UUID }}&force=true" \
+          curl -sf -X GET "${{ secrets.COOLIFY_API_URL }}/deploy?uuid=${{ steps.app.outputs.uuid }}&force=true" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
 
       - name: Comment PR with preview URL
@@ -41,8 +130,9 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const url = 'https://preview.app.sendrec.eu';
-            const body = `Preview deployed: ${url}`;
+            const uuid = '${{ steps.app.outputs.uuid }}';
+            const url = 'https://${{ env.PREVIEW_DOMAIN }}';
+            const body = `Preview deployed: ${url}\n<!-- coolify-preview-uuid:${uuid} -->`;
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -74,17 +164,31 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Stop preview app
+      - name: Find and delete preview app
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
         run: |
-          curl -sf -X POST "${{ secrets.COOLIFY_API_URL }}/applications/${{ secrets.COOLIFY_SENDREC_PREVIEW_UUID }}/stop" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
+          APP_NAME="sendrec-pr-${{ env.PR_NUMBER }}"
 
-      - name: Reset preview branch to main
-        run: |
-          curl -sf -X PATCH "${{ secrets.COOLIFY_API_URL }}/applications/${{ secrets.COOLIFY_SENDREC_PREVIEW_UUID }}" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"git_branch": "main"}'
+          UUID=$(curl -sf "$COOLIFY_API_URL/applications" \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN" | \
+            python3 -c "
+          import json, sys
+          apps = json.load(sys.stdin)
+          for a in apps:
+              if a['name'] == '$APP_NAME':
+                  print(a['uuid'])
+                  break
+          ")
+
+          if [ -n "$UUID" ]; then
+            echo "Deleting preview app: $UUID ($APP_NAME)"
+            curl -sf -X DELETE "$COOLIFY_API_URL/applications/$UUID" \
+              -H "Authorization: Bearer $COOLIFY_API_TOKEN"
+          else
+            echo "No preview app found for $APP_NAME"
+          fi
 
       - name: Comment PR cleanup
         uses: actions/github-script@v7
