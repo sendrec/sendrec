@@ -12,9 +12,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  COOLIFY_API: ${{ secrets.COOLIFY_API_URL }}
-  COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
-  STAGING_UUID: ${{ secrets.COOLIFY_SENDREC_STAGING_UUID }}
   PR_NUMBER: ${{ github.event.pull_request.number }}
 
 jobs:
@@ -58,93 +55,78 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Find or create preview app
-        id: app
+      - name: Setup SSH
         run: |
-          APP_NAME="[preview] sendrec PR-${PR_NUMBER}"
-          PREVIEW_DOMAIN="https://pr-${PR_NUMBER}.app.sendrec.eu"
-
-          # Check if preview app already exists
-          EXISTING_UUID=$(curl -sf \
-            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-            "${COOLIFY_API}/applications" \
-            | jq -r --arg name "$APP_NAME" '.[] | select(.name == $name) | .uuid // empty')
-
-          if [ -n "$EXISTING_UUID" ]; then
-            echo "Preview app exists: $EXISTING_UUID"
-            # Update image tag
-            curl -sf -X PATCH \
-              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-              -H "Content-Type: application/json" \
-              "${COOLIFY_API}/applications/${EXISTING_UUID}" \
-              -d "{\"docker_registry_image_tag\": \"pr-${PR_NUMBER}\"}"
-            echo "uuid=${EXISTING_UUID}" >> "$GITHUB_OUTPUT"
-          else
-            echo "Creating new preview app..."
-            # Create the application
-            RESULT=$(curl -sf -X POST \
-              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-              -H "Content-Type: application/json" \
-              "${COOLIFY_API}/applications/dockerimage" \
-              -d "{
-                \"server_uuid\": \"${{ secrets.COOLIFY_SERVER_UUID }}\",
-                \"project_uuid\": \"${{ secrets.COOLIFY_PROJECT_UUID }}\",
-                \"environment_name\": \"production\",
-                \"destination_uuid\": \"${{ secrets.COOLIFY_DESTINATION_UUID }}\",
-                \"docker_registry_image_name\": \"${{ secrets.DOCKERHUB_USERNAME }}/sendrec\",
-                \"docker_registry_image_tag\": \"pr-${PR_NUMBER}\",
-                \"name\": \"${APP_NAME}\",
-                \"ports_exposes\": \"8080\"
-              }")
-            NEW_UUID=$(echo "$RESULT" | jq -r '.uuid')
-            echo "Created preview app: $NEW_UUID"
-
-            # Configure domain and volumes
-            curl -sf -X PATCH \
-              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-              -H "Content-Type: application/json" \
-              "${COOLIFY_API}/applications/${NEW_UUID}" \
-              -d "{
-                \"domains\": \"${PREVIEW_DOMAIN}\",
-                \"custom_docker_run_options\": \"-v /opt/sendrec/models:/models:ro -v /var/lib/docker/volumes/sendrec_garage-keys/_data:/run/garage-keys:ro\"
-              }"
-
-            # Copy env vars from staging, override BASE_URL
-            echo "Copying env vars from staging..."
-            ENVS=$(curl -sf \
-              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-              "${COOLIFY_API}/applications/${STAGING_UUID}/envs")
-
-            # De-duplicate by key (take first occurrence)
-            UNIQUE_KEYS=$(echo "$ENVS" | jq -r '[.[].key] | unique[]')
-            for KEY in $UNIQUE_KEYS; do
-              VALUE=$(echo "$ENVS" | jq -r --arg k "$KEY" '[.[] | select(.key == $k)][0].value')
-
-              # Override BASE_URL for preview
-              if [ "$KEY" = "BASE_URL" ]; then
-                VALUE="${PREVIEW_DOMAIN}"
-              fi
-
-              # Escape value for JSON
-              ESCAPED_VALUE=$(echo "$VALUE" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().rstrip("\n")))')
-
-              curl -sf -X POST \
-                -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-                -H "Content-Type: application/json" \
-                "${COOLIFY_API}/applications/${NEW_UUID}/envs" \
-                -d "{\"key\": \"${KEY}\", \"value\": ${ESCAPED_VALUE}}" > /dev/null
-              echo "  Set ${KEY}"
-            done
-
-            echo "uuid=${NEW_UUID}" >> "$GITHUB_OUTPUT"
-          fi
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
 
       - name: Deploy preview
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/sendrec:pr-${{ env.PR_NUMBER }}
+          STAGING_UUID: ${{ secrets.COOLIFY_SENDREC_STAGING_UUID }}
         run: |
-          curl -sf -X GET \
-            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-            "${COOLIFY_API}/deploy?uuid=${{ steps.app.outputs.uuid }}&force=false"
-          echo "Deployed preview PR-${PR_NUMBER}"
+          CONTAINER="sendrec-preview-${PR_NUMBER}"
+          DOMAIN="pr-${PR_NUMBER}.app.sendrec.eu"
+
+          ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s <<SCRIPT
+            set -e
+
+            # Pull the new image
+            docker pull ${IMAGE}
+
+            # Find the staging container dynamically (name starts with the Coolify UUID)
+            STAGING_CONTAINER=\$(docker ps --filter "name=${STAGING_UUID}" --format "{{.Names}}" | head -1)
+            if [ -z "\$STAGING_CONTAINER" ]; then
+              echo "ERROR: Staging container not found"
+              exit 1
+            fi
+
+            # Export staging env vars, override BASE_URL
+            docker exec \$STAGING_CONTAINER env | \
+              grep -v '^HOSTNAME=' | \
+              grep -v '^HOME=' | \
+              grep -v '^PATH=' | \
+              grep -v '^COOLIFY_' | \
+              grep -v '^SOURCE_COMMIT=' | \
+              grep -v '^HOST=' | \
+              grep -v '^PORT=' | \
+              sed 's|^BASE_URL=.*|BASE_URL=https://${DOMAIN}|' \
+              > /tmp/preview-${PR_NUMBER}.env
+
+            # Stop existing preview container if running
+            docker rm -f ${CONTAINER} 2>/dev/null || true
+
+            # Run preview container on the coolify network with Traefik labels
+            docker run -d \
+              --name ${CONTAINER} \
+              --network coolify \
+              --restart unless-stopped \
+              --env-file /tmp/preview-${PR_NUMBER}.env \
+              -v /opt/sendrec/models:/models:ro \
+              -v /var/lib/docker/volumes/sendrec_garage-keys/_data:/run/garage-keys:ro \
+              -l "traefik.enable=true" \
+              -l "traefik.http.routers.preview-${PR_NUMBER}.rule=Host(\\\`${DOMAIN}\\\`)" \
+              -l "traefik.http.routers.preview-${PR_NUMBER}.entryPoints=https" \
+              -l "traefik.http.routers.preview-${PR_NUMBER}.tls=true" \
+              -l "traefik.http.routers.preview-${PR_NUMBER}.tls.certresolver=letsencrypt" \
+              -l "traefik.http.routers.preview-${PR_NUMBER}.middlewares=gzip" \
+              -l "traefik.http.routers.preview-${PR_NUMBER}-http.rule=Host(\\\`${DOMAIN}\\\`)" \
+              -l "traefik.http.routers.preview-${PR_NUMBER}-http.entryPoints=http" \
+              -l "traefik.http.routers.preview-${PR_NUMBER}-http.middlewares=redirect-to-https" \
+              -l "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https" \
+              -l "traefik.http.middlewares.gzip.compress=true" \
+              -l "traefik.http.services.preview-${PR_NUMBER}.loadbalancer.server.port=8080" \
+              ${IMAGE}
+
+            # Cleanup env file
+            rm -f /tmp/preview-${PR_NUMBER}.env
+
+            echo "Preview container ${CONTAINER} started on ${DOMAIN}"
+          SCRIPT
 
       - name: Comment PR with preview URL
         uses: actions/github-script@v7
@@ -184,24 +166,21 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Delete preview app
+      - name: Setup SSH
         run: |
-          APP_NAME="[preview] sendrec PR-${PR_NUMBER}"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
 
-          # Find the preview app
-          APP_UUID=$(curl -sf \
-            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-            "${COOLIFY_API}/applications" \
-            | jq -r --arg name "$APP_NAME" '.[] | select(.name == $name) | .uuid // empty')
-
-          if [ -n "$APP_UUID" ]; then
-            curl -sf -X DELETE \
-              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-              "${COOLIFY_API}/applications/${APP_UUID}"
-            echo "Deleted preview app ${APP_UUID}"
-          else
-            echo "No preview app found for PR-${PR_NUMBER}, skipping"
-          fi
+      - name: Teardown preview
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          CONTAINER="sendrec-preview-${PR_NUMBER}"
+          ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "docker rm -f ${CONTAINER} 2>/dev/null && echo 'Removed ${CONTAINER}' || echo 'No preview container found'"
 
       - name: Comment PR cleanup
         uses: actions/github-script@v7
