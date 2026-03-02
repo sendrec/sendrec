@@ -84,6 +84,32 @@ func findCookieWithPath(cookies []*http.Cookie, name, path string) *http.Cookie 
 
 // --- Register ---
 
+func TestRegister_Disabled(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.SetRegistrationEnabled(false)
+
+	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.Register(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
+	}
+
+	errMsg := decodeErrorResponse(t, rec)
+	if errMsg != "registration is disabled" {
+		t.Errorf("expected error 'registration is disabled', got %q", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
 func TestRegister_Success(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()

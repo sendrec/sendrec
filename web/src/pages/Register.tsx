@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
@@ -5,6 +6,22 @@ import { AuthForm } from "../components/AuthForm";
 export function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then((res) => res.json())
+      .then((data: { registrationEnabled?: boolean }) => {
+        if (data.registrationEnabled === false) {
+          navigate("/login", { replace: true });
+        } else {
+          setReady(true);
+        }
+      })
+      .catch(() => setReady(true));
+  }, [navigate]);
+
+  if (!ready) return null;
 
   async function handleRegister(data: {
     email: string;

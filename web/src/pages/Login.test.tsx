@@ -34,6 +34,12 @@ vi.mock("../api/client", () => ({
   setAccessToken: (...args: unknown[]) => mockSetAccessToken(...args),
 }));
 
+function mockHealthResponse(registrationEnabled: boolean) {
+  vi.spyOn(global, "fetch").mockResolvedValueOnce(
+    new Response(JSON.stringify({ registrationEnabled }), { status: 200 })
+  );
+}
+
 function renderLogin() {
   return render(
     <MemoryRouter>
@@ -47,6 +53,7 @@ describe("Login", () => {
     mockApiFetch.mockReset();
     mockSetAccessToken.mockReset();
     mockNavigate.mockReset();
+    vi.restoreAllMocks();
   });
 
   it("renders sign in form", () => {
@@ -105,5 +112,23 @@ describe("Login", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(mockNavigate).toHaveBeenCalledWith("/check-email", { state: { email: "alice@example.com" } });
+  });
+
+  it("hides sign up link when registration is disabled", async () => {
+    mockHealthResponse(false);
+    renderLogin();
+
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("link", { name: "Sign up" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows sign up link when registration is enabled", async () => {
+    mockHealthResponse(true);
+    renderLogin();
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole("link", { name: "Sign up" })).toBeInTheDocument();
+    });
   });
 });

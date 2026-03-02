@@ -112,6 +112,8 @@ func main() {
 
 	slog.Info("sendrec starting", "version", version)
 
+	registrationEnabled := getEnv("REGISTRATION_ENABLED", "true") == "true"
+
 	srv := server.New(server.Config{
 		Version:                 version,
 		DB:                      db.Pool,
@@ -120,6 +122,7 @@ func main() {
 		WebFS:                   webFS,
 		JWTSecret:               jwtSecret,
 		BaseURL:                 baseURL,
+		RegistrationEnabled:     registrationEnabled,
 		MaxUploadBytes:          getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
 		MaxVideosPerMonth:       int(getEnvInt64("MAX_VIDEOS_PER_MONTH", int64(plans.Free.MaxVideosPerMonth))),
 		MaxVideoDurationSeconds: int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),

@@ -69,12 +69,13 @@ func newServerWithDB(t *testing.T) (*server.Server, pgxmock.PgxPoolIface) {
 	t.Cleanup(func() { mock.Close() })
 
 	srv := server.New(server.Config{
-		DB:              mock,
-		Pinger:          &mockPinger{err: nil},
-		Storage:         &mockStorage{},
-		JWTSecret:       "test-secret",
-		BaseURL:         "https://localhost:8080",
-		S3PublicEndpoint: "https://storage.example.com",
+		DB:                  mock,
+		Pinger:              &mockPinger{err: nil},
+		Storage:             &mockStorage{},
+		JWTSecret:           "test-secret",
+		BaseURL:             "https://localhost:8080",
+		S3PublicEndpoint:    "https://storage.example.com",
+		RegistrationEnabled: true,
 	})
 	return srv, mock
 }
@@ -112,7 +113,7 @@ func TestHealthEndpointReturnsOK(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","version":""}`
+	expected := `{"status":"ok","version":"","registrationEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -140,7 +141,7 @@ func TestHealthEndpointWithPingSuccess(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","version":""}`
+	expected := `{"status":"ok","version":"","registrationEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -157,6 +158,32 @@ func TestHealthEndpointWithPingFailure(t *testing.T) {
 	}
 
 	expected := `{"status":"unhealthy","version":"","error":"database unreachable"}`
+	if rec.Body.String() != expected {
+		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
+	}
+}
+
+func TestHealthEndpointIncludesRegistrationEnabled(t *testing.T) {
+	srv := server.New(server.Config{
+		Pinger:              &mockPinger{err: nil},
+		RegistrationEnabled: true,
+	})
+	rec := executeRequest(srv, http.MethodGet, "/api/health")
+
+	expected := `{"status":"ok","version":"","registrationEnabled":true}`
+	if rec.Body.String() != expected {
+		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
+	}
+}
+
+func TestHealthEndpointRegistrationDisabled(t *testing.T) {
+	srv := server.New(server.Config{
+		Pinger:              &mockPinger{err: nil},
+		RegistrationEnabled: false,
+	})
+	rec := executeRequest(srv, http.MethodGet, "/api/health")
+
+	expected := `{"status":"ok","version":"","registrationEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -574,7 +601,7 @@ func TestSPADoesNotInterceptHealthEndpoint(t *testing.T) {
 		t.Errorf("expected status 200 for health endpoint with SPA, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","version":""}`
+	expected := `{"status":"ok","version":"","registrationEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected health JSON, got %q", rec.Body.String())
 	}

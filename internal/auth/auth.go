@@ -35,15 +35,20 @@ type EmailSender interface {
 }
 
 type Handler struct {
-	db            database.DBTX
-	jwtSecret     string
-	secureCookies bool
-	emailSender   EmailSender
-	baseURL       string
+	db                  database.DBTX
+	jwtSecret           string
+	secureCookies       bool
+	emailSender         EmailSender
+	baseURL             string
+	registrationEnabled bool
 }
 
 func NewHandler(db database.DBTX, jwtSecret string, secureCookies bool) *Handler {
-	return &Handler{db: db, jwtSecret: jwtSecret, secureCookies: secureCookies}
+	return &Handler{db: db, jwtSecret: jwtSecret, secureCookies: secureCookies, registrationEnabled: true}
+}
+
+func (h *Handler) SetRegistrationEnabled(enabled bool) {
+	h.registrationEnabled = enabled
 }
 
 func (h *Handler) SetEmailSender(sender EmailSender, baseURL string) {
@@ -94,6 +99,11 @@ func hashToken(raw string) string {
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	if !h.registrationEnabled {
+		httputil.WriteError(w, http.StatusForbidden, "registration is disabled")
+		return
+	}
+
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")

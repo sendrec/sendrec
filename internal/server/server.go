@@ -54,20 +54,22 @@ type Config struct {
 	CreemWebhookSecret      string
 	CreemProProductID       string
 	CreemOrgProProductID    string
+	RegistrationEnabled     bool
 	GeoIPDBPath             string
 }
 
 type Server struct {
-	router          chi.Router
-	version         string
-	pinger          Pinger
-	authHandler     *auth.Handler
-	videoHandler    *video.Handler
-	orgHandler      *organization.Handler
-	db              database.DBTX
-	billingHandlers *billing.Handlers
-	webFS           fs.FS
-	enableDocs      bool
+	router              chi.Router
+	version             string
+	pinger              Pinger
+	authHandler         *auth.Handler
+	videoHandler        *video.Handler
+	orgHandler          *organization.Handler
+	db                  database.DBTX
+	billingHandlers     *billing.Handlers
+	webFS               fs.FS
+	enableDocs          bool
+	registrationEnabled bool
 }
 
 func New(cfg Config) *Server {
@@ -80,7 +82,7 @@ func New(cfg Config) *Server {
 		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
 	}))
 
-	s := &Server{router: r, version: cfg.Version, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs}
+	s := &Server{router: r, version: cfg.Version, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -95,6 +97,7 @@ func New(cfg Config) *Server {
 
 		secureCookies := strings.HasPrefix(baseURL, "https://")
 		s.authHandler = auth.NewHandler(cfg.DB, jwtSecret, secureCookies)
+		s.authHandler.SetRegistrationEnabled(cfg.RegistrationEnabled)
 		if cfg.EmailSender != nil {
 			s.authHandler.SetEmailSender(cfg.EmailSender, baseURL)
 		}
@@ -401,7 +404,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_, _ = fmt.Fprintf(w, `{"status":"ok","version":%q}`, s.version)
+	_, _ = fmt.Fprintf(w, `{"status":"ok","version":%q,"registrationEnabled":%t}`, s.version, s.registrationEnabled)
 }
 
 func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError, apiFetch, setAccessToken } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
@@ -5,6 +6,16 @@ import { AuthForm } from "../components/AuthForm";
 export function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then((res) => res.json())
+      .then((data: { registrationEnabled?: boolean }) => {
+        setRegistrationEnabled(data.registrationEnabled !== false);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleLogin(data: {
     email: string;
@@ -49,7 +60,11 @@ export function Login() {
           <Link to="/forgot-password" className="auth-footer-link-block">
             Forgot password?
           </Link>
-          Don&apos;t have an account? <Link to={registerPath}>Sign up</Link>
+          {registrationEnabled && (
+            <>
+              Don&apos;t have an account? <Link to={registerPath}>Sign up</Link>
+            </>
+          )}
         </>
       }
     />

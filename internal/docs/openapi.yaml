@@ -791,6 +791,11 @@ components:
         status:
           type: string
           enum: [ok, unhealthy]
+        version:
+          type: string
+        registrationEnabled:
+          type: boolean
+          description: Whether new user registration is allowed
         error:
           type: string
 
@@ -1235,7 +1240,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Register a new user
-      description: Rate limited to 0.5 requests per second with a burst of 5.
+      description: Rate limited to 0.5 requests per second with a burst of 5. Returns 403 when registration is disabled via `REGISTRATION_ENABLED=false`.
       operationId: register
       requestBody:
         required: true
@@ -1252,6 +1257,12 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "400":
           description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Registration is disabled
           content:
             application/json:
               schema:

@@ -185,6 +185,12 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 |----------|-------------|---------|
 | `BRANDING_ENABLED` | Allow users to customize watch page branding (logo, colors, footer) | `false` |
 
+### Registration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REGISTRATION_ENABLED` | Allow new user signups. Set to `false` to disable the registration form and API endpoint | `true` |
+
 ### Analytics (optional)
 
 | Variable | Description | Default |
