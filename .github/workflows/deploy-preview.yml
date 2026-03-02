@@ -15,124 +15,33 @@ env:
   PR_NUMBER: ${{ github.event.pull_request.number }}
 
 jobs:
-  publish:
-    if: >-
-      github.event.action != 'closed' &&
-      github.event.pull_request.author_association != 'NONE' &&
-      github.event.pull_request.author_association != 'FIRST_TIMER' &&
-      github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
-    runs-on: ubuntu-latest
-    environment: staging
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          build-args: VERSION=pr-${{ env.PR_NUMBER }}-${{ github.sha }}
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sendrec:pr-${{ env.PR_NUMBER }}
-          cache-from: type=gha,scope=pr-${{ env.PR_NUMBER }}
-          cache-to: type=gha,mode=max,scope=pr-${{ env.PR_NUMBER }}
-
   deploy:
     if: >-
       github.event.action != 'closed' &&
       github.event.pull_request.author_association != 'NONE' &&
       github.event.pull_request.author_association != 'FIRST_TIMER' &&
       github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
-    needs: publish
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Setup SSH
+      - name: Update preview app branch
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          curl -sf -X PATCH "${{ secrets.COOLIFY_API_URL }}/applications/${{ secrets.COOLIFY_SENDREC_PREVIEW_UUID }}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"git_branch": "${{ github.head_ref }}"}'
 
-      - name: Deploy preview
-        env:
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/sendrec:pr-${{ env.PR_NUMBER }}
-          STAGING_UUID: ${{ secrets.COOLIFY_SENDREC_STAGING_UUID }}
+      - name: Deploy preview via Coolify
         run: |
-          CONTAINER="sendrec-preview-${PR_NUMBER}"
-          DOMAIN="pr-${PR_NUMBER}.app.sendrec.eu"
-
-          ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s <<SCRIPT
-            set -e
-
-            # Pull the new image
-            docker pull ${IMAGE}
-
-            # Find the staging container dynamically (name starts with the Coolify UUID)
-            STAGING_CONTAINER=\$(docker ps --filter "name=${STAGING_UUID}" --format "{{.Names}}" | head -1)
-            if [ -z "\$STAGING_CONTAINER" ]; then
-              echo "ERROR: Staging container not found"
-              exit 1
-            fi
-
-            # Export staging env vars, override BASE_URL
-            docker exec \$STAGING_CONTAINER env | \
-              grep -v '^HOSTNAME=' | \
-              grep -v '^HOME=' | \
-              grep -v '^PATH=' | \
-              grep -v '^COOLIFY_' | \
-              grep -v '^SOURCE_COMMIT=' | \
-              grep -v '^HOST=' | \
-              grep -v '^PORT=' | \
-              sed 's|^BASE_URL=.*|BASE_URL=https://${DOMAIN}|' \
-              > /tmp/preview-${PR_NUMBER}.env
-
-            # Stop existing preview container if running
-            docker rm -f ${CONTAINER} 2>/dev/null || true
-
-            # Run preview container on the coolify network with Traefik labels
-            docker run -d \
-              --name ${CONTAINER} \
-              --network coolify \
-              --restart unless-stopped \
-              --env-file /tmp/preview-${PR_NUMBER}.env \
-              -v /opt/sendrec/models:/models:ro \
-              -l "traefik.enable=true" \
-              -l "traefik.http.routers.preview-${PR_NUMBER}.rule=Host(\\\`${DOMAIN}\\\`)" \
-              -l "traefik.http.routers.preview-${PR_NUMBER}.entryPoints=https" \
-              -l "traefik.http.routers.preview-${PR_NUMBER}.tls=true" \
-              -l "traefik.http.routers.preview-${PR_NUMBER}.tls.certresolver=letsencrypt" \
-              -l "traefik.http.routers.preview-${PR_NUMBER}.middlewares=gzip" \
-              -l "traefik.http.routers.preview-${PR_NUMBER}-http.rule=Host(\\\`${DOMAIN}\\\`)" \
-              -l "traefik.http.routers.preview-${PR_NUMBER}-http.entryPoints=http" \
-              -l "traefik.http.routers.preview-${PR_NUMBER}-http.middlewares=redirect-to-https" \
-              -l "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https" \
-              -l "traefik.http.middlewares.gzip.compress=true" \
-              -l "traefik.http.services.preview-${PR_NUMBER}.loadbalancer.server.port=8080" \
-              ${IMAGE}
-
-            # Cleanup env file
-            rm -f /tmp/preview-${PR_NUMBER}.env
-
-            echo "Preview container ${CONTAINER} started on ${DOMAIN}"
-          SCRIPT
+          curl -sf -X GET "${{ secrets.COOLIFY_API_URL }}/deploy?uuid=${{ secrets.COOLIFY_SENDREC_PREVIEW_UUID }}&force=true" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
 
       - name: Comment PR with preview URL
         uses: actions/github-script@v7
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const url = `https://pr-${prNumber}.app.sendrec.eu`;
+            const url = 'https://preview.app.sendrec.eu';
             const body = `Preview deployed: ${url}`;
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -165,21 +74,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - name: Setup SSH
+      - name: Stop preview app
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          curl -sf -X POST "${{ secrets.COOLIFY_API_URL }}/applications/${{ secrets.COOLIFY_SENDREC_PREVIEW_UUID }}/stop" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
 
-      - name: Teardown preview
-        env:
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      - name: Reset preview branch to main
         run: |
-          CONTAINER="sendrec-preview-${PR_NUMBER}"
-          ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "docker rm -f ${CONTAINER} 2>/dev/null && echo 'Removed ${CONTAINER}' || echo 'No preview container found'"
+          curl -sf -X PATCH "${{ secrets.COOLIFY_API_URL }}/applications/${{ secrets.COOLIFY_SENDREC_PREVIEW_UUID }}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"git_branch": "main"}'
 
       - name: Comment PR cleanup
         uses: actions/github-script@v7
