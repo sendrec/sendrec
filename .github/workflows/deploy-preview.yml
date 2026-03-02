@@ -11,45 +11,142 @@ concurrency:
   group: preview-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  COOLIFY_API: ${{ secrets.COOLIFY_API_URL }}
+  COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+  STAGING_UUID: ${{ secrets.COOLIFY_SENDREC_STAGING_UUID }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+
 jobs:
-  deploy:
-    if: github.event.pull_request.author_association != 'NONE' && github.event.pull_request.author_association != 'FIRST_TIMER' && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
+  publish:
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.author_association != 'NONE' &&
+      github.event.pull_request.author_association != 'FIRST_TIMER' &&
+      github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
     runs-on: ubuntu-latest
+    environment: staging
     steps:
-      - name: Setup SSH
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: VERSION=pr-${{ env.PR_NUMBER }}-${{ github.sha }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sendrec:pr-${{ env.PR_NUMBER }}
+          cache-from: type=gha,scope=pr-${{ env.PR_NUMBER }}
+          cache-to: type=gha,mode=max,scope=pr-${{ env.PR_NUMBER }}
+
+  deploy:
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.author_association != 'NONE' &&
+      github.event.pull_request.author_association != 'FIRST_TIMER' &&
+      github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Find or create preview app
+        id: app
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          APP_NAME="[preview] sendrec PR-${PR_NUMBER}"
+          PREVIEW_DOMAIN="https://pr-${PR_NUMBER}.app.sendrec.eu"
+
+          # Check if preview app already exists
+          EXISTING_UUID=$(curl -sf \
+            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+            "${COOLIFY_API}/applications" \
+            | jq -r --arg name "$APP_NAME" '.[] | select(.name == $name) | .uuid // empty')
+
+          if [ -n "$EXISTING_UUID" ]; then
+            echo "Preview app exists: $EXISTING_UUID"
+            # Update image tag
+            curl -sf -X PATCH \
+              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "${COOLIFY_API}/applications/${EXISTING_UUID}" \
+              -d "{\"docker_registry_image_tag\": \"pr-${PR_NUMBER}\"}"
+            echo "uuid=${EXISTING_UUID}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Creating new preview app..."
+            # Create the application
+            RESULT=$(curl -sf -X POST \
+              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "${COOLIFY_API}/applications/dockerimage" \
+              -d "{
+                \"server_uuid\": \"${{ secrets.COOLIFY_SERVER_UUID }}\",
+                \"project_uuid\": \"${{ secrets.COOLIFY_PROJECT_UUID }}\",
+                \"environment_name\": \"production\",
+                \"destination_uuid\": \"${{ secrets.COOLIFY_DESTINATION_UUID }}\",
+                \"docker_registry_image_name\": \"${{ secrets.DOCKERHUB_USERNAME }}/sendrec\",
+                \"docker_registry_image_tag\": \"pr-${PR_NUMBER}\",
+                \"name\": \"${APP_NAME}\",
+                \"ports_exposes\": \"8080\"
+              }")
+            NEW_UUID=$(echo "$RESULT" | jq -r '.uuid')
+            echo "Created preview app: $NEW_UUID"
+
+            # Configure domain and volumes
+            curl -sf -X PATCH \
+              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "${COOLIFY_API}/applications/${NEW_UUID}" \
+              -d "{
+                \"domains\": \"${PREVIEW_DOMAIN}\",
+                \"custom_docker_run_options\": \"-v /opt/sendrec/models:/models:ro -v /var/lib/docker/volumes/sendrec_garage-keys/_data:/run/garage-keys:ro\"
+              }"
+
+            # Copy env vars from staging, override BASE_URL
+            echo "Copying env vars from staging..."
+            ENVS=$(curl -sf \
+              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+              "${COOLIFY_API}/applications/${STAGING_UUID}/envs")
+
+            # De-duplicate by key (take first occurrence)
+            UNIQUE_KEYS=$(echo "$ENVS" | jq -r '[.[].key] | unique[]')
+            for KEY in $UNIQUE_KEYS; do
+              VALUE=$(echo "$ENVS" | jq -r --arg k "$KEY" '[.[] | select(.key == $k)][0].value')
+
+              # Override BASE_URL for preview
+              if [ "$KEY" = "BASE_URL" ]; then
+                VALUE="${PREVIEW_DOMAIN}"
+              fi
+
+              # Escape value for JSON
+              ESCAPED_VALUE=$(echo "$VALUE" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().rstrip("\n")))')
+
+              curl -sf -X POST \
+                -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+                -H "Content-Type: application/json" \
+                "${COOLIFY_API}/applications/${NEW_UUID}/envs" \
+                -d "{\"key\": \"${KEY}\", \"value\": ${ESCAPED_VALUE}}" > /dev/null
+              echo "  Set ${KEY}"
+            done
+
+            echo "uuid=${NEW_UUID}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Deploy preview
-        if: github.event.action != 'closed'
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          BRANCH_REF: ${{ github.event.pull_request.head.ref }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
         run: |
-          if ! echo "$BRANCH_REF" | grep -qE '^[a-zA-Z0-9._/-]+$'; then
-            echo "::error::Invalid branch name: $BRANCH_REF"
-            exit 1
-          fi
-          ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "/opt/sendrec/deploy.sh preview up ${PR_NUMBER} ${BRANCH_REF}"
-
-      - name: Teardown preview
-        if: github.event.action == 'closed'
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-        run: |
-          ssh -i ~/.ssh/deploy_key "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "/opt/sendrec/deploy.sh preview down ${PR_NUMBER}"
+          curl -sf -X GET \
+            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+            "${COOLIFY_API}/deploy?uuid=${{ steps.app.outputs.uuid }}&force=false"
+          echo "Deployed preview PR-${PR_NUMBER}"
 
       - name: Comment PR with preview URL
-        if: github.event.action != 'closed'
         uses: actions/github-script@v7
         with:
           script: |
@@ -78,8 +175,35 @@ jobs:
               });
             }
 
+  teardown:
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.author_association != 'NONE' &&
+      github.event.pull_request.author_association != 'FIRST_TIMER' &&
+      github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Delete preview app
+        run: |
+          APP_NAME="[preview] sendrec PR-${PR_NUMBER}"
+
+          # Find the preview app
+          APP_UUID=$(curl -sf \
+            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+            "${COOLIFY_API}/applications" \
+            | jq -r --arg name "$APP_NAME" '.[] | select(.name == $name) | .uuid // empty')
+
+          if [ -n "$APP_UUID" ]; then
+            curl -sf -X DELETE \
+              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+              "${COOLIFY_API}/applications/${APP_UUID}"
+            echo "Deleted preview app ${APP_UUID}"
+          else
+            echo "No preview app found for PR-${PR_NUMBER}, skipping"
+          fi
+
       - name: Comment PR cleanup
-        if: github.event.action == 'closed'
         uses: actions/github-script@v7
         with:
           script: |
