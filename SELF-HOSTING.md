@@ -1,6 +1,6 @@
 # Self-Hosting Guide
 
-SendRec is designed to run on a single server with Docker Compose. A small VPS (2 vCPU, 4 GB RAM) is enough.
+SendRec is designed to run on a single server with Docker Compose. A small VPS (2 vCPU, 4 GB RAM) is sufficient.
 
 ## Quick start
 
