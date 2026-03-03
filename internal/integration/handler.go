@@ -174,7 +174,7 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 	videoID := chi.URLParam(r, "id")
 
 	var title, shareToken string
-	var transcript *string
+	var transcriptJSON []byte
 
 	orgID := auth.OrgIDFromContext(r.Context())
 	var err error
@@ -182,20 +182,20 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		role := auth.OrgRoleFromContext(r.Context())
 		if role == "owner" || role == "admin" {
 			err = h.db.QueryRow(r.Context(),
-				"SELECT title, share_token, transcript FROM videos WHERE id = $1 AND organization_id = $2",
+				"SELECT title, share_token, transcript_json FROM videos WHERE id = $1 AND organization_id = $2",
 				videoID, orgID,
-			).Scan(&title, &shareToken, &transcript)
+			).Scan(&title, &shareToken, &transcriptJSON)
 		} else {
 			err = h.db.QueryRow(r.Context(),
-				"SELECT title, share_token, transcript FROM videos WHERE id = $1 AND user_id = $2 AND organization_id = $3",
+				"SELECT title, share_token, transcript_json FROM videos WHERE id = $1 AND user_id = $2 AND organization_id = $3",
 				videoID, userID, orgID,
-			).Scan(&title, &shareToken, &transcript)
+			).Scan(&title, &shareToken, &transcriptJSON)
 		}
 	} else {
 		err = h.db.QueryRow(r.Context(),
-			"SELECT title, share_token, transcript FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NULL",
+			"SELECT title, share_token, transcript_json FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NULL",
 			videoID, userID,
-		).Scan(&title, &shareToken, &transcript)
+		).Scan(&title, &shareToken, &transcriptJSON)
 	}
 	if err != nil {
 		http.Error(w, "video not found", http.StatusNotFound)
@@ -223,10 +223,7 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 	}
 
 	videoURL := h.baseURL + "/watch/" + shareToken
-	description := ""
-	if transcript != nil {
-		description = truncate(*transcript, 500)
-	}
+	description := extractTranscriptText(transcriptJSON, 500)
 
 	resp, err := creator.CreateIssue(r.Context(), CreateIssueRequest{
 		Title:       title,
@@ -354,9 +351,25 @@ func stringVal(m map[string]any, key string) string {
 	return s
 }
 
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
+func extractTranscriptText(transcriptJSON []byte, maxLen int) string {
+	if len(transcriptJSON) == 0 {
+		return ""
 	}
-	return s[:maxLen]
+	var segments []struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(transcriptJSON, &segments); err != nil {
+		return ""
+	}
+	var result string
+	for _, seg := range segments {
+		if result != "" {
+			result += " "
+		}
+		result += seg.Text
+		if len(result) >= maxLen {
+			return result[:maxLen]
+		}
+	}
+	return result
 }
