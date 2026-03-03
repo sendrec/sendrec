@@ -52,7 +52,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -61,13 +62,31 @@ describe("Settings", () => {
     expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
   });
 
+  it("renders Integrations card", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Integrations")).toBeInTheDocument();
+    });
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
+    expect(screen.getByText("Jira")).toBeInTheDocument();
+  });
+
   it("disables email field", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -81,7 +100,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -96,7 +116,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -117,6 +138,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // PATCH response
     renderSettings();
 
@@ -146,6 +168,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockRejectedValueOnce(new Error("Failed to update name"));
     renderSettings();
 
@@ -169,7 +192,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -192,6 +216,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // PATCH response
     renderSettings();
 
@@ -222,6 +247,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // PATCH response
     renderSettings();
 
@@ -249,7 +275,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "views_and_comments" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -264,7 +291,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -281,6 +309,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -306,6 +335,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -327,7 +357,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: true })
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -341,7 +372,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -357,7 +389,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: true })
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -374,6 +407,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -397,7 +431,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: true })
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -415,7 +450,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -432,7 +468,8 @@ describe("Settings", () => {
         { id: "key-1", name: "My Nextcloud", createdAt: "2026-02-16T10:00:00Z", lastUsedAt: "2026-02-16T12:00:00Z" },
         { id: "key-2", name: "", createdAt: "2026-02-15T10:00:00Z", lastUsedAt: null },
       ])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -449,6 +486,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce({ id: "new-key-1", key: "sr_abc123", name: "Test Key", createdAt: "2026-02-16T10:00:00Z" });
     renderSettings();
 
@@ -476,6 +514,7 @@ describe("Settings", () => {
         { id: "key-1", name: "My Key", createdAt: "2026-02-16T10:00:00Z", lastUsedAt: null },
       ])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // DELETE response
     renderSettings();
 
@@ -499,7 +538,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: true })
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -516,6 +556,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -547,6 +588,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockRejectedValueOnce(new Error("maximum number of API keys reached"));
     renderSettings();
 
@@ -567,7 +609,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -584,6 +627,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -620,6 +664,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // POST test-slack response
     renderSettings();
 
@@ -646,6 +691,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockRejectedValueOnce(new Error("Invalid webhook URL"));
     renderSettings();
 
@@ -672,6 +718,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce(undefined); // PUT response for clear
     renderSettings();
 
@@ -704,7 +751,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -719,7 +767,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -734,7 +783,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -753,7 +803,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -773,7 +824,8 @@ describe("Settings", () => {
         .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null, webhookUrl: null, webhookSecret: null })
         .mockResolvedValueOnce({ brandingEnabled: false })
         .mockResolvedValueOnce([])
-        .mockRejectedValueOnce(new Error("Not Found")); // billing
+        .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
       renderSettings();
 
       await waitFor(() => {
@@ -790,6 +842,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce({ brandingEnabled: false })
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
+        .mockResolvedValueOnce([]) // integrations
         .mockResolvedValueOnce(undefined) // PUT notifications
         .mockResolvedValueOnce({ notificationMode: "off", webhookSecret: "whsec_abc123" }) // GET after save
         .mockResolvedValueOnce([]); // deliveries fetch triggered by savedWebhookUrl change
@@ -832,6 +885,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce({ brandingEnabled: false })
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
+        .mockResolvedValueOnce([]) // integrations
         .mockResolvedValueOnce([
           {
             id: "del-1",
@@ -877,6 +931,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce({ brandingEnabled: false })
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
+        .mockResolvedValueOnce([]) // integrations
         .mockResolvedValueOnce([]) // initial deliveries fetch
         .mockResolvedValueOnce(undefined) // POST test-webhook
         .mockResolvedValueOnce([{ // refreshed deliveries
@@ -911,7 +966,8 @@ describe("Settings", () => {
         .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null, webhookUrl: null, webhookSecret: null })
         .mockResolvedValueOnce({ brandingEnabled: false })
         .mockResolvedValueOnce([])
-        .mockRejectedValueOnce(new Error("Not Found")); // billing
+        .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
       renderSettings();
 
       await waitFor(() => {
@@ -931,6 +987,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce({ brandingEnabled: false })
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
+        .mockResolvedValueOnce([]) // integrations
         .mockResolvedValueOnce([]); // deliveries
       renderSettings();
 
@@ -955,6 +1012,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce({ brandingEnabled: false })
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
+        .mockResolvedValueOnce([]) // integrations
         .mockResolvedValueOnce([]) // deliveries
         .mockResolvedValueOnce({ webhookSecret: "whsec_new" }); // regenerate response
       renderSettings();
@@ -981,7 +1039,8 @@ describe("Settings", () => {
         .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null, webhookUrl: null, webhookSecret: null })
         .mockResolvedValueOnce({ brandingEnabled: false })
         .mockResolvedValueOnce([])
-        .mockRejectedValueOnce(new Error("Not Found")); // billing
+        .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
       renderSettings();
 
       await waitFor(() => {
@@ -1030,7 +1089,8 @@ describe("Settings", () => {
         .mockResolvedValueOnce({ notificationMode: "off" })
         .mockResolvedValueOnce({ maxVideosPerMonth: 25, maxVideoDurationSeconds: 300, videosUsedThisMonth: 10, brandingEnabled: false, aiEnabled: false })
         .mockResolvedValueOnce([])
-        .mockRejectedValueOnce(new Error("Not Found"));
+        .mockRejectedValueOnce(new Error("Not Found")) // billing
+        .mockResolvedValueOnce([]); // integrations
 
       renderSettings();
 
@@ -1084,7 +1144,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: true })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -1098,7 +1159,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -1114,6 +1176,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: true })
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce({ message: "Settings updated" }); // PATCH /api/user
     renderSettings();
 
@@ -1138,7 +1201,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: false, noiseReductionEnabled: true })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -1153,7 +1217,8 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ notificationMode: "off" })
       .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: false, noiseReductionEnabled: false })
       .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(new Error("Not Found")); // billing
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
     renderSettings();
 
     await waitFor(() => {
@@ -1169,6 +1234,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ brandingEnabled: false, transcriptionEnabled: false, noiseReductionEnabled: true })
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
       .mockResolvedValueOnce({ message: "Settings updated" }); // PATCH /api/user
     renderSettings();
 

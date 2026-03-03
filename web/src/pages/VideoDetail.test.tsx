@@ -1277,8 +1277,8 @@ describe("VideoDetail", () => {
     fireEvent.click(within(dialog).getByText("Cancel"));
 
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    // Should not have called delete API (only the initial 7 setup calls)
-    expect(mockApiFetch).toHaveBeenCalledTimes(7);
+    // Should not have called delete API (only the initial 8 setup calls including integrations)
+    expect(mockApiFetch).toHaveBeenCalledTimes(8);
   });
 
   // ─── Toast ────────────────────────────────────────────────────

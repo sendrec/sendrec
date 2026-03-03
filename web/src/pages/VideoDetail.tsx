@@ -233,6 +233,10 @@ export function VideoDetail() {
   const [savingBranding, setSavingBranding] = useState(false);
   const [brandingMessage, setBrandingMessage] = useState("");
 
+  const [integrations, setIntegrations] = useState<{ provider: string }[]>([]);
+  const [issueDropdownOpen, setIssueDropdownOpen] = useState(false);
+  const [creatingIssue, setCreatingIssue] = useState(false);
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -268,6 +272,15 @@ export function VideoDetail() {
               .catch(() => {});
           }
         }
+
+        try {
+          const intgData = await apiFetch<{ provider: string }[]>(
+            "/api/settings/integrations",
+          );
+          if (intgData) setIntegrations(intgData);
+        } catch {
+          /* integrations not configured — ok */
+        }
       } catch {
         if (!video) {
           setNotFound(true);
@@ -288,6 +301,33 @@ export function VideoDetail() {
     setToast(message);
     toastTimer.current = setTimeout(() => setToast(null), 2000);
   }
+
+  async function createIssue(provider: string) {
+    if (!video) return;
+    setCreatingIssue(true);
+    setIssueDropdownOpen(false);
+    try {
+      const result = await apiFetch<{ issueUrl: string; issueKey: string }>(
+        `/api/videos/${video.id}/create-issue`,
+        { method: "POST", body: JSON.stringify({ provider }) },
+      );
+      if (result) {
+        showToast(`Issue created: ${result.issueKey}`);
+        window.open(result.issueUrl, "_blank", "noopener");
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to create issue");
+    } finally {
+      setCreatingIssue(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!issueDropdownOpen) return;
+    const close = () => setIssueDropdownOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [issueDropdownOpen]);
 
   async function refetchVideo() {
     const videos = await apiFetch<Video[]>("/api/videos");
@@ -1026,6 +1066,93 @@ export function VideoDetail() {
             Download
           </a>
         )}
+        {integrations.length > 0 &&
+          (integrations.length === 1 ? (
+            <button
+              onClick={() => createIssue(integrations[0].provider)}
+              className="detail-btn"
+              disabled={creatingIssue}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="8" cy="8" r="6" />
+                <line x1="8" y1="5" x2="8" y2="11" />
+                <line x1="5" y1="8" x2="11" y2="8" />
+              </svg>
+              {creatingIssue
+                ? "Creating..."
+                : `Create ${integrations[0].provider === "github" ? "GitHub" : "Jira"} Issue`}
+            </button>
+          ) : (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIssueDropdownOpen(!issueDropdownOpen);
+                }}
+                className="detail-btn"
+                disabled={creatingIssue}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <circle cx="8" cy="8" r="6" />
+                  <line x1="8" y1="5" x2="8" y2="11" />
+                  <line x1="5" y1="8" x2="11" y2="8" />
+                </svg>
+                {creatingIssue ? "Creating..." : "Create Issue"}
+              </button>
+              {issueDropdownOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    zIndex: 10,
+                    background: "var(--color-surface, #fff)",
+                    border: "1px solid var(--color-border, #ddd)",
+                    borderRadius: "0.5rem",
+                    marginTop: "0.25rem",
+                    minWidth: "160px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  }}
+                >
+                  {integrations.map((intg) => (
+                    <button
+                      key={intg.provider}
+                      onClick={() => createIssue(intg.provider)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: "0.5rem 1rem",
+                        border: "none",
+                        background: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        fontSize: "0.875rem",
+                        color: "inherit",
+                      }}
+                    >
+                      {intg.provider === "github"
+                        ? "GitHub Issue"
+                        : "Jira Issue"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
       </div>
 
       {/* Share Settings */}
