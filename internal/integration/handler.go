@@ -317,21 +317,6 @@ func (h *Handler) preserveOrEncryptTokens(r *http.Request, userID, provider stri
 	return nil
 }
 
-func encryptTokenFields(provider string, config map[string]any, key []byte) error {
-	for _, field := range tokenFields[provider] {
-		val := stringVal(config, field)
-		if val == "" {
-			continue
-		}
-		encrypted, err := Encrypt(key, val)
-		if err != nil {
-			return err
-		}
-		config[field] = encrypted
-	}
-	return nil
-}
-
 func decryptTokenFields(provider string, config map[string]any, key []byte) error {
 	for _, field := range tokenFields[provider] {
 		val := stringVal(config, field)
