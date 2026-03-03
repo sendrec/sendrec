@@ -175,10 +175,28 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 
 	var title, shareToken string
 	var transcript *string
-	err := h.db.QueryRow(r.Context(),
-		"SELECT title, share_token, transcript FROM videos WHERE id = $1 AND user_id = $2",
-		videoID, userID,
-	).Scan(&title, &shareToken, &transcript)
+
+	orgID := auth.OrgIDFromContext(r.Context())
+	var err error
+	if orgID != "" {
+		role := auth.OrgRoleFromContext(r.Context())
+		if role == "owner" || role == "admin" {
+			err = h.db.QueryRow(r.Context(),
+				"SELECT title, share_token, transcript FROM videos WHERE id = $1 AND organization_id = $2",
+				videoID, orgID,
+			).Scan(&title, &shareToken, &transcript)
+		} else {
+			err = h.db.QueryRow(r.Context(),
+				"SELECT title, share_token, transcript FROM videos WHERE id = $1 AND user_id = $2 AND organization_id = $3",
+				videoID, userID, orgID,
+			).Scan(&title, &shareToken, &transcript)
+		}
+	} else {
+		err = h.db.QueryRow(r.Context(),
+			"SELECT title, share_token, transcript FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NULL",
+			videoID, userID,
+		).Scan(&title, &shareToken, &transcript)
+	}
 	if err != nil {
 		http.Error(w, "video not found", http.StatusNotFound)
 		return
