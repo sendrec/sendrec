@@ -15,6 +15,7 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/docs"
 	"github.com/sendrec/sendrec/internal/geoip"
+	"github.com/sendrec/sendrec/internal/integration"
 	"github.com/sendrec/sendrec/internal/organization"
 	"github.com/sendrec/sendrec/internal/ratelimit"
 	"github.com/sendrec/sendrec/internal/video"
@@ -65,6 +66,7 @@ type Server struct {
 	authHandler         *auth.Handler
 	videoHandler        *video.Handler
 	orgHandler          *organization.Handler
+	integrationHandler  *integration.Handler
 	db                  database.DBTX
 	billingHandlers     *billing.Handlers
 	webFS               fs.FS
@@ -145,6 +147,8 @@ func New(cfg Config) *Server {
 		if sender, ok := cfg.EmailSender.(organization.EmailSender); ok {
 			s.orgHandler.SetEmailSender(sender)
 		}
+
+		s.integrationHandler = integration.NewHandler(cfg.DB, integration.DeriveKey(jwtSecret), baseURL)
 	}
 
 	s.routes()
@@ -272,6 +276,12 @@ func (s *Server) routes() {
 				r.Post("/billing/checkout", s.billingHandlers.CreateCheckout)
 				r.Post("/billing/cancel", s.billingHandlers.CancelSubscription)
 			}
+			if s.integrationHandler != nil {
+				r.Get("/integrations", s.integrationHandler.List)
+				r.Put("/integrations/{provider}", s.integrationHandler.Save)
+				r.Delete("/integrations/{provider}", s.integrationHandler.Delete)
+				r.Post("/integrations/{provider}/test", s.integrationHandler.Test)
+			}
 		})
 
 		videoLimiter := ratelimit.NewLimiter(2, 10)
@@ -319,6 +329,9 @@ func (s *Server) routes() {
 			r.Post("/{id}/remove-segments", s.videoHandler.RemoveSegments)
 			r.Post("/{id}/detect-silence", s.videoHandler.DetectSilence)
 			r.Put("/{id}/dismiss-title", s.videoHandler.DismissTitle)
+				if s.integrationHandler != nil {
+					r.Post("/{id}/create-issue", s.integrationHandler.CreateIssue)
+				}
 			})
 		})
 
