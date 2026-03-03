@@ -34,6 +34,8 @@ tags:
     description: Playlist management and sharing
   - name: Billing
     description: Subscription and billing management
+  - name: Integrations
+    description: External service integrations (Jira, GitHub)
 
 components:
   securitySchemes:
@@ -1214,6 +1216,73 @@ components:
       required: [webhookSecret]
       properties:
         webhookSecret:
+          type: string
+
+    IntegrationConfig:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          enum: [jira, github]
+        config:
+          type: object
+          description: Provider-specific configuration (tokens masked in responses)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GitHubConfig:
+      type: object
+      required: [token, owner, repo]
+      properties:
+        token:
+          type: string
+          description: GitHub personal access token
+        owner:
+          type: string
+          description: Repository owner (org or user)
+        repo:
+          type: string
+          description: Repository name
+
+    JiraConfig:
+      type: object
+      required: [base_url, email, api_token, project_key]
+      properties:
+        base_url:
+          type: string
+          description: Jira instance URL
+        email:
+          type: string
+          format: email
+        api_token:
+          type: string
+          description: Jira API token
+        project_key:
+          type: string
+          description: Jira project key
+
+    CreateIssueRequest:
+      type: object
+      required: [provider]
+      properties:
+        provider:
+          type: string
+          enum: [jira, github]
+
+    CreateIssueResponse:
+      type: object
+      properties:
+        issueUrl:
+          type: string
+          format: uri
+        issueKey:
           type: string
 
 paths:
@@ -4413,3 +4482,137 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/integrations:
+    get:
+      tags: [Integrations]
+      operationId: listIntegrations
+      summary: List configured integrations
+      description: Returns all integrations for the authenticated user. Token fields are masked.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of integrations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IntegrationConfig"
+        "401":
+          description: Unauthorized
+
+  /api/settings/integrations/{provider}:
+    put:
+      tags: [Integrations]
+      operationId: saveIntegration
+      summary: Save or update integration config
+      description: Creates or updates the integration configuration for the specified provider. Tokens are encrypted at rest.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [jira, github]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/GitHubConfig"
+                - $ref: "#/components/schemas/JiraConfig"
+      responses:
+        "200":
+          description: Integration saved
+        "400":
+          description: Invalid provider or missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+
+    delete:
+      tags: [Integrations]
+      operationId: deleteIntegration
+      summary: Remove an integration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [jira, github]
+      responses:
+        "204":
+          description: Integration deleted
+        "401":
+          description: Unauthorized
+
+  /api/settings/integrations/{provider}/test:
+    post:
+      tags: [Integrations]
+      operationId: testIntegration
+      summary: Test integration connection
+      description: Validates the stored credentials by connecting to the external provider.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [jira, github]
+      responses:
+        "200":
+          description: Connection successful
+        "400":
+          description: Connection failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Integration not configured
+
+  /api/videos/{id}/create-issue:
+    post:
+      tags: [Integrations]
+      operationId: createIssueFromVideo
+      summary: Create an external issue from a video
+      description: Creates a Jira or GitHub issue pre-populated with the video title, watch URL, and transcript excerpt.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIssueRequest"
+      responses:
+        "200":
+          description: Issue created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateIssueResponse"
+        "404":
+          description: Video or integration not found
+        "502":
+          description: External provider error
