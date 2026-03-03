@@ -1,12 +1,18 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/pashagolub/pgxmock/v4"
+	"github.com/sendrec/sendrec/internal/auth"
 )
 
 func TestJiraCreateIssue(t *testing.T) {
@@ -200,5 +206,117 @@ func TestGitHubValidateConfigBadToken(t *testing.T) {
 	client.baseURL = server.URL
 	if err := client.ValidateConfig(context.Background()); err == nil {
 		t.Error("ValidateConfig should fail with bad token")
+	}
+}
+
+// --- Handler tests ---
+
+func setupHandler(t *testing.T) (*Handler, pgxmock.PgxPoolIface) {
+	t.Helper()
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := NewHandler(mock, DeriveKey("test-secret"), "https://app.sendrec.eu")
+	return h, mock
+}
+
+func withUserCtx(r *http.Request, userID string) *http.Request {
+	return r.WithContext(auth.ContextWithUserID(r.Context(), userID))
+}
+
+func withChiParam(r *http.Request, key, value string) *http.Request {
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add(key, value)
+	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+}
+
+func TestListIntegrations(t *testing.T) {
+	h, mock := setupHandler(t)
+	defer mock.Close()
+
+	rows := pgxmock.NewRows([]string{"id", "provider", "config", "created_at", "updated_at"}).
+		AddRow("int-1", "github", []byte(`{"token":"not-encrypted","owner":"org","repo":"repo"}`), time.Now(), time.Now())
+	mock.ExpectQuery("SELECT id, provider, config, created_at, updated_at FROM user_integrations WHERE user_id").
+		WithArgs("user-1").
+		WillReturnRows(rows)
+
+	req := httptest.NewRequest("GET", "/api/settings/integrations", nil)
+	req = withUserCtx(req, "user-1")
+	w := httptest.NewRecorder()
+	h.List(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSaveIntegration(t *testing.T) {
+	h, mock := setupHandler(t)
+	defer mock.Close()
+
+	mock.ExpectExec("INSERT INTO user_integrations").
+		WithArgs("user-1", "github", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := `{"token":"ghp_test123","owner":"sendrec","repo":"sendrec"}`
+	req := httptest.NewRequest("PUT", "/api/settings/integrations/github", bytes.NewBufferString(body))
+	req = withUserCtx(req, "user-1")
+	req = withChiParam(req, "provider", "github")
+	w := httptest.NewRecorder()
+	h.Save(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDeleteIntegration(t *testing.T) {
+	h, mock := setupHandler(t)
+	defer mock.Close()
+
+	mock.ExpectExec("DELETE FROM user_integrations WHERE user_id").
+		WithArgs("user-1", "github").
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	req := httptest.NewRequest("DELETE", "/api/settings/integrations/github", nil)
+	req = withUserCtx(req, "user-1")
+	req = withChiParam(req, "provider", "github")
+	w := httptest.NewRecorder()
+	h.Delete(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", w.Code)
+	}
+}
+
+func TestSaveInvalidProvider(t *testing.T) {
+	h, mock := setupHandler(t)
+	defer mock.Close()
+
+	req := httptest.NewRequest("PUT", "/api/settings/integrations/notion", bytes.NewBufferString(`{}`))
+	req = withUserCtx(req, "user-1")
+	req = withChiParam(req, "provider", "notion")
+	w := httptest.NewRecorder()
+	h.Save(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestSaveMissingRequiredFields(t *testing.T) {
+	h, mock := setupHandler(t)
+	defer mock.Close()
+
+	body := `{"token":"ghp_test"}`
+	req := httptest.NewRequest("PUT", "/api/settings/integrations/github", bytes.NewBufferString(body))
+	req = withUserCtx(req, "user-1")
+	req = withChiParam(req, "provider", "github")
+	w := httptest.NewRecorder()
+	h.Save(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing fields, got %d", w.Code)
 	}
 }
