@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
@@ -94,7 +95,7 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := encryptTokenFields(provider, config, h.encKey); err != nil {
+	if err := h.preserveOrEncryptTokens(r, userID, provider, config); err != nil {
 		http.Error(w, "encryption error", http.StatusInternalServerError)
 		return
 	}
@@ -269,6 +270,48 @@ func validateConfig(provider string, config map[string]any) error {
 	for _, field := range fields {
 		if stringVal(config, field) == "" {
 			return fmt.Errorf("missing required field: %s", field)
+		}
+	}
+	return nil
+}
+
+func isMasked(val string) bool {
+	return strings.HasSuffix(val, "******")
+}
+
+func (h *Handler) preserveOrEncryptTokens(r *http.Request, userID, provider string, config map[string]any) error {
+	var existing map[string]any
+	for _, field := range tokenFields[provider] {
+		val := stringVal(config, field)
+		if val == "" || !isMasked(val) {
+			continue
+		}
+		if existing == nil {
+			var err error
+			existing, err = h.loadConfig(r, userID, provider)
+			if err != nil {
+				return fmt.Errorf("cannot resolve masked token: no existing config")
+			}
+		}
+	}
+
+	for _, field := range tokenFields[provider] {
+		val := stringVal(config, field)
+		if val == "" {
+			continue
+		}
+		if isMasked(val) && existing != nil {
+			encrypted, err := Encrypt(h.encKey, stringVal(existing, field))
+			if err != nil {
+				return err
+			}
+			config[field] = encrypted
+		} else {
+			encrypted, err := Encrypt(h.encKey, val)
+			if err != nil {
+				return err
+			}
+			config[field] = encrypted
 		}
 	}
 	return nil

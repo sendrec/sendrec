@@ -205,7 +205,21 @@ export function Settings() {
 
       try {
         const intgData = await apiFetch<IntegrationConfig[]>("/api/settings/integrations");
-        if (intgData) setIntegrations(intgData);
+        if (intgData) {
+          setIntegrations(intgData);
+          for (const ig of intgData) {
+            if (ig.provider === "github") {
+              setGhToken(ig.config.token || "");
+              setGhOwner(ig.config.owner || "");
+              setGhRepo(ig.config.repo || "");
+            } else if (ig.provider === "jira") {
+              setJiraBaseUrl(ig.config.base_url || "");
+              setJiraEmail(ig.config.email || "");
+              setJiraApiToken(ig.config.api_token || "");
+              setJiraProjectKey(ig.config.project_key || "");
+            }
+          }
+        }
       } catch { /* integrations endpoint not available — ok */ }
 
       const params = new URLSearchParams(window.location.search);
