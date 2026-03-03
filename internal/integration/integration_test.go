@@ -29,13 +29,15 @@ func TestJiraCreateIssue(t *testing.T) {
 			t.Errorf("expected Basic auth, got %q", authHeader)
 		}
 		var body map[string]any
-		json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
 		fields, _ := body["fields"].(map[string]any)
 		if fields["summary"] != "My Video" {
 			t.Errorf("expected summary 'My Video', got %v", fields["summary"])
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]any{"key": "PROJ-123", "self": server.URL + "/rest/api/3/issue/10001"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"key": "PROJ-123", "self": server.URL + "/rest/api/3/issue/10001"})
 	}))
 	defer server.Close()
 
@@ -57,7 +59,7 @@ func TestJiraCreateIssue(t *testing.T) {
 func TestJiraValidateConfig(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/rest/api/3/myself" {
-			json.NewEncoder(w).Encode(map[string]any{"accountId": "123"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"accountId": "123"})
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -150,12 +152,14 @@ func TestGitHubCreateIssue(t *testing.T) {
 			t.Errorf("unexpected auth: %s", r.Header.Get("Authorization"))
 		}
 		var body map[string]any
-		json.NewDecoder(r.Body).Decode(&body)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
 		if body["title"] != "My Video" {
 			t.Errorf("expected title 'My Video', got %v", body["title"])
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]any{"html_url": "https://github.com/sendrec/sendrec/issues/42", "number": 42})
+		_ = json.NewEncoder(w).Encode(map[string]any{"html_url": "https://github.com/sendrec/sendrec/issues/42", "number": 42})
 	}))
 	defer server.Close()
 
@@ -180,9 +184,9 @@ func TestGitHubValidateConfig(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/user":
-			json.NewEncoder(w).Encode(map[string]any{"login": "testuser"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"login": "testuser"})
 		case "/repos/sendrec/sendrec":
-			json.NewEncoder(w).Encode(map[string]any{"full_name": "sendrec/sendrec"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"full_name": "sendrec/sendrec"})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

@@ -53,7 +53,7 @@ func (c *JiraClient) CreateIssue(ctx context.Context, req CreateIssueRequest) (*
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to Jira")
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if err := checkProviderResponse(resp); err != nil {
 		return nil, err
@@ -84,14 +84,14 @@ func (c *JiraClient) ValidateConfig(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not connect to Jira")
 	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	defer resp.Body.Close() //nolint:errcheck
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return fmt.Errorf("authentication failed, check your email and API token")
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("Jira API error: %d", resp.StatusCode)
+		return fmt.Errorf("jira API error: %d", resp.StatusCode)
 	}
 	return nil
 }
