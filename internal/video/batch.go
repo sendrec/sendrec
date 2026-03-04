@@ -84,6 +84,16 @@ func (h *Handler) BatchDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(deleted) > 0 {
+		ids := make([]string, len(deleted))
+		for i, d := range deleted {
+			ids[i] = d.id
+		}
+		if _, err := h.db.Exec(r.Context(), "DELETE FROM playlist_videos WHERE video_id = ANY($1)", ids); err != nil {
+			slog.Error("batch delete: failed to remove from playlists", "error", err)
+		}
+	}
+
 	for _, d := range deleted {
 		go func(dv deletedVideo) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)

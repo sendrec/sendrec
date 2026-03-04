@@ -1956,6 +1956,9 @@ func TestDelete_Success(t *testing.T) {
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
 		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key", "webcam_key", "transcript_key", "title"}).AddRow(fileKey, (*string)(nil), (*string)(nil), (*string)(nil), "Test Video"))
+	mock.ExpectExec(`DELETE FROM playlist_videos WHERE video_id`).
+		WithArgs(videoID).
+		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Delete("/api/videos/{id}", handler.Delete)
@@ -3454,6 +3457,9 @@ func TestDelete_MarksFilePurgedOnSuccess(t *testing.T) {
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
 		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key", "webcam_key", "transcript_key", "title"}).AddRow(fileKey, (*string)(nil), (*string)(nil), (*string)(nil), "Test Video"))
+	mock.ExpectExec(`DELETE FROM playlist_videos WHERE video_id`).
+		WithArgs(videoID).
+		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	mock.ExpectExec(`UPDATE videos SET file_purged_at`).
 		WithArgs(fileKey).
@@ -3502,6 +3508,9 @@ func TestDelete_CleansUpWebcamFile(t *testing.T) {
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
 		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key", "webcam_key", "transcript_key", "title"}).AddRow(fileKey, (*string)(nil), &webcamKey, (*string)(nil), "Test Video"))
+	mock.ExpectExec(`DELETE FROM playlist_videos WHERE video_id`).
+		WithArgs(videoID).
+		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	mock.ExpectExec(`UPDATE videos SET file_purged_at`).
 		WithArgs(fileKey).
@@ -4529,6 +4538,9 @@ func TestDelete_CleansUpTranscriptFile(t *testing.T) {
 	mock.ExpectQuery(`UPDATE videos SET status = 'deleted'`).
 		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"file_key", "thumbnail_key", "webcam_key", "transcript_key", "title"}).AddRow(fileKey, (*string)(nil), (*string)(nil), &transcriptKey, "Test Video"))
+	mock.ExpectExec(`DELETE FROM playlist_videos WHERE video_id`).
+		WithArgs(videoID).
+		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	mock.ExpectExec(`UPDATE videos SET file_purged_at`).
 		WithArgs(fileKey).

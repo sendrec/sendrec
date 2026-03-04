@@ -28,6 +28,9 @@ func TestBatchDelete_Success(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "thumbnail_key", "webcam_key", "transcript_key", "title"}).
 			AddRow("video-1", "recordings/user1/token1.webm", nil, nil, nil, "Recording 1").
 			AddRow("video-2", "recordings/user1/token2.webm", nil, nil, nil, "Recording 2"))
+	mock.ExpectExec(`DELETE FROM playlist_videos WHERE video_id`).
+		WithArgs([]string{"video-1", "video-2"}).
+		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	body, _ := json.Marshal(batchRequest{VideoIDs: videoIDs})
 
@@ -70,6 +73,9 @@ func TestBatchDelete_PartialOwnership(t *testing.T) {
 		WithArgs(videoIDs, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "thumbnail_key", "webcam_key", "transcript_key", "title"}).
 			AddRow("video-1", "recordings/user1/token1.webm", nil, nil, nil, "Recording 1"))
+	mock.ExpectExec(`DELETE FROM playlist_videos WHERE video_id`).
+		WithArgs([]string{"video-1"}).
+		WillReturnResult(pgxmock.NewResult("DELETE", 0))
 
 	body, _ := json.Marshal(batchRequest{VideoIDs: videoIDs})
 
