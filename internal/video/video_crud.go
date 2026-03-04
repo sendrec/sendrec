@@ -567,6 +567,10 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, err := h.db.Exec(r.Context(), "DELETE FROM playlist_videos WHERE video_id = $1", videoID); err != nil {
+		slog.Error("video: failed to remove from playlists", "videoID", videoID, "error", err)
+	}
+
 	h.dispatchWebhook(userID, webhook.Event{
 		Name:      "video.deleted",
 		Timestamp: time.Now().UTC(),
