@@ -25,6 +25,7 @@ interface Invite {
   id: string;
   email: string;
   role: string;
+  acceptLink?: string;
   expiresAt: string;
   createdAt: string;
 }
@@ -580,6 +581,17 @@ export function OrgSettings() {
                         Role: {invite.role} — Expires {new Date(invite.expiresAt).toLocaleDateString("en-GB")}
                       </span>
                     </div>
+                    {invite.acceptLink && (
+                      <button
+                        type="button"
+                        className="btn btn--secondary btn--danger-sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(invite.acceptLink!);
+                        }}
+                      >
+                        Copy link
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn btn--danger btn--danger-sm"

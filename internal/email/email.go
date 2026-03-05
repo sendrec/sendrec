@@ -42,7 +42,8 @@ func New(cfg Config) *Client {
 
 type txRequest struct {
 	SubscriberEmail string         `json:"subscriber_email"`
-	TemplateID      int            `json:"template_id"`
+	TemplateID      int            `json:"template_id,omitempty"`
+	Body            string         `json:"body,omitempty"`
 	Data            map[string]any `json:"data"`
 	ContentType     string         `json:"content_type"`
 }
@@ -174,20 +175,14 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 		return nil
 	}
 
-	if c.config.CommentTemplateID == 0 {
-		slog.Warn("comment template ID not set, skipping comment notification", "video_title", videoTitle)
-		return nil
-	}
-
 	if !c.isAllowed(toEmail) {
 		return nil
 	}
 
 	c.ensureSubscriber(ctx, toEmail, toName)
 
-	body := txRequest{
+	tx := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.CommentTemplateID,
 		Data: map[string]any{
 			"name":          toName,
 			"videoTitle":    videoTitle,
@@ -198,17 +193,21 @@ func (c *Client) SendCommentNotification(ctx context.Context, toEmail, toName, v
 		ContentType: "html",
 	}
 
-	return c.sendTx(ctx, body)
+	if c.config.CommentTemplateID != 0 {
+		tx.TemplateID = c.config.CommentTemplateID
+	} else {
+		tx.Body = fmt.Sprintf(
+			`<p>Hi %s,</p><p><strong>%s</strong> commented on your video <strong>%s</strong>:</p><blockquote>%s</blockquote><p><a href="%s">View video</a></p>`,
+			toName, commentAuthor, videoTitle, commentBody, watchURL,
+		)
+	}
+
+	return c.sendTx(ctx, tx)
 }
 
 func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, videoTitle, watchURL string, viewCount int) error {
 	if c.config.BaseURL == "" {
 		slog.Warn("email not configured, view notification skipped", "video_title", videoTitle)
-		return nil
-	}
-
-	if c.config.ViewTemplateID == 0 {
-		slog.Warn("view template ID not set, skipping view notification", "video_title", videoTitle)
 		return nil
 	}
 
@@ -218,9 +217,8 @@ func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, vide
 
 	c.ensureSubscriber(ctx, toEmail, toName)
 
-	body := txRequest{
+	tx := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.ViewTemplateID,
 		Data: map[string]any{
 			"name":       toName,
 			"videoTitle": videoTitle,
@@ -231,7 +229,16 @@ func (c *Client) SendViewNotification(ctx context.Context, toEmail, toName, vide
 		ContentType: "html",
 	}
 
-	return c.sendTx(ctx, body)
+	if c.config.ViewTemplateID != 0 {
+		tx.TemplateID = c.config.ViewTemplateID
+	} else {
+		tx.Body = fmt.Sprintf(
+			`<p>Hi %s,</p><p>Your video <strong>%s</strong> has been viewed %d time(s).</p><p><a href="%s">View video</a></p>`,
+			toName, videoTitle, viewCount, watchURL,
+		)
+	}
+
+	return c.sendTx(ctx, tx)
 }
 
 func (c *Client) SendConfirmation(ctx context.Context, toEmail, toName, confirmLink string) error {
@@ -240,18 +247,12 @@ func (c *Client) SendConfirmation(ctx context.Context, toEmail, toName, confirmL
 		return nil
 	}
 
-	if c.config.ConfirmTemplateID == 0 {
-		slog.Warn("confirm template ID not set, skipping confirmation email", "recipient", toEmail)
-		return nil
-	}
-
 	// Confirmation emails bypass the allowlist — they must always be sent,
 	// even on staging/preview, so new users can complete registration.
 	c.ensureSubscriber(ctx, toEmail, toName)
 
-	body := txRequest{
+	tx := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.ConfirmTemplateID,
 		Data: map[string]any{
 			"confirmLink": confirmLink,
 			"name":        toName,
@@ -259,7 +260,16 @@ func (c *Client) SendConfirmation(ctx context.Context, toEmail, toName, confirmL
 		ContentType: "html",
 	}
 
-	return c.sendTx(ctx, body)
+	if c.config.ConfirmTemplateID != 0 {
+		tx.TemplateID = c.config.ConfirmTemplateID
+	} else {
+		tx.Body = fmt.Sprintf(
+			`<p>Hi %s,</p><p>Please confirm your email address by clicking the link below:</p><p><a href="%s">Confirm email</a></p>`,
+			toName, confirmLink,
+		)
+	}
+
+	return c.sendTx(ctx, tx)
 }
 
 func (c *Client) SendWelcome(ctx context.Context, toEmail, toName, dashboardURL string) error {
@@ -268,18 +278,12 @@ func (c *Client) SendWelcome(ctx context.Context, toEmail, toName, dashboardURL 
 		return nil
 	}
 
-	if c.config.WelcomeTemplateID == 0 {
-		slog.Warn("welcome template ID not set, skipping welcome email", "recipient", toEmail)
-		return nil
-	}
-
 	// Welcome emails bypass the allowlist — they are part of the core
 	// onboarding flow and must always be sent after email confirmation.
 	c.ensureSubscriber(ctx, toEmail, toName)
 
-	body := txRequest{
+	tx := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.WelcomeTemplateID,
 		Data: map[string]any{
 			"name":         toName,
 			"dashboardURL": dashboardURL,
@@ -287,7 +291,16 @@ func (c *Client) SendWelcome(ctx context.Context, toEmail, toName, dashboardURL 
 		ContentType: "html",
 	}
 
-	return c.sendTx(ctx, body)
+	if c.config.WelcomeTemplateID != 0 {
+		tx.TemplateID = c.config.WelcomeTemplateID
+	} else {
+		tx.Body = fmt.Sprintf(
+			`<p>Hi %s,</p><p>Welcome to SendRec! Your account is ready.</p><p><a href="%s">Go to dashboard</a></p>`,
+			toName, dashboardURL,
+		)
+	}
+
+	return c.sendTx(ctx, tx)
 }
 
 func (c *Client) SendOnboardingDay2(ctx context.Context, toEmail, toName, dashboardURL string) error {
@@ -296,18 +309,11 @@ func (c *Client) SendOnboardingDay2(ctx context.Context, toEmail, toName, dashbo
 		return nil
 	}
 
-	if c.config.OnboardingDay2TemplateID == 0 {
-		slog.Warn("onboarding day 2 template ID not set, skipping", "recipient", toEmail)
-		return nil
-	}
-
-	// Onboarding emails bypass the allowlist — they are part of the core
-	// onboarding flow and must always be sent.
+	// Onboarding emails bypass the allowlist.
 	c.ensureSubscriber(ctx, toEmail, toName)
 
-	body := txRequest{
+	tx := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.OnboardingDay2TemplateID,
 		Data: map[string]any{
 			"name":         toName,
 			"dashboardURL": dashboardURL,
@@ -315,7 +321,16 @@ func (c *Client) SendOnboardingDay2(ctx context.Context, toEmail, toName, dashbo
 		ContentType: "html",
 	}
 
-	return c.sendTx(ctx, body)
+	if c.config.OnboardingDay2TemplateID != 0 {
+		tx.TemplateID = c.config.OnboardingDay2TemplateID
+	} else {
+		tx.Body = fmt.Sprintf(
+			`<p>Hi %s,</p><p>Ready to share your first video? Record and share in seconds.</p><p><a href="%s">Get started</a></p>`,
+			toName, dashboardURL,
+		)
+	}
+
+	return c.sendTx(ctx, tx)
 }
 
 func (c *Client) SendOnboardingDay7(ctx context.Context, toEmail, toName, dashboardURL string) error {
@@ -324,17 +339,11 @@ func (c *Client) SendOnboardingDay7(ctx context.Context, toEmail, toName, dashbo
 		return nil
 	}
 
-	if c.config.OnboardingDay7TemplateID == 0 {
-		slog.Warn("onboarding day 7 template ID not set, skipping", "recipient", toEmail)
-		return nil
-	}
-
 	// Onboarding emails bypass the allowlist.
 	c.ensureSubscriber(ctx, toEmail, toName)
 
-	body := txRequest{
+	tx := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.OnboardingDay7TemplateID,
 		Data: map[string]any{
 			"name":         toName,
 			"dashboardURL": dashboardURL,
@@ -342,17 +351,21 @@ func (c *Client) SendOnboardingDay7(ctx context.Context, toEmail, toName, dashbo
 		ContentType: "html",
 	}
 
-	return c.sendTx(ctx, body)
+	if c.config.OnboardingDay7TemplateID != 0 {
+		tx.TemplateID = c.config.OnboardingDay7TemplateID
+	} else {
+		tx.Body = fmt.Sprintf(
+			`<p>Hi %s,</p><p>Unlock more with SendRec Pro — longer recordings, custom branding, and more.</p><p><a href="%s">Learn more</a></p>`,
+			toName, dashboardURL,
+		)
+	}
+
+	return c.sendTx(ctx, tx)
 }
 
 func (c *Client) SendDigestNotification(ctx context.Context, toEmail, toName string, videos []DigestVideoSummary) error {
 	if c.config.BaseURL == "" {
 		slog.Warn("email not configured, digest notification skipped")
-		return nil
-	}
-
-	if c.config.ViewTemplateID == 0 {
-		slog.Warn("view template ID not set, skipping digest notification")
 		return nil
 	}
 
@@ -369,9 +382,8 @@ func (c *Client) SendDigestNotification(ctx context.Context, toEmail, toName str
 		totalComments += v.CommentCount
 	}
 
-	body := txRequest{
+	tx := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.ViewTemplateID,
 		Data: map[string]any{
 			"name":          toName,
 			"isDigest":      "true",
@@ -382,7 +394,16 @@ func (c *Client) SendDigestNotification(ctx context.Context, toEmail, toName str
 		ContentType: "html",
 	}
 
-	return c.sendTx(ctx, body)
+	if c.config.ViewTemplateID != 0 {
+		tx.TemplateID = c.config.ViewTemplateID
+	} else {
+		tx.Body = fmt.Sprintf(
+			`<p>Hi %s,</p><p>Your videos received %d view(s) and %d comment(s) this week.</p>`,
+			toName, totalViews, totalComments,
+		)
+	}
+
+	return c.sendTx(ctx, tx)
 }
 
 func (c *Client) SendOrgInvite(ctx context.Context, toEmail, orgName, inviterName, acceptLink string) error {
@@ -391,18 +412,12 @@ func (c *Client) SendOrgInvite(ctx context.Context, toEmail, orgName, inviterNam
 		return nil
 	}
 
-	if c.config.OrgInviteTemplateID == 0 {
-		slog.Warn("org invite template ID not set, skipping org invite email", "recipient", toEmail)
-		return nil
-	}
-
 	// Invite emails bypass the allowlist — they must always be sent
 	// so invited users can join the organization.
 	c.ensureSubscriber(ctx, toEmail, "")
 
-	body := txRequest{
+	tx := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.OrgInviteTemplateID,
 		Data: map[string]any{
 			"orgName":     orgName,
 			"inviterName": inviterName,
@@ -411,7 +426,16 @@ func (c *Client) SendOrgInvite(ctx context.Context, toEmail, orgName, inviterNam
 		ContentType: "html",
 	}
 
-	return c.sendTx(ctx, body)
+	if c.config.OrgInviteTemplateID != 0 {
+		tx.TemplateID = c.config.OrgInviteTemplateID
+	} else {
+		tx.Body = fmt.Sprintf(
+			`<p>Hi,</p><p><strong>%s</strong> has invited you to join <strong>%s</strong> on SendRec.</p><p><a href="%s">Accept invitation</a></p>`,
+			inviterName, orgName, acceptLink,
+		)
+	}
+
+	return c.sendTx(ctx, tx)
 }
 
 // RetentionVideoSummary represents a single video in a retention warning email.
@@ -426,18 +450,12 @@ func (c *Client) SendRetentionWarning(ctx context.Context, toEmail string, video
 		return nil
 	}
 
-	if c.config.RetentionWarningTemplateID == 0 {
-		slog.Warn("retention warning template ID not set, skipping retention warning email", "recipient", toEmail)
-		return nil
-	}
-
 	// Retention warning emails bypass the allowlist — they are critical
 	// notifications that must always be sent before video deletion.
 	c.ensureSubscriber(ctx, toEmail, "")
 
-	body := txRequest{
+	tx := txRequest{
 		SubscriberEmail: toEmail,
-		TemplateID:      c.config.RetentionWarningTemplateID,
 		Data: map[string]any{
 			"videos":     videos,
 			"expiryDate": expiryDate,
@@ -445,5 +463,18 @@ func (c *Client) SendRetentionWarning(ctx context.Context, toEmail string, video
 		ContentType: "html",
 	}
 
-	return c.sendTx(ctx, body)
+	if c.config.RetentionWarningTemplateID != 0 {
+		tx.TemplateID = c.config.RetentionWarningTemplateID
+	} else {
+		var titles []string
+		for _, v := range videos {
+			titles = append(titles, v.Title)
+		}
+		tx.Body = fmt.Sprintf(
+			`<p>Hi,</p><p>The following videos will be deleted on <strong>%s</strong>: %s.</p><p>Upgrade your plan to keep them.</p>`,
+			expiryDate, strings.Join(titles, ", "),
+		)
+	}
+
+	return c.sendTx(ctx, tx)
 }

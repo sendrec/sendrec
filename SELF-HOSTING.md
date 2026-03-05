@@ -270,17 +270,23 @@ Enable subscription billing with [Creem](https://creem.io) (EU merchant of recor
 
 ### Email notifications (optional)
 
+SendRec uses [Listmonk](https://listmonk.app) for transactional emails. Only the base URL and credentials are required — all template IDs are optional. When a template ID is not set, a plain HTML fallback email is sent automatically.
+
 | Variable | Description |
 |----------|-------------|
 | `LISTMONK_BASE_URL` | Listmonk instance URL |
 | `LISTMONK_USERNAME` | Listmonk API username |
 | `LISTMONK_PASSWORD` | Listmonk API password |
-| `LISTMONK_TEMPLATE_ID` | Template ID for share link emails |
-| `LISTMONK_COMMENT_TEMPLATE_ID` | Template ID for new comment notifications |
-| `LISTMONK_VIEW_TEMPLATE_ID` | Template ID for view notifications (instant and digest) |
-| `LISTMONK_CONFIRM_TEMPLATE_ID` | Template ID for email confirmation on signup. Template variables: `{{ .Tx.Data.name }}`, `{{ .Tx.Data.confirmLink }}`. Confirmation emails bypass the allowlist and are always sent |
-| `LISTMONK_WELCOME_TEMPLATE_ID` | Template ID for the welcome email sent after email confirmation. Template variables: `{{ .Tx.Data.name }}`, `{{ .Tx.Data.dashboardURL }}`. Bypasses the allowlist |
-| `EMAIL_ALLOWLIST` | Comma-separated list of allowed recipient domains (`@example.com`) and addresses (`alice@example.com`). When set, emails are only sent to matching recipients (except confirmation and welcome emails). Useful for staging/preview environments |
+| `LISTMONK_TEMPLATE_ID` | Template ID for share link emails (optional — fallback sends plain email) |
+| `LISTMONK_COMMENT_TEMPLATE_ID` | Template ID for new comment notifications (optional) |
+| `LISTMONK_VIEW_TEMPLATE_ID` | Template ID for view notifications and weekly digest (optional) |
+| `LISTMONK_CONFIRM_TEMPLATE_ID` | Template ID for email confirmation on signup (optional). Template variables: `{{ .Tx.Data.name }}`, `{{ .Tx.Data.confirmLink }}`. Confirmation emails bypass the allowlist |
+| `LISTMONK_WELCOME_TEMPLATE_ID` | Template ID for the welcome email after email confirmation (optional). Template variables: `{{ .Tx.Data.name }}`, `{{ .Tx.Data.dashboardURL }}`. Bypasses the allowlist |
+| `LISTMONK_ONBOARDING_DAY2_TEMPLATE_ID` | Template ID for day 2 onboarding email (optional). Bypasses the allowlist |
+| `LISTMONK_ONBOARDING_DAY7_TEMPLATE_ID` | Template ID for day 7 onboarding email (optional). Bypasses the allowlist |
+| `LISTMONK_ORG_INVITE_TEMPLATE_ID` | Template ID for workspace invitation emails (optional). Template variables: `{{ .Tx.Data.orgName }}`, `{{ .Tx.Data.inviterName }}`, `{{ .Tx.Data.acceptLink }}`. Bypasses the allowlist |
+| `LISTMONK_RETENTION_WARNING_TEMPLATE_ID` | Template ID for data retention warning emails (optional). Template variables: `{{ .Tx.Data.videos }}`, `{{ .Tx.Data.expiryDate }}`. Bypasses the allowlist |
+| `EMAIL_ALLOWLIST` | Comma-separated list of allowed recipient domains (`@example.com`) and addresses (`alice@example.com`). When set, emails are only sent to matching recipients (except confirmation, welcome, onboarding, invite, and retention emails). Useful for staging/preview environments |
 
 ## S3_PUBLIC_ENDPOINT explained
 

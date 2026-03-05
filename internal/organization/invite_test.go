@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,6 +112,12 @@ func TestSendInvite(t *testing.T) {
 	}
 	if emailMock.inviter != "Alice" {
 		t.Errorf("expected inviter name %q, got %q", "Alice", emailMock.inviter)
+	}
+	if resp.AcceptLink == "" {
+		t.Error("expected acceptLink in response")
+	}
+	if !strings.Contains(resp.AcceptLink, "/invites/accept?token=") {
+		t.Errorf("expected acceptLink to contain invite path, got %q", resp.AcceptLink)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

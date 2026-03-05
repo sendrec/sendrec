@@ -130,11 +130,15 @@ func TestSendCommentNotification_UsesCommentTemplateID(t *testing.T) {
 	}
 }
 
-func TestSendCommentNotification_LogsWarningWhenTemplateIDZero(t *testing.T) {
-	serverHit := false
-
+func TestSendCommentNotification_FallbackBodyWhenTemplateIDZero(t *testing.T) {
+	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serverHit = true
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &received)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -143,18 +147,19 @@ func TestSendCommentNotification_LogsWarningWhenTemplateIDZero(t *testing.T) {
 		BaseURL:           srv.URL,
 		Username:          "user",
 		Password:          "pass",
-		TemplateID:        10,
 		CommentTemplateID: 0,
 	})
 
 	err := client.SendCommentNotification(context.Background(),
 		"alice@example.com", "Alice", "My Video", "Bob", "Nice video!", "https://example.com/watch/abc")
 	if err != nil {
-		t.Fatalf("expected nil error when CommentTemplateID is zero, got: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if serverHit {
-		t.Error("expected no HTTP request when CommentTemplateID is zero")
+	if received.TemplateID != 0 {
+		t.Errorf("expected template_id=0, got %d", received.TemplateID)
+	}
+	if received.Body == "" {
+		t.Error("expected inline body when template ID is zero")
 	}
 }
 
@@ -241,10 +246,15 @@ func TestSendViewNotification_Success(t *testing.T) {
 	}
 }
 
-func TestSendViewNotification_SkipsWhenTemplateIDZero(t *testing.T) {
-	serverHit := false
+func TestSendViewNotification_FallbackBodyWhenTemplateIDZero(t *testing.T) {
+	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serverHit = true
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &received)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -261,8 +271,11 @@ func TestSendViewNotification_SkipsWhenTemplateIDZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if serverHit {
-		t.Error("expected no HTTP request when ViewTemplateID is zero")
+	if received.TemplateID != 0 {
+		t.Errorf("expected template_id=0, got %d", received.TemplateID)
+	}
+	if received.Body == "" {
+		t.Error("expected inline body when template ID is zero")
 	}
 }
 
@@ -564,10 +577,15 @@ func TestSendConfirmation_BypassesAllowlist(t *testing.T) {
 	}
 }
 
-func TestSendConfirmation_SkipsWhenTemplateIDZero(t *testing.T) {
-	serverHit := false
+func TestSendConfirmation_FallbackBodyWhenTemplateIDZero(t *testing.T) {
+	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serverHit = true
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &received)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -584,8 +602,11 @@ func TestSendConfirmation_SkipsWhenTemplateIDZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if serverHit {
-		t.Error("expected no HTTP request when ConfirmTemplateID is zero")
+	if received.TemplateID != 0 {
+		t.Errorf("expected template_id=0, got %d", received.TemplateID)
+	}
+	if received.Body == "" {
+		t.Error("expected inline body when template ID is zero")
 	}
 }
 
@@ -634,10 +655,15 @@ func TestSendWelcome_Success(t *testing.T) {
 	}
 }
 
-func TestSendWelcome_SkipsWhenTemplateIDZero(t *testing.T) {
-	serverHit := false
+func TestSendWelcome_FallbackBodyWhenTemplateIDZero(t *testing.T) {
+	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serverHit = true
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &received)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -654,8 +680,11 @@ func TestSendWelcome_SkipsWhenTemplateIDZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if serverHit {
-		t.Error("expected no HTTP request when WelcomeTemplateID is zero")
+	if received.TemplateID != 0 {
+		t.Errorf("expected template_id=0, got %d", received.TemplateID)
+	}
+	if received.Body == "" {
+		t.Error("expected inline body when template ID is zero")
 	}
 }
 
@@ -741,10 +770,15 @@ func TestSendOnboardingDay2_Success(t *testing.T) {
 	}
 }
 
-func TestSendOnboardingDay2_SkipsWhenTemplateIDZero(t *testing.T) {
-	serverHit := false
+func TestSendOnboardingDay2_FallbackBodyWhenTemplateIDZero(t *testing.T) {
+	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serverHit = true
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &received)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -761,8 +795,11 @@ func TestSendOnboardingDay2_SkipsWhenTemplateIDZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if serverHit {
-		t.Error("expected no HTTP request when OnboardingDay2TemplateID is zero")
+	if received.TemplateID != 0 {
+		t.Errorf("expected template_id=0, got %d", received.TemplateID)
+	}
+	if received.Body == "" {
+		t.Error("expected inline body when template ID is zero")
 	}
 }
 
@@ -848,10 +885,15 @@ func TestSendOnboardingDay7_Success(t *testing.T) {
 	}
 }
 
-func TestSendOnboardingDay7_SkipsWhenTemplateIDZero(t *testing.T) {
-	serverHit := false
+func TestSendOnboardingDay7_FallbackBodyWhenTemplateIDZero(t *testing.T) {
+	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serverHit = true
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &received)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -868,8 +910,11 @@ func TestSendOnboardingDay7_SkipsWhenTemplateIDZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if serverHit {
-		t.Error("expected no HTTP request when OnboardingDay7TemplateID is zero")
+	if received.TemplateID != 0 {
+		t.Errorf("expected template_id=0, got %d", received.TemplateID)
+	}
+	if received.Body == "" {
+		t.Error("expected inline body when template ID is zero")
 	}
 }
 
@@ -972,10 +1017,15 @@ func TestSendRetentionWarning_Success(t *testing.T) {
 	}
 }
 
-func TestSendRetentionWarning_SkipsWhenTemplateIDZero(t *testing.T) {
-	serverHit := false
+func TestSendRetentionWarning_FallbackBodyWhenTemplateIDZero(t *testing.T) {
+	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serverHit = true
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &received)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -992,8 +1042,11 @@ func TestSendRetentionWarning_SkipsWhenTemplateIDZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if serverHit {
-		t.Error("expected no HTTP request when RetentionWarningTemplateID is zero")
+	if received.TemplateID != 0 {
+		t.Errorf("expected template_id=0, got %d", received.TemplateID)
+	}
+	if received.Body == "" {
+		t.Error("expected inline body when template ID is zero")
 	}
 }
 
