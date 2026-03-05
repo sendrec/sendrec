@@ -39,14 +39,14 @@ func newOIDCTestServer(t *testing.T) (*httptest.Server, *rsa.PrivateKey) {
 			"id_token_signing_alg_values_supported": []string{"RS256"},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(discovery)
+		_ = json.NewEncoder(w).Encode(discovery)
 	})
 
 	mux.HandleFunc("GET /jwks", func(w http.ResponseWriter, r *http.Request) {
 		jwk := jose.JSONWebKey{Key: &privateKey.PublicKey, KeyID: "test-key", Algorithm: "RS256", Use: "sig"}
 		jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{jwk}}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(jwks)
+		_ = json.NewEncoder(w).Encode(jwks)
 	})
 
 	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +89,7 @@ func newOIDCTestServer(t *testing.T) (*httptest.Server, *rsa.PrivateKey) {
 			"id_token":     rawToken,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	})
 
 	mux.HandleFunc("GET /userinfo", func(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +99,7 @@ func newOIDCTestServer(t *testing.T) (*httptest.Server, *rsa.PrivateKey) {
 			"name":  "OIDC User",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	})
 
 	server := httptest.NewServer(mux)
