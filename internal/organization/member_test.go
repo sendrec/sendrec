@@ -363,3 +363,46 @@ func TestUpdateMemberRole_Self(t *testing.T) {
 		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
 }
+
+func TestUpdateMemberRole_ToViewer(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, testBaseURL)
+	orgID := "org-1"
+
+	mock.ExpectQuery(`SELECT role FROM organization_members WHERE organization_id = \$1 AND user_id = \$2`).
+		WithArgs(orgID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("owner"))
+
+	mock.ExpectExec(`UPDATE organization_members SET role = \$1 WHERE organization_id = \$2 AND user_id = \$3`).
+		WithArgs("viewer", orgID, testTargetUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body, _ := json.Marshal(updateRoleRequest{Role: "viewer"})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/organizations/{orgId}/members/{userId}/role", handler.UpdateMemberRole)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/organizations/"+orgID+"/members/"+testTargetUserID+"/role", body))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp["role"] != "viewer" {
+		t.Errorf("expected role %q, got %q", "viewer", resp["role"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}

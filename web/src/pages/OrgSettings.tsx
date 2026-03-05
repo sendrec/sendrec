@@ -31,7 +31,7 @@ interface Invite {
 
 interface OrgBilling {
   plan: string;
-  effectivePlan: string;
+  planInherited: boolean;
   subscriptionStatus?: string;
   portalUrl?: string;
 }
@@ -43,7 +43,7 @@ interface SsoConfig {
   enforceSso: boolean;
 }
 
-const ROLES = ["member", "admin", "owner"] as const;
+const ROLES = ["viewer", "member", "admin", "owner"] as const;
 
 export function OrgSettings() {
   const { id: orgId } = useParams<{ id: string }>();
@@ -130,10 +130,10 @@ export function OrgSettings() {
         setInvites((inviteData as Invite[]) ?? []);
         setBilling(billingData as OrgBilling | null);
 
-        const effectivePlan = (billingData as OrgBilling | null)?.effectivePlan ?? orgData?.subscriptionPlan;
-        if (effectivePlan === "business") {
+        const billingPlan = (billingData as OrgBilling | null)?.plan ?? orgData?.subscriptionPlan;
+        if (billingPlan === "business") {
           try {
-            const ssoData = await apiFetch<SsoConfig>("/api/settings/sso");
+            const ssoData = await apiFetch<SsoConfig>(`/api/organizations/${orgId}/sso`);
             if (ssoData) {
               setSsoIssuerUrl(ssoData.issuerUrl || "");
               setSsoClientId(ssoData.clientId || "");
@@ -346,7 +346,7 @@ export function OrgSettings() {
     setSsoMessage("");
     setSavingSso(true);
     try {
-      await apiFetch("/api/settings/sso", {
+      await apiFetch(`/api/organizations/${orgId}/sso`, {
         method: "PUT",
         body: JSON.stringify({
           issuerUrl: ssoIssuerUrl.trim(),
@@ -376,7 +376,7 @@ export function OrgSettings() {
         setSsoError("");
         setSsoMessage("");
         try {
-          await apiFetch("/api/settings/sso", { method: "DELETE" });
+          await apiFetch(`/api/organizations/${orgId}/sso`, { method: "DELETE" });
           setSsoIssuerUrl("");
           setSsoClientId("");
           setSsoClientSecret("");
@@ -547,6 +547,7 @@ export function OrgSettings() {
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value)}
               >
+                <option value="viewer">Viewer</option>
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
               </select>
@@ -598,18 +599,18 @@ export function OrgSettings() {
         <div className="card settings-section">
           <div className="card-header">
             <h2>Billing</h2>
-            <span className={`plan-badge ${billing.effectivePlan !== "free" ? "plan-badge--pro" : ""}`}>
-              {billing.effectivePlan === "business" ? "Business" : billing.effectivePlan === "pro" ? "Pro" : "Free"}
+            <span className={`plan-badge ${billing.plan !== "free" ? "plan-badge--pro" : ""}`}>
+              {billing.plan === "business" ? "Business" : billing.plan === "pro" ? "Pro" : "Free"}
             </span>
           </div>
 
-          {billing.plan === "free" && billing.effectivePlan !== billing.plan && (
+          {billing.planInherited && (
             <p className="card-description">
-              This workspace has {billing.effectivePlan === "business" ? "Business" : "Pro"} features through your personal subscription. No separate workspace upgrade needed.
+              Inherited from your personal plan. Upgrade the workspace directly for independent billing.
             </p>
           )}
 
-          {billing.plan === "free" && billing.effectivePlan === billing.plan && !billing.subscriptionStatus && (
+          {billing.plan === "free" && !billing.planInherited && !billing.subscriptionStatus && (
             <>
               <p className="card-description">
                 Upgrade for unlimited videos and recording duration.
@@ -731,7 +732,7 @@ export function OrgSettings() {
         </div>
       )}
 
-      {canManage && (billing?.effectivePlan === "business" || org.subscriptionPlan === "business") && (
+      {canManage && (billing?.plan === "business" || org.subscriptionPlan === "business") && (
         <form onSubmit={handleSsoSave} className="card settings-section">
           <h2>Single Sign-On</h2>
           <p className="card-description">

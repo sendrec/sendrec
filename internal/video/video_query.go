@@ -182,7 +182,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 			maxOrgMembers = 0
 		}
 		_ = h.db.QueryRow(r.Context(),
-			`SELECT COUNT(*) FROM organization_members WHERE organization_id = $1`,
+			`SELECT COUNT(*) FROM organization_members WHERE organization_id = $1 AND role != 'viewer'`,
 			orgID,
 		).Scan(&orgMembersUsed)
 	}
@@ -546,24 +546,14 @@ func (h *Handler) countVideosThisMonth(ctx context.Context, userID string) (int,
 }
 
 func (h *Handler) getOrgPlan(ctx context.Context, orgID string) (string, error) {
-	var orgPlan, ownerPlan string
+	var plan string
 	err := h.db.QueryRow(ctx,
-		`SELECT o.subscription_plan, COALESCE(u.subscription_plan, 'free')
-		 FROM organizations o
-		 LEFT JOIN organization_members om ON om.organization_id = o.id AND om.role = 'owner'
-		 LEFT JOIN users u ON u.id = om.user_id
-		 WHERE o.id = $1
-		 ORDER BY CASE u.subscription_plan WHEN 'business' THEN 2 WHEN 'pro' THEN 1 ELSE 0 END DESC
-		 LIMIT 1`,
-		orgID,
-	).Scan(&orgPlan, &ownerPlan)
+		"SELECT subscription_plan FROM organizations WHERE id = $1", orgID,
+	).Scan(&plan)
 	if err != nil {
 		return "free", err
 	}
-	if plans.Rank(ownerPlan) > plans.Rank(orgPlan) {
-		return ownerPlan, nil
-	}
-	return orgPlan, nil
+	return plan, nil
 }
 
 func orgScope(ctx context.Context) *string {

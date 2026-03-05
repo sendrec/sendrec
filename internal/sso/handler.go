@@ -276,8 +276,6 @@ func newTokenID() (string, error) {
 	return hex.EncodeToString(b[:]), nil
 }
 
-// --- Workspace SSO Config CRUD (Task 6) ---
-
 type ssoConfigRequest struct {
 	IssuerURL    string `json:"issuerUrl"`
 	ClientID     string `json:"clientId"`
@@ -296,14 +294,15 @@ type ssoConfigResponse struct {
 
 // SaveConfig upserts the workspace SSO configuration for the caller's organization.
 func (h *Handler) SaveConfig(w http.ResponseWriter, r *http.Request) {
-	orgID := auth.OrgIDFromContext(r.Context())
-	if orgID == "" {
-		httputil.WriteError(w, http.StatusBadRequest, "organization context required")
-		return
-	}
+	userID := auth.UserIDFromContext(r.Context())
+	orgID := chi.URLParam(r, "orgId")
 
-	role := auth.OrgRoleFromContext(r.Context())
-	if role != "owner" && role != "admin" {
+	var role string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+		orgID, userID,
+	).Scan(&role)
+	if err != nil || (role != "owner" && role != "admin") {
 		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
 		return
 	}
@@ -361,11 +360,7 @@ func (h *Handler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 
 // GetConfig returns the workspace SSO configuration for the caller's organization.
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
-	orgID := auth.OrgIDFromContext(r.Context())
-	if orgID == "" {
-		httputil.WriteError(w, http.StatusBadRequest, "organization context required")
-		return
-	}
+	orgID := chi.URLParam(r, "orgId")
 
 	var provider, issuerURL, clientID string
 	var enforceSSO bool
@@ -386,7 +381,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, ssoConfigResponse{
 		Provider:     provider,
 		IssuerURL:    issuerURL,
-		ClientID:     integration.MaskToken(clientID),
+		ClientID:     clientID,
 		ClientSecret: "******",
 		EnforceSSO:   enforceSSO,
 		Configured:   true,
@@ -395,14 +390,15 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 
 // DeleteConfig removes the workspace SSO configuration for the caller's organization.
 func (h *Handler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
-	orgID := auth.OrgIDFromContext(r.Context())
-	if orgID == "" {
-		httputil.WriteError(w, http.StatusBadRequest, "organization context required")
-		return
-	}
+	userID := auth.UserIDFromContext(r.Context())
+	orgID := chi.URLParam(r, "orgId")
 
-	role := auth.OrgRoleFromContext(r.Context())
-	if role != "owner" {
+	var role string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+		orgID, userID,
+	).Scan(&role)
+	if err != nil || role != "owner" {
 		httputil.WriteError(w, http.StatusForbidden, "owner role required")
 		return
 	}
@@ -418,8 +414,6 @@ func (h *Handler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 
 	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
-
-// --- Workspace SSO Login Flow (Task 7) ---
 
 // InitiateOrgSSO starts the SSO flow for a user based on their email's
 // organization membership. It looks up the SSO config for the organization
@@ -457,7 +451,7 @@ func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 		IssuerURL:    issuerURL,
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		RedirectURL:  h.baseURL + "/api/sso/org/callback",
+		RedirectURL:  h.baseURL + "/api/auth/sso/org/callback",
 	})
 	if err != nil {
 		slog.Error("sso: failed to create OIDC provider", "error", err)
@@ -569,7 +563,7 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 		IssuerURL:    issuerURL,
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		RedirectURL:  h.baseURL + "/api/sso/org/callback",
+		RedirectURL:  h.baseURL + "/api/auth/sso/org/callback",
 	})
 	if err != nil {
 		slog.Error("sso: failed to create OIDC provider for callback", "error", err)
@@ -612,8 +606,6 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
-// --- Connected Accounts API (Task 9) ---
-
 type identityResponse struct {
 	Provider   string    `json:"provider"`
 	ExternalID string    `json:"externalId"`
@@ -649,6 +641,11 @@ func (h *Handler) ListIdentities(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		identities = append(identities, identity)
+	}
+	if err := rows.Err(); err != nil {
+		slog.Error("sso: rows iteration error", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to list identities")
+		return
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, identities)

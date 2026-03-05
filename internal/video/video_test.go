@@ -6615,14 +6615,14 @@ func authenticatedOrgRequest(t *testing.T, method, target string, body []byte) *
 	return req.WithContext(ctx)
 }
 
-func expectOrgPlanQuery(mock pgxmock.PgxPoolIface, orgPlan, ownerPlan string) {
-	mock.ExpectQuery(`SELECT o.subscription_plan`).
+func expectOrgPlanQuery(mock pgxmock.PgxPoolIface, orgPlan string) {
+	mock.ExpectQuery(`SELECT subscription_plan FROM organizations WHERE id`).
 		WithArgs(testOrgID).
-		WillReturnRows(pgxmock.NewRows([]string{"subscription_plan", "subscription_plan"}).
-			AddRow(orgPlan, ownerPlan))
+		WillReturnRows(pgxmock.NewRows([]string{"subscription_plan"}).
+			AddRow(orgPlan))
 }
 
-func TestLimits_OrgFreeWithProOwner(t *testing.T) {
+func TestLimits_OrgProInherited(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -6632,8 +6632,8 @@ func TestLimits_OrgFreeWithProOwner(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
 
-	expectOrgPlanQuery(mock, "free", "pro")
-	// Pro effective plan → unlimited videos, playlists
+	expectOrgPlanQuery(mock, "pro")
+	// Pro plan → unlimited videos, playlists
 	// getUserPlan for org member limits
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
@@ -6672,7 +6672,7 @@ func TestLimits_OrgFreeWithProOwner(t *testing.T) {
 	}
 }
 
-func TestLimits_OrgProWithFreeOwner(t *testing.T) {
+func TestLimits_OrgProOwnSubscription(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -6682,8 +6682,8 @@ func TestLimits_OrgProWithFreeOwner(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
 
-	expectOrgPlanQuery(mock, "pro", "free")
-	// Pro effective plan → unlimited
+	expectOrgPlanQuery(mock, "pro")
+	// Pro plan → unlimited
 	expectPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
 		WithArgs(testOrgID).
@@ -6715,7 +6715,7 @@ func TestLimits_OrgProWithFreeOwner(t *testing.T) {
 	}
 }
 
-func TestLimits_OrgFreeWithFreeOwner(t *testing.T) {
+func TestLimits_OrgFree(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -6725,7 +6725,7 @@ func TestLimits_OrgFreeWithFreeOwner(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
 
-	expectOrgPlanQuery(mock, "free", "free")
+	expectOrgPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos WHERE organization_id`).
 		WithArgs(testOrgID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(5))

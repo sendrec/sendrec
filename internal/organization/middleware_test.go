@@ -207,3 +207,66 @@ func TestRequireRole_Denied(t *testing.T) {
 		t.Errorf("expected error %q, got %q", "insufficient permissions", errResp.Error)
 	}
 }
+
+func TestRequireWriter_BlocksViewer(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/videos", nil)
+	ctx := auth.ContextWithOrg(req.Context(), "org-1", "viewer")
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler := RequireWriter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("next handler should not be called for viewer")
+	}))
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "viewers cannot perform this action" {
+		t.Errorf("expected error %q, got %q", "viewers cannot perform this action", errMsg)
+	}
+}
+
+func TestRequireWriter_AllowsMember(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/videos", nil)
+	ctx := auth.ContextWithOrg(req.Context(), "org-1", "member")
+	req = req.WithContext(ctx)
+
+	var calledNext bool
+	rec := httptest.NewRecorder()
+	handler := RequireWriter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calledNext = true
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}))
+	handler.ServeHTTP(rec, req)
+
+	if !calledNext {
+		t.Fatal("expected next handler to be called for member")
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+}
+
+func TestRequireWriter_AllowsPersonal(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/videos", nil)
+
+	var calledNext bool
+	rec := httptest.NewRecorder()
+	handler := RequireWriter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calledNext = true
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}))
+	handler.ServeHTTP(rec, req)
+
+	if !calledNext {
+		t.Fatal("expected next handler to be called for personal context")
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+}

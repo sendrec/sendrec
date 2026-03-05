@@ -178,8 +178,8 @@ func (h *Handler) UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Role != "admin" && req.Role != "member" {
-		httputil.WriteError(w, http.StatusBadRequest, "role must be admin or member")
+	if req.Role != "admin" && req.Role != "member" && req.Role != "viewer" {
+		httputil.WriteError(w, http.StatusBadRequest, "role must be admin, member, or viewer")
 		return
 	}
 

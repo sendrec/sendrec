@@ -415,4 +415,40 @@ describe("Layout", () => {
     const { container } = renderLayout();
     await expectNoA11yViolations(container);
   });
+
+  it("hides Record link when viewer role", () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "viewer", memberCount: 3 },
+      ],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "viewer", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
+      loading: false,
+    });
+    renderLayout();
+    expect(screen.queryByRole("link", { name: "Record" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Library" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Playlists" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Analytics" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
+  });
+
+  it("shows Record link for member role", () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "member", memberCount: 3 },
+      ],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "member", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
+      loading: false,
+    });
+    renderLayout();
+    expect(screen.getByRole("link", { name: "Record" })).toBeInTheDocument();
+  });
 });

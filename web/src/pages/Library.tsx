@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { TransferDialog } from "../components/TransferDialog";
+import { useOrganization } from "../hooks/useOrganization";
 import { LimitsResponse } from "../types/limits";
 
 interface Video {
@@ -90,6 +92,8 @@ function expiryLabel(shareExpiresAt: string | null): { text: string; expired: bo
 }
 
 export function Library() {
+  const { selectedOrg } = useOrganization();
+  const isViewer = selectedOrg?.role === "viewer";
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -115,6 +119,7 @@ export function Library() {
   const [sidebarMenuId, setSidebarMenuId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+  const [transferVideoId, setTransferVideoId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     message: string;
     onConfirm: () => void;
@@ -478,35 +483,39 @@ export function Library() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-          <Link
-            to="/"
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-text)",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            Record
-          </Link>
-          <Link
-            to="/?tab=upload"
-            style={{
-              background: "transparent",
-              color: "var(--color-accent)",
-              border: "1px solid var(--color-accent)",
-              borderRadius: 8,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            Upload
-          </Link>
+          {!isViewer && (
+            <>
+              <Link
+                to="/"
+                style={{
+                  background: "var(--color-accent)",
+                  color: "var(--color-text)",
+                  borderRadius: 8,
+                  padding: "10px 24px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
+              >
+                Record
+              </Link>
+              <Link
+                to="/?tab=upload"
+                style={{
+                  background: "transparent",
+                  color: "var(--color-accent)",
+                  border: "1px solid var(--color-accent)",
+                  borderRadius: 8,
+                  padding: "10px 24px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
+              >
+                Upload
+              </Link>
+            </>
+          )}
         </div>
         {limits && limits.maxVideosPerMonth > 0 && (
           <p style={{ color: "var(--color-text-secondary)", fontSize: 13, marginTop: 16 }}>
@@ -690,13 +699,15 @@ export function Library() {
           onChange={(e) => handleSearchChange(e.target.value)}
           className="library-search"
         />
-        <Link
-          to="/"
-          className="detail-btn detail-btn--accent"
-          style={{ textDecoration: "none", whiteSpace: "nowrap" }}
-        >
-          New Recording
-        </Link>
+        {!isViewer && (
+          <Link
+            to="/"
+            className="detail-btn detail-btn--accent"
+            style={{ textDecoration: "none", whiteSpace: "nowrap" }}
+          >
+            New Recording
+          </Link>
+        )}
       </div>
 
       <div className="view-controls">
@@ -729,7 +740,7 @@ export function Library() {
         </div>
       </div>
 
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && !isViewer && (
         <div className="batch-toolbar">
           <span style={{ fontWeight: 600, fontSize: 14 }}>
             {selectedIds.size} selected
@@ -892,13 +903,15 @@ export function Library() {
                         boxShadow: "0 4px 16px var(--color-shadow)",
                       }}
                     >
-                      <button
-                        onClick={() => { togglePin(video.id); setOpenMenuId(null); }}
-                        className="action-link"
-                        style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
-                      >
-                        {video.pinned ? "Unpin" : "Pin"}
-                      </button>
+                      {!isViewer && (
+                        <button
+                          onClick={() => { togglePin(video.id); setOpenMenuId(null); }}
+                          className="action-link"
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
+                        >
+                          {video.pinned ? "Unpin" : "Pin"}
+                        </button>
+                      )}
                       <Link
                         to={`/videos/${video.id}/analytics`}
                         className="action-link"
@@ -915,15 +928,28 @@ export function Library() {
                       >
                         {downloadingId === video.id ? "Downloading..." : "Download"}
                       </button>
-                      <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
-                      <button
-                        onClick={() => { deleteVideo(video.id); setOpenMenuId(null); }}
-                        disabled={deletingId === video.id}
-                        className="action-link"
-                        style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: "var(--color-error)", opacity: deletingId === video.id ? 0.5 : undefined }}
-                      >
-                        {deletingId === video.id ? "Deleting..." : "Delete"}
-                      </button>
+                      {!isViewer && (
+                        <button
+                          onClick={() => { setTransferVideoId(video.id); setOpenMenuId(null); }}
+                          className="action-link"
+                          style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
+                        >
+                          Move to...
+                        </button>
+                      )}
+                      {!isViewer && (
+                        <>
+                          <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
+                          <button
+                            onClick={() => { deleteVideo(video.id); setOpenMenuId(null); }}
+                            disabled={deletingId === video.id}
+                            className="action-link"
+                            style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: "var(--color-error)", opacity: deletingId === video.id ? 0.5 : undefined }}
+                          >
+                            {deletingId === video.id ? "Deleting..." : "Delete"}
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -967,6 +993,19 @@ export function Library() {
           danger={confirmDialog.danger}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {transferVideoId && (
+        <TransferDialog
+          videoId={transferVideoId}
+          videoTitle={videos.find((v) => v.id === transferVideoId)?.title ?? "Untitled"}
+          onTransferred={() => {
+            setTransferVideoId(null);
+            showToast("Video moved");
+            fetchVideosAndLimits(searchQuery, activeFilter);
+          }}
+          onCancel={() => setTransferVideoId(null)}
         />
       )}
     </div>

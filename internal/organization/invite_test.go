@@ -487,3 +487,78 @@ func TestAcceptInvite_WrongEmail(t *testing.T) {
 		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
 }
+
+func TestSendInvite_ViewerRole(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	emailMock := &mockEmailSender{}
+	handler := NewHandler(mock, testBaseURL)
+	handler.SetEmailSender(emailMock)
+	orgID := "org-1"
+	inviteeEmail := "viewer@example.com"
+	now := time.Now().UTC().Truncate(time.Second)
+
+	// Caller role check
+	mock.ExpectQuery(`SELECT role FROM organization_members WHERE organization_id = \$1 AND user_id = \$2`).
+		WithArgs(orgID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("owner"))
+
+	// Already-member check
+	mock.ExpectQuery(`SELECT 1 FROM organization_members om JOIN users u ON u\.id = om\.user_id WHERE om\.organization_id = \$1 AND u\.email = \$2`).
+		WithArgs(orgID, inviteeEmail).
+		WillReturnError(pgx.ErrNoRows)
+
+	// Pending invite check
+	mock.ExpectQuery(`SELECT 1 FROM organization_invites WHERE organization_id = \$1 AND email = \$2 AND accepted_at IS NULL AND expires_at > now\(\)`).
+		WithArgs(orgID, inviteeEmail).
+		WillReturnError(pgx.ErrNoRows)
+
+	// Insert invite
+	mock.ExpectQuery(`INSERT INTO organization_invites`).
+		WithArgs(orgID, inviteeEmail, "viewer", testUserID, pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).AddRow("invite-v1", now))
+
+	// Org name for email
+	mock.ExpectQuery(`SELECT name FROM organizations WHERE id = \$1`).
+		WithArgs(orgID).
+		WillReturnRows(pgxmock.NewRows([]string{"name"}).AddRow("Acme Corp"))
+
+	// Inviter name for email
+	mock.ExpectQuery(`SELECT name FROM users WHERE id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"name"}).AddRow("Alice"))
+
+	body, _ := json.Marshal(sendInviteRequest{Email: inviteeEmail, Role: "viewer"})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/organizations/{orgId}/invites", handler.SendInvite)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/organizations/"+orgID+"/invites", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	var resp inviteResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.ID != "invite-v1" {
+		t.Errorf("expected ID %q, got %q", "invite-v1", resp.ID)
+	}
+	if resp.Role != "viewer" {
+		t.Errorf("expected role %q, got %q", "viewer", resp.Role)
+	}
+	if resp.Email != inviteeEmail {
+		t.Errorf("expected email %q, got %q", inviteeEmail, resp.Email)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}

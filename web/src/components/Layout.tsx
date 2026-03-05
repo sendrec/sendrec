@@ -236,13 +236,15 @@ export function Layout({ children }: LayoutProps) {
         </div>
 
         <div className={`nav-links${menuOpen ? " nav-links--open" : ""}`}>
-          <Link
-            to="/"
-            className={`nav-link${isActive("/") ? " nav-link--active" : ""}`}
-            onClick={handleNavClick}
-          >
-            Record
-          </Link>
+          {selectedOrg?.role !== "viewer" && (
+            <Link
+              to="/"
+              className={`nav-link${isActive("/") ? " nav-link--active" : ""}`}
+              onClick={handleNavClick}
+            >
+              Record
+            </Link>
+          )}
 
           <Link
             to="/library"

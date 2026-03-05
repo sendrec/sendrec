@@ -275,14 +275,14 @@ describe("OrgSettings", () => {
       .mockResolvedValueOnce(mockOrg)
       .mockResolvedValueOnce([ownerMember, regularMember])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ plan: "free", effectivePlan: "pro" });
+      .mockResolvedValueOnce({ plan: "pro", planInherited: true });
     renderOrgSettings();
 
     await waitFor(() => {
       expect(screen.getByText("Pro")).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/Pro features through your personal subscription/)).toBeInTheDocument();
+    expect(screen.getByText(/Inherited from your personal plan/)).toBeInTheDocument();
     expect(screen.queryByText("Upgrade to Pro")).not.toBeInTheDocument();
   });
 
@@ -291,14 +291,14 @@ describe("OrgSettings", () => {
       .mockResolvedValueOnce(mockOrg)
       .mockResolvedValueOnce([ownerMember, regularMember])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ plan: "free", effectivePlan: "free" });
+      .mockResolvedValueOnce({ plan: "free", planInherited: false });
     renderOrgSettings();
 
     await waitFor(() => {
       expect(screen.getByText("Upgrade to Pro")).toBeInTheDocument();
     });
 
-    expect(screen.queryByText(/personal subscription/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Inherited from your personal plan/)).not.toBeInTheDocument();
   });
 
   it("shows manage subscription when workspace has its own Pro plan", async () => {
@@ -306,7 +306,7 @@ describe("OrgSettings", () => {
       .mockResolvedValueOnce(mockOrg)
       .mockResolvedValueOnce([ownerMember, regularMember])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ plan: "pro", effectivePlan: "pro", portalUrl: "https://portal.example.com" });
+      .mockResolvedValueOnce({ plan: "pro", planInherited: false, portalUrl: "https://portal.example.com" });
     renderOrgSettings();
 
     await waitFor(() => {
@@ -314,7 +314,7 @@ describe("OrgSettings", () => {
     });
 
     expect(screen.getByText("Cancel subscription")).toBeInTheDocument();
-    expect(screen.queryByText(/personal subscription/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Inherited from your personal plan/)).not.toBeInTheDocument();
   });
 
   it("renders Data Retention select", async () => {
@@ -423,5 +423,95 @@ describe("OrgSettings", () => {
     });
 
     expect(screen.queryByText("Single Sign-On")).not.toBeInTheDocument();
+  });
+
+  it("shows Inherited badge when planInherited is true", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(mockOrg)
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "pro", planInherited: true });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Inherited from your personal plan/)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Pro")).toBeInTheDocument();
+  });
+
+  it("hides upgrade cards for paid non-inherited plan", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(mockOrg)
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "pro", planInherited: false });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Upgrade to Pro")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Inherited/)).not.toBeInTheDocument();
+  });
+
+  it("gates SSO on billing.plan === business", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business", planInherited: false })
+      .mockResolvedValueOnce({ issuerUrl: "", clientId: "", configured: false, enforceSso: false });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Single Sign-On")).toBeInTheDocument();
+    });
+  });
+
+  it("invite dropdown includes Viewer option", async () => {
+    mockOwnerResponses();
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    const roleSelect = screen.getByLabelText("Role");
+    const viewerOption = Array.from(roleSelect.querySelectorAll("option")).find(
+      (opt) => opt.textContent === "Viewer"
+    );
+    expect(viewerOption).toBeDefined();
+    expect(viewerOption!.getAttribute("value")).toBe("viewer");
+  });
+
+  it("role dropdown includes viewer for non-owner members", async () => {
+    mockOwnerResponses();
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    const roleSelects = screen.getAllByRole("combobox").filter(
+      (el) => el.getAttribute("aria-label")?.startsWith("Role for")
+    );
+    expect(roleSelects.length).toBeGreaterThan(0);
+
+    const firstRoleSelect = roleSelects[0];
+    const options = Array.from(firstRoleSelect.querySelectorAll("option")).map(
+      (opt) => opt.getAttribute("value")
+    );
+    expect(options).toContain("viewer");
   });
 });

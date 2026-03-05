@@ -11,6 +11,13 @@ vi.mock("../api/client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
+const mockUseOrganization = vi.fn().mockReturnValue({
+  selectedOrg: null,
+});
+vi.mock("../hooks/useOrganization", () => ({
+  useOrganization: () => mockUseOrganization(),
+}));
+
 const unlimitedLimits = { maxVideosPerMonth: 0, maxVideoDurationSeconds: 0, videosUsedThisMonth: 0, brandingEnabled: false };
 
 function makeVideo(overrides: Record<string, unknown> = {}) {
@@ -36,6 +43,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     ctaUrl: null,
     suggestedTitle: null,
     summaryStatus: "none",
+    pinned: false,
     folderId: null,
     tags: [],
     ...overrides,
@@ -71,6 +79,9 @@ async function openOverflowMenu(user?: ReturnType<typeof userEvent.setup>) {
 describe("Library", () => {
   beforeEach(() => {
     mockApiFetch.mockReset();
+    mockUseOrganization.mockReturnValue({
+      selectedOrg: null,
+    });
   });
 
   afterEach(() => {
@@ -802,6 +813,109 @@ describe("Library", () => {
       });
 
       expect(container.querySelector(".video-card-play")).not.toBeNull();
+    });
+  });
+
+  describe("viewer role restrictions", () => {
+    beforeEach(() => {
+      mockUseOrganization.mockReturnValue({
+        selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "viewer", memberCount: 3 },
+        orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "viewer", memberCount: 3 }],
+        selectedOrgId: "org-1",
+      });
+    });
+
+    it("hides delete and pin in dropdown for viewer", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+
+      expect(screen.getByText("Analytics")).toBeInTheDocument();
+      expect(screen.getByText("Download")).toBeInTheDocument();
+      expect(screen.queryByText("Delete")).not.toBeInTheDocument();
+      expect(screen.queryByText("Pin")).not.toBeInTheDocument();
+      expect(screen.queryByText("Move to...")).not.toBeInTheDocument();
+    });
+
+    it("hides New Recording button for viewer", async () => {
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole("link", { name: "New Recording" })).not.toBeInTheDocument();
+    });
+
+    it("hides batch toolbar for viewer", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("checkbox", { name: "Select My Recording" }));
+
+      expect(screen.queryByText("1 selected")).not.toBeInTheDocument();
+    });
+
+    it("hides empty state Record and Upload links for viewer", async () => {
+      mockFetch([]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("No recordings yet.")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole("link", { name: "Record" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("member role permissions", () => {
+    beforeEach(() => {
+      mockUseOrganization.mockReturnValue({
+        selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "member", memberCount: 3 },
+        orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "member", memberCount: 3 }],
+        selectedOrgId: "org-1",
+      });
+    });
+
+    it("shows New Recording and delete for member", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole("link", { name: "New Recording" })).toBeInTheDocument();
+
+      await openOverflowMenu(user);
+      expect(screen.getByText("Delete")).toBeInTheDocument();
+    });
+
+    it("shows Move to... in dropdown for non-viewer", async () => {
+      const user = userEvent.setup();
+      mockFetch([makeVideo()]);
+      renderLibrary();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+      });
+
+      await openOverflowMenu(user);
+      expect(screen.getByText("Move to...")).toBeInTheDocument();
     });
   });
 });

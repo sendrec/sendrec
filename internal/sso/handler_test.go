@@ -428,12 +428,20 @@ func newTestHandlerWithKey(t *testing.T) (*Handler, pgxmock.PgxPoolIface) {
 func requestWithOrg(r *http.Request, orgID, role string) *http.Request {
 	ctx := auth.ContextWithUserID(r.Context(), "user-1")
 	ctx = auth.ContextWithOrg(ctx, orgID, role)
+	// Set chi URL params for handlers that use chi.URLParam
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", orgID)
+	ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
 	return r.WithContext(ctx)
 }
 
 func TestSaveConfig_Success(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("admin"))
 
 	mock.ExpectExec(`INSERT INTO organization_sso_configs`).
 		WithArgs("org-1", "https://accounts.google.com", "client-123", pgxmock.AnyArg(), false).
@@ -467,6 +475,10 @@ func TestSaveConfig_RequiresOrgContext(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
 
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("", "").
+		WillReturnError(pgx.ErrNoRows)
+
 	body := `{"issuerUrl":"https://example.com","clientId":"id","clientSecret":"secret"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
 	// No org context set.
@@ -474,14 +486,18 @@ func TestSaveConfig_RequiresOrgContext(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.SaveConfig(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }
 
 func TestSaveConfig_RequiresAdmin(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("member"))
 
 	body := `{"issuerUrl":"https://example.com","clientId":"id","clientSecret":"secret"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
@@ -528,9 +544,8 @@ func TestGetConfig_Success(t *testing.T) {
 	if resp.IssuerURL != "https://accounts.google.com" {
 		t.Errorf("issuer_url = %q, want %q", resp.IssuerURL, "https://accounts.google.com")
 	}
-	// client_id should be masked
-	if resp.ClientID == "client-123" {
-		t.Error("client_id should be masked")
+	if resp.ClientID != "client-123" {
+		t.Errorf("client_id = %q, want %q", resp.ClientID, "client-123")
 	}
 	if resp.ClientSecret != "******" {
 		t.Errorf("client_secret = %q, want %q", resp.ClientSecret, "******")
@@ -580,6 +595,10 @@ func TestDeleteConfig_Success(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
 
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("owner"))
+
 	mock.ExpectExec(`DELETE FROM organization_sso_configs WHERE organization_id`).
 		WithArgs("org-1").
 		WillReturnResult(pgxmock.NewResult("DELETE", 1))
@@ -611,6 +630,10 @@ func TestDeleteConfig_RequiresOwner(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
 
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("admin"))
+
 	req := httptest.NewRequest(http.MethodDelete, "/api/sso/config", nil)
 	req = requestWithOrg(req, "org-1", "admin")
 
@@ -621,8 +644,6 @@ func TestDeleteConfig_RequiresOwner(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }
-
-// --- Task 7: Workspace SSO Login Flow Tests ---
 
 func TestInitiateOrgSSO_NoEmail(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)

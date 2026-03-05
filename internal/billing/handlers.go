@@ -15,7 +15,6 @@ import (
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
-	"github.com/sendrec/sendrec/internal/plans"
 )
 
 const maxWebhookBodyBytes = 64 * 1024
@@ -81,17 +80,22 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	).Scan(&subscriptionID)
 
 	if subscriptionID != nil {
-		_, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, productID)
+		info, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, productID)
 		if err != nil {
 			slog.Error("failed to upgrade subscription", "error", err, "user_id", userID)
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
 			return
 		}
 		plan := h.planFromProductID(productID)
-		_, _ = h.db.Exec(r.Context(),
-			"UPDATE users SET subscription_plan = $1 WHERE id = $2",
-			plan, userID,
+		_, err = h.db.Exec(r.Context(),
+			"UPDATE users SET subscription_plan = $1, creem_subscription_id = $2 WHERE id = $3",
+			plan, info.ID, userID,
 		)
+		if err != nil {
+			slog.Error("failed to update user plan after upgrade", "error", err, "user_id", userID)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
+			return
+		}
 		slog.Info("subscription upgraded", "user_id", userID, "plan", plan)
 		httputil.WriteJSON(w, http.StatusOK, map[string]string{"upgraded": plan})
 		return
@@ -110,7 +114,7 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 
 type billingResponse struct {
 	Plan               string  `json:"plan"`
-	EffectivePlan      string  `json:"effectivePlan,omitempty"`
+	PlanInherited      bool    `json:"planInherited"`
 	SubscriptionID     *string `json:"subscriptionId"`
 	SubscriptionStatus *string `json:"subscriptionStatus"`
 	PortalURL          *string `json:"portalUrl"`
@@ -227,17 +231,22 @@ func (h *Handlers) CreateOrgCheckout(w http.ResponseWriter, r *http.Request) {
 	).Scan(&subscriptionID)
 
 	if subscriptionID != nil {
-		_, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, orgProductID)
+		info, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, orgProductID)
 		if err != nil {
 			slog.Error("failed to upgrade org subscription", "error", err, "org_id", orgID)
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
 			return
 		}
 		plan := h.planFromProductID(orgProductID)
-		_, _ = h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = $1, updated_at = now() WHERE id = $2",
-			plan, orgID,
+		_, err = h.db.Exec(r.Context(),
+			"UPDATE organizations SET subscription_plan = $1, creem_subscription_id = $2, updated_at = now() WHERE id = $3",
+			plan, info.ID, orgID,
 		)
+		if err != nil {
+			slog.Error("failed to update org plan after upgrade", "error", err, "org_id", orgID)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
+			return
+		}
 		slog.Info("org subscription upgraded", "org_id", orgID, "plan", plan)
 		httputil.WriteJSON(w, http.StatusOK, map[string]string{"upgraded": plan})
 		return
@@ -272,37 +281,21 @@ func (h *Handlers) GetOrgBilling(w http.ResponseWriter, r *http.Request) {
 	var plan string
 	var subscriptionID *string
 	var customerID *string
+	var planInheritedFrom *string
 
 	err = h.db.QueryRow(r.Context(),
-		"SELECT subscription_plan, creem_subscription_id, creem_customer_id FROM organizations WHERE id = $1",
+		"SELECT subscription_plan, creem_subscription_id, creem_customer_id, plan_inherited_from FROM organizations WHERE id = $1",
 		orgID,
-	).Scan(&plan, &subscriptionID, &customerID)
+	).Scan(&plan, &subscriptionID, &customerID, &planInheritedFrom)
 	if err != nil {
 		slog.Error("failed to get org billing info", "error", err, "org_id", orgID)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to get billing info")
 		return
 	}
 
-	var ownerPlan string
-	_ = h.db.QueryRow(r.Context(),
-		`SELECT COALESCE(u.subscription_plan, 'free')
-		 FROM organization_members om
-		 JOIN users u ON u.id = om.user_id
-		 WHERE om.organization_id = $1 AND om.role = 'owner'
-		 ORDER BY CASE u.subscription_plan WHEN 'business' THEN 2 WHEN 'pro' THEN 1 ELSE 0 END DESC
-		 LIMIT 1`,
-		orgID,
-	).Scan(&ownerPlan)
-
-	effectivePlan := plan
-	if plans.Rank(ownerPlan) > plans.Rank(plan) {
-		effectivePlan = ownerPlan
-	}
-
 	resp := billingResponse{
-		Plan:           plan,
-		EffectivePlan:  effectivePlan,
-		SubscriptionID: subscriptionID,
+		Plan:          plan,
+		PlanInherited: planInheritedFrom != nil,
 	}
 
 	if subscriptionID != nil {
@@ -478,7 +471,7 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 		}
 
 		_, err := h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3, updated_at = now() WHERE id = $4",
+			"UPDATE organizations SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3, plan_inherited_from = NULL, updated_at = now() WHERE id = $4",
 			plan, payload.Object.ID, payload.Object.Customer.ID, orgID,
 		)
 		if err != nil {
@@ -508,6 +501,11 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
 			return
 		}
+
+		// Propagate plan change to grandfathered orgs
+		_, _ = h.db.Exec(r.Context(),
+			"UPDATE organizations SET subscription_plan = $1, updated_at = now() WHERE plan_inherited_from = $2",
+			plan, userID)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -536,6 +534,11 @@ func (h *Handlers) handleSubscriptionCanceled(r *http.Request, w http.ResponseWr
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
 			return
 		}
+
+		// Downgrade grandfathered orgs
+		_, _ = h.db.Exec(r.Context(),
+			"UPDATE organizations SET subscription_plan = 'free', updated_at = now() WHERE plan_inherited_from = $1",
+			userID)
 	}
 
 	w.WriteHeader(http.StatusOK)
