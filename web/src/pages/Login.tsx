@@ -2,15 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError, apiFetch, setAccessToken } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
-
-function providerLabel(provider: string): string {
-  switch (provider) {
-    case "google": return "Google";
-    case "microsoft": return "Microsoft";
-    case "github": return "GitHub";
-    default: return provider;
-  }
-}
+import { providerLabel } from "../utils/sso";
 
 export function Login() {
   const navigate = useNavigate();

@@ -439,7 +439,7 @@ func TestSaveConfig_Success(t *testing.T) {
 		WithArgs("org-1", "https://accounts.google.com", "client-123", pgxmock.AnyArg(), false).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
-	body := `{"issuer_url":"https://accounts.google.com","client_id":"client-123","client_secret":"secret-456","enforce_sso":false}`
+	body := `{"issuerUrl":"https://accounts.google.com","clientId":"client-123","clientSecret":"secret-456","enforceSso":false}`
 	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
 	req = requestWithOrg(req, "org-1", "admin")
 
@@ -467,7 +467,7 @@ func TestSaveConfig_RequiresOrgContext(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
 
-	body := `{"issuer_url":"https://example.com","client_id":"id","client_secret":"secret"}`
+	body := `{"issuerUrl":"https://example.com","clientId":"id","clientSecret":"secret"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
 	// No org context set.
 
@@ -483,7 +483,7 @@ func TestSaveConfig_RequiresAdmin(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
 
-	body := `{"issuer_url":"https://example.com","client_id":"id","client_secret":"secret"}`
+	body := `{"issuerUrl":"https://example.com","clientId":"id","clientSecret":"secret"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
 	req = requestWithOrg(req, "org-1", "member")
 

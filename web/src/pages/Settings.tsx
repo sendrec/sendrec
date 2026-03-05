@@ -6,6 +6,7 @@ import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LimitsResponse } from "../types/limits";
+import { providerLabel } from "../utils/sso";
 
 interface UserProfile {
   name: string;
@@ -52,15 +53,6 @@ interface IntegrationConfig {
 interface LinkedIdentity {
   provider: string;
   email: string;
-}
-
-function providerLabel(provider: string): string {
-  switch (provider) {
-    case "google": return "Google";
-    case "microsoft": return "Microsoft";
-    case "github": return "GitHub";
-    default: return provider;
-  }
 }
 
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/;

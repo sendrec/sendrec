@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -56,6 +57,7 @@ func (h *Handler) Providers(w http.ResponseWriter, r *http.Request) {
 	for name := range h.providers {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	httputil.WriteJSON(w, http.StatusOK, providersResponse{Providers: names})
 }
 
@@ -97,6 +99,15 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	provider, ok := h.providers[providerName]
 	if !ok {
 		h.redirectWithError(w, r, "unknown provider")
+		return
+	}
+
+	if errParam := r.URL.Query().Get("error"); errParam != "" {
+		desc := r.URL.Query().Get("error_description")
+		if desc == "" {
+			desc = "login was denied"
+		}
+		h.redirectWithError(w, r, desc)
 		return
 	}
 
@@ -182,7 +193,7 @@ func (h *Handler) resolveUser(ctx context.Context, providerName string, info *Us
 		}
 		// Link the external identity to the existing verified user.
 		if _, err := h.db.Exec(ctx,
-			"INSERT INTO external_identities (user_id, provider, external_id, email) VALUES ($1, $2, $3, $4)",
+			"INSERT INTO external_identities (user_id, provider, external_id, email) VALUES ($1, $2, $3, $4) ON CONFLICT (provider, external_id) DO NOTHING",
 			userID, providerName, info.ExternalID, info.Email,
 		); err != nil {
 			return "", fmt.Errorf("link identity: %w", err)
@@ -192,7 +203,7 @@ func (h *Handler) resolveUser(ctx context.Context, providerName string, info *Us
 
 	// 3. No existing user -- create one.
 	err = h.db.QueryRow(ctx,
-		"INSERT INTO users (email, password, name, email_verified) VALUES ($1, $2, $3, true) RETURNING id",
+		"INSERT INTO users (email, password, name, email_verified) VALUES ($1, $2, $3, true) ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email RETURNING id",
 		info.Email, "", info.Name,
 	).Scan(&userID)
 	if err != nil {
@@ -200,7 +211,7 @@ func (h *Handler) resolveUser(ctx context.Context, providerName string, info *Us
 	}
 
 	if _, err := h.db.Exec(ctx,
-		"INSERT INTO external_identities (user_id, provider, external_id, email) VALUES ($1, $2, $3, $4)",
+		"INSERT INTO external_identities (user_id, provider, external_id, email) VALUES ($1, $2, $3, $4) ON CONFLICT (provider, external_id) DO NOTHING",
 		userID, providerName, info.ExternalID, info.Email,
 	); err != nil {
 		return "", fmt.Errorf("create identity: %w", err)
@@ -268,18 +279,18 @@ func newTokenID() (string, error) {
 // --- Workspace SSO Config CRUD (Task 6) ---
 
 type ssoConfigRequest struct {
-	IssuerURL    string `json:"issuer_url"`
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	EnforceSSO   bool   `json:"enforce_sso"`
+	IssuerURL    string `json:"issuerUrl"`
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+	EnforceSSO   bool   `json:"enforceSso"`
 }
 
 type ssoConfigResponse struct {
 	Provider     string `json:"provider"`
-	IssuerURL    string `json:"issuer_url"`
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	EnforceSSO   bool   `json:"enforce_sso"`
+	IssuerURL    string `json:"issuerUrl"`
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+	EnforceSSO   bool   `json:"enforceSso"`
 	Configured   bool   `json:"configured"`
 }
 
@@ -488,6 +499,15 @@ func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 // the state, exchanges the code, resolves the user, auto-provisions organization
 // membership, and issues tokens.
 func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
+	if errParam := r.URL.Query().Get("error"); errParam != "" {
+		desc := r.URL.Query().Get("error_description")
+		if desc == "" {
+			desc = "login was denied"
+		}
+		h.redirectWithError(w, r, desc)
+		return
+	}
+
 	stateCookie, err := r.Cookie("sso_state")
 	if err != nil {
 		h.redirectWithError(w, r, "missing state cookie")
@@ -596,9 +616,9 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 
 type identityResponse struct {
 	Provider   string    `json:"provider"`
-	ExternalID string    `json:"external_id"`
+	ExternalID string    `json:"externalId"`
 	Email      string    `json:"email"`
-	CreatedAt  time.Time `json:"created_at"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 // ListIdentities returns all external identity links for the authenticated user.

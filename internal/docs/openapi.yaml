@@ -5070,7 +5070,7 @@ paths:
           schema:
             type: string
       responses:
-        "307":
+        "302":
           description: Redirect to identity provider
         "400":
           description: Unknown or disabled provider
@@ -5104,7 +5104,7 @@ paths:
             type: string
           description: OAuth2 state parameter for CSRF protection
       responses:
-        "307":
+        "302":
           description: Redirect to frontend with sso_token query parameter
         "400":
           description: Invalid state or authorization code
@@ -5128,7 +5128,7 @@ paths:
             format: email
           description: User email address used to look up the workspace SSO configuration
       responses:
-        "307":
+        "302":
           description: Redirect to workspace identity provider
         "404":
           description: No SSO configuration found for the email domain
@@ -5157,7 +5157,7 @@ paths:
             type: string
           description: OAuth2 state parameter for CSRF protection
       responses:
-        "307":
+        "302":
           description: Redirect to frontend with sso_token query parameter
         "400":
           description: Invalid state or authorization code
