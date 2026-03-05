@@ -247,14 +247,16 @@ export function OrgSettings() {
     setUpgrading(true);
     setBillingMessage("");
     try {
-      const resp = await apiFetch<{ checkoutUrl: string }>(
+      const resp = await apiFetch<{ checkoutUrl?: string; upgraded?: string }>(
         `/api/organizations/${orgId}/billing/checkout`,
         {
           method: "POST",
           body: JSON.stringify({ plan }),
         }
       );
-      if (resp?.checkoutUrl) {
+      if (resp?.upgraded) {
+        window.location.reload();
+      } else if (resp?.checkoutUrl) {
         window.location.href = resp.checkoutUrl;
       }
     } catch (err) {

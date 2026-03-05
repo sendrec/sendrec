@@ -537,11 +537,13 @@ export function Settings() {
     setUpgrading(true);
     setBillingMessage("");
     try {
-      const resp = await apiFetch<{ checkoutUrl: string }>("/api/settings/billing/checkout", {
+      const resp = await apiFetch<{ checkoutUrl?: string; upgraded?: string }>("/api/settings/billing/checkout", {
         method: "POST",
         body: JSON.stringify({ plan }),
       });
-      if (resp?.checkoutUrl) {
+      if (resp?.upgraded) {
+        window.location.reload();
+      } else if (resp?.checkoutUrl) {
         window.location.href = resp.checkoutUrl;
       }
     } catch (err: unknown) {

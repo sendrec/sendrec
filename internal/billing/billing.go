@@ -117,6 +117,45 @@ func (c *Client) GetSubscription(ctx context.Context, subscriptionID string) (*S
 	return &info, nil
 }
 
+type upgradeRequest struct {
+	ProductID      string `json:"product_id"`
+	UpdateBehavior string `json:"update_behavior"`
+}
+
+func (c *Client) UpgradeSubscription(ctx context.Context, subscriptionID, productID string) (*SubscriptionInfo, error) {
+	body, err := json.Marshal(upgradeRequest{
+		ProductID:      productID,
+		UpdateBehavior: "proration-charge-immediately",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal upgrade request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/subscriptions/"+subscriptionID+"/upgrade", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create upgrade request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", c.apiKey)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("upgrade request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("creem upgrade returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var info SubscriptionInfo
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return nil, fmt.Errorf("decode upgrade response: %w", err)
+	}
+	return &info, nil
+}
+
 func (c *Client) CancelSubscription(ctx context.Context, subscriptionID string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/subscriptions/"+subscriptionID+"/cancel", nil)
 	if err != nil {
