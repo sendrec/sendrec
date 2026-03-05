@@ -1251,4 +1251,60 @@ describe("Settings", () => {
       }));
     });
   });
+
+  it("renders Data Retention select", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", retentionDays: 0 })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Auto-delete after")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Auto-delete after")).toHaveValue("0");
+  });
+
+  it("renders Data Retention with saved value", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", retentionDays: 90 })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]); // integrations
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Auto-delete after")).toHaveValue("90");
+    });
+  });
+
+  it("changing retention days calls PATCH /api/user", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com", retentionDays: 0 })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
+      .mockResolvedValueOnce({ message: "Settings updated" }); // PATCH /api/user
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Auto-delete after")).toBeInTheDocument();
+    });
+
+    await userEvent.selectOptions(screen.getByLabelText("Auto-delete after"), "30");
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/user", expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ retentionDays: 30 }),
+      }));
+    });
+  });
 });
