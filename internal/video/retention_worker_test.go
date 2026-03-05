@@ -36,8 +36,8 @@ func TestProcessRetentionWarnings_SendsForExpiring(t *testing.T) {
 
 	sender := &mockRetentionSender{}
 
-	mock.ExpectQuery(`SELECT v.id, v.title, v.share_id, u.email`).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "share_id", "email", "retention_days"}).
+	mock.ExpectQuery(`SELECT v.id, v.title, v.share_token, u.email`).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "share_token", "email", "retention_days"}).
 			AddRow("vid-1", "My Video", "abc123", "alice@example.com", 30).
 			AddRow("vid-2", "Other Video", "def456", "alice@example.com", 30))
 
@@ -60,7 +60,7 @@ func TestProcessRetentionWarnings_SendsForExpiring(t *testing.T) {
 		t.Errorf("expected first video title 'My Video', got %q", sender.calls[0].videos[0].Title)
 	}
 	if sender.calls[0].videos[0].WatchURL != "https://app.sendrec.eu/watch/abc123" {
-		t.Errorf("expected watchURL with share_id, got %q", sender.calls[0].videos[0].WatchURL)
+		t.Errorf("expected watchURL with share_token, got %q", sender.calls[0].videos[0].WatchURL)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -78,8 +78,8 @@ func TestProcessRetentionWarnings_SkipsPinnedVideos(t *testing.T) {
 	sender := &mockRetentionSender{}
 
 	// The query itself filters out pinned=true, so an empty result set means pinned videos are skipped.
-	mock.ExpectQuery(`SELECT v.id, v.title, v.share_id, u.email`).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "share_id", "email", "retention_days"}))
+	mock.ExpectQuery(`SELECT v.id, v.title, v.share_token, u.email`).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "share_token", "email", "retention_days"}))
 
 	processRetentionWarnings(context.Background(), mock, sender, "https://app.sendrec.eu")
 

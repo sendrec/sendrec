@@ -17,7 +17,7 @@ type RetentionSender interface {
 
 func processRetentionWarnings(ctx context.Context, db database.DBTX, sender RetentionSender, baseURL string) {
 	rows, err := db.Query(ctx,
-		`SELECT v.id, v.title, v.share_id, u.email,
+		`SELECT v.id, v.title, v.share_token, u.email,
 		        COALESCE(o.retention_days, u.retention_days) AS retention_days
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
@@ -35,27 +35,27 @@ func processRetentionWarnings(ctx context.Context, db database.DBTX, sender Rete
 	defer rows.Close()
 
 	type videoEntry struct {
-		id       string
-		title    string
-		shareID  string
-		days     int
+		id         string
+		title      string
+		shareToken string
+		days       int
 	}
 
 	grouped := make(map[string][]videoEntry)
 	retentionDays := make(map[string]int)
 
 	for rows.Next() {
-		var id, title, shareID, userEmail string
+		var id, title, shareToken, userEmail string
 		var days int
-		if err := rows.Scan(&id, &title, &shareID, &userEmail, &days); err != nil {
+		if err := rows.Scan(&id, &title, &shareToken, &userEmail, &days); err != nil {
 			slog.Error("retention-worker: warnings scan failed", "error", err)
 			continue
 		}
 		grouped[userEmail] = append(grouped[userEmail], videoEntry{
-			id:      id,
-			title:   title,
-			shareID: shareID,
-			days:    days,
+			id:         id,
+			title:      title,
+			shareToken: shareToken,
+			days:       days,
 		})
 		retentionDays[userEmail] = days
 	}
@@ -70,7 +70,7 @@ func processRetentionWarnings(ctx context.Context, db database.DBTX, sender Rete
 		for i, e := range entries {
 			videos[i] = email.RetentionVideoSummary{
 				Title:    e.title,
-				WatchURL: fmt.Sprintf("%s/watch/%s", baseURL, e.shareID),
+				WatchURL: fmt.Sprintf("%s/watch/%s", baseURL, e.shareToken),
 			}
 			videoIDs = append(videoIDs, e.id)
 		}
