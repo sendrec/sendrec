@@ -96,6 +96,7 @@ function makeVideo(overrides: Record<string, unknown> = {}) {
     folderId: null,
     transcriptionLanguage: null,
     tags: [],
+    pinned: false,
     playlists: [],
     ...overrides,
   };
@@ -1737,4 +1738,23 @@ describe("VideoDetail", () => {
       { timeout: 4000 },
     );
   }, 10000);
+
+  it("renders pin button", async () => {
+    setupDefaultMocks();
+    renderVideoDetail("v1");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Pin video" })).toBeInTheDocument();
+    });
+    expect(screen.getByText("Pin")).toBeInTheDocument();
+  });
+
+  it("renders unpin button when video is pinned", async () => {
+    setupDefaultMocks({ video: makeVideo({ pinned: true }) });
+    renderVideoDetail("v1");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Unpin video" })).toBeInTheDocument();
+    });
+    expect(screen.getByText("Unpin")).toBeInTheDocument();
+    expect(screen.getByText("Pinned")).toBeInTheDocument();
+  });
 });
