@@ -1,0 +1,4 @@
+ALTER TABLE organizations ADD COLUMN retention_days INT NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN retention_days INT NOT NULL DEFAULT 0;
+ALTER TABLE videos ADD COLUMN pinned BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE videos ADD COLUMN retention_warned_at TIMESTAMPTZ;
