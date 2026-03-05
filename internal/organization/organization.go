@@ -36,6 +36,7 @@ type orgListItem struct {
 	Name             string `json:"name"`
 	Slug             string `json:"slug"`
 	SubscriptionPlan string `json:"subscriptionPlan"`
+	RetentionDays    int    `json:"retentionDays"`
 	Role             string `json:"role"`
 	MemberCount      int64  `json:"memberCount"`
 }
@@ -45,6 +46,7 @@ type orgDetailResponse struct {
 	Name             string `json:"name"`
 	Slug             string `json:"slug"`
 	SubscriptionPlan string `json:"subscriptionPlan"`
+	RetentionDays    int    `json:"retentionDays"`
 	Role             string `json:"role"`
 	MemberCount      int64  `json:"memberCount"`
 	CreatedAt        string `json:"createdAt"`
@@ -56,8 +58,9 @@ type createOrgRequest struct {
 }
 
 type updateOrgRequest struct {
-	Name *string `json:"name"`
-	Slug *string `json:"slug"`
+	Name          *string `json:"name"`
+	Slug          *string `json:"slug"`
+	RetentionDays *int    `json:"retentionDays"`
 }
 
 func generateSlug(name string) string {
@@ -174,7 +177,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 
 	rows, err := h.db.Query(r.Context(),
-		`SELECT o.id, o.name, o.slug, o.subscription_plan, om.role,
+		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.retention_days, om.role,
 		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id) AS member_count
 		 FROM organizations o
 		 JOIN organization_members om ON om.organization_id = o.id
@@ -191,7 +194,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	items := make([]orgListItem, 0)
 	for rows.Next() {
 		var item orgListItem
-		if err := rows.Scan(&item.ID, &item.Name, &item.Slug, &item.SubscriptionPlan, &item.Role, &item.MemberCount); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Slug, &item.SubscriptionPlan, &item.RetentionDays, &item.Role, &item.MemberCount); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan organization")
 			return
 		}
@@ -208,13 +211,13 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	var resp orgDetailResponse
 	var createdAt, updatedAt time.Time
 	err := h.db.QueryRow(r.Context(),
-		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.created_at, o.updated_at, om.role,
+		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.retention_days, o.created_at, o.updated_at, om.role,
 		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id) AS member_count
 		 FROM organizations o
 		 JOIN organization_members om ON om.organization_id = o.id
 		 WHERE o.id = $1 AND om.user_id = $2`,
 		orgID, userID,
-	).Scan(&resp.ID, &resp.Name, &resp.Slug, &resp.SubscriptionPlan, &createdAt, &updatedAt, &resp.Role, &resp.MemberCount)
+	).Scan(&resp.ID, &resp.Name, &resp.Slug, &resp.SubscriptionPlan, &resp.RetentionDays, &createdAt, &updatedAt, &resp.Role, &resp.MemberCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.WriteError(w, http.StatusNotFound, "organization not found")
@@ -258,7 +261,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == nil && req.Slug == nil {
+	if req.Name == nil && req.Slug == nil && req.RetentionDays == nil {
 		httputil.WriteError(w, http.StatusBadRequest, "nothing to update")
 		return
 	}
@@ -289,6 +292,14 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		req.Slug = &trimmed
 	}
 
+	if req.RetentionDays != nil {
+		validRetentionDays := map[int]bool{0: true, 30: true, 60: true, 90: true, 180: true, 365: true}
+		if !validRetentionDays[*req.RetentionDays] {
+			httputil.WriteError(w, http.StatusBadRequest, "invalid retention days: must be 0, 30, 60, 90, 180, or 365")
+			return
+		}
+	}
+
 	setClauses := []string{}
 	args := []any{}
 	paramIdx := 1
@@ -301,6 +312,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Slug != nil {
 		setClauses = append(setClauses, fmt.Sprintf("slug = $%d", paramIdx))
 		args = append(args, *req.Slug)
+		paramIdx++
+	}
+	if req.RetentionDays != nil {
+		setClauses = append(setClauses, fmt.Sprintf("retention_days = $%d", paramIdx))
+		args = append(args, *req.RetentionDays)
 		paramIdx++
 	}
 
@@ -328,13 +344,13 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	var resp orgDetailResponse
 	var createdAt, updatedAt time.Time
 	err = h.db.QueryRow(r.Context(),
-		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.created_at, o.updated_at,
+		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.retention_days, o.created_at, o.updated_at,
 		        (SELECT role FROM organization_members WHERE organization_id = o.id AND user_id = $2) AS role,
 		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id) AS member_count
 		 FROM organizations o
 		 WHERE o.id = $1`,
 		orgID, userID,
-	).Scan(&resp.ID, &resp.Name, &resp.Slug, &resp.SubscriptionPlan, &createdAt, &updatedAt, &resp.Role, &resp.MemberCount)
+	).Scan(&resp.ID, &resp.Name, &resp.Slug, &resp.SubscriptionPlan, &resp.RetentionDays, &createdAt, &updatedAt, &resp.Role, &resp.MemberCount)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to read updated organization")
 		return

@@ -181,11 +181,11 @@ func TestList(t *testing.T) {
 
 	handler := NewHandler(mock, testBaseURL)
 
-	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, om\.role`).
+	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, om\.role`).
 		WithArgs(testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "role", "member_count"}).
-			AddRow("org-1", "Acme Corp", "acme-corp", "free", "owner", int64(3)).
-			AddRow("org-2", "Beta Inc", "beta-inc", "pro", "member", int64(5)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "role", "member_count"}).
+			AddRow("org-1", "Acme Corp", "acme-corp", "free", 0, "owner", int64(3)).
+			AddRow("org-2", "Beta Inc", "beta-inc", "pro", 90, "member", int64(5)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/organizations", handler.List)
@@ -233,10 +233,10 @@ func TestGet(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	orgID := "org-1"
 
-	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.created_at, o\.updated_at, om\.role`).
+	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, o\.created_at, o\.updated_at, om\.role`).
 		WithArgs(orgID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "created_at", "updated_at", "role", "member_count"}).
-			AddRow(orgID, "Acme Corp", "acme-corp", "free", now, now, "owner", int64(3)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count"}).
+			AddRow(orgID, "Acme Corp", "acme-corp", "free", 0, now, now, "owner", int64(3)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/organizations/{orgId}", handler.Get)
@@ -280,7 +280,7 @@ func TestGet_NonMember(t *testing.T) {
 	handler := NewHandler(mock, testBaseURL)
 	orgID := "org-1"
 
-	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.created_at, o\.updated_at, om\.role`).
+	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, o\.created_at, o\.updated_at, om\.role`).
 		WithArgs(orgID, testUserID).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -324,10 +324,10 @@ func TestUpdate_AsOwner(t *testing.T) {
 		WithArgs(newName, orgID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
-	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.created_at, o\.updated_at`).
+	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, o\.created_at, o\.updated_at`).
 		WithArgs(orgID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "created_at", "updated_at", "role", "member_count"}).
-			AddRow(orgID, newName, "acme-corp", "free", now, now, "owner", int64(1)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count"}).
+			AddRow(orgID, newName, "acme-corp", "free", 0, now, now, "owner", int64(1)))
 
 	body, _ := json.Marshal(map[string]any{"name": newName})
 
@@ -450,6 +450,92 @@ func TestDelete_AsAdmin(t *testing.T) {
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
 	if errMsg != "only owners can delete the organization" {
 		t.Errorf("expected error %q, got %q", "only owners can delete the organization", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestUpdate_RetentionDays_Valid(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, testBaseURL)
+	orgID := "org-1"
+	now := time.Now().UTC().Truncate(time.Second)
+	retentionDays := 90
+
+	mock.ExpectQuery(`SELECT role FROM organization_members WHERE organization_id = \$1 AND user_id = \$2`).
+		WithArgs(orgID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("owner"))
+
+	mock.ExpectExec(`UPDATE organizations SET retention_days = \$1, updated_at = now\(\) WHERE id = \$2`).
+		WithArgs(retentionDays, orgID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, o\.created_at, o\.updated_at`).
+		WithArgs(orgID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count"}).
+			AddRow(orgID, "Acme Corp", "acme-corp", "free", retentionDays, now, now, "owner", int64(1)))
+
+	body, _ := json.Marshal(map[string]any{"retentionDays": retentionDays})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/organizations/{orgId}", handler.Update)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/organizations/"+orgID, body))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp orgDetailResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.RetentionDays != retentionDays {
+		t.Errorf("expected retentionDays %d, got %d", retentionDays, resp.RetentionDays)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestUpdate_RetentionDays_Invalid(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, testBaseURL)
+	orgID := "org-1"
+
+	mock.ExpectQuery(`SELECT role FROM organization_members WHERE organization_id = \$1 AND user_id = \$2`).
+		WithArgs(orgID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("owner"))
+
+	body, _ := json.Marshal(map[string]any{"retentionDays": 45})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/organizations/{orgId}", handler.Update)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/organizations/"+orgID, body))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "invalid retention days: must be 0, 30, 60, 90, 180, or 365" {
+		t.Errorf("expected error %q, got %q", "invalid retention days: must be 0, 30, 60, 90, 180, or 365", errMsg)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
