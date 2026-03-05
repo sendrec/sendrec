@@ -54,7 +54,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -71,7 +71,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -89,7 +89,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -105,7 +105,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -122,7 +122,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -144,7 +144,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // PATCH response
     renderSettings();
 
@@ -175,7 +175,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockRejectedValueOnce(new Error("Failed to update name"));
     renderSettings();
 
@@ -201,7 +201,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -225,7 +225,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // PATCH response
     renderSettings();
 
@@ -257,7 +257,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // PATCH response
     renderSettings();
 
@@ -287,7 +287,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -304,7 +304,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -322,7 +322,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -349,7 +349,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([]) // api-keys
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -373,7 +373,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -389,7 +389,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -407,7 +407,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -425,7 +425,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -451,7 +451,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ companyName: "Acme Corp", colorBackground: "#112233", colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -471,7 +471,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -490,7 +490,7 @@ describe("Settings", () => {
       ])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -508,7 +508,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce({ id: "new-key-1", key: "sr_abc123", name: "Test Key", createdAt: "2026-02-16T10:00:00Z" });
     renderSettings();
 
@@ -537,7 +537,7 @@ describe("Settings", () => {
       ])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // DELETE response
     renderSettings();
 
@@ -563,7 +563,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -581,7 +581,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null })
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -614,7 +614,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockRejectedValueOnce(new Error("maximum number of API keys reached"));
     renderSettings();
 
@@ -637,7 +637,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -655,7 +655,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // PUT response
     renderSettings();
 
@@ -693,7 +693,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // POST test-slack response
     renderSettings();
 
@@ -721,7 +721,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockRejectedValueOnce(new Error("Invalid webhook URL"));
     renderSettings();
 
@@ -749,7 +749,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce(undefined); // PUT response for clear
     renderSettings();
 
@@ -784,7 +784,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -801,7 +801,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -818,7 +818,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -839,7 +839,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -861,7 +861,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
       renderSettings();
 
       await waitFor(() => {
@@ -879,7 +879,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
         .mockResolvedValueOnce([]) // integrations
-        .mockResolvedValueOnce([]) // identities
+        .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
         .mockResolvedValueOnce(undefined) // PUT notifications
         .mockResolvedValueOnce({ notificationMode: "off", webhookSecret: "whsec_abc123" }) // GET after save
         .mockResolvedValueOnce([]); // deliveries fetch triggered by savedWebhookUrl change
@@ -923,7 +923,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
         .mockResolvedValueOnce([]) // integrations
-        .mockResolvedValueOnce([]) // identities
+        .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
         .mockResolvedValueOnce([
           {
             id: "del-1",
@@ -970,7 +970,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
         .mockResolvedValueOnce([]) // integrations
-        .mockResolvedValueOnce([]) // identities
+        .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
         .mockResolvedValueOnce([]) // initial deliveries fetch
         .mockResolvedValueOnce(undefined) // POST test-webhook
         .mockResolvedValueOnce([{ // refreshed deliveries
@@ -1007,7 +1007,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
       renderSettings();
 
       await waitFor(() => {
@@ -1028,7 +1028,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
         .mockResolvedValueOnce([]) // integrations
-        .mockResolvedValueOnce([]) // identities
+        .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
         .mockResolvedValueOnce([]); // deliveries
       renderSettings();
 
@@ -1054,7 +1054,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
         .mockResolvedValueOnce([]) // integrations
-        .mockResolvedValueOnce([]) // identities
+        .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
         .mockResolvedValueOnce([]) // deliveries
         .mockResolvedValueOnce({ webhookSecret: "whsec_new" }); // regenerate response
       renderSettings();
@@ -1083,7 +1083,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
       renderSettings();
 
       await waitFor(() => {
@@ -1134,7 +1134,7 @@ describe("Settings", () => {
         .mockResolvedValueOnce([])
         .mockRejectedValueOnce(new Error("Not Found")) // billing
         .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
 
       renderSettings();
 
@@ -1190,7 +1190,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -1206,7 +1206,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -1223,7 +1223,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce({ message: "Settings updated" }); // PATCH /api/user
     renderSettings();
 
@@ -1250,7 +1250,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -1267,7 +1267,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -1284,7 +1284,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce({ message: "Settings updated" }); // PATCH /api/user
     renderSettings();
 
@@ -1310,7 +1310,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -1327,7 +1327,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]); // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -1343,7 +1343,7 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([]) // identities
+      .mockResolvedValueOnce({ identities: [], hasPassword: false }) // identities
       .mockResolvedValueOnce({ message: "Settings updated" }); // PATCH /api/user
     renderSettings();
 
@@ -1369,10 +1369,13 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([
-        { provider: "google", email: "alice@gmail.com" },
-        { provider: "microsoft", email: "alice@outlook.com" },
-      ]); // identities
+      .mockResolvedValueOnce({
+        identities: [
+          { provider: "google", email: "alice@gmail.com" },
+          { provider: "microsoft", email: "alice@outlook.com" },
+        ],
+        hasPassword: true,
+      }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -1393,10 +1396,13 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([
-        { provider: "google", email: "alice@gmail.com" },
-        { provider: "microsoft", email: "alice@outlook.com" },
-      ]) // identities
+      .mockResolvedValueOnce({
+        identities: [
+          { provider: "google", email: "alice@gmail.com" },
+          { provider: "microsoft", email: "alice@outlook.com" },
+        ],
+        hasPassword: true,
+      }) // identities
       .mockResolvedValueOnce(undefined); // DELETE response
     renderSettings();
 
@@ -1416,7 +1422,7 @@ describe("Settings", () => {
     });
   });
 
-  it("disables disconnect when only one identity", async () => {
+  it("disables disconnect when only one identity and no password", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
       .mockResolvedValueOnce({ notificationMode: "off" })
@@ -1424,9 +1430,10 @@ describe("Settings", () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error("Not Found")) // billing
       .mockResolvedValueOnce([]) // integrations
-      .mockResolvedValueOnce([
-        { provider: "google", email: "alice@gmail.com" },
-      ]); // identities
+      .mockResolvedValueOnce({
+        identities: [{ provider: "google", email: "alice@gmail.com" }],
+        hasPassword: false,
+      }); // identities
     renderSettings();
 
     await waitFor(() => {
@@ -1434,5 +1441,26 @@ describe("Settings", () => {
     });
 
     expect(screen.getByRole("button", { name: "Disconnect" })).toBeDisabled();
+  });
+
+  it("enables disconnect when only one identity but has password", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce([]) // integrations
+      .mockResolvedValueOnce({
+        identities: [{ provider: "google", email: "alice@gmail.com" }],
+        hasPassword: true,
+      }); // identities
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Connected Accounts")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: "Disconnect" })).toBeEnabled();
   });
 });

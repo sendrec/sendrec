@@ -687,6 +687,10 @@ func TestListIdentities_Success(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
+	mock.ExpectQuery(`SELECT password FROM users WHERE id = \$1`).
+		WithArgs("user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"password"}).AddRow("$2a$10$hashed"))
+
 	createdAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	mock.ExpectQuery(`SELECT provider, external_id, email, created_at FROM external_identities WHERE user_id = \$1 ORDER BY created_at`).
 		WithArgs("user-1").
@@ -705,19 +709,25 @@ func TestListIdentities_Success(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
-	var identities []identityResponse
-	if err := json.NewDecoder(rec.Body).Decode(&identities); err != nil {
+	var resp struct {
+		Identities  []identityResponse `json:"identities"`
+		HasPassword bool               `json:"hasPassword"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if len(identities) != 2 {
-		t.Fatalf("identities count = %d, want 2", len(identities))
+	if len(resp.Identities) != 2 {
+		t.Fatalf("identities count = %d, want 2", len(resp.Identities))
 	}
-	if identities[0].Provider != "github" {
-		t.Errorf("first provider = %q, want %q", identities[0].Provider, "github")
+	if resp.Identities[0].Provider != "github" {
+		t.Errorf("first provider = %q, want %q", resp.Identities[0].Provider, "github")
 	}
-	if identities[1].Provider != "google" {
-		t.Errorf("second provider = %q, want %q", identities[1].Provider, "google")
+	if resp.Identities[1].Provider != "google" {
+		t.Errorf("second provider = %q, want %q", resp.Identities[1].Provider, "google")
+	}
+	if !resp.HasPassword {
+		t.Error("expected hasPassword = true")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

@@ -621,6 +621,15 @@ func (h *Handler) ListIdentities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var password string
+	if err := h.db.QueryRow(r.Context(),
+		"SELECT password FROM users WHERE id = $1", userID,
+	).Scan(&password); err != nil {
+		slog.Error("sso: failed to check user password", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to list identities")
+		return
+	}
+
 	rows, err := h.db.Query(r.Context(),
 		"SELECT provider, external_id, email, created_at FROM external_identities WHERE user_id = $1 ORDER BY created_at",
 		userID,
@@ -648,7 +657,10 @@ func (h *Handler) ListIdentities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httputil.WriteJSON(w, http.StatusOK, identities)
+	httputil.WriteJSON(w, http.StatusOK, map[string]any{
+		"identities":  identities,
+		"hasPassword": password != "",
+	})
 }
 
 // UnlinkIdentity removes an external identity link for the authenticated user.

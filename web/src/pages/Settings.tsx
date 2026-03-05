@@ -55,6 +55,11 @@ interface LinkedIdentity {
   email: string;
 }
 
+interface IdentitiesResponse {
+  identities: LinkedIdentity[];
+  hasPassword: boolean;
+}
+
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
 
 function formatJson(value: string): string {
@@ -145,6 +150,7 @@ export function Settings() {
   const [jiraApiToken, setJiraApiToken] = useState("");
   const [jiraProjectKey, setJiraProjectKey] = useState("");
   const [identities, setIdentities] = useState<LinkedIdentity[]>([]);
+  const [identityHasPassword, setIdentityHasPassword] = useState(false);
   const [identityError, setIdentityError] = useState("");
 
   const nameIsDirty = profile !== null && name !== profile.name;
@@ -219,7 +225,7 @@ export function Settings() {
       try {
         const [intgData, identityData] = await Promise.all([
           apiFetch<IntegrationConfig[]>("/api/settings/integrations").catch(() => null),
-          apiFetch<LinkedIdentity[]>("/api/user/identities").catch(() => null),
+          apiFetch<IdentitiesResponse>("/api/user/identities").catch(() => null),
         ]);
         if (intgData) {
           setIntegrations(intgData);
@@ -237,7 +243,8 @@ export function Settings() {
           }
         }
         if (identityData) {
-          setIdentities(identityData);
+          setIdentities(identityData.identities);
+          setIdentityHasPassword(identityData.hasPassword);
         }
       } catch { /* integrations/identities not available */ }
 
@@ -1728,8 +1735,8 @@ body                /* Background, font, text color */
                   type="button"
                   className="btn btn--danger btn--danger-sm"
                   onClick={() => handleDisconnectIdentity(identity.provider)}
-                  disabled={identities.length <= 1}
-                  title={identities.length <= 1 ? "Cannot disconnect your only login method" : undefined}
+                  disabled={identities.length <= 1 && !identityHasPassword}
+                  title={identities.length <= 1 && !identityHasPassword ? "Cannot disconnect your only login method" : undefined}
                 >
                   Disconnect
                 </button>
