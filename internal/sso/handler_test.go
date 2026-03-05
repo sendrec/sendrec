@@ -803,3 +803,260 @@ func TestUnlinkIdentity_BlocksLastIdentityNoPassword(t *testing.T) {
 	}
 }
 
+// --- OrgCallback Tests ---
+
+func TestOrgCallback_ErrorParam_Redirects(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/org/callback?error=access_denied&error_description=User+cancelled", nil)
+	rec := httptest.NewRecorder()
+	handler.OrgCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error= in redirect", location)
+	}
+	if !strings.Contains(location, "cancelled") {
+		t.Fatalf("Location = %q, want error description containing 'cancelled'", location)
+	}
+}
+
+func TestOrgCallback_ErrorParam_DefaultDescription(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/org/callback?error=access_denied", nil)
+	rec := httptest.NewRecorder()
+	handler.OrgCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "denied") {
+		t.Fatalf("Location = %q, want 'denied' in error", location)
+	}
+}
+
+func TestOrgCallback_MissingStateCookie(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/org/callback?code=auth-code&state=some-state", nil)
+	rec := httptest.NewRecorder()
+	handler.OrgCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error=", location)
+	}
+}
+
+func TestOrgCallback_MissingOrgCookie(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/org/callback?code=auth-code&state=valid-state", nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: "valid-state"})
+	rec := httptest.NewRecorder()
+	handler.OrgCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error=", location)
+	}
+}
+
+func TestOrgCallback_StateMismatch(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/org/callback?code=auth-code&state=wrong-state", nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: "correct-state"})
+	req.AddCookie(&http.Cookie{Name: "sso_org", Value: "org-1"})
+	rec := httptest.NewRecorder()
+	handler.OrgCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error=", location)
+	}
+}
+
+func TestOrgCallback_MissingCode(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	state := "valid-state-no-code"
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/org/callback?state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	req.AddCookie(&http.Cookie{Name: "sso_org", Value: "org-1"})
+	rec := httptest.NewRecorder()
+	handler.OrgCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error=", location)
+	}
+}
+
+func TestOrgCallback_ConfigNotFound(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT issuer_url, client_id, client_secret_encrypted FROM organization_sso_configs`).
+		WithArgs("org-1").
+		WillReturnError(pgx.ErrNoRows)
+
+	state := "valid-state-no-config"
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/org/callback?code=auth-code&state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	req.AddCookie(&http.Cookie{Name: "sso_org", Value: "org-1"})
+	rec := httptest.NewRecorder()
+	handler.OrgCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error=", location)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestOrgCallback_ClearsStateCookies(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT issuer_url, client_id, client_secret_encrypted FROM organization_sso_configs`).
+		WithArgs("org-1").
+		WillReturnError(pgx.ErrNoRows)
+
+	state := "valid-state-cookies"
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/org/callback?code=auth-code&state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	req.AddCookie(&http.Cookie{Name: "sso_org", Value: "org-1"})
+	rec := httptest.NewRecorder()
+	handler.OrgCallback(rec, req)
+
+	var stateCleared, orgCleared bool
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "sso_state" && c.MaxAge < 0 {
+			stateCleared = true
+		}
+		if c.Name == "sso_org" && c.MaxAge < 0 {
+			orgCleared = true
+		}
+	}
+	if !stateCleared {
+		t.Error("sso_state cookie was not cleared")
+	}
+	if !orgCleared {
+		t.Error("sso_org cookie was not cleared")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+// --- Additional SSO Config Tests ---
+
+func TestSaveConfig_WithEnforcement(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("owner"))
+
+	mock.ExpectExec(`INSERT INTO organization_sso_configs`).
+		WithArgs("org-1", "https://login.microsoftonline.com/tenant/v2.0", "ms-client", pgxmock.AnyArg(), true).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := `{"issuerUrl":"https://login.microsoftonline.com/tenant/v2.0","clientId":"ms-client","clientSecret":"ms-secret","enforceSso":true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
+	req = requestWithOrg(req, "org-1", "owner")
+
+	rec := httptest.NewRecorder()
+	handler.SaveConfig(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSaveConfig_ViewerBlocked(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("viewer"))
+
+	body := `{"issuerUrl":"https://example.com","clientId":"id","clientSecret":"secret"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
+	req = requestWithOrg(req, "org-1", "viewer")
+
+	rec := httptest.NewRecorder()
+	handler.SaveConfig(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestUnlinkIdentity_AllowedWithPassword(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT password FROM users WHERE id = \$1`).
+		WithArgs("user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"password"}).AddRow("$2a$10$hashed"))
+
+	mock.ExpectQuery(`SELECT count\(\*\) FROM external_identities WHERE user_id = \$1`).
+		WithArgs("user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
+
+	mock.ExpectExec(`DELETE FROM external_identities WHERE user_id = \$1 AND provider = \$2`).
+		WithArgs("user-1", "google").
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/sso/identities/google", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+	rec := callWithChiParam(handler.UnlinkIdentity, http.MethodDelete, "/api/sso/identities/{provider}", "provider", "google", req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
