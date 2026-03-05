@@ -731,7 +731,7 @@ export function Settings() {
             </>
           )}
 
-          {billing.plan === "pro" && !billing.subscriptionStatus && (
+          {billing.plan === "pro" && billing.subscriptionStatus !== "canceled" && (
             <div className="upgrade-card">
               <div className="upgrade-card-info">
                 <span className="upgrade-card-plan">Business</span>
