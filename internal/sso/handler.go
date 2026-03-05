@@ -591,3 +591,96 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 	redirectURL := h.baseURL + "/login?sso_token=" + url.QueryEscape(accessToken)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
+
+// --- Connected Accounts API (Task 9) ---
+
+type identityResponse struct {
+	Provider   string    `json:"provider"`
+	ExternalID string    `json:"external_id"`
+	Email      string    `json:"email"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// ListIdentities returns all external identity links for the authenticated user.
+func (h *Handler) ListIdentities(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	if userID == "" {
+		httputil.WriteError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	rows, err := h.db.Query(r.Context(),
+		"SELECT provider, external_id, email, created_at FROM external_identities WHERE user_id = $1 ORDER BY created_at",
+		userID,
+	)
+	if err != nil {
+		slog.Error("sso: failed to list identities", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to list identities")
+		return
+	}
+	defer rows.Close()
+
+	identities := make([]identityResponse, 0)
+	for rows.Next() {
+		var identity identityResponse
+		if err := rows.Scan(&identity.Provider, &identity.ExternalID, &identity.Email, &identity.CreatedAt); err != nil {
+			slog.Error("sso: failed to scan identity row", "error", err)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to list identities")
+			return
+		}
+		identities = append(identities, identity)
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, identities)
+}
+
+// UnlinkIdentity removes an external identity link for the authenticated user.
+func (h *Handler) UnlinkIdentity(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	if userID == "" {
+		httputil.WriteError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	providerName := chi.URLParam(r, "provider")
+
+	// Check if user has a password set.
+	var password string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT password FROM users WHERE id = $1",
+		userID,
+	).Scan(&password)
+	if err != nil {
+		slog.Error("sso: failed to check user password", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to unlink identity")
+		return
+	}
+
+	// Count remaining identities.
+	var identityCount int
+	err = h.db.QueryRow(r.Context(),
+		"SELECT count(*) FROM external_identities WHERE user_id = $1",
+		userID,
+	).Scan(&identityCount)
+	if err != nil {
+		slog.Error("sso: failed to count identities", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to unlink identity")
+		return
+	}
+
+	if password == "" && identityCount <= 1 {
+		httputil.WriteError(w, http.StatusBadRequest, "cannot unlink last identity without a password set")
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"DELETE FROM external_identities WHERE user_id = $1 AND provider = $2",
+		userID, providerName,
+	); err != nil {
+		slog.Error("sso: failed to delete identity", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to unlink identity")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}

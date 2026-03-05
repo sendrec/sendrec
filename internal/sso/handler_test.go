@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -652,6 +653,128 @@ func TestInitiateOrgSSO_NoConfig(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+// --- Task 9: Connected Accounts API Tests ---
+
+func TestListIdentities_Success(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	createdAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	mock.ExpectQuery(`SELECT provider, external_id, email, created_at FROM external_identities WHERE user_id = \$1 ORDER BY created_at`).
+		WithArgs("user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"provider", "external_id", "email", "created_at"}).
+			AddRow("github", "gh-123", "user@example.com", createdAt).
+			AddRow("google", "ggl-456", "user@example.com", createdAt))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/identities", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	handler.ListIdentities(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var identities []identityResponse
+	if err := json.NewDecoder(rec.Body).Decode(&identities); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(identities) != 2 {
+		t.Fatalf("identities count = %d, want 2", len(identities))
+	}
+	if identities[0].Provider != "github" {
+		t.Errorf("first provider = %q, want %q", identities[0].Provider, "github")
+	}
+	if identities[1].Provider != "google" {
+		t.Errorf("second provider = %q, want %q", identities[1].Provider, "google")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestUnlinkIdentity_Success(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	// User has a password set.
+	mock.ExpectQuery(`SELECT password FROM users WHERE id = \$1`).
+		WithArgs("user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"password"}).AddRow("$2a$10$hashed"))
+
+	// Count identities = 2.
+	mock.ExpectQuery(`SELECT count\(\*\) FROM external_identities WHERE user_id = \$1`).
+		WithArgs("user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
+
+	// Delete the identity.
+	mock.ExpectExec(`DELETE FROM external_identities WHERE user_id = \$1 AND provider = \$2`).
+		WithArgs("user-1", "github").
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/sso/identities/github", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+	rec := callWithChiParam(handler.UnlinkIdentity, http.MethodDelete, "/api/sso/identities/{provider}", "provider", "github", req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp["status"] != "ok" {
+		t.Errorf("status = %q, want %q", resp["status"], "ok")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestUnlinkIdentity_BlocksLastIdentityNoPassword(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	// User has NO password set (empty string).
+	mock.ExpectQuery(`SELECT password FROM users WHERE id = \$1`).
+		WithArgs("user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"password"}).AddRow(""))
+
+	// Count identities = 1 (last one).
+	mock.ExpectQuery(`SELECT count\(\*\) FROM external_identities WHERE user_id = \$1`).
+		WithArgs("user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/sso/identities/github", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+	rec := callWithChiParam(handler.UnlinkIdentity, http.MethodDelete, "/api/sso/identities/{provider}", "provider", "github", req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+
+	// Verify the error message mentions the constraint.
+	var errResp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	if !strings.Contains(errResp["error"], "cannot unlink last identity") {
+		t.Errorf("error = %q, want to contain %q", errResp["error"], "cannot unlink last identity")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
