@@ -53,10 +53,13 @@ export function Login() {
     }
   }, [navigate]);
 
+  const [ssoEmail, setSsoEmail] = useState("");
+
   async function handleLogin(data: {
     email: string;
     password: string;
   }) {
+    setSsoEmail("");
     try {
       const result = await apiFetch<{ accessToken: string }>(
         "/api/auth/login",
@@ -79,6 +82,10 @@ export function Login() {
         navigate("/check-email", { state: { email: data.email } });
         return;
       }
+      if (err instanceof ApiError && err.status === 403 && err.message === "sso_required") {
+        setSsoEmail(data.email);
+        throw new Error("Your workspace requires SSO sign-in. Use the button below.");
+      }
       throw err;
     }
   }
@@ -86,15 +93,23 @@ export function Login() {
   const redirect = searchParams.get("redirect");
   const registerPath = redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : "/register";
 
-  const ssoSection = (ssoProviders.length > 0 || ssoError) ? (
+  const ssoSection = (ssoProviders.length > 0 || ssoError || ssoEmail) ? (
     <>
       {ssoError && (
         <div className="auth-error-banner">{ssoError}</div>
       )}
-      {ssoProviders.length > 0 && (
+      {(ssoProviders.length > 0 || ssoEmail) && (
         <>
           <div className="auth-divider">or</div>
           <div className="sso-buttons">
+            {ssoEmail && (
+              <a
+                href={`/api/auth/sso/org?email=${encodeURIComponent(ssoEmail)}`}
+                className="btn btn--secondary btn--sso"
+              >
+                Sign in with workspace SSO
+              </a>
+            )}
             {ssoProviders.map((provider) => (
               <a
                 key={provider}
