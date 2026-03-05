@@ -38,6 +38,8 @@ tags:
     description: Team workspace management
   - name: Integrations
     description: External service integrations (Jira, GitHub)
+  - name: SSO
+    description: Single sign-on (social login and workspace OIDC/SAML)
 
 components:
   securitySchemes:
@@ -1408,6 +1410,83 @@ components:
           type: integer
           enum: [0, 30, 60, 90, 180, 365]
           description: Auto-delete videos after this many days (0 = disabled)
+
+    SSOProviderList:
+      type: object
+      required: [providers]
+      properties:
+        providers:
+          type: array
+          items:
+            type: string
+          description: List of enabled social login provider names (e.g. google, microsoft, github)
+
+    SSOConfig:
+      type: object
+      properties:
+        provider:
+          type: string
+          description: OIDC provider identifier
+        issuerUrl:
+          type: string
+          format: uri
+          description: OIDC issuer URL
+        clientId:
+          type: string
+          description: OAuth2 client ID
+        clientSecret:
+          type: string
+          description: OAuth2 client secret (masked in responses)
+        enforceSso:
+          type: boolean
+          description: When true, workspace members must authenticate via SSO
+        configured:
+          type: boolean
+          description: Whether SSO is configured for this workspace
+
+    SSOConfigRequest:
+      type: object
+      required: [issuerUrl, clientId, clientSecret]
+      properties:
+        issuerUrl:
+          type: string
+          format: uri
+          description: OIDC issuer URL
+        clientId:
+          type: string
+          description: OAuth2 client ID
+        clientSecret:
+          type: string
+          description: OAuth2 client secret
+        enforceSso:
+          type: boolean
+          description: When true, workspace members must authenticate via SSO
+
+    ExternalIdentity:
+      type: object
+      required: [provider, externalId, email, createdAt]
+      properties:
+        provider:
+          type: string
+          description: Identity provider name (e.g. google, microsoft, github)
+        externalId:
+          type: string
+          description: User ID at the external provider
+        email:
+          type: string
+          format: email
+          description: Email address from the external provider
+        createdAt:
+          type: string
+          format: date-time
+
+    StatusOkResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
 
 paths:
   /api/health:
@@ -4959,6 +5038,274 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/sso/providers:
+    get:
+      tags: [SSO]
+      summary: List enabled SSO providers
+      description: Returns the list of social login providers enabled on this instance (e.g. google, microsoft, github).
+      operationId: listSSOProviders
+      responses:
+        "200":
+          description: List of enabled providers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SSOProviderList"
+
+  /api/auth/sso/{provider}:
+    get:
+      tags: [SSO]
+      summary: Initiate social login
+      description: Redirects to the identity provider's authorization page. The provider parameter must be one of the enabled providers.
+      operationId: initiateSocialLogin
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "307":
+          description: Redirect to identity provider
+        "400":
+          description: Unknown or disabled provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/sso/{provider}/callback:
+    get:
+      tags: [SSO]
+      summary: OAuth2 callback
+      description: Handles the OAuth2 callback from the identity provider. Exchanges the authorization code for tokens, creates or links the user account, and redirects to the frontend with an SSO token.
+      operationId: ssoCallback
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth2 authorization code
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth2 state parameter for CSRF protection
+      responses:
+        "307":
+          description: Redirect to frontend with sso_token query parameter
+        "400":
+          description: Invalid state or authorization code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/sso/org:
+    get:
+      tags: [SSO]
+      summary: Initiate workspace SSO login
+      description: Looks up the workspace SSO configuration for the given email domain and redirects to the workspace identity provider.
+      operationId: initiateWorkspaceSSO
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+          description: User email address used to look up the workspace SSO configuration
+      responses:
+        "307":
+          description: Redirect to workspace identity provider
+        "404":
+          description: No SSO configuration found for the email domain
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/sso/org/callback:
+    get:
+      tags: [SSO]
+      summary: Workspace SSO callback
+      description: Handles the callback from the workspace identity provider. Validates the token, creates or links the user account, and redirects to the frontend.
+      operationId: workspaceSSOCallback
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth2 authorization code
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth2 state parameter for CSRF protection
+      responses:
+        "307":
+          description: Redirect to frontend with sso_token query parameter
+        "400":
+          description: Invalid state or authorization code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/settings/sso:
+    get:
+      tags: [SSO]
+      summary: Get workspace SSO configuration
+      description: Returns the SSO configuration for the current workspace. Requires organization context.
+      operationId: getSSOConfig
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: SSO configuration (or configured=false if not set up)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SSOConfig"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [SSO]
+      summary: Save workspace SSO configuration
+      description: Creates or updates the SSO configuration for the current workspace. Requires admin or owner role.
+      operationId: saveSSOConfig
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SSOConfigRequest"
+      responses:
+        "200":
+          description: SSO configuration saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusOkResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (admin or owner required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [SSO]
+      summary: Delete workspace SSO configuration
+      description: Removes the SSO configuration for the current workspace. Requires owner role.
+      operationId: deleteSSOConfig
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: SSO configuration deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusOkResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only owners can delete SSO configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/user/identities:
+    get:
+      tags: [SSO]
+      summary: List connected accounts
+      description: Returns all external identities linked to the authenticated user's account.
+      operationId: listIdentities
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of connected external identities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExternalIdentity"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/user/identities/{provider}:
+    delete:
+      tags: [SSO]
+      summary: Unlink an external identity
+      description: Removes a connected external identity from the authenticated user's account. Cannot unlink the last identity if no password is set.
+      operationId: unlinkIdentity
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Provider name to unlink (e.g. google, microsoft, github)
+      responses:
+        "200":
+          description: Identity unlinked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusOkResponse"
+        "400":
+          description: Cannot unlink the last identity (no other login method available)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
           content:
             application/json:
               schema:
