@@ -36,6 +36,13 @@ interface OrgBilling {
   portalUrl?: string;
 }
 
+interface SsoConfig {
+  issuerUrl: string;
+  clientId: string;
+  configured: boolean;
+  enforceSso: boolean;
+}
+
 const ROLES = ["member", "admin", "owner"] as const;
 
 export function OrgSettings() {
@@ -74,6 +81,16 @@ export function OrgSettings() {
 
   const [retentionDays, setRetentionDays] = useState(0);
 
+  const [ssoIssuerUrl, setSsoIssuerUrl] = useState("");
+  const [ssoClientId, setSsoClientId] = useState("");
+  const [ssoClientSecret, setSsoClientSecret] = useState("");
+  const [ssoEnforce, setSsoEnforce] = useState(false);
+  const [ssoConfigured, setSsoConfigured] = useState(false);
+  const [ssoMessage, setSsoMessage] = useState("");
+  const [ssoError, setSsoError] = useState("");
+  const [savingSso, setSavingSso] = useState(false);
+  const [removingSso, setRemovingSso] = useState(false);
+
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
@@ -100,13 +117,24 @@ export function OrgSettings() {
       apiFetch<Invite[]>(`/api/organizations/${orgId}/invites`).catch(() => []),
       apiFetch<OrgBilling>(`/api/organizations/${orgId}/billing`).catch(() => null),
     ])
-      .then(([orgData, memberData, inviteData, billingData]) => {
+      .then(async ([orgData, memberData, inviteData, billingData]) => {
         if (orgData) {
           setOrg(orgData);
           setOrgName(orgData.name);
           setOrgSlug(orgData.slug);
           if (orgData.retentionDays !== undefined) {
             setRetentionDays(orgData.retentionDays);
+          }
+          if (orgData.subscriptionPlan === "business") {
+            try {
+              const ssoData = await apiFetch<SsoConfig>("/api/settings/sso");
+              if (ssoData) {
+                setSsoIssuerUrl(ssoData.issuerUrl || "");
+                setSsoClientId(ssoData.clientId || "");
+                setSsoConfigured(ssoData.configured);
+                setSsoEnforce(ssoData.enforceSso);
+              }
+            } catch { /* SSO not available */ }
           }
         }
         setMembers(memberData ?? []);
@@ -290,6 +318,58 @@ export function OrgSettings() {
     } catch {
       setRetentionDays(previous);
     }
+  }
+
+  async function handleSsoSave(event: FormEvent) {
+    event.preventDefault();
+    setSsoError("");
+    setSsoMessage("");
+    setSavingSso(true);
+    try {
+      await apiFetch("/api/settings/sso", {
+        method: "PUT",
+        body: JSON.stringify({
+          issuerUrl: ssoIssuerUrl.trim(),
+          clientId: ssoClientId.trim(),
+          clientSecret: ssoClientSecret || undefined,
+          enforceSso: ssoEnforce,
+        }),
+      });
+      setSsoMessage("SSO settings saved");
+      setSsoConfigured(true);
+      setSsoClientSecret("");
+    } catch (err) {
+      setSsoError(err instanceof Error ? err.message : "Failed to save SSO settings");
+    } finally {
+      setSavingSso(false);
+    }
+  }
+
+  function handleRemoveSso() {
+    setConfirmDialog({
+      message: "Remove SSO configuration? Members will need to use password login.",
+      confirmLabel: "Remove SSO",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setRemovingSso(true);
+        setSsoError("");
+        setSsoMessage("");
+        try {
+          await apiFetch("/api/settings/sso", { method: "DELETE" });
+          setSsoIssuerUrl("");
+          setSsoClientId("");
+          setSsoClientSecret("");
+          setSsoEnforce(false);
+          setSsoConfigured(false);
+          setSsoMessage("SSO configuration removed");
+        } catch (err) {
+          setSsoError(err instanceof Error ? err.message : "Failed to remove SSO");
+        } finally {
+          setRemovingSso(false);
+        }
+      },
+    });
   }
 
   if (orgsLoading || !canManage || loading) {
@@ -592,6 +672,97 @@ export function OrgSettings() {
             </select>
           </div>
         </div>
+      )}
+
+      {canManage && org.subscriptionPlan === "business" && (
+        <form onSubmit={handleSsoSave} className="card settings-section">
+          <h2>Single Sign-On</h2>
+          <p className="card-description">
+            Configure OIDC-based single sign-on for your workspace. Members can sign in using your identity provider.
+          </p>
+
+          <div className="form-field">
+            <label className="form-label" htmlFor="sso-issuer-url">Issuer URL</label>
+            <input
+              id="sso-issuer-url"
+              type="url"
+              className="form-input"
+              value={ssoIssuerUrl}
+              onChange={(e) => setSsoIssuerUrl(e.target.value)}
+              placeholder="https://accounts.google.com"
+              required
+            />
+          </div>
+
+          <div className="form-field">
+            <label className="form-label" htmlFor="sso-client-id">Client ID</label>
+            <input
+              id="sso-client-id"
+              type="text"
+              className="form-input"
+              value={ssoClientId}
+              onChange={(e) => setSsoClientId(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-field">
+            <label className="form-label" htmlFor="sso-client-secret">Client Secret</label>
+            <input
+              id="sso-client-secret"
+              type="password"
+              className="form-input"
+              value={ssoClientSecret}
+              onChange={(e) => setSsoClientSecret(e.target.value)}
+              placeholder={ssoConfigured ? "Unchanged" : ""}
+            />
+          </div>
+
+          <div className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              id="sso-enforce"
+              type="checkbox"
+              checked={ssoEnforce}
+              onChange={(e) => setSsoEnforce(e.target.checked)}
+              style={{ width: "auto" }}
+            />
+            <label htmlFor="sso-enforce" className="form-label" style={{ margin: 0 }}>
+              Enforce SSO for all members
+            </label>
+          </div>
+          {ssoEnforce && (
+            <p className="form-hint" style={{ color: "var(--color-warning)" }}>
+              When enforced, members must sign in through your identity provider. Password login will be disabled for workspace members.
+            </p>
+          )}
+
+          {ssoError && (
+            <p className="status-message status-message--error">{ssoError}</p>
+          )}
+          {ssoMessage && (
+            <p className="status-message status-message--success">{ssoMessage}</p>
+          )}
+
+          <div className="btn-row">
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={savingSso || !ssoIssuerUrl.trim() || !ssoClientId.trim()}
+            >
+              {savingSso ? "Saving..." : "Save SSO settings"}
+            </button>
+            {ssoConfigured && (
+              <button
+                type="button"
+                className="btn btn--danger"
+                onClick={handleRemoveSso}
+                disabled={removingSso}
+              >
+                {removingSso ? "Removing..." : "Remove SSO"}
+              </button>
+            )}
+          </div>
+        </form>
       )}
 
       {isOwner && (

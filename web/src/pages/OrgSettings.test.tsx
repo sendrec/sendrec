@@ -367,4 +367,61 @@ describe("OrgSettings", () => {
       }));
     });
   });
+
+  it("renders SSO card for business plan admin", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "admin", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "admin", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([adminMember, ownerMember])
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce({ issuerUrl: "https://accounts.google.com", clientId: "abc123", configured: true, enforceSso: false }); // SSO config
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Single Sign-On")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Issuer URL")).toHaveValue("https://accounts.google.com");
+    expect(screen.getByLabelText("Client ID")).toHaveValue("abc123");
+    expect(screen.getByRole("button", { name: "Save SSO settings" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove SSO" })).toBeInTheDocument();
+  });
+
+  it("hides SSO card for free plan", async () => {
+    mockOwnerResponses();
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Single Sign-On")).not.toBeInTheDocument();
+  });
+
+  it("hides SSO card for member role", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "member", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "member", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+    });
+
+    expect(screen.queryByText("Single Sign-On")).not.toBeInTheDocument();
+  });
 });
