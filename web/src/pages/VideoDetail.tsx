@@ -45,6 +45,7 @@ interface Video {
   folderId: string | null;
   transcriptionLanguage: string | null;
   noiseReduction: boolean;
+  pinned: boolean;
   tags: VideoTag[];
   playlists: { id: string; title: string }[];
 }
@@ -387,6 +388,17 @@ export function VideoDetail() {
     setVideo((prev) =>
       prev ? { ...prev, emailGateEnabled: newValue } : prev,
     );
+  }
+
+  async function togglePin() {
+    if (!video) return;
+    const resp = await apiFetch<{ pinned: boolean }>(`/api/videos/${video.id}/pin`, {
+      method: "PUT",
+    });
+    if (resp) {
+      setVideo((prev) => (prev ? { ...prev, pinned: resp.pinned } : prev));
+      showToast(resp.pinned ? "Video pinned" : "Video unpinned");
+    }
   }
 
   async function toggleLinkExpiry() {
@@ -989,6 +1001,12 @@ export function VideoDetail() {
                 <span style={{ color: "var(--color-accent)" }}>Noise reduced</span>
               </>
             )}
+            {video.pinned && (
+              <>
+                <span>&middot;</span>
+                <span style={{ color: "var(--color-accent)" }}>Pinned</span>
+              </>
+            )}
           </p>
 
           {video.status === "processing" && (
@@ -1066,6 +1084,14 @@ export function VideoDetail() {
             Download
           </a>
         )}
+        <button
+          className="detail-btn"
+          onClick={togglePin}
+          aria-label={video.pinned ? "Unpin video" : "Pin video"}
+        >
+          <svg viewBox="0 0 24 24" fill={video.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h-6v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/><line x1="14" y1="6" x2="14" y2="2"/><line x1="10" y1="6" x2="10" y2="2"/></svg>
+          {video.pinned ? "Unpin" : "Pin"}
+        </button>
         {integrations.length > 0 &&
           (integrations.length === 1 ? (
             <button

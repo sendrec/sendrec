@@ -558,6 +558,7 @@ type userResponse struct {
 	Email                 string `json:"email"`
 	TranscriptionLanguage string `json:"transcriptionLanguage"`
 	NoiseReduction        bool   `json:"noiseReduction"`
+	RetentionDays         int    `json:"retentionDays"`
 }
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
@@ -565,8 +566,8 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	var resp userResponse
 	err := h.db.QueryRow(r.Context(),
-		"SELECT name, email, transcription_language, noise_reduction FROM users WHERE id = $1", userID,
-	).Scan(&resp.Name, &resp.Email, &resp.TranscriptionLanguage, &resp.NoiseReduction)
+		"SELECT name, email, transcription_language, noise_reduction, retention_days FROM users WHERE id = $1", userID,
+	).Scan(&resp.Name, &resp.Email, &resp.TranscriptionLanguage, &resp.NoiseReduction, &resp.RetentionDays)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "user not found")
 		return
@@ -581,6 +582,7 @@ type updateUserRequest struct {
 	NewPassword           string `json:"newPassword"`
 	TranscriptionLanguage string `json:"transcriptionLanguage"`
 	NoiseReduction        *bool  `json:"noiseReduction"`
+	RetentionDays         *int   `json:"retentionDays"`
 }
 
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -595,8 +597,9 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	hasPasswordChange := req.NewPassword != ""
 	hasLanguageChange := req.TranscriptionLanguage != ""
 	hasNoiseReductionChange := req.NoiseReduction != nil
+	hasRetentionChange := req.RetentionDays != nil
 
-	if !hasNameChange && !hasPasswordChange && !hasLanguageChange && !hasNoiseReductionChange {
+	if !hasNameChange && !hasPasswordChange && !hasLanguageChange && !hasNoiseReductionChange && !hasRetentionChange {
 		httputil.WriteError(w, http.StatusBadRequest, "nothing to update")
 		return
 	}
@@ -621,6 +624,21 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			*req.NoiseReduction, userID,
 		); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update noise reduction")
+			return
+		}
+	}
+
+	if hasRetentionChange {
+		validRetentionDays := map[int]bool{0: true, 30: true, 60: true, 90: true, 180: true, 365: true}
+		if !validRetentionDays[*req.RetentionDays] {
+			httputil.WriteError(w, http.StatusBadRequest, "invalid retention days: must be 0, 30, 60, 90, 180, or 365")
+			return
+		}
+		if _, err := h.db.Exec(r.Context(),
+			"UPDATE users SET retention_days = $1, updated_at = now() WHERE id = $2",
+			*req.RetentionDays, userID,
+		); err != nil {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to update retention days")
 			return
 		}
 	}

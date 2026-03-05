@@ -316,4 +316,55 @@ describe("OrgSettings", () => {
     expect(screen.getByText("Cancel subscription")).toBeInTheDocument();
     expect(screen.queryByText(/personal subscription/)).not.toBeInTheDocument();
   });
+
+  it("renders Data Retention select", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, retentionDays: 0 })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found"));
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Auto-delete after")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Auto-delete after")).toHaveValue("0");
+  });
+
+  it("renders Data Retention with saved value", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, retentionDays: 60 })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found"));
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Auto-delete after")).toHaveValue("60");
+    });
+  });
+
+  it("changing retention days calls PATCH /api/organizations/:id", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, retentionDays: 0 })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found")) // billing
+      .mockResolvedValueOnce({ message: "Settings updated" }); // PATCH response
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Auto-delete after")).toBeInTheDocument();
+    });
+
+    await user.selectOptions(screen.getByLabelText("Auto-delete after"), "90");
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/organizations/org-1", expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ retentionDays: 90 }),
+      }));
+    });
+  });
 });

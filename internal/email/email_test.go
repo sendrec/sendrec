@@ -910,6 +910,132 @@ func TestSendOnboardingDay7_BypassesAllowlist(t *testing.T) {
 	}
 }
 
+func TestSendRetentionWarning_Success(t *testing.T) {
+	var receivedRaw json.RawMessage
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		receivedRaw = body
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                    srv.URL,
+		Username:                   "user",
+		Password:                   "pass",
+		RetentionWarningTemplateID: 15,
+	})
+
+	videos := []RetentionVideoSummary{
+		{Title: "Video One", WatchURL: "https://example.com/watch/abc"},
+		{Title: "Video Two", WatchURL: "https://example.com/watch/def"},
+	}
+
+	err := client.SendRetentionWarning(context.Background(), "alice@example.com", videos, "2026-04-01")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var parsed struct {
+		SubscriberEmail string `json:"subscriber_email"`
+		TemplateID      int    `json:"template_id"`
+		Data            struct {
+			Videos     []RetentionVideoSummary `json:"videos"`
+			ExpiryDate string                  `json:"expiryDate"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(receivedRaw, &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if parsed.TemplateID != 15 {
+		t.Errorf("expected template_id=15, got %d", parsed.TemplateID)
+	}
+	if parsed.SubscriberEmail != "alice@example.com" {
+		t.Errorf("expected subscriber email alice@example.com, got %q", parsed.SubscriberEmail)
+	}
+	if parsed.Data.ExpiryDate != "2026-04-01" {
+		t.Errorf("expected expiryDate=2026-04-01, got %s", parsed.Data.ExpiryDate)
+	}
+	if len(parsed.Data.Videos) != 2 {
+		t.Fatalf("expected 2 videos, got %d", len(parsed.Data.Videos))
+	}
+	if parsed.Data.Videos[0].Title != "Video One" {
+		t.Errorf("expected first video title 'Video One', got %q", parsed.Data.Videos[0].Title)
+	}
+	if parsed.Data.Videos[0].WatchURL != "https://example.com/watch/abc" {
+		t.Errorf("expected first video watchURL, got %q", parsed.Data.Videos[0].WatchURL)
+	}
+}
+
+func TestSendRetentionWarning_SkipsWhenTemplateIDZero(t *testing.T) {
+	serverHit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverHit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                    srv.URL,
+		Username:                   "user",
+		Password:                   "pass",
+		RetentionWarningTemplateID: 0,
+	})
+
+	err := client.SendRetentionWarning(context.Background(),
+		"alice@example.com", []RetentionVideoSummary{{Title: "V", WatchURL: "https://example.com/watch/abc"}}, "2026-04-01")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if serverHit {
+		t.Error("expected no HTTP request when RetentionWarningTemplateID is zero")
+	}
+}
+
+func TestSendRetentionWarning_BypassesAllowlist(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                    srv.URL,
+		Username:                   "user",
+		Password:                   "pass",
+		RetentionWarningTemplateID: 15,
+		Allowlist:                  []string{"@sendrec.eu"},
+	})
+
+	err := client.SendRetentionWarning(context.Background(),
+		"stranger@example.com",
+		[]RetentionVideoSummary{{Title: "V", WatchURL: "https://example.com/watch/abc"}},
+		"2026-04-01")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.SubscriberEmail != "stranger@example.com" {
+		t.Errorf("expected retention warning email to bypass allowlist, got %q", received.SubscriberEmail)
+	}
+}
+
 func TestParseAllowlist(t *testing.T) {
 	tests := []struct {
 		input    string

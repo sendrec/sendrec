@@ -1390,9 +1390,9 @@ func TestGetUser_Success(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT name, email, transcription_language, noise_reduction FROM users WHERE id = \$1`).
+	mock.ExpectQuery(`SELECT name, email, transcription_language, noise_reduction, retention_days FROM users WHERE id = \$1`).
 		WithArgs("user-uuid-1").
-		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language", "noise_reduction"}).AddRow("Alice", "alice@example.com", "auto", true))
+		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language", "noise_reduction", "retention_days"}).AddRow("Alice", "alice@example.com", "auto", true, 0))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/user", nil)
 	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
@@ -1427,7 +1427,7 @@ func TestGetUser_NotFound(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT name, email, transcription_language, noise_reduction FROM users WHERE id = \$1`).
+	mock.ExpectQuery(`SELECT name, email, transcription_language, noise_reduction, retention_days FROM users WHERE id = \$1`).
 		WithArgs("missing-id").
 		WillReturnError(pgx.ErrNoRows)
 
@@ -1577,10 +1577,10 @@ func TestGetUser_IncludesTranscriptionLanguage(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT name, email, transcription_language, noise_reduction FROM users WHERE id = \$1`).
+	mock.ExpectQuery(`SELECT name, email, transcription_language, noise_reduction, retention_days FROM users WHERE id = \$1`).
 		WithArgs("user-uuid-1").
-		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language", "noise_reduction"}).
-			AddRow("Alice", "alice@example.com", "de", true))
+		WillReturnRows(pgxmock.NewRows([]string{"name", "email", "transcription_language", "noise_reduction", "retention_days"}).
+			AddRow("Alice", "alice@example.com", "de", true, 0))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/user", nil)
 	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
@@ -1640,5 +1640,50 @@ func TestUpdateUser_InvalidTranscriptionLanguage(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestUpdateUser_RetentionDays(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectExec(`UPDATE users SET retention_days = \$1, updated_at = now\(\) WHERE id = \$2`).
+		WithArgs(90, "user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	body := `{"retentionDays":90}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/user", strings.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
+	rec := httptest.NewRecorder()
+
+	handler.UpdateUser(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+func TestUpdateUser_InvalidRetentionDays(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	body := `{"retentionDays":45}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/user", strings.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
+	rec := httptest.NewRecorder()
+
+	handler.UpdateUser(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+
+	errMsg := decodeErrorResponse(t, rec)
+	if errMsg != "invalid retention days: must be 0, 30, 60, 90, 180, or 365" {
+		t.Errorf("expected retention days error, got %q", errMsg)
 	}
 }

@@ -12,6 +12,7 @@ interface UserProfile {
   email: string;
   transcriptionLanguage?: string;
   noiseReduction?: boolean;
+  retentionDays?: number;
 }
 
 interface APIKeyItem {
@@ -123,6 +124,7 @@ export function Settings() {
   const [transcriptionLanguage, setTranscriptionLanguage] = useState("auto");
   const [noiseReductionEnabled, setNoiseReductionEnabled] = useState(false);
   const [noiseReduction, setNoiseReduction] = useState(true);
+  const [retentionDays, setRetentionDays] = useState(0);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [integrations, setIntegrations] = useState<IntegrationConfig[]>([]);
   const [intgExpanded, setIntgExpanded] = useState<string | null>(null);
@@ -157,6 +159,9 @@ export function Settings() {
           }
           if (result.noiseReduction !== undefined) {
             setNoiseReduction(result.noiseReduction);
+          }
+          if (result.retentionDays !== undefined) {
+            setRetentionDays(result.retentionDays);
           }
         }
         if (notifPrefs) {
@@ -632,6 +637,19 @@ export function Settings() {
     }
   }
 
+  async function handleRetentionDaysChange(value: number) {
+    const previous = retentionDays;
+    setRetentionDays(value);
+    try {
+      await apiFetch("/api/user", {
+        method: "PATCH",
+        body: JSON.stringify({ retentionDays: value }),
+      });
+    } catch {
+      setRetentionDays(previous);
+    }
+  }
+
   return (
     <div className="page-container">
       <h1 className="page-title">Settings</h1>
@@ -823,6 +841,29 @@ export function Settings() {
           )}
         </div>
       )}
+
+      <div className="card settings-section">
+        <h2>Data Retention</h2>
+        <p className="card-description">
+          Automatically delete videos after a set number of days. Pinned videos are excluded.
+        </p>
+        <div className="form-field">
+          <label className="form-label" htmlFor="retention-days">Auto-delete after</label>
+          <select
+            id="retention-days"
+            className="form-input"
+            value={retentionDays}
+            onChange={(e) => handleRetentionDaysChange(Number(e.target.value))}
+          >
+            <option value={0}>Off</option>
+            <option value={30}>30 days</option>
+            <option value={60}>60 days</option>
+            <option value={90}>90 days</option>
+            <option value={180}>180 days</option>
+            <option value={365}>365 days</option>
+          </select>
+        </div>
+      </div>
 
       <div className="card settings-section">
         <h2>Integrations</h2>

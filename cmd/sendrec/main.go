@@ -96,8 +96,9 @@ func main() {
 		WelcomeTemplateID:        int(getEnvInt64("LISTMONK_WELCOME_TEMPLATE_ID", 0)),
 		OnboardingDay2TemplateID: int(getEnvInt64("LISTMONK_ONBOARDING_DAY2_TEMPLATE_ID", 0)),
 		OnboardingDay7TemplateID: int(getEnvInt64("LISTMONK_ONBOARDING_DAY7_TEMPLATE_ID", 0)),
-		OrgInviteTemplateID:      int(getEnvInt64("LISTMONK_ORG_INVITE_TEMPLATE_ID", 0)),
-		Allowlist:                email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
+		OrgInviteTemplateID:          int(getEnvInt64("LISTMONK_ORG_INVITE_TEMPLATE_ID", 0)),
+		RetentionWarningTemplateID:   int(getEnvInt64("LISTMONK_RETENTION_WARNING_TEMPLATE_ID", 0)),
+		Allowlist:                    email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
 	})
 
 	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
@@ -176,6 +177,7 @@ func main() {
 	video.StartDigestWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 	video.StartTranscodeWorker(cleanupCtx, db.Pool, store, 2*time.Minute)
 	video.StartOnboardingWorker(cleanupCtx, db.Pool, emailClient, baseURL)
+	video.StartRetentionWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%s", port),

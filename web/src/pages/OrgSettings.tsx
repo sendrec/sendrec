@@ -10,6 +10,7 @@ interface OrgDetail {
   slug: string;
   subscriptionPlan: string;
   createdAt: string;
+  retentionDays?: number;
 }
 
 interface Member {
@@ -71,6 +72,8 @@ export function OrgSettings() {
   const [upgrading, setUpgrading] = useState(false);
   const [canceling, setCanceling] = useState(false);
 
+  const [retentionDays, setRetentionDays] = useState(0);
+
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
@@ -102,6 +105,9 @@ export function OrgSettings() {
           setOrg(orgData);
           setOrgName(orgData.name);
           setOrgSlug(orgData.slug);
+          if (orgData.retentionDays !== undefined) {
+            setRetentionDays(orgData.retentionDays);
+          }
         }
         setMembers(memberData ?? []);
         setInvites((inviteData as Invite[]) ?? []);
@@ -271,6 +277,19 @@ export function OrgSettings() {
         }
       },
     });
+  }
+
+  async function handleRetentionDaysChange(value: number) {
+    const previous = retentionDays;
+    setRetentionDays(value);
+    try {
+      await apiFetch(`/api/organizations/${orgId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ retentionDays: value }),
+      });
+    } catch {
+      setRetentionDays(previous);
+    }
   }
 
   if (orgsLoading || !canManage || loading) {
@@ -547,6 +566,31 @@ export function OrgSettings() {
           {billingMessage && (
             <p className="status-message">{billingMessage}</p>
           )}
+        </div>
+      )}
+
+      {canManage && (
+        <div className="card settings-section">
+          <h2>Data Retention</h2>
+          <p className="card-description">
+            Automatically delete workspace videos after a set number of days. Pinned videos are excluded.
+          </p>
+          <div className="form-field">
+            <label className="form-label" htmlFor="org-retention-days">Auto-delete after</label>
+            <select
+              id="org-retention-days"
+              className="form-input"
+              value={retentionDays}
+              onChange={(e) => handleRetentionDaysChange(Number(e.target.value))}
+            >
+              <option value={0}>Off</option>
+              <option value={30}>30 days</option>
+              <option value={60}>60 days</option>
+              <option value={90}>90 days</option>
+              <option value={180}>180 days</option>
+              <option value={365}>365 days</option>
+            </select>
+          </div>
         </div>
       )}
 

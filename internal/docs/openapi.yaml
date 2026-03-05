@@ -34,6 +34,8 @@ tags:
     description: Playlist management and sharing
   - name: Billing
     description: Subscription and billing management
+  - name: Organizations
+    description: Team workspace management
   - name: Integrations
     description: External service integrations (Jira, GitHub)
 
@@ -126,6 +128,9 @@ components:
         email:
           type: string
           format: email
+        retentionDays:
+          type: integer
+          description: Auto-delete videos after this many days (0 = disabled)
 
     UpdateUserRequest:
       type: object
@@ -138,6 +143,10 @@ components:
           type: string
           minLength: 8
           maxLength: 72
+        retentionDays:
+          type: integer
+          enum: [0, 30, 60, 90, 180, 365]
+          description: Auto-delete videos after this many days (0 = disabled)
 
     CreateVideoRequest:
       type: object
@@ -267,6 +276,14 @@ components:
           type: string
           enum: [none, pending, processing, ready, failed]
           description: Status of AI document generation
+        pinned:
+          type: boolean
+          description: Whether the video is pinned (exempt from retention auto-delete)
+        retentionWarnedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the retention warning email was sent (null if not warned)
 
     NotificationPreferencesResponse:
       type: object
@@ -444,6 +461,9 @@ components:
         brandingEnabled:
           type: boolean
           description: Whether watch page branding customization is enabled
+        retentionDays:
+          type: integer
+          description: Auto-delete videos after this many days (0 = disabled). Reflects org setting if in workspace context, otherwise user setting.
 
     UpdateVideoRequest:
       type: object
@@ -1284,6 +1304,110 @@ components:
           format: uri
         issueKey:
           type: string
+
+    PinResponse:
+      type: object
+      required: [pinned]
+      properties:
+        pinned:
+          type: boolean
+
+    OrgListItem:
+      type: object
+      required: [id, name, slug, subscriptionPlan, retentionDays, role, memberCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        subscriptionPlan:
+          type: string
+          enum: [free, pro]
+        retentionDays:
+          type: integer
+          description: Auto-delete videos after this many days (0 = disabled)
+        role:
+          type: string
+          enum: [owner, admin, member]
+        memberCount:
+          type: integer
+          format: int64
+
+    OrgDetailResponse:
+      type: object
+      required: [id, name, slug, subscriptionPlan, retentionDays, role, memberCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        subscriptionPlan:
+          type: string
+          enum: [free, pro]
+        retentionDays:
+          type: integer
+          description: Auto-delete videos after this many days (0 = disabled)
+        role:
+          type: string
+          enum: [owner, admin, member]
+        memberCount:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateOrgRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+
+    CreateOrgResponse:
+      type: object
+      required: [id, name, slug, subscriptionPlan, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        subscriptionPlan:
+          type: string
+          enum: [free, pro]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateOrgRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        slug:
+          type: string
+          maxLength: 100
+        retentionDays:
+          type: integer
+          enum: [0, 30, 60, 90, 180, 365]
+          description: Auto-delete videos after this many days (0 = disabled)
 
 paths:
   /api/health:
@@ -3797,6 +3921,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/videos/{id}/pin:
+    put:
+      tags: [Videos]
+      summary: Toggle video pin status
+      description: Toggles the pinned state of a video. Pinned videos are exempt from automatic retention deletion.
+      operationId: toggleVideoPin
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pin status toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/videos/batch/delete:
     post:
       tags: [Videos]
@@ -4616,3 +4774,192 @@ paths:
           description: Video or integration not found
         "502":
           description: External provider error
+
+  /api/organizations:
+    get:
+      tags: [Organizations]
+      summary: List organizations
+      description: Returns all organizations the authenticated user is a member of.
+      operationId: listOrganizations
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of organizations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrgListItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [Organizations]
+      summary: Create an organization
+      description: Creates a new organization and adds the authenticated user as owner. Free plan allows 1 organization.
+      operationId: createOrganization
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrgRequest"
+      responses:
+        "201":
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateOrgResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Organization limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/organizations/{orgId}:
+    get:
+      tags: [Organizations]
+      summary: Get organization details
+      description: Returns full details of an organization the authenticated user is a member of.
+      operationId: getOrganization
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Organization details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgDetailResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Organizations]
+      summary: Update an organization
+      description: Updates organization settings. Only owners and admins can update.
+      operationId: updateOrganization
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrgRequest"
+      responses:
+        "200":
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgDetailResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (owner or admin required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Slug already taken
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Organizations]
+      summary: Delete an organization
+      description: Permanently deletes an organization. Only owners can delete.
+      operationId: deleteOrganization
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Organization deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only owners can delete the organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"

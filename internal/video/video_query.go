@@ -51,6 +51,7 @@ type listItem struct {
 	FolderID              *string            `json:"folderId"`
 	TranscriptionLanguage *string            `json:"transcriptionLanguage"`
 	NoiseReduction        bool               `json:"noiseReduction"`
+	Pinned                bool               `json:"pinned"`
 	Tags                  []listItemTag      `json:"tags"`
 	Playlists             []listItemPlaylist `json:"playlists"`
 }
@@ -109,6 +110,7 @@ type limitsResponse struct {
 	OrgsUsed                int            `json:"orgsUsed"`
 	MaxOrgMembers           int            `json:"maxOrgMembers"`
 	OrgMembersUsed          int            `json:"orgMembersUsed"`
+	RetentionDays           int            `json:"retentionDays"`
 	FieldLimits             map[string]int `json:"fieldLimits"`
 }
 
@@ -185,6 +187,17 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		).Scan(&orgMembersUsed)
 	}
 
+	var retentionDays int
+	if orgID != "" {
+		_ = h.db.QueryRow(r.Context(),
+			"SELECT retention_days FROM organizations WHERE id = $1", orgID,
+		).Scan(&retentionDays)
+	} else {
+		_ = h.db.QueryRow(r.Context(),
+			"SELECT retention_days FROM users WHERE id = $1", userID,
+		).Scan(&retentionDays)
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, limitsResponse{
 		MaxVideosPerMonth:       maxVideos,
 		MaxVideoDurationSeconds: maxDuration,
@@ -199,6 +212,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		OrgsUsed:                orgsUsed,
 		MaxOrgMembers:           maxOrgMembers,
 		OrgMembersUsed:          orgMembersUsed,
+		RetentionDays:           retentionDays,
 		FieldLimits:             validate.FieldLimits(),
 	})
 }
@@ -227,7 +241,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		    v.thumbnail_key, v.share_password, v.comment_mode,
 		    (SELECT COUNT(*) FROM video_comments vc WHERE vc.video_id = v.id) AS comment_count,
 		    v.transcript_status, v.view_notification, v.download_enabled, v.cta_text, v.cta_url, v.email_gate_enabled, v.summary_status, v.document_status,
-		    v.suggested_title, v.folder_id, v.transcription_language, v.noise_reduction,
+		    v.suggested_title, v.folder_id, v.transcription_language, v.noise_reduction, v.pinned,
 		    COALESCE((SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color) ORDER BY t.name)
 		      FROM video_tags vt JOIN tags t ON t.id = vt.tag_id
 		      WHERE vt.video_id = v.id), '[]'::json) AS tags_json,
@@ -295,7 +309,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var sharePassword *string
 		var tagsJSON string
 		var playlistsJSON string
-		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.DocumentStatus, &item.SuggestedTitle, &item.FolderID, &item.TranscriptionLanguage, &item.NoiseReduction, &tagsJSON, &playlistsJSON); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Status, &item.Duration, &item.ShareToken, &createdAt, &shareExpiresAt, &item.ViewCount, &item.UniqueViewCount, &thumbnailKey, &sharePassword, &item.CommentMode, &item.CommentCount, &item.TranscriptStatus, &item.ViewNotification, &item.DownloadEnabled, &item.CtaText, &item.CtaUrl, &item.EmailGateEnabled, &item.SummaryStatus, &item.DocumentStatus, &item.SuggestedTitle, &item.FolderID, &item.TranscriptionLanguage, &item.NoiseReduction, &item.Pinned, &tagsJSON, &playlistsJSON); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan video")
 			return
 		}

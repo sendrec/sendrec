@@ -28,6 +28,7 @@ interface Video {
   suggestedTitle: string | null;
   summaryStatus: string;
   folderId: string | null;
+  pinned: boolean;
   tags: VideoTag[];
 }
 
@@ -276,6 +277,18 @@ export function Library() {
       document.body.removeChild(textArea);
     }
     showToast("Link copied");
+  }
+
+  async function togglePin(id: string) {
+    try {
+      const resp = await apiFetch<{ pinned: boolean }>(`/api/videos/${id}/pin`, { method: "PUT" });
+      if (resp) {
+        setVideos((prev) => prev.map((v) => v.id === id ? { ...v, pinned: resp.pinned } : v));
+        showToast(resp.pinned ? "Video pinned" : "Video unpinned");
+      }
+    } catch {
+      showToast("Failed to update pin");
+    }
   }
 
   async function downloadVideo(id: string) {
@@ -761,6 +774,24 @@ export function Library() {
                     {video.status === "uploading" ? "uploading..." : "processing..."}
                   </span>
                 )}
+                {video.pinned && (
+                  <span
+                    className="video-card-pin"
+                    title="Pinned"
+                    style={{
+                      position: "absolute",
+                      top: 6,
+                      left: 6,
+                      background: "rgba(0,0,0,0.6)",
+                      borderRadius: 4,
+                      padding: "2px 4px",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--color-accent)" }}><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h-6v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/><line x1="14" y1="6" x2="14" y2="2"/><line x1="10" y1="6" x2="10" y2="2"/></svg>
+                  </span>
+                )}
               </div>
             </Link>
             <input
@@ -861,6 +892,13 @@ export function Library() {
                         boxShadow: "0 4px 16px var(--color-shadow)",
                       }}
                     >
+                      <button
+                        onClick={() => { togglePin(video.id); setOpenMenuId(null); }}
+                        className="action-link"
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
+                      >
+                        {video.pinned ? "Unpin" : "Pin"}
+                      </button>
                       <Link
                         to={`/videos/${video.id}/analytics`}
                         className="action-link"
