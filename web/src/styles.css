@@ -2610,6 +2610,33 @@ textarea.form-input {
   cursor: not-allowed;
 }
 
+/* Auth pages — SSO divider and buttons */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.5rem 0;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+.sso-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.btn--sso {
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+}
+
 /* Wide page container for Library */
 .page-container--wide { max-width: 1200px; }
 

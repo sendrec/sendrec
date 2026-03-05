@@ -3,10 +3,21 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError, apiFetch, setAccessToken } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
 
+function providerLabel(provider: string): string {
+  switch (provider) {
+    case "google": return "Google";
+    case "microsoft": return "Microsoft";
+    case "github": return "GitHub";
+    default: return provider;
+  }
+}
+
 export function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [ssoProviders, setSsoProviders] = useState<string[]>([]);
+  const [ssoError, setSsoError] = useState("");
 
   useEffect(() => {
     fetch("/api/health")
@@ -16,6 +27,39 @@ export function Login() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    fetch("/api/auth/sso/providers")
+      .then((res) => {
+        if (!res.ok) return;
+        return res.json();
+      })
+      .then((data: { providers?: string[] } | undefined) => {
+        if (data?.providers?.length) {
+          setSsoProviders(data.providers);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("sso_token");
+    const error = params.get("sso_error");
+
+    if (token) {
+      setAccessToken(token);
+      window.history.replaceState({}, "", window.location.pathname);
+      const redirect = params.get("redirect");
+      navigate(redirect || "/");
+      return;
+    }
+
+    if (error) {
+      setSsoError(error);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [navigate]);
 
   async function handleLogin(data: {
     email: string;
@@ -50,11 +94,36 @@ export function Login() {
   const redirect = searchParams.get("redirect");
   const registerPath = redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : "/register";
 
+  const ssoSection = (ssoProviders.length > 0 || ssoError) ? (
+    <>
+      {ssoError && (
+        <div className="auth-error-banner">{ssoError}</div>
+      )}
+      {ssoProviders.length > 0 && (
+        <>
+          <div className="auth-divider">or</div>
+          <div className="sso-buttons">
+            {ssoProviders.map((provider) => (
+              <a
+                key={provider}
+                href={`/api/auth/sso/${provider}`}
+                className="btn btn--secondary btn--sso"
+              >
+                Continue with {providerLabel(provider)}
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  ) : null;
+
   return (
     <AuthForm
       title="Sign in"
       submitLabel="Sign in"
       onSubmit={handleLogin}
+      afterSubmit={ssoSection}
       footer={
         <>
           <Link to="/forgot-password" className="auth-footer-link-block">

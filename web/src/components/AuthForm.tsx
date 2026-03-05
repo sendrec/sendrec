@@ -12,6 +12,7 @@ interface AuthFormProps {
     name: string;
   }) => Promise<void>;
   footer: ReactNode;
+  afterSubmit?: ReactNode;
 }
 
 export function AuthForm({
@@ -21,6 +22,7 @@ export function AuthForm({
   showPasswordConfirm,
   onSubmit,
   footer,
+  afterSubmit,
 }: AuthFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -146,6 +148,8 @@ export function AuthForm({
         <button type="submit" disabled={loading}>
           {loading ? "Loading..." : submitLabel}
         </button>
+
+        {afterSubmit}
 
         <div className="auth-footer">
           {footer}
