@@ -49,6 +49,20 @@ interface IntegrationConfig {
   config: Record<string, string>;
 }
 
+interface LinkedIdentity {
+  provider: string;
+  email: string;
+}
+
+function providerLabel(provider: string): string {
+  switch (provider) {
+    case "google": return "Google";
+    case "microsoft": return "Microsoft";
+    case "github": return "GitHub";
+    default: return provider;
+  }
+}
+
 const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
 
 function formatJson(value: string): string {
@@ -138,6 +152,8 @@ export function Settings() {
   const [jiraEmail, setJiraEmail] = useState("");
   const [jiraApiToken, setJiraApiToken] = useState("");
   const [jiraProjectKey, setJiraProjectKey] = useState("");
+  const [identities, setIdentities] = useState<LinkedIdentity[]>([]);
+  const [identityError, setIdentityError] = useState("");
 
   const nameIsDirty = profile !== null && name !== profile.name;
   useUnsavedChanges(nameIsDirty);
@@ -209,7 +225,10 @@ export function Settings() {
       }
 
       try {
-        const intgData = await apiFetch<IntegrationConfig[]>("/api/settings/integrations");
+        const [intgData, identityData] = await Promise.all([
+          apiFetch<IntegrationConfig[]>("/api/settings/integrations").catch(() => null),
+          apiFetch<LinkedIdentity[]>("/api/user/identities").catch(() => null),
+        ]);
         if (intgData) {
           setIntegrations(intgData);
           for (const ig of intgData) {
@@ -225,7 +244,10 @@ export function Settings() {
             }
           }
         }
-      } catch { /* integrations endpoint not available — ok */ }
+        if (identityData) {
+          setIdentities(identityData);
+        }
+      } catch { /* integrations/identities not available */ }
 
       const params = new URLSearchParams(window.location.search);
       if (params.get("billing") === "success") {
@@ -600,6 +622,16 @@ export function Settings() {
       setIntgMessage("Disconnected");
     } catch (err) {
       setIntgError(err instanceof Error ? err.message : "Failed to disconnect");
+    }
+  }
+
+  async function handleDisconnectIdentity(provider: string) {
+    setIdentityError("");
+    try {
+      await apiFetch(`/api/user/identities/${provider}`, { method: "DELETE" });
+      setIdentities((prev) => prev.filter((i) => i.provider !== provider));
+    } catch (err) {
+      setIdentityError(err instanceof Error ? err.message : "Failed to disconnect");
     }
   }
 
@@ -1626,6 +1658,39 @@ body                /* Background, font, text color */
           </button>
         </div>
       </form>
+
+      {identities.length > 0 && (
+        <div className="card settings-section">
+          <h2>Connected Accounts</h2>
+          <p className="card-description">
+            External accounts linked to your SendRec account.
+          </p>
+
+          {identityError && (
+            <p className="status-message status-message--error">{identityError}</p>
+          )}
+
+          <div className="key-list">
+            {identities.map((identity) => (
+              <div key={identity.provider} className="api-key-row">
+                <div className="api-key-info">
+                  <span className="api-key-name">{providerLabel(identity.provider)}</span>
+                  <span className="api-key-meta">{identity.email}</span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn--danger btn--danger-sm"
+                  onClick={() => handleDisconnectIdentity(identity.provider)}
+                  disabled={identities.length <= 1}
+                  title={identities.length <= 1 ? "Cannot disconnect your only login method" : undefined}
+                >
+                  Disconnect
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {confirmDialog && (
         <ConfirmDialog
