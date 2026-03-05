@@ -239,7 +239,7 @@ func TestRequireWriter_AllowsMember(t *testing.T) {
 	handler := RequireWriter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calledNext = true
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 	handler.ServeHTTP(rec, req)
 
@@ -259,7 +259,7 @@ func TestRequireWriter_AllowsPersonal(t *testing.T) {
 	handler := RequireWriter(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calledNext = true
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 	handler.ServeHTTP(rec, req)
 
