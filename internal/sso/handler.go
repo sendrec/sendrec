@@ -407,3 +407,187 @@ func (h *Handler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 
 	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
+
+// --- Workspace SSO Login Flow (Task 7) ---
+
+// InitiateOrgSSO starts the SSO flow for a user based on their email's
+// organization membership. It looks up the SSO config for the organization
+// the user belongs to and redirects to the OIDC provider.
+func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	var orgID, issuerURL, clientID, encryptedSecret string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT o.id, c.issuer_url, c.client_id, c.client_secret_encrypted
+		 FROM organization_sso_configs c
+		 JOIN organizations o ON o.id = c.organization_id
+		 JOIN organization_members m ON m.organization_id = o.id
+		 JOIN users u ON u.id = m.user_id
+		 WHERE u.email = $1 LIMIT 1`,
+		email,
+	).Scan(&orgID, &issuerURL, &clientID, &encryptedSecret)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "no SSO configuration found for this email")
+		return
+	}
+
+	clientSecret, err := integration.Decrypt(h.encryptionKey, encryptedSecret)
+	if err != nil {
+		slog.Error("sso: failed to decrypt client secret", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to initiate SSO")
+		return
+	}
+
+	provider, err := NewOIDCProvider(r.Context(), OIDCConfig{
+		IssuerURL:    issuerURL,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  h.baseURL + "/api/sso/org/callback",
+	})
+	if err != nil {
+		slog.Error("sso: failed to create OIDC provider", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to initiate SSO")
+		return
+	}
+
+	state, err := generateState()
+	if err != nil {
+		slog.Error("sso: failed to generate state", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to initiate SSO")
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sso_state",
+		Value:    state,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   h.secureCookies,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   300,
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sso_org",
+		Value:    orgID,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   h.secureCookies,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   300,
+	})
+
+	http.Redirect(w, r, provider.AuthURL(state), http.StatusFound)
+}
+
+// OrgCallback handles the OIDC redirect for workspace SSO login. It validates
+// the state, exchanges the code, resolves the user, auto-provisions organization
+// membership, and issues tokens.
+func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
+	stateCookie, err := r.Cookie("sso_state")
+	if err != nil {
+		h.redirectWithError(w, r, "missing state cookie")
+		return
+	}
+
+	orgCookie, err := r.Cookie("sso_org")
+	if err != nil {
+		h.redirectWithError(w, r, "missing organization cookie")
+		return
+	}
+
+	// Clear both cookies immediately.
+	http.SetCookie(w, &http.Cookie{
+		Name: "sso_state", Value: "", Path: "/",
+		HttpOnly: true, Secure: h.secureCookies,
+		SameSite: http.SameSiteLaxMode, MaxAge: -1,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name: "sso_org", Value: "", Path: "/",
+		HttpOnly: true, Secure: h.secureCookies,
+		SameSite: http.SameSiteLaxMode, MaxAge: -1,
+	})
+
+	queryState := r.URL.Query().Get("state")
+	if queryState == "" || queryState != stateCookie.Value {
+		h.redirectWithError(w, r, "invalid state parameter")
+		return
+	}
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		h.redirectWithError(w, r, "missing authorization code")
+		return
+	}
+
+	orgID := orgCookie.Value
+
+	// Load SSO config for the organization.
+	var issuerURL, clientID, encryptedSecret string
+	err = h.db.QueryRow(r.Context(),
+		"SELECT issuer_url, client_id, client_secret_encrypted FROM organization_sso_configs WHERE organization_id = $1",
+		orgID,
+	).Scan(&issuerURL, &clientID, &encryptedSecret)
+	if err != nil {
+		slog.Error("sso: org callback config not found", "orgID", orgID, "error", err)
+		h.redirectWithError(w, r, "SSO configuration not found")
+		return
+	}
+
+	clientSecret, err := integration.Decrypt(h.encryptionKey, encryptedSecret)
+	if err != nil {
+		slog.Error("sso: failed to decrypt client secret", "error", err)
+		h.redirectWithError(w, r, "authentication failed")
+		return
+	}
+
+	provider, err := NewOIDCProvider(r.Context(), OIDCConfig{
+		IssuerURL:    issuerURL,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  h.baseURL + "/api/sso/org/callback",
+	})
+	if err != nil {
+		slog.Error("sso: failed to create OIDC provider for callback", "error", err)
+		h.redirectWithError(w, r, "authentication failed")
+		return
+	}
+
+	info, err := provider.Exchange(r.Context(), code)
+	if err != nil {
+		slog.Error("sso: org exchange failed", "orgID", orgID, "error", err)
+		h.redirectWithError(w, r, "authentication failed")
+		return
+	}
+
+	// Use orgID as the provider name for external_identities.
+	userID, err := h.resolveUser(r.Context(), orgID, info)
+	if err != nil {
+		slog.Error("sso: org resolve user failed", "orgID", orgID, "error", err)
+		h.redirectWithError(w, r, err.Error())
+		return
+	}
+
+	// Auto-add user as organization member.
+	if _, err := h.db.Exec(r.Context(),
+		"INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+		orgID, userID,
+	); err != nil {
+		slog.Error("sso: failed to add org member", "orgID", orgID, "userID", userID, "error", err)
+	}
+
+	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
+	if err != nil {
+		slog.Error("sso: org issue tokens failed", "error", err)
+		h.redirectWithError(w, r, "failed to create session")
+		return
+	}
+
+	h.setRefreshTokenCookie(w, refreshToken)
+	redirectURL := h.baseURL + "/login?sso_token=" + url.QueryEscape(accessToken)
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+}

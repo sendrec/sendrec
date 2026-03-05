@@ -621,3 +621,41 @@ func TestDeleteConfig_RequiresOwner(t *testing.T) {
 	}
 }
 
+// --- Task 7: Workspace SSO Login Flow Tests ---
+
+func TestInitiateOrgSSO_NoEmail(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/org/initiate", nil)
+
+	rec := httptest.NewRecorder()
+	handler.InitiateOrgSSO(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestInitiateOrgSSO_NoConfig(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT o.id, c.issuer_url, c.client_id, c.client_secret_encrypted`).
+		WithArgs("user@example.com").
+		WillReturnError(pgx.ErrNoRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/org/initiate?email=user@example.com", nil)
+
+	rec := httptest.NewRecorder()
+	handler.InitiateOrgSSO(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
