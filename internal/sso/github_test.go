@@ -23,7 +23,7 @@ func newGitHubTestServer(t *testing.T) *httptest.Server {
 			"scope":        "read:user,user:email",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	})
 
 	mux.HandleFunc("GET /user", func(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +38,7 @@ func newGitHubTestServer(t *testing.T) *httptest.Server {
 			Name:  "The Octocat",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(user)
+		_ = json.NewEncoder(w).Encode(user)
 	})
 
 	mux.HandleFunc("GET /user/emails", func(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +53,7 @@ func newGitHubTestServer(t *testing.T) *httptest.Server {
 			{Email: "unverified@example.com", Primary: false, Verified: false},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(emails)
+		_ = json.NewEncoder(w).Encode(emails)
 	})
 
 	return httptest.NewServer(mux)
@@ -119,7 +119,7 @@ func TestGitHubProvider_Exchange_FallsBackToLogin(t *testing.T) {
 
 	mux.HandleFunc("POST /login/oauth/access_token", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"access_token": "gho_mock_token",
 			"token_type":   "bearer",
 		})
@@ -128,7 +128,7 @@ func TestGitHubProvider_Exchange_FallsBackToLogin(t *testing.T) {
 	mux.HandleFunc("GET /user", func(w http.ResponseWriter, r *http.Request) {
 		user := githubUser{ID: 99, Login: "loginonly", Name: ""}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(user)
+		_ = json.NewEncoder(w).Encode(user)
 	})
 
 	mux.HandleFunc("GET /user/emails", func(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +136,7 @@ func TestGitHubProvider_Exchange_FallsBackToLogin(t *testing.T) {
 			{Email: "loginonly@example.com", Primary: true, Verified: true},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(emails)
+		_ = json.NewEncoder(w).Encode(emails)
 	})
 
 	server := httptest.NewServer(mux)
@@ -162,7 +162,7 @@ func TestGitHubProvider_Exchange_NoVerifiedEmail(t *testing.T) {
 
 	mux.HandleFunc("POST /login/oauth/access_token", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"access_token": "gho_mock_token",
 			"token_type":   "bearer",
 		})
@@ -170,7 +170,7 @@ func TestGitHubProvider_Exchange_NoVerifiedEmail(t *testing.T) {
 
 	mux.HandleFunc("GET /user", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(githubUser{ID: 1, Login: "nomail"})
+		_ = json.NewEncoder(w).Encode(githubUser{ID: 1, Login: "nomail"})
 	})
 
 	mux.HandleFunc("GET /user/emails", func(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +178,7 @@ func TestGitHubProvider_Exchange_NoVerifiedEmail(t *testing.T) {
 			{Email: "nope@example.com", Primary: true, Verified: false},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(emails)
+		_ = json.NewEncoder(w).Encode(emails)
 	})
 
 	server := httptest.NewServer(mux)

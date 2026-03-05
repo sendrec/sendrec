@@ -93,7 +93,7 @@ func (p *GitHubProvider) fetchUser(client *http.Client) (*githubUser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetch github user: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("github /user returned status %d", resp.StatusCode)
@@ -111,7 +111,7 @@ func (p *GitHubProvider) fetchPrimaryEmail(client *http.Client) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("fetch github emails: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("github /user/emails returned status %d", resp.StatusCode)
