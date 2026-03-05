@@ -145,6 +145,12 @@ func main() {
 		CreemWebhookSecret:      creemWebhookSecret,
 		CreemProProductID:       creemProProductID,
 		CreemOrgProProductID:    creemOrgProProductID,
+		GoogleClientID:          getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:      getEnv("GOOGLE_CLIENT_SECRET", ""),
+		MicrosoftClientID:       getEnv("MICROSOFT_CLIENT_ID", ""),
+		MicrosoftClientSecret:   getEnv("MICROSOFT_CLIENT_SECRET", ""),
+		GitHubSSOClientID:       getEnv("GITHUB_SSO_CLIENT_ID", ""),
+		GitHubSSOClientSecret:   getEnv("GITHUB_SSO_CLIENT_SECRET", ""),
 	})
 
 	if creemAPIKey != "" {
