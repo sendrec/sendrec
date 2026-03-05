@@ -329,6 +329,7 @@ func (s *Server) routes() {
 			r.Post("/{id}/remove-segments", s.videoHandler.RemoveSegments)
 			r.Post("/{id}/detect-silence", s.videoHandler.DetectSilence)
 			r.Put("/{id}/dismiss-title", s.videoHandler.DismissTitle)
+			r.Put("/{id}/pin", s.videoHandler.TogglePin)
 				if s.integrationHandler != nil {
 					r.Post("/{id}/create-issue", s.integrationHandler.CreateIssue)
 				}

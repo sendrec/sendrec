@@ -337,6 +337,22 @@ func (h *Handler) GenerateDocument(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) TogglePin(w http.ResponseWriter, r *http.Request) {
+	videoID := chi.URLParam(r, "id")
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
+
+	var pinned bool
+	err := h.db.QueryRow(r.Context(),
+		"UPDATE videos SET pinned = NOT pinned, updated_at = now() WHERE "+where+" RETURNING pinned", args...,
+	).Scan(&pinned)
+	if err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]bool{"pinned": pinned})
+}
+
 func (h *Handler) DismissTitle(w http.ResponseWriter, r *http.Request) {
 	videoID := chi.URLParam(r, "id")
 	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
