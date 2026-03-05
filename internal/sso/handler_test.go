@@ -1,0 +1,411 @@
+package sso
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/pashagolub/pgxmock/v4"
+	"github.com/sendrec/sendrec/internal/auth"
+)
+
+const testJWTSecret = "test-sso-jwt-secret"
+const testBaseURL = "http://localhost:3000"
+
+// mockProvider is a test double that satisfies the Provider interface.
+type mockProvider struct {
+	authURL  string
+	userInfo *UserInfo
+	err      error
+}
+
+func (m *mockProvider) AuthURL(state string) string {
+	return m.authURL + "?state=" + state
+}
+
+func (m *mockProvider) Exchange(_ context.Context, _ string) (*UserInfo, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.userInfo, nil
+}
+
+func newTestHandler(t *testing.T) (*Handler, pgxmock.PgxPoolIface) {
+	t.Helper()
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("create pgxmock pool: %v", err)
+	}
+	handler := NewHandler(mock, testJWTSecret, testBaseURL, false, nil)
+	return handler, mock
+}
+
+// callWithChiParam makes a request through a chi router so that
+// chi.URLParam("provider") is populated.
+func callWithChiParam(handler http.HandlerFunc, method, path, paramName, paramValue string, r *http.Request) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add(paramName, paramValue)
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+	handler.ServeHTTP(rec, r)
+	return rec
+}
+
+func TestProviders_ReturnsEnabledList(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("github", &mockProvider{authURL: "https://github.com/login"})
+	handler.RegisterProvider("google", &mockProvider{authURL: "https://accounts.google.com"})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/providers", nil)
+	rec := httptest.NewRecorder()
+	handler.Providers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp providersResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(resp.Providers) != 2 {
+		t.Fatalf("providers count = %d, want 2", len(resp.Providers))
+	}
+
+	providers := make(map[string]bool)
+	for _, p := range resp.Providers {
+		providers[p] = true
+	}
+	if !providers["github"] || !providers["google"] {
+		t.Errorf("providers = %v, want github and google", resp.Providers)
+	}
+}
+
+func TestInitiateSSO_RedirectsToProvider(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("github", &mockProvider{authURL: "https://github.com/login/oauth/authorize"})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/github/initiate", nil)
+	rec := callWithChiParam(handler.Initiate, http.MethodGet, "/api/sso/{provider}/initiate", "provider", "github", req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+
+	location := rec.Header().Get("Location")
+	if location == "" {
+		t.Fatal("Location header is empty")
+	}
+	if len(location) < 10 {
+		t.Fatalf("Location = %q, want a valid URL", location)
+	}
+
+	// Verify the sso_state cookie was set.
+	cookies := rec.Result().Cookies()
+	var stateCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "sso_state" {
+			stateCookie = c
+			break
+		}
+	}
+	if stateCookie == nil {
+		t.Fatal("sso_state cookie not set")
+	}
+	if stateCookie.MaxAge != 300 {
+		t.Errorf("sso_state MaxAge = %d, want 300", stateCookie.MaxAge)
+	}
+	if !stateCookie.HttpOnly {
+		t.Error("sso_state cookie should be HttpOnly")
+	}
+}
+
+func TestInitiateSSO_UnknownProvider(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/unknown/initiate", nil)
+	rec := callWithChiParam(handler.Initiate, http.MethodGet, "/api/sso/{provider}/initiate", "provider", "unknown", req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestCallback_NewUser_CreatesAccount(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("github", &mockProvider{
+		authURL: "https://github.com/login",
+		userInfo: &UserInfo{
+			ExternalID: "gh-12345",
+			Email:      "newuser@example.com",
+			Name:       "New User",
+		},
+	})
+
+	// Step 1: external identity lookup -- not found
+	mock.ExpectQuery(`SELECT user_id FROM external_identities WHERE provider = \$1 AND external_id = \$2`).
+		WithArgs("github", "gh-12345").
+		WillReturnError(pgx.ErrNoRows)
+
+	// Step 2: user lookup by email -- not found
+	mock.ExpectQuery(`SELECT id, email_verified FROM users WHERE email = \$1`).
+		WithArgs("newuser@example.com").
+		WillReturnError(pgx.ErrNoRows)
+
+	// Step 3: create user
+	mock.ExpectQuery(`INSERT INTO users`).
+		WithArgs("newuser@example.com", "", "New User").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
+
+	// Step 4: create external identity
+	mock.ExpectExec(`INSERT INTO external_identities`).
+		WithArgs("user-uuid-1", "github", "gh-12345", "newuser@example.com").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	// Step 5: issue tokens (insert refresh token)
+	mock.ExpectExec(`INSERT INTO refresh_tokens`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	state := "valid-state-12345"
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/github/callback?code=auth-code&state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	rec := callWithChiParam(handler.Callback, http.MethodGet, "/api/sso/{provider}/callback", "provider", "github", req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+
+	location := rec.Header().Get("Location")
+	if location == "" {
+		t.Fatal("Location header is empty")
+	}
+
+	// Verify it redirects to /login?sso_token=...
+	if !strings.Contains(location, "/login?sso_token=") {
+		t.Fatalf("Location = %q, want to contain /login?sso_token=", location)
+	}
+
+	// Verify refresh token cookie was set.
+	var refreshCookie *http.Cookie
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "refresh_token" && c.Value != "" {
+			refreshCookie = c
+			break
+		}
+	}
+	if refreshCookie == nil {
+		t.Fatal("refresh_token cookie not set")
+	}
+
+	// Verify the access token in the redirect URL is valid.
+	parsed, parseErr := url.Parse(location)
+	if parseErr != nil {
+		t.Fatalf("parse location URL: %v", parseErr)
+	}
+	accessToken := parsed.Query().Get("sso_token")
+	claims, err := auth.ValidateToken(testJWTSecret, accessToken)
+	if err != nil {
+		t.Fatalf("access token validation failed: %v", err)
+	}
+	if claims.UserID != "user-uuid-1" {
+		t.Errorf("claims.UserID = %q, want %q", claims.UserID, "user-uuid-1")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestCallback_ExistingIdentity_SignsIn(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("github", &mockProvider{
+		authURL: "https://github.com/login",
+		userInfo: &UserInfo{
+			ExternalID: "gh-existing",
+			Email:      "existing@example.com",
+			Name:       "Existing User",
+		},
+	})
+
+	// External identity found
+	mock.ExpectQuery(`SELECT user_id FROM external_identities WHERE provider = \$1 AND external_id = \$2`).
+		WithArgs("github", "gh-existing").
+		WillReturnRows(pgxmock.NewRows([]string{"user_id"}).AddRow("user-uuid-existing"))
+
+	// Issue tokens
+	mock.ExpectExec(`INSERT INTO refresh_tokens`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-existing", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	state := "valid-state-existing"
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/github/callback?code=auth-code&state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	rec := callWithChiParam(handler.Callback, http.MethodGet, "/api/sso/{provider}/callback", "provider", "github", req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "/login?sso_token=") {
+		t.Fatalf("Location = %q, want /login?sso_token=", location)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestCallback_ExistingVerifiedUser_LinksIdentity(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("google", &mockProvider{
+		authURL: "https://accounts.google.com",
+		userInfo: &UserInfo{
+			ExternalID: "google-456",
+			Email:      "verified@example.com",
+			Name:       "Verified User",
+		},
+	})
+
+	// External identity not found
+	mock.ExpectQuery(`SELECT user_id FROM external_identities WHERE provider = \$1 AND external_id = \$2`).
+		WithArgs("google", "google-456").
+		WillReturnError(pgx.ErrNoRows)
+
+	// User exists and is verified
+	mock.ExpectQuery(`SELECT id, email_verified FROM users WHERE email = \$1`).
+		WithArgs("verified@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_verified"}).AddRow("user-uuid-verified", true))
+
+	// Link identity
+	mock.ExpectExec(`INSERT INTO external_identities`).
+		WithArgs("user-uuid-verified", "google", "google-456", "verified@example.com").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	// Issue tokens
+	mock.ExpectExec(`INSERT INTO refresh_tokens`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-verified", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	state := "valid-state-link"
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/google/callback?code=auth-code&state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	rec := callWithChiParam(handler.Callback, http.MethodGet, "/api/sso/{provider}/callback", "provider", "google", req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "/login?sso_token=") {
+		t.Fatalf("Location = %q, want /login?sso_token=", location)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestCallback_UnverifiedUser_RejectsLink(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("github", &mockProvider{
+		authURL: "https://github.com/login",
+		userInfo: &UserInfo{
+			ExternalID: "gh-unverified",
+			Email:      "unverified@example.com",
+			Name:       "Unverified User",
+		},
+	})
+
+	// External identity not found
+	mock.ExpectQuery(`SELECT user_id FROM external_identities WHERE provider = \$1 AND external_id = \$2`).
+		WithArgs("github", "gh-unverified").
+		WillReturnError(pgx.ErrNoRows)
+
+	// User exists but is NOT verified
+	mock.ExpectQuery(`SELECT id, email_verified FROM users WHERE email = \$1`).
+		WithArgs("unverified@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_verified"}).AddRow("user-uuid-unverified", false))
+
+	state := "valid-state-unverified"
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/github/callback?code=auth-code&state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	rec := callWithChiParam(handler.Callback, http.MethodGet, "/api/sso/{provider}/callback", "provider", "github", req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error= in redirect", location)
+	}
+	if !strings.Contains(location, "email+not+verified") && !strings.Contains(location, "email%20not%20verified") {
+		t.Fatalf("Location = %q, want 'email not verified' error", location)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestCallback_StateMismatch_RejectsRequest(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("github", &mockProvider{authURL: "https://github.com/login"})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/github/callback?code=auth-code&state=wrong-state", nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: "correct-state"})
+	rec := callWithChiParam(handler.Callback, http.MethodGet, "/api/sso/{provider}/callback", "provider", "github", req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error= in redirect", location)
+	}
+}
+
+func TestCallback_MissingStateCookie_RejectsRequest(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("github", &mockProvider{authURL: "https://github.com/login"})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/github/callback?code=auth-code&state=some-state", nil)
+	rec := callWithChiParam(handler.Callback, http.MethodGet, "/api/sso/{provider}/callback", "provider", "github", req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error= in redirect", location)
+	}
+}
+
