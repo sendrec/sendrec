@@ -109,6 +109,7 @@ type limitsResponse struct {
 	OrgsUsed                int            `json:"orgsUsed"`
 	MaxOrgMembers           int            `json:"maxOrgMembers"`
 	OrgMembersUsed          int            `json:"orgMembersUsed"`
+	RetentionDays           int            `json:"retentionDays"`
 	FieldLimits             map[string]int `json:"fieldLimits"`
 }
 
@@ -185,6 +186,17 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		).Scan(&orgMembersUsed)
 	}
 
+	var retentionDays int
+	if orgID != "" {
+		_ = h.db.QueryRow(r.Context(),
+			"SELECT retention_days FROM organizations WHERE id = $1", orgID,
+		).Scan(&retentionDays)
+	} else {
+		_ = h.db.QueryRow(r.Context(),
+			"SELECT retention_days FROM users WHERE id = $1", userID,
+		).Scan(&retentionDays)
+	}
+
 	httputil.WriteJSON(w, http.StatusOK, limitsResponse{
 		MaxVideosPerMonth:       maxVideos,
 		MaxVideoDurationSeconds: maxDuration,
@@ -199,6 +211,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		OrgsUsed:                orgsUsed,
 		MaxOrgMembers:           maxOrgMembers,
 		OrgMembersUsed:          orgMembersUsed,
+		RetentionDays:           retentionDays,
 		FieldLimits:             validate.FieldLimits(),
 	})
 }

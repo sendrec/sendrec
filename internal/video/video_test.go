@@ -3571,6 +3571,9 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(`SELECT retention_days FROM users WHERE id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(90))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -3588,6 +3591,7 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 		VideosUsedThisMonth     int `json:"videosUsedThisMonth"`
 		MaxPlaylists            int `json:"maxPlaylists"`
 		PlaylistsUsed           int `json:"playlistsUsed"`
+		RetentionDays           int `json:"retentionDays"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -3606,6 +3610,9 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	}
 	if resp.PlaylistsUsed != 1 {
 		t.Errorf("expected playlistsUsed 1, got %d", resp.PlaylistsUsed)
+	}
+	if resp.RetentionDays != 90 {
+		t.Errorf("expected retentionDays 90, got %d", resp.RetentionDays)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -3628,6 +3635,9 @@ func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectQuery(`SELECT retention_days FROM users WHERE id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(0))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -3676,6 +3686,9 @@ func TestLimits_ProUser(t *testing.T) {
 
 	expectPlanQuery(mock, "pro")
 	// No ExpectQuery for COUNT — pro users have unlimited videos and playlists
+	mock.ExpectQuery(`SELECT retention_days FROM users WHERE id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(0))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -6626,6 +6639,9 @@ func TestLimits_OrgFreeWithProOwner(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
 		WithArgs(testOrgID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
+	mock.ExpectQuery(`SELECT retention_days FROM organizations WHERE id = \$1`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(0))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -6672,6 +6688,9 @@ func TestLimits_OrgProWithFreeOwner(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
 		WithArgs(testOrgID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(`SELECT retention_days FROM organizations WHERE id = \$1`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(0))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -6720,6 +6739,9 @@ func TestLimits_OrgFreeWithFreeOwner(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
 		WithArgs(testOrgID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
+	mock.ExpectQuery(`SELECT retention_days FROM organizations WHERE id = \$1`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(60))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
@@ -6740,6 +6762,9 @@ func TestLimits_OrgFreeWithFreeOwner(t *testing.T) {
 	}
 	if resp.VideosUsedThisMonth != 5 {
 		t.Errorf("expected videosUsedThisMonth 5, got %d", resp.VideosUsedThisMonth)
+	}
+	if resp.RetentionDays != 60 {
+		t.Errorf("expected retentionDays 60, got %d", resp.RetentionDays)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
