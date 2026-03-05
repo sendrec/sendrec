@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,9 +12,11 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/integration"
 )
 
 // Handler implements the HTTP endpoints for social login and SSO callbacks.
@@ -260,4 +263,147 @@ func newTokenID() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b[:]), nil
+}
+
+// --- Workspace SSO Config CRUD (Task 6) ---
+
+type ssoConfigRequest struct {
+	IssuerURL    string `json:"issuer_url"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	EnforceSSO   bool   `json:"enforce_sso"`
+}
+
+type ssoConfigResponse struct {
+	Provider     string `json:"provider"`
+	IssuerURL    string `json:"issuer_url"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	EnforceSSO   bool   `json:"enforce_sso"`
+	Configured   bool   `json:"configured"`
+}
+
+// SaveConfig upserts the workspace SSO configuration for the caller's organization.
+func (h *Handler) SaveConfig(w http.ResponseWriter, r *http.Request) {
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "organization context required")
+		return
+	}
+
+	role := auth.OrgRoleFromContext(r.Context())
+	if role != "owner" && role != "admin" {
+		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
+		return
+	}
+
+	var req ssoConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.IssuerURL == "" || req.ClientID == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "issuer_url and client_id are required")
+		return
+	}
+
+	// If client_secret is empty, preserve the existing encrypted secret.
+	var encryptedSecret string
+	if req.ClientSecret == "" {
+		err := h.db.QueryRow(r.Context(),
+			"SELECT client_secret_encrypted FROM organization_sso_configs WHERE organization_id = $1",
+			orgID,
+		).Scan(&encryptedSecret)
+		if err != nil {
+			httputil.WriteError(w, http.StatusBadRequest, "client_secret is required")
+			return
+		}
+	} else {
+		var err error
+		encryptedSecret, err = integration.Encrypt(h.encryptionKey, req.ClientSecret)
+		if err != nil {
+			slog.Error("sso: failed to encrypt client secret", "error", err)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to save SSO config")
+			return
+		}
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		`INSERT INTO organization_sso_configs (organization_id, provider, issuer_url, client_id, client_secret_encrypted, enforce_sso)
+		 VALUES ($1, 'oidc', $2, $3, $4, $5)
+		 ON CONFLICT (organization_id) DO UPDATE
+		 SET issuer_url = EXCLUDED.issuer_url,
+		     client_id = EXCLUDED.client_id,
+		     client_secret_encrypted = EXCLUDED.client_secret_encrypted,
+		     enforce_sso = EXCLUDED.enforce_sso,
+		     updated_at = now()`,
+		orgID, req.IssuerURL, req.ClientID, encryptedSecret, req.EnforceSSO,
+	); err != nil {
+		slog.Error("sso: failed to upsert SSO config", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to save SSO config")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// GetConfig returns the workspace SSO configuration for the caller's organization.
+func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "organization context required")
+		return
+	}
+
+	var provider, issuerURL, clientID string
+	var enforceSSO bool
+	err := h.db.QueryRow(r.Context(),
+		"SELECT provider, issuer_url, client_id, enforce_sso FROM organization_sso_configs WHERE organization_id = $1",
+		orgID,
+	).Scan(&provider, &issuerURL, &clientID, &enforceSSO)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			httputil.WriteJSON(w, http.StatusOK, ssoConfigResponse{Configured: false})
+			return
+		}
+		slog.Error("sso: failed to load SSO config", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to load SSO config")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, ssoConfigResponse{
+		Provider:     provider,
+		IssuerURL:    issuerURL,
+		ClientID:     integration.MaskToken(clientID),
+		ClientSecret: "******",
+		EnforceSSO:   enforceSSO,
+		Configured:   true,
+	})
+}
+
+// DeleteConfig removes the workspace SSO configuration for the caller's organization.
+func (h *Handler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
+	orgID := auth.OrgIDFromContext(r.Context())
+	if orgID == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "organization context required")
+		return
+	}
+
+	role := auth.OrgRoleFromContext(r.Context())
+	if role != "owner" {
+		httputil.WriteError(w, http.StatusForbidden, "owner role required")
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"DELETE FROM organization_sso_configs WHERE organization_id = $1",
+		orgID,
+	); err != nil {
+		slog.Error("sso: failed to delete SSO config", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to delete SSO config")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/sendrec/sendrec/internal/auth"
+	"github.com/sendrec/sendrec/internal/integration"
 )
 
 const testJWTSecret = "test-sso-jwt-secret"
@@ -406,6 +407,217 @@ func TestCallback_MissingStateCookie_RejectsRequest(t *testing.T) {
 	location := rec.Header().Get("Location")
 	if !strings.Contains(location, "sso_error=") {
 		t.Fatalf("Location = %q, want sso_error= in redirect", location)
+	}
+}
+
+// --- Task 6: Workspace SSO Config CRUD Tests ---
+
+var testEncryptionKey = integration.DeriveKey("test-encryption-secret")
+
+func newTestHandlerWithKey(t *testing.T) (*Handler, pgxmock.PgxPoolIface) {
+	t.Helper()
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("create pgxmock pool: %v", err)
+	}
+	handler := NewHandler(mock, testJWTSecret, testBaseURL, false, testEncryptionKey)
+	return handler, mock
+}
+
+func requestWithOrg(r *http.Request, orgID, role string) *http.Request {
+	ctx := auth.ContextWithUserID(r.Context(), "user-1")
+	ctx = auth.ContextWithOrg(ctx, orgID, role)
+	return r.WithContext(ctx)
+}
+
+func TestSaveConfig_Success(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectExec(`INSERT INTO organization_sso_configs`).
+		WithArgs("org-1", "https://accounts.google.com", "client-123", pgxmock.AnyArg(), false).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := `{"issuer_url":"https://accounts.google.com","client_id":"client-123","client_secret":"secret-456","enforce_sso":false}`
+	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
+	req = requestWithOrg(req, "org-1", "admin")
+
+	rec := httptest.NewRecorder()
+	handler.SaveConfig(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp["status"] != "ok" {
+		t.Errorf("status = %q, want %q", resp["status"], "ok")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSaveConfig_RequiresOrgContext(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	body := `{"issuer_url":"https://example.com","client_id":"id","client_secret":"secret"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
+	// No org context set.
+
+	rec := httptest.NewRecorder()
+	handler.SaveConfig(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestSaveConfig_RequiresAdmin(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	body := `{"issuer_url":"https://example.com","client_id":"id","client_secret":"secret"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
+	req = requestWithOrg(req, "org-1", "member")
+
+	rec := httptest.NewRecorder()
+	handler.SaveConfig(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestGetConfig_Success(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT provider, issuer_url, client_id, enforce_sso FROM organization_sso_configs`).
+		WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"provider", "issuer_url", "client_id", "enforce_sso"}).
+			AddRow("oidc", "https://accounts.google.com", "client-123", true))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/config", nil)
+	req = requestWithOrg(req, "org-1", "admin")
+
+	rec := httptest.NewRecorder()
+	handler.GetConfig(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp ssoConfigResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !resp.Configured {
+		t.Error("configured = false, want true")
+	}
+	if resp.Provider != "oidc" {
+		t.Errorf("provider = %q, want %q", resp.Provider, "oidc")
+	}
+	if resp.IssuerURL != "https://accounts.google.com" {
+		t.Errorf("issuer_url = %q, want %q", resp.IssuerURL, "https://accounts.google.com")
+	}
+	// client_id should be masked
+	if resp.ClientID == "client-123" {
+		t.Error("client_id should be masked")
+	}
+	if resp.ClientSecret != "******" {
+		t.Errorf("client_secret = %q, want %q", resp.ClientSecret, "******")
+	}
+	if !resp.EnforceSSO {
+		t.Error("enforce_sso = false, want true")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestGetConfig_NotConfigured(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT provider, issuer_url, client_id, enforce_sso FROM organization_sso_configs`).
+		WithArgs("org-1").
+		WillReturnError(pgx.ErrNoRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/config", nil)
+	req = requestWithOrg(req, "org-1", "admin")
+
+	rec := httptest.NewRecorder()
+	handler.GetConfig(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp ssoConfigResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.Configured {
+		t.Error("configured = true, want false")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestDeleteConfig_Success(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectExec(`DELETE FROM organization_sso_configs WHERE organization_id`).
+		WithArgs("org-1").
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/sso/config", nil)
+	req = requestWithOrg(req, "org-1", "owner")
+
+	rec := httptest.NewRecorder()
+	handler.DeleteConfig(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp["status"] != "ok" {
+		t.Errorf("status = %q, want %q", resp["status"], "ok")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestDeleteConfig_RequiresOwner(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/sso/config", nil)
+	req = requestWithOrg(req, "org-1", "admin")
+
+	rec := httptest.NewRecorder()
+	handler.DeleteConfig(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }
 
