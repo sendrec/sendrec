@@ -73,6 +73,30 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If user already has an active subscription, upgrade via Creem API (with proration)
+	var subscriptionID *string
+	_ = h.db.QueryRow(r.Context(),
+		"SELECT creem_subscription_id FROM users WHERE id = $1",
+		userID,
+	).Scan(&subscriptionID)
+
+	if subscriptionID != nil {
+		_, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, productID)
+		if err != nil {
+			slog.Error("failed to upgrade subscription", "error", err, "user_id", userID)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
+			return
+		}
+		plan := h.planFromProductID(productID)
+		_, _ = h.db.Exec(r.Context(),
+			"UPDATE users SET subscription_plan = $1 WHERE id = $2",
+			plan, userID,
+		)
+		slog.Info("subscription upgraded", "user_id", userID, "plan", plan)
+		httputil.WriteJSON(w, http.StatusOK, map[string]string{"upgraded": plan})
+		return
+	}
+
 	successURL := h.baseURL + "/settings?billing=success"
 	checkoutURL, err := h.creem.CreateCheckout(r.Context(), productID, userID, successURL)
 	if err != nil {
@@ -192,6 +216,30 @@ func (h *Handlers) CreateOrgCheckout(w http.ResponseWriter, r *http.Request) {
 
 	if orgProductID == "" {
 		httputil.WriteError(w, http.StatusBadRequest, "plan not configured")
+		return
+	}
+
+	// If org already has an active subscription, upgrade via Creem API (with proration)
+	var subscriptionID *string
+	_ = h.db.QueryRow(r.Context(),
+		"SELECT creem_subscription_id FROM organizations WHERE id = $1",
+		orgID,
+	).Scan(&subscriptionID)
+
+	if subscriptionID != nil {
+		_, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, orgProductID)
+		if err != nil {
+			slog.Error("failed to upgrade org subscription", "error", err, "org_id", orgID)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
+			return
+		}
+		plan := h.planFromProductID(orgProductID)
+		_, _ = h.db.Exec(r.Context(),
+			"UPDATE organizations SET subscription_plan = $1, updated_at = now() WHERE id = $2",
+			plan, orgID,
+		)
+		slog.Info("org subscription upgraded", "org_id", orgID, "plan", plan)
+		httputil.WriteJSON(w, http.StatusOK, map[string]string{"upgraded": plan})
 		return
 	}
 

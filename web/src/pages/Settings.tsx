@@ -533,21 +533,39 @@ export function Settings() {
     }
   }
 
-  async function handleUpgrade(plan: string) {
+  async function doUpgrade(plan: string) {
     setUpgrading(true);
     setBillingMessage("");
     try {
-      const resp = await apiFetch<{ checkoutUrl: string }>("/api/settings/billing/checkout", {
+      const resp = await apiFetch<{ checkoutUrl?: string; upgraded?: string }>("/api/settings/billing/checkout", {
         method: "POST",
         body: JSON.stringify({ plan }),
       });
-      if (resp?.checkoutUrl) {
+      if (resp?.upgraded) {
+        window.location.reload();
+      } else if (resp?.checkoutUrl) {
         window.location.href = resp.checkoutUrl;
       }
     } catch (err: unknown) {
       setBillingMessage(err instanceof Error ? err.message : "Failed to start checkout");
     } finally {
       setUpgrading(false);
+    }
+  }
+
+  function handleUpgrade(plan: string) {
+    if (billing?.subscriptionId) {
+      const label = plan === "business" ? "Business" : "Pro";
+      setConfirmDialog({
+        message: `Upgrade to ${label}? Your remaining credit will be prorated.`,
+        confirmLabel: `Upgrade to ${label}`,
+        onConfirm: () => {
+          setConfirmDialog(null);
+          doUpgrade(plan);
+        },
+      });
+    } else {
+      doUpgrade(plan);
     }
   }
 
