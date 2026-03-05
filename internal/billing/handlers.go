@@ -73,30 +73,6 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for existing active subscription to upgrade instead of creating new checkout
-	var subscriptionID *string
-	_ = h.db.QueryRow(r.Context(),
-		"SELECT creem_subscription_id FROM users WHERE id = $1",
-		userID,
-	).Scan(&subscriptionID)
-
-	if subscriptionID != nil {
-		info, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, productID)
-		if err != nil {
-			slog.Error("failed to upgrade subscription", "error", err, "user_id", userID)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
-			return
-		}
-		plan := h.planFromProductID(productID)
-		_, _ = h.db.Exec(r.Context(),
-			"UPDATE users SET subscription_plan = $1 WHERE id = $2",
-			plan, userID,
-		)
-		slog.Info("subscription upgraded", "user_id", userID, "plan", plan, "subscription_id", info.ID)
-		httputil.WriteJSON(w, http.StatusOK, map[string]string{"upgraded": plan})
-		return
-	}
-
 	successURL := h.baseURL + "/settings?billing=success"
 	checkoutURL, err := h.creem.CreateCheckout(r.Context(), productID, userID, successURL)
 	if err != nil {
@@ -216,30 +192,6 @@ func (h *Handlers) CreateOrgCheckout(w http.ResponseWriter, r *http.Request) {
 
 	if orgProductID == "" {
 		httputil.WriteError(w, http.StatusBadRequest, "plan not configured")
-		return
-	}
-
-	// Check for existing active subscription to upgrade instead of creating new checkout
-	var subscriptionID *string
-	_ = h.db.QueryRow(r.Context(),
-		"SELECT creem_subscription_id FROM organizations WHERE id = $1",
-		orgID,
-	).Scan(&subscriptionID)
-
-	if subscriptionID != nil {
-		info, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, orgProductID)
-		if err != nil {
-			slog.Error("failed to upgrade org subscription", "error", err, "org_id", orgID)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
-			return
-		}
-		plan := h.planFromProductID(orgProductID)
-		_, _ = h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = $1 WHERE id = $2",
-			plan, orgID,
-		)
-		slog.Info("org subscription upgraded", "org_id", orgID, "plan", plan, "subscription_id", info.ID)
-		httputil.WriteJSON(w, http.StatusOK, map[string]string{"upgraded": plan})
 		return
 	}
 
@@ -465,6 +417,18 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 	}
 
 	if orgID != "" {
+		// Cancel previous subscription if upgrading to a higher plan
+		var oldSubID *string
+		_ = h.db.QueryRow(r.Context(),
+			"SELECT creem_subscription_id FROM organizations WHERE id = $1",
+			orgID,
+		).Scan(&oldSubID)
+		if oldSubID != nil && *oldSubID != payload.Object.ID {
+			if err := h.creem.CancelSubscription(r.Context(), *oldSubID); err != nil {
+				slog.Warn("failed to cancel old org subscription", "error", err, "old_sub", *oldSubID, "org_id", orgID)
+			}
+		}
+
 		_, err := h.db.Exec(r.Context(),
 			"UPDATE organizations SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3, updated_at = now() WHERE id = $4",
 			plan, payload.Object.ID, payload.Object.Customer.ID, orgID,
@@ -475,6 +439,18 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 			return
 		}
 	} else {
+		// Cancel previous subscription if upgrading to a higher plan
+		var oldSubID *string
+		_ = h.db.QueryRow(r.Context(),
+			"SELECT creem_subscription_id FROM users WHERE id = $1",
+			userID,
+		).Scan(&oldSubID)
+		if oldSubID != nil && *oldSubID != payload.Object.ID {
+			if err := h.creem.CancelSubscription(r.Context(), *oldSubID); err != nil {
+				slog.Warn("failed to cancel old user subscription", "error", err, "old_sub", *oldSubID, "user_id", userID)
+			}
+		}
+
 		_, err := h.db.Exec(r.Context(),
 			"UPDATE users SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3 WHERE id = $4",
 			plan, payload.Object.ID, payload.Object.Customer.ID, userID,
