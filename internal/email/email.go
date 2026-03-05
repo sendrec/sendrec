@@ -23,8 +23,9 @@ type Config struct {
 	WelcomeTemplateID        int
 	OnboardingDay2TemplateID int
 	OnboardingDay7TemplateID int
-	OrgInviteTemplateID      int
-	Allowlist                []string
+	OrgInviteTemplateID          int
+	RetentionWarningTemplateID   int
+	Allowlist                    []string
 }
 
 type Client struct {
@@ -406,6 +407,40 @@ func (c *Client) SendOrgInvite(ctx context.Context, toEmail, orgName, inviterNam
 			"orgName":     orgName,
 			"inviterName": inviterName,
 			"acceptLink":  acceptLink,
+		},
+		ContentType: "html",
+	}
+
+	return c.sendTx(ctx, body)
+}
+
+// RetentionVideoSummary represents a single video in a retention warning email.
+type RetentionVideoSummary struct {
+	Title    string `json:"title"`
+	WatchURL string `json:"watchURL"`
+}
+
+func (c *Client) SendRetentionWarning(ctx context.Context, toEmail string, videos []RetentionVideoSummary, expiryDate string) error {
+	if c.config.BaseURL == "" {
+		slog.Warn("email not configured, retention warning email skipped", "recipient", toEmail)
+		return nil
+	}
+
+	if c.config.RetentionWarningTemplateID == 0 {
+		slog.Warn("retention warning template ID not set, skipping retention warning email", "recipient", toEmail)
+		return nil
+	}
+
+	// Retention warning emails bypass the allowlist — they are critical
+	// notifications that must always be sent before video deletion.
+	c.ensureSubscriber(ctx, toEmail, "")
+
+	body := txRequest{
+		SubscriberEmail: toEmail,
+		TemplateID:      c.config.RetentionWarningTemplateID,
+		Data: map[string]any{
+			"videos":     videos,
+			"expiryDate": expiryDate,
 		},
 		ContentType: "html",
 	}
