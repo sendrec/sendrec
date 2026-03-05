@@ -131,8 +131,8 @@ export function Layout({ children }: LayoutProps) {
           <img src="/images/logo.png" alt="" width="48" height="48" />
           <span className="logo-send">Send</span><span className="logo-rec">Rec</span>
           {plan && (
-            <span className={`plan-badge${plan === "pro" ? " plan-badge--pro" : ""}`}>
-              {plan === "pro" ? "Pro" : "Free"}
+            <span className={`plan-badge${plan !== "free" ? " plan-badge--pro" : ""}`}>
+              {plan === "business" ? "Business" : plan === "pro" ? "Pro" : "Free"}
             </span>
           )}
         </Link>

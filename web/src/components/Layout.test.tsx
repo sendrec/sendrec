@@ -191,6 +191,16 @@ describe("Layout", () => {
     expect(screen.getByText("Pro")).toHaveClass("plan-badge", "plan-badge--pro");
   });
 
+  it("shows Business badge for business plan", async () => {
+    mockApiFetch.mockResolvedValueOnce({ plan: "business" });
+    renderLayout();
+
+    await waitFor(() => {
+      expect(screen.getByText("Business")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Business")).toHaveClass("plan-badge", "plan-badge--pro");
+  });
+
   it("shows Free badge when billing API fails", async () => {
     mockApiFetch.mockRejectedValueOnce(new Error("not available"));
     renderLayout();
