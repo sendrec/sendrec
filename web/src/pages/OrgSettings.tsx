@@ -125,21 +125,23 @@ export function OrgSettings() {
           if (orgData.retentionDays !== undefined) {
             setRetentionDays(orgData.retentionDays);
           }
-          if (orgData.subscriptionPlan === "business") {
-            try {
-              const ssoData = await apiFetch<SsoConfig>("/api/settings/sso");
-              if (ssoData) {
-                setSsoIssuerUrl(ssoData.issuerUrl || "");
-                setSsoClientId(ssoData.clientId || "");
-                setSsoConfigured(ssoData.configured);
-                setSsoEnforce(ssoData.enforceSso);
-              }
-            } catch { /* SSO not available */ }
-          }
         }
         setMembers(memberData ?? []);
         setInvites((inviteData as Invite[]) ?? []);
         setBilling(billingData as OrgBilling | null);
+
+        const effectivePlan = (billingData as OrgBilling | null)?.effectivePlan ?? orgData?.subscriptionPlan;
+        if (effectivePlan === "business") {
+          try {
+            const ssoData = await apiFetch<SsoConfig>("/api/settings/sso");
+            if (ssoData) {
+              setSsoIssuerUrl(ssoData.issuerUrl || "");
+              setSsoClientId(ssoData.clientId || "");
+              setSsoConfigured(ssoData.configured);
+              setSsoEnforce(ssoData.enforceSso);
+            }
+          } catch { /* SSO not available */ }
+        }
       })
       .catch(() => setError("Failed to load workspace"))
       .finally(() => setLoading(false));
@@ -729,7 +731,7 @@ export function OrgSettings() {
         </div>
       )}
 
-      {canManage && org.subscriptionPlan === "business" && (
+      {canManage && (billing?.effectivePlan === "business" || org.subscriptionPlan === "business") && (
         <form onSubmit={handleSsoSave} className="card settings-section">
           <h2>Single Sign-On</h2>
           <p className="card-description">

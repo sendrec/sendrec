@@ -55,7 +55,7 @@ export function useOrganization() {
       body: JSON.stringify({ name }),
     });
     if (result) {
-      setOrgs((prev) => [...prev, result]);
+      setOrgs((prev) => [...prev, { ...result, role: "owner", memberCount: 1 }]);
       setCurrentOrgId(result.id);
     }
     return result ?? null;
