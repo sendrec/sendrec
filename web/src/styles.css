@@ -2634,6 +2634,8 @@ textarea.form-input {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
   cursor: pointer;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .video-card:hover {
@@ -2730,6 +2732,7 @@ textarea.form-input {
 /* Card body */
 .video-card-body {
   padding: 12px 14px 14px;
+  flex: 1;
 }
 
 .video-card-title {

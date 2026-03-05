@@ -279,6 +279,18 @@ export function Library() {
     showToast("Link copied");
   }
 
+  async function togglePin(id: string) {
+    try {
+      const resp = await apiFetch<{ pinned: boolean }>(`/api/videos/${id}/pin`, { method: "PUT" });
+      if (resp) {
+        setVideos((prev) => prev.map((v) => v.id === id ? { ...v, pinned: resp.pinned } : v));
+        showToast(resp.pinned ? "Video pinned" : "Video unpinned");
+      }
+    } catch {
+      showToast("Failed to update pin");
+    }
+  }
+
   async function downloadVideo(id: string) {
     setDownloadingId(id);
     try {
@@ -880,6 +892,13 @@ export function Library() {
                         boxShadow: "0 4px 16px var(--color-shadow)",
                       }}
                     >
+                      <button
+                        onClick={() => { togglePin(video.id); setOpenMenuId(null); }}
+                        className="action-link"
+                        style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
+                      >
+                        {video.pinned ? "Unpin" : "Pin"}
+                      </button>
                       <Link
                         to={`/videos/${video.id}/analytics`}
                         className="action-link"
