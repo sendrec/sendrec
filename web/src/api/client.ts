@@ -1,12 +1,15 @@
 import { getCurrentOrgId } from "./orgContext";
 
 class ApiError extends Error {
+  public readonly data: Record<string, unknown>;
   constructor(
     public readonly status: number,
-    message: string
+    message: string,
+    data: Record<string, unknown> = {}
   ) {
     super(message);
     this.name = "ApiError";
+    this.data = data;
   }
 }
 
@@ -75,15 +78,17 @@ async function apiFetch<T>(
 
   if (!response.ok) {
     let message = response.statusText;
+    let data: Record<string, unknown> = {};
     try {
       const body = await response.json();
       if (body.error) {
         message = body.error;
       }
+      data = body;
     } catch {
       // response body wasn't JSON, keep statusText
     }
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, message, data);
   }
 
   if (response.status === 204 || response.status === 202) {

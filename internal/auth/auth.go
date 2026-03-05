@@ -219,19 +219,21 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check SSO enforcement
-	var enforcedOrgName string
+	var enforcedOrgID, enforcedOrgName string
 	err = h.db.QueryRow(r.Context(),
-		`SELECT o.name FROM organization_sso_configs c
+		`SELECT o.id, o.name FROM organization_sso_configs c
 		 JOIN organizations o ON o.id = c.organization_id
 		 JOIN organization_members m ON m.organization_id = o.id
 		 WHERE m.user_id = $1 AND c.enforce_sso = true AND m.role != 'owner'
 		 LIMIT 1`,
 		userID,
-	).Scan(&enforcedOrgName)
+	).Scan(&enforcedOrgID, &enforcedOrgName)
 	if err == nil {
-		httputil.WriteJSON(w, http.StatusForbidden, map[string]string{
+		httputil.WriteJSON(w, http.StatusForbidden, map[string]any{
 			"error":   "sso_required",
 			"message": "Your workspace \"" + enforcedOrgName + "\" requires SSO sign-in",
+			"orgId":   enforcedOrgID,
+			"orgName": enforcedOrgName,
 		})
 		return
 	}

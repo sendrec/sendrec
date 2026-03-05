@@ -418,6 +418,7 @@ func (h *Handler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 // InitiateOrgSSO starts the SSO flow for a user based on their email's
 // organization membership. It looks up the SSO config for the organization
 // the user belongs to and redirects to the OIDC provider.
+// If orgId is provided, it scopes the lookup to that specific organization.
 func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 	email := r.URL.Query().Get("email")
 	if email == "" {
@@ -426,18 +427,35 @@ func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var orgID, issuerURL, clientID, encryptedSecret string
-	err := h.db.QueryRow(r.Context(),
-		`SELECT o.id, c.issuer_url, c.client_id, c.client_secret_encrypted
-		 FROM organization_sso_configs c
-		 JOIN organizations o ON o.id = c.organization_id
-		 JOIN organization_members m ON m.organization_id = o.id
-		 JOIN users u ON u.id = m.user_id
-		 WHERE u.email = $1 LIMIT 1`,
-		email,
-	).Scan(&orgID, &issuerURL, &clientID, &encryptedSecret)
-	if err != nil {
-		httputil.WriteError(w, http.StatusNotFound, "no SSO configuration found for this email")
-		return
+	orgFilter := r.URL.Query().Get("org")
+	if orgFilter != "" {
+		err := h.db.QueryRow(r.Context(),
+			`SELECT o.id, c.issuer_url, c.client_id, c.client_secret_encrypted
+			 FROM organization_sso_configs c
+			 JOIN organizations o ON o.id = c.organization_id
+			 JOIN organization_members m ON m.organization_id = o.id
+			 JOIN users u ON u.id = m.user_id
+			 WHERE u.email = $1 AND o.id = $2`,
+			email, orgFilter,
+		).Scan(&orgID, &issuerURL, &clientID, &encryptedSecret)
+		if err != nil {
+			httputil.WriteError(w, http.StatusNotFound, "no SSO configuration found for this workspace")
+			return
+		}
+	} else {
+		err := h.db.QueryRow(r.Context(),
+			`SELECT o.id, c.issuer_url, c.client_id, c.client_secret_encrypted
+			 FROM organization_sso_configs c
+			 JOIN organizations o ON o.id = c.organization_id
+			 JOIN organization_members m ON m.organization_id = o.id
+			 JOIN users u ON u.id = m.user_id
+			 WHERE u.email = $1 LIMIT 1`,
+			email,
+		).Scan(&orgID, &issuerURL, &clientID, &encryptedSecret)
+		if err != nil {
+			httputil.WriteError(w, http.StatusNotFound, "no SSO configuration found for this email")
+			return
+		}
 	}
 
 	clientSecret, err := integration.Decrypt(h.encryptionKey, encryptedSecret)

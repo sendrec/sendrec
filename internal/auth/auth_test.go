@@ -35,7 +35,7 @@ func expectInsertRefreshToken(mock pgxmock.PgxPoolIface, userID string) {
 }
 
 func expectNoSSOEnforcement(mock pgxmock.PgxPoolIface, userID string) {
-	mock.ExpectQuery(`SELECT o.name FROM organization_sso_configs`).
+	mock.ExpectQuery(`SELECT o.id, o.name FROM organization_sso_configs`).
 		WithArgs(userID).
 		WillReturnError(pgx.ErrNoRows)
 }
@@ -747,9 +747,9 @@ func TestLogin_BlockedByEnforcedSSO(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "password", "email_verified"}).
 			AddRow("user-uuid-1", string(hashedPassword), true))
 
-	mock.ExpectQuery(`SELECT o.name FROM organization_sso_configs`).
+	mock.ExpectQuery(`SELECT o.id, o.name FROM organization_sso_configs`).
 		WithArgs("user-uuid-1").
-		WillReturnRows(pgxmock.NewRows([]string{"name"}).AddRow("Acme Corp"))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name"}).AddRow("org-1", "Acme Corp"))
 
 	body := `{"email":"alice@example.com","password":"correctpassword"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
@@ -761,15 +761,18 @@ func TestLogin_BlockedByEnforcedSSO(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
 	}
 
-	var resp map[string]string
+	var resp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if resp["error"] != "sso_required" {
 		t.Errorf("expected error 'sso_required', got %q", resp["error"])
 	}
-	if !strings.Contains(resp["message"], "Acme Corp") {
+	if !strings.Contains(resp["message"].(string), "Acme Corp") {
 		t.Errorf("expected message to contain org name, got %q", resp["message"])
+	}
+	if resp["orgId"] != "org-1" {
+		t.Errorf("expected orgId 'org-1', got %q", resp["orgId"])
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

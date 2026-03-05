@@ -4,12 +4,19 @@ import { ApiError, apiFetch, setAccessToken } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
 import { providerLabel } from "../utils/sso";
 
+interface SsoEnforcement {
+  email: string;
+  orgId: string;
+  orgName: string;
+}
+
 export function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [ssoProviders, setSsoProviders] = useState<string[]>([]);
   const [ssoError, setSsoError] = useState("");
+  const [ssoEnforcement, setSsoEnforcement] = useState<SsoEnforcement | null>(null);
 
   useEffect(() => {
     fetch("/api/health")
@@ -53,13 +60,11 @@ export function Login() {
     }
   }, [navigate]);
 
-  const [ssoEmail, setSsoEmail] = useState("");
-
   async function handleLogin(data: {
     email: string;
     password: string;
   }) {
-    setSsoEmail("");
+    setSsoEnforcement(null);
     try {
       const result = await apiFetch<{ accessToken: string }>(
         "/api/auth/login",
@@ -83,8 +88,10 @@ export function Login() {
         return;
       }
       if (err instanceof ApiError && err.status === 403 && err.message === "sso_required") {
-        setSsoEmail(data.email);
-        throw new Error("Your workspace requires SSO sign-in. Use the button below.");
+        const orgId = (err.data.orgId as string) ?? "";
+        const orgName = (err.data.orgName as string) ?? "your workspace";
+        setSsoEnforcement({ email: data.email, orgId, orgName });
+        throw new Error(`"${orgName}" requires SSO sign-in`);
       }
       throw err;
     }
@@ -93,21 +100,21 @@ export function Login() {
   const redirect = searchParams.get("redirect");
   const registerPath = redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : "/register";
 
-  const ssoSection = (ssoProviders.length > 0 || ssoError || ssoEmail) ? (
+  const ssoSection = (ssoProviders.length > 0 || ssoError || ssoEnforcement) ? (
     <>
       {ssoError && (
         <div className="auth-error-banner">{ssoError}</div>
       )}
-      {(ssoProviders.length > 0 || ssoEmail) && (
+      {(ssoProviders.length > 0 || ssoEnforcement) && (
         <>
           <div className="auth-divider">or</div>
           <div className="sso-buttons">
-            {ssoEmail && (
+            {ssoEnforcement && (
               <a
-                href={`/api/auth/sso/org?email=${encodeURIComponent(ssoEmail)}`}
+                href={`/api/auth/sso/org?email=${encodeURIComponent(ssoEnforcement.email)}&org=${encodeURIComponent(ssoEnforcement.orgId)}`}
                 className="btn btn--secondary btn--sso"
               >
-                Sign in with workspace SSO
+                Sign in with SSO for {ssoEnforcement.orgName}
               </a>
             )}
             {ssoProviders.map((provider) => (
