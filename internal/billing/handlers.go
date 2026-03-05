@@ -21,22 +21,26 @@ import (
 const maxWebhookBodyBytes = 64 * 1024
 
 type Handlers struct {
-	db              database.DBTX
-	creem           *Client
-	baseURL         string
-	proProductID    string
-	orgProProductID string
-	webhookSecret   string
+	db                   database.DBTX
+	creem                *Client
+	baseURL              string
+	proProductID         string
+	orgProProductID      string
+	businessProductID    string
+	orgBusinessProductID string
+	webhookSecret        string
 }
 
-func NewHandlers(db database.DBTX, creem *Client, baseURL, proProductID, orgProProductID, webhookSecret string) *Handlers {
+func NewHandlers(db database.DBTX, creem *Client, baseURL, proProductID, orgProProductID, businessProductID, orgBusinessProductID, webhookSecret string) *Handlers {
 	return &Handlers{
-		db:              db,
-		creem:           creem,
-		baseURL:         baseURL,
-		proProductID:    proProductID,
-		orgProProductID: orgProProductID,
-		webhookSecret:   webhookSecret,
+		db:                   db,
+		creem:                creem,
+		baseURL:              baseURL,
+		proProductID:         proProductID,
+		orgProProductID:      orgProProductID,
+		businessProductID:    businessProductID,
+		orgBusinessProductID: orgBusinessProductID,
+		webhookSecret:        webhookSecret,
 	}
 }
 
@@ -53,13 +57,24 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Plan != "pro" {
+	var productID string
+	switch req.Plan {
+	case "pro":
+		productID = h.proProductID
+	case "business":
+		productID = h.businessProductID
+	default:
 		httputil.WriteError(w, http.StatusBadRequest, "unsupported plan")
 		return
 	}
 
+	if productID == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "plan not configured")
+		return
+	}
+
 	successURL := h.baseURL + "/settings?billing=success"
-	checkoutURL, err := h.creem.CreateCheckout(r.Context(), h.proProductID, userID, successURL)
+	checkoutURL, err := h.creem.CreateCheckout(r.Context(), productID, userID, successURL)
 	if err != nil {
 		slog.Error("failed to create checkout", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create checkout")
@@ -164,19 +179,25 @@ func (h *Handlers) CreateOrgCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Plan != "pro" {
+	var orgProductID string
+	switch req.Plan {
+	case "pro":
+		orgProductID = h.orgProProductID
+	case "business":
+		orgProductID = h.orgBusinessProductID
+	default:
 		httputil.WriteError(w, http.StatusBadRequest, "unsupported plan")
 		return
 	}
 
-	if h.orgProProductID == "" {
-		httputil.WriteError(w, http.StatusBadRequest, "org billing not configured")
+	if orgProductID == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "plan not configured")
 		return
 	}
 
 	successURL := h.baseURL + "/organizations/" + orgID + "/settings?billing=success"
 	metadata := map[string]string{"userId": userID, "orgId": orgID}
-	checkoutURL, err := h.creem.CreateCheckoutWithMetadata(r.Context(), h.orgProProductID, successURL, metadata)
+	checkoutURL, err := h.creem.CreateCheckoutWithMetadata(r.Context(), orgProductID, successURL, metadata)
 	if err != nil {
 		slog.Error("failed to create org checkout", "error", err, "org_id", orgID)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create checkout")
@@ -456,6 +477,9 @@ func (h *Handlers) verifySignature(body []byte, signature string) bool {
 }
 
 func (h *Handlers) planFromProductID(productID string) string {
+	if productID == h.businessProductID || (h.orgBusinessProductID != "" && productID == h.orgBusinessProductID) {
+		return "business"
+	}
 	if productID == h.proProductID || (h.orgProProductID != "" && productID == h.orgProProductID) {
 		return "pro"
 	}

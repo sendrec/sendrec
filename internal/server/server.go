@@ -52,10 +52,12 @@ type Config struct {
 	ViewNotifier            video.ViewNotifier
 	SlackNotifier           video.SlackNotifier
 	WebhookClient           *webhook.Client
-	CreemAPIKey             string
-	CreemWebhookSecret      string
-	CreemProProductID       string
-	CreemOrgProProductID    string
+	CreemAPIKey              string
+	CreemWebhookSecret       string
+	CreemProProductID        string
+	CreemOrgProProductID     string
+	CreemBusinessProductID   string
+	CreemOrgBusinessProductID string
 	RegistrationEnabled     bool
 	GeoIPDBPath             string
 	GoogleClientID          string
@@ -148,7 +150,7 @@ func New(cfg Config) *Server {
 
 		if cfg.CreemAPIKey != "" {
 			creemClient := billing.New(cfg.CreemAPIKey, "")
-			s.billingHandlers = billing.NewHandlers(cfg.DB, creemClient, baseURL, cfg.CreemProProductID, cfg.CreemOrgProProductID, cfg.CreemWebhookSecret)
+			s.billingHandlers = billing.NewHandlers(cfg.DB, creemClient, baseURL, cfg.CreemProProductID, cfg.CreemOrgProProductID, cfg.CreemBusinessProductID, cfg.CreemOrgBusinessProductID, cfg.CreemWebhookSecret)
 		}
 
 		s.orgHandler = organization.NewHandler(cfg.DB, baseURL)

@@ -533,13 +533,13 @@ export function Settings() {
     }
   }
 
-  async function handleUpgrade() {
+  async function handleUpgrade(plan: string) {
     setUpgrading(true);
     setBillingMessage("");
     try {
       const resp = await apiFetch<{ checkoutUrl: string }>("/api/settings/billing/checkout", {
         method: "POST",
-        body: JSON.stringify({ plan: "pro" }),
+        body: JSON.stringify({ plan }),
       });
       if (resp?.checkoutUrl) {
         window.location.href = resp.checkoutUrl;
@@ -682,15 +682,15 @@ export function Settings() {
         <div className="card settings-section">
           <div className="card-header">
             <h2>Subscription</h2>
-            <span className={`plan-badge ${billing.plan === "pro" ? "plan-badge--pro" : ""}`}>
-              {billing.plan === "pro" ? "Pro" : "Free"}
+            <span className={`plan-badge ${billing.plan !== "free" ? "plan-badge--pro" : ""}`}>
+              {billing.plan === "business" ? "Business" : billing.plan === "pro" ? "Pro" : "Free"}
             </span>
           </div>
 
           {billing.plan === "free" && !billing.subscriptionStatus && (
             <>
               <p className="card-description">
-                Upgrade to Pro for unlimited videos and recording duration.
+                Upgrade for unlimited videos and recording duration.
               </p>
               <div className="upgrade-card">
                 <div className="upgrade-card-info">
@@ -702,14 +702,51 @@ export function Settings() {
                   <button
                     type="button"
                     className="btn btn--primary"
-                    onClick={handleUpgrade}
+                    onClick={() => handleUpgrade("pro")}
                     disabled={upgrading}
                   >
                     {upgrading ? "Redirecting..." : "Upgrade to Pro"}
                   </button>
                 </div>
               </div>
+              <div className="upgrade-card">
+                <div className="upgrade-card-info">
+                  <span className="upgrade-card-plan">Business</span>
+                  <span className="upgrade-card-desc">Everything in Pro, plus SSO and workspace access controls</span>
+                </div>
+                <div className="upgrade-card-actions">
+                  <span className="upgrade-card-price">&euro;12/mo</span>
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={() => handleUpgrade("business")}
+                    disabled={upgrading}
+                  >
+                    {upgrading ? "Redirecting..." : "Upgrade to Business"}
+                  </button>
+                </div>
+              </div>
             </>
+          )}
+
+          {billing.plan === "pro" && !billing.subscriptionStatus && (
+            <div className="upgrade-card">
+              <div className="upgrade-card-info">
+                <span className="upgrade-card-plan">Business</span>
+                <span className="upgrade-card-desc">Everything in Pro, plus SSO and workspace access controls</span>
+              </div>
+              <div className="upgrade-card-actions">
+                <span className="upgrade-card-price">&euro;12/mo</span>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => handleUpgrade("business")}
+                  disabled={upgrading}
+                >
+                  {upgrading ? "Redirecting..." : "Upgrade to Business"}
+                </button>
+              </div>
+            </div>
           )}
 
           {billing.subscriptionStatus === "canceled" && (
@@ -718,7 +755,7 @@ export function Settings() {
             </p>
           )}
 
-          {billing.plan === "pro" && billing.subscriptionStatus !== "canceled" && (
+          {(billing.plan === "pro" || billing.plan === "business") && billing.subscriptionStatus !== "canceled" && (
             <div className="btn-row">
               {billing.portalUrl && (
                 <a
