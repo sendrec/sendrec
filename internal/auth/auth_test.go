@@ -34,6 +34,12 @@ func expectInsertRefreshToken(mock pgxmock.PgxPoolIface, userID string) {
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 }
 
+func expectNoSSOEnforcement(mock pgxmock.PgxPoolIface, userID string) {
+	mock.ExpectQuery(`SELECT o.name FROM organization_sso_configs`).
+		WithArgs(userID).
+		WillReturnError(pgx.ErrNoRows)
+}
+
 func expectRefreshValidation(mock pgxmock.PgxPoolIface, tokenID, userID string, expiresAt time.Time, revoked bool) {
 	mock.ExpectQuery(`SELECT revoked, expires_at FROM refresh_tokens`).
 		WithArgs(tokenID, userID).
@@ -566,6 +572,7 @@ func TestLogin_Success(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "password", "email_verified"}).
 			AddRow("user-uuid-1", string(hashedPassword), true))
 
+	expectNoSSOEnforcement(mock, "user-uuid-1")
 	expectInsertRefreshToken(mock, "user-uuid-1")
 
 	body := `{"email":"alice@example.com","password":"correctpassword"}`
@@ -726,6 +733,82 @@ func TestLogin_InvalidJSON(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
+func TestLogin_BlockedByEnforcedSSO(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctpassword"), bcrypt.DefaultCost)
+
+	mock.ExpectQuery(`SELECT id, password, email_verified FROM users WHERE email`).
+		WithArgs("alice@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "password", "email_verified"}).
+			AddRow("user-uuid-1", string(hashedPassword), true))
+
+	mock.ExpectQuery(`SELECT o.name FROM organization_sso_configs`).
+		WithArgs("user-uuid-1").
+		WillReturnRows(pgxmock.NewRows([]string{"name"}).AddRow("Acme Corp"))
+
+	body := `{"email":"alice@example.com","password":"correctpassword"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.Login(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp["error"] != "sso_required" {
+		t.Errorf("expected error 'sso_required', got %q", resp["error"])
+	}
+	if !strings.Contains(resp["message"], "Acme Corp") {
+		t.Errorf("expected message to contain org name, got %q", resp["message"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+func TestLogin_OwnerExemptFromSSO(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctpassword"), bcrypt.DefaultCost)
+
+	mock.ExpectQuery(`SELECT id, password, email_verified FROM users WHERE email`).
+		WithArgs("owner@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "password", "email_verified"}).
+			AddRow("owner-uuid-1", string(hashedPassword), true))
+
+	// Owner is excluded by the WHERE role != 'owner' clause, so no rows returned
+	expectNoSSOEnforcement(mock, "owner-uuid-1")
+	expectInsertRefreshToken(mock, "owner-uuid-1")
+
+	body := `{"email":"owner@example.com","password":"correctpassword"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.Login(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	resp := decodeTokenResponse(t, rec)
+	if resp.AccessToken == "" {
+		t.Error("expected non-empty access token")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
 	}
 }
 

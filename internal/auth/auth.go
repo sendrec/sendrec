@@ -218,6 +218,24 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check SSO enforcement
+	var enforcedOrgName string
+	err = h.db.QueryRow(r.Context(),
+		`SELECT o.name FROM organization_sso_configs c
+		 JOIN organizations o ON o.id = c.organization_id
+		 JOIN organization_members m ON m.organization_id = o.id
+		 WHERE m.user_id = $1 AND c.enforce_sso = true AND m.role != 'owner'
+		 LIMIT 1`,
+		userID,
+	).Scan(&enforcedOrgName)
+	if err == nil {
+		httputil.WriteJSON(w, http.StatusForbidden, map[string]string{
+			"error":   "sso_required",
+			"message": "Your workspace \"" + enforcedOrgName + "\" requires SSO sign-in",
+		})
+		return
+	}
+
 	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate tokens")
