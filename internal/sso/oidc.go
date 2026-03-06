@@ -3,6 +3,7 @@ package sso
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
@@ -30,7 +31,19 @@ type OIDCProvider struct {
 func NewOIDCProvider(ctx context.Context, cfg OIDCConfig) (*OIDCProvider, error) {
 	provider, err := oidc.NewProvider(ctx, cfg.IssuerURL)
 	if err != nil {
-		return nil, fmt.Errorf("oidc discovery: %w", err)
+		// Some providers (e.g. Auth0) return the issuer URL with a trailing
+		// slash in their discovery document while the saved config may not
+		// have one (or vice versa). Retry with the slash toggled.
+		alt := cfg.IssuerURL
+		if strings.HasSuffix(alt, "/") {
+			alt = strings.TrimRight(alt, "/")
+		} else {
+			alt += "/"
+		}
+		provider, err = oidc.NewProvider(ctx, alt)
+		if err != nil {
+			return nil, fmt.Errorf("oidc discovery: %w", err)
+		}
 	}
 
 	scopes := cfg.Scopes
