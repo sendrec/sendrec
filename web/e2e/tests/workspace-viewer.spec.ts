@@ -86,7 +86,7 @@ test.describe.serial("Workspace Viewer Role", () => {
     const viewer = members.find((m: { email: string }) => m.email === TEST_USER_2.email);
 
     const response = await page.request.patch(
-      `/api/organizations/${workspaceId}/members/${viewer.userId}`,
+      `/api/organizations/${workspaceId}/members/${viewer.id}`,
       { data: { role: "member" }, headers: authHeaders }
     );
     expect(response.ok()).toBeTruthy();
@@ -107,7 +107,7 @@ test.describe.serial("Workspace Viewer Role", () => {
     const member = members.find((m: { email: string }) => m.email === TEST_USER_2.email);
 
     const response = await page.request.patch(
-      `/api/organizations/${workspaceId}/members/${member.userId}`,
+      `/api/organizations/${workspaceId}/members/${member.id}`,
       { data: { role: "viewer" }, headers: authHeaders }
     );
     expect(response.ok()).toBeTruthy();
