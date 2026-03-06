@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/sendrec/sendrec/internal/database"
 )
@@ -186,4 +189,113 @@ func (h *Handler) fetchSCIMUser(ctx context.Context, userID, orgID string) (*SCI
 			Location:     h.baseURL + "/api/organizations/" + orgID + "/scim/v2/Users/" + id,
 		},
 	}, nil
+}
+
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+	orgID := chi.URLParam(r, "orgId")
+	userID := chi.URLParam(r, "id")
+
+	user, err := h.fetchSCIMUser(r.Context(), userID, orgID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, user)
+}
+
+func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	orgID := chi.URLParam(r, "orgId")
+
+	count := 100
+	startIndex := 1
+	if c := r.URL.Query().Get("count"); c != "" {
+		if v, err := strconv.Atoi(c); err == nil && v > 0 && v <= 100 {
+			count = v
+		}
+	}
+	if s := r.URL.Query().Get("startIndex"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 {
+			startIndex = v
+		}
+	}
+	offset := startIndex - 1
+
+	filterEmail := parseUserNameFilter(r.URL.Query().Get("filter"))
+
+	var total int
+	var rows pgx.Rows
+	var err error
+
+	if filterEmail != "" {
+		err = h.db.QueryRow(r.Context(),
+			"SELECT COUNT(*) FROM users u JOIN organization_members om ON om.user_id = u.id WHERE om.organization_id = $1 AND u.email = $2",
+			orgID, filterEmail,
+		).Scan(&total)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "query failed")
+			return
+		}
+		rows, err = h.db.Query(r.Context(),
+			"SELECT u.id, u.email, u.name FROM users u JOIN organization_members om ON om.user_id = u.id WHERE om.organization_id = $1 AND u.email = $2 ORDER BY u.email LIMIT $3 OFFSET $4",
+			orgID, filterEmail, count, offset,
+		)
+	} else {
+		err = h.db.QueryRow(r.Context(),
+			"SELECT COUNT(*) FROM users u JOIN organization_members om ON om.user_id = u.id WHERE om.organization_id = $1",
+			orgID,
+		).Scan(&total)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "query failed")
+			return
+		}
+		rows, err = h.db.Query(r.Context(),
+			"SELECT u.id, u.email, u.name FROM users u JOIN organization_members om ON om.user_id = u.id WHERE om.organization_id = $1 ORDER BY u.email LIMIT $2 OFFSET $3",
+			orgID, count, offset,
+		)
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	defer rows.Close()
+
+	var users []SCIMUser
+	for rows.Next() {
+		var id, email, name string
+		if err := rows.Scan(&id, &email, &name); err != nil {
+			continue
+		}
+		users = append(users, SCIMUser{
+			Schemas:  []string{UserSchema},
+			ID:       id,
+			UserName: email,
+			Name:     SCIMName{Formatted: name},
+			Emails:   []SCIMEmail{{Value: email, Primary: true}},
+			Active:   true,
+			Meta:     &SCIMMeta{ResourceType: "User", Location: h.baseURL + "/api/organizations/" + orgID + "/scim/v2/Users/" + id},
+		})
+	}
+	if users == nil {
+		users = []SCIMUser{}
+	}
+
+	h.writeJSON(w, http.StatusOK, SCIMListResponse{
+		Schemas:      []string{ListResponseSchema},
+		TotalResults: total,
+		ItemsPerPage: count,
+		StartIndex:   startIndex,
+		Resources:    users,
+	})
+}
+
+// parseUserNameFilter extracts email from `userName eq "user@example.com"`.
+func parseUserNameFilter(filter string) string {
+	if filter == "" {
+		return ""
+	}
+	parts := strings.SplitN(filter, " eq ", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) != "userName" {
+		return ""
+	}
+	return strings.Trim(strings.TrimSpace(parts[1]), `"`)
 }

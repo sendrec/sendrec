@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -166,5 +167,121 @@ func TestCreateUser_ExistingUser(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("got status %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetUser(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT u.id, u.email, u.name FROM users u`).
+		WithArgs("user-1", "org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email", "name"}).
+			AddRow("user-1", "jane@example.com", "Jane Doe"))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	rctx.URLParams.Add("id", "user-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rec := httptest.NewRecorder()
+
+	handler.GetUser(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+
+	var user SCIMUser
+	json.NewDecoder(rec.Body).Decode(&user)
+	if user.UserName != "jane@example.com" {
+		t.Errorf("UserName = %q, want jane@example.com", user.UserName)
+	}
+}
+
+func TestGetUser_NotFound(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT u.id, u.email, u.name FROM users u`).
+		WithArgs("no-such-user", "org-1").
+		WillReturnError(pgx.ErrNoRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	rctx.URLParams.Add("id", "no-such-user")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rec := httptest.NewRecorder()
+
+	handler.GetUser(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("got status %d, want 404", rec.Code)
+	}
+}
+
+func TestListUsers(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM users u JOIN organization_members`).
+		WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
+
+	mock.ExpectQuery(`SELECT u.id, u.email, u.name FROM users u JOIN organization_members`).
+		WithArgs("org-1", 100, 0).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email", "name"}).
+			AddRow("user-1", "jane@example.com", "Jane").
+			AddRow("user-2", "bob@example.com", "Bob"))
+
+	req := httptest.NewRequest(http.MethodGet, "/?count=100&startIndex=1", nil)
+	req = withOrgID(req, "org-1")
+	rec := httptest.NewRecorder()
+
+	handler.ListUsers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp SCIMListResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.TotalResults != 2 {
+		t.Errorf("TotalResults = %d, want 2", resp.TotalResults)
+	}
+	if len(resp.Resources) != 2 {
+		t.Errorf("Resources length = %d, want 2", len(resp.Resources))
+	}
+}
+
+func TestListUsers_FilterByUserName(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM users u JOIN organization_members`).
+		WithArgs("org-1", "jane@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
+
+	mock.ExpectQuery(`SELECT u.id, u.email, u.name FROM users u JOIN organization_members`).
+		WithArgs("org-1", "jane@example.com", 100, 0).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email", "name"}).
+			AddRow("user-1", "jane@example.com", "Jane"))
+
+	filterURL := "/?filter=" + url.QueryEscape(`userName eq "jane@example.com"`)
+	req := httptest.NewRequest(http.MethodGet, filterURL, nil)
+	req = withOrgID(req, "org-1")
+	rec := httptest.NewRecorder()
+
+	handler.ListUsers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want 200", rec.Code)
+	}
+
+	var resp SCIMListResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.TotalResults != 1 {
+		t.Errorf("TotalResults = %d, want 1", resp.TotalResults)
 	}
 }
