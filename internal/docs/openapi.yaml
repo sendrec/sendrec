@@ -1183,7 +1183,7 @@ components:
       properties:
         plan:
           type: string
-          enum: [free, pro]
+          enum: [free, pro, business]
         subscriptionId:
           type: string
           nullable: true
@@ -1327,13 +1327,13 @@ components:
           type: string
         subscriptionPlan:
           type: string
-          enum: [free, pro]
+          enum: [free, pro, business]
         retentionDays:
           type: integer
           description: Auto-delete videos after this many days (0 = disabled)
         role:
           type: string
-          enum: [owner, admin, member]
+          enum: [owner, admin, member, viewer]
         memberCount:
           type: integer
           format: int64
@@ -1351,13 +1351,13 @@ components:
           type: string
         subscriptionPlan:
           type: string
-          enum: [free, pro]
+          enum: [free, pro, business]
         retentionDays:
           type: integer
           description: Auto-delete videos after this many days (0 = disabled)
         role:
           type: string
-          enum: [owner, admin, member]
+          enum: [owner, admin, member, viewer]
         memberCount:
           type: integer
           format: int64
@@ -1389,7 +1389,7 @@ components:
           type: string
         subscriptionPlan:
           type: string
-          enum: [free, pro]
+          enum: [free, pro, business]
         createdAt:
           type: string
           format: date-time
@@ -1410,6 +1410,207 @@ components:
           type: integer
           enum: [0, 30, 60, 90, 180, 365]
           description: Auto-delete videos after this many days (0 = disabled)
+
+    MemberResponse:
+      type: object
+      required: [id, name, email, role, joinedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+        joinedAt:
+          type: string
+          format: date-time
+
+    UpdateMemberRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, member, viewer]
+
+    UpdateMemberRoleResponse:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, member, viewer]
+
+    SendInviteRequest:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, member, viewer]
+
+    InviteResponse:
+      type: object
+      required: [id, email, role, acceptLink, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, member, viewer]
+        acceptLink:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    InviteListItem:
+      type: object
+      required: [id, email, role, invitedByName, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, member, viewer]
+        invitedByName:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    AcceptInviteRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    AcceptInviteResponse:
+      type: object
+      required: [organizationId, name, slug, role]
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        role:
+          type: string
+          enum: [admin, member, viewer]
+
+    OrgBillingResponse:
+      type: object
+      required: [plan]
+      properties:
+        plan:
+          type: string
+          enum: [free, pro, business]
+        subscriptionId:
+          type: string
+          nullable: true
+        subscriptionStatus:
+          type: string
+          nullable: true
+        portalUrl:
+          type: string
+          nullable: true
+
+    OrgCheckoutRequest:
+      type: object
+      required: [plan]
+      properties:
+        plan:
+          type: string
+          enum: [pro, business]
+
+    OrgCheckoutResponse:
+      type: object
+      properties:
+        checkoutUrl:
+          type: string
+        upgraded:
+          type: string
+          description: Set when subscription was upgraded in-place instead of creating checkout
+
+    OrgSSOConfigResponse:
+      type: object
+      required: [configured]
+      properties:
+        configured:
+          type: boolean
+        provider:
+          type: string
+        issuerUrl:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+          description: Masked value (******) when configured
+        enforceSso:
+          type: boolean
+
+    SaveOrgSSOConfigRequest:
+      type: object
+      required: [issuerUrl, clientId]
+      properties:
+        issuerUrl:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+          description: Omit to preserve existing secret on update
+        enforceSso:
+          type: boolean
+
+    TransferVideoRequest:
+      type: object
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Target organization ID, or null to move to personal scope
+
+    TransferVideoResponse:
+      type: object
+      required: [id, title]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
 
     SSOProviderList:
       type: object
@@ -5038,6 +5239,625 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/organizations/{orgId}/members:
+    get:
+      tags: [Organizations]
+      summary: List organization members
+      description: Returns all members of the organization. Any member can view the member list.
+      operationId: listOrganizationMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MemberResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/organizations/{orgId}/members/{userId}:
+    delete:
+      tags: [Organizations]
+      summary: Remove a member from an organization
+      description: Removes a member from the organization. Owners and admins can remove members. Owners cannot be removed.
+      operationId: removeOrganizationMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Member removed
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (owner or admin required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization or member not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Organizations]
+      summary: Update a member's role
+      description: Changes a member's role within the organization. Only owners can update roles.
+      operationId: updateOrganizationMemberRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberRoleRequest"
+      responses:
+        "200":
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateMemberRoleResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only owners can update member roles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization or member not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/organizations/{orgId}/invites:
+    post:
+      tags: [Organizations]
+      summary: Send an invite
+      description: Sends an invitation email to join the organization. Owners and admins can send invites.
+      operationId: sendOrganizationInvite
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendInviteRequest"
+      responses:
+        "201":
+          description: Invite sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteResponse"
+        "400":
+          description: Validation error (e.g. user already a member, invite already pending)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (owner or admin required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Organizations]
+      summary: List pending invites
+      description: Returns all pending invites for the organization. Owners and admins can view invites.
+      operationId: listOrganizationInvites
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: List of pending invites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InviteListItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (owner or admin required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/organizations/{orgId}/invites/{inviteId}:
+    delete:
+      tags: [Organizations]
+      summary: Revoke an invite
+      description: Revokes a pending invitation. Owners and admins can revoke invites.
+      operationId: revokeOrganizationInvite
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: inviteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Invite revoked
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (owner or admin required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization or invite not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/invites/accept:
+    post:
+      tags: [Organizations]
+      summary: Accept an invite
+      description: Accepts an organization invitation using the invite token. The authenticated user is added as a member with the invited role.
+      operationId: acceptOrganizationInvite
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInviteRequest"
+      responses:
+        "200":
+          description: Invite accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptInviteResponse"
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: User is already a member of the organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/organizations/{orgId}/billing:
+    get:
+      tags: [Organizations]
+      summary: Get organization billing info
+      description: Returns the billing and subscription details for the organization. Any member can view billing info.
+      operationId: getOrganizationBilling
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Billing information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgBillingResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Organizations]
+      summary: Cancel organization subscription
+      description: Cancels the organization's paid subscription. Only owners can cancel.
+      operationId: cancelOrganizationSubscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Subscription cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only owners can cancel the subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found or no active subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/organizations/{orgId}/billing/checkout:
+    post:
+      tags: [Organizations]
+      summary: Create organization billing checkout
+      description: Creates a checkout session for upgrading the organization's subscription plan. Only owners can initiate checkout.
+      operationId: createOrganizationCheckout
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrgCheckoutRequest"
+      responses:
+        "200":
+          description: Checkout session created or subscription upgraded in-place
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgCheckoutResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only owners can initiate checkout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/organizations/{orgId}/sso:
+    get:
+      tags: [Organizations]
+      summary: Get organization SSO configuration
+      description: Returns the SSO configuration for the organization. Any member can view the SSO config.
+      operationId: getOrganizationSSOConfig
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: SSO configuration (or configured=false if not set up)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgSSOConfigResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Organizations]
+      summary: Save organization SSO configuration
+      description: Creates or updates the SSO configuration for the organization. Owners and admins can manage SSO config.
+      operationId: saveOrganizationSSOConfig
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveOrgSSOConfigRequest"
+      responses:
+        "200":
+          description: SSO configuration saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgSSOConfigResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions (owner or admin required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Organizations]
+      summary: Delete organization SSO configuration
+      description: Removes the SSO configuration for the organization. Only owners can delete SSO config.
+      operationId: deleteOrganizationSSOConfig
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: SSO configuration deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusOkResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Only owners can delete SSO configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Organization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/videos/{id}/transfer:
+    post:
+      tags: [Videos]
+      summary: Transfer a video between scopes
+      description: Transfers a video to an organization or back to personal scope. The user must own the video and be a member of the target organization.
+      operationId: transferVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferVideoRequest"
+      responses:
+        "200":
+          description: Video transferred
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferVideoResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video or organization not found
           content:
             application/json:
               schema:
