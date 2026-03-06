@@ -82,16 +82,6 @@ func TestSendPasswordReset_ServerError(t *testing.T) {
 	}
 }
 
-func TestSendPasswordReset_NoBaseURL(t *testing.T) {
-	client := New(Config{})
-
-	// Should not error — just logs to stdout
-	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestSendCommentNotification_UsesCommentTemplateID(t *testing.T) {
 	var received txRequest
 
@@ -1111,6 +1101,70 @@ func TestParseAllowlist(t *testing.T) {
 				t.Errorf("ParseAllowlist(%q)[%d]: got %q, want %q", tt.input, i, result[i], tt.expected[i])
 			}
 		}
+	}
+}
+
+func TestSendmail_FallbackWhenNoListmonk(t *testing.T) {
+	client := New(Config{
+		FromAddress: "test@sendrec.eu",
+	})
+
+	// Without Listmonk, sendmail fallback is attempted.
+	// If sendmail is not available, it gracefully returns nil.
+	// If sendmail IS available (macOS), it sends the email.
+	err := client.SendPasswordReset(context.Background(),
+		"alice@example.com", "Alice", "https://example.com/reset")
+	if err != nil {
+		t.Fatalf("expected graceful fallback, got error: %v", err)
+	}
+}
+
+func TestSendmail_AllEmailTypesWork(t *testing.T) {
+	client := New(Config{})
+
+	// All email types should work without Listmonk configured
+	tests := []struct {
+		name string
+		fn   func() error
+	}{
+		{"PasswordReset", func() error {
+			return client.SendPasswordReset(context.Background(), "a@b.com", "A", "https://example.com/reset")
+		}},
+		{"CommentNotification", func() error {
+			return client.SendCommentNotification(context.Background(), "a@b.com", "A", "V", "B", "Hi", "https://example.com/watch")
+		}},
+		{"ViewNotification", func() error {
+			return client.SendViewNotification(context.Background(), "a@b.com", "A", "V", "https://example.com/watch", 1)
+		}},
+		{"Confirmation", func() error {
+			return client.SendConfirmation(context.Background(), "a@b.com", "A", "https://example.com/confirm")
+		}},
+		{"Welcome", func() error {
+			return client.SendWelcome(context.Background(), "a@b.com", "A", "https://example.com")
+		}},
+		{"OnboardingDay2", func() error {
+			return client.SendOnboardingDay2(context.Background(), "a@b.com", "A", "https://example.com")
+		}},
+		{"OnboardingDay7", func() error {
+			return client.SendOnboardingDay7(context.Background(), "a@b.com", "A", "https://example.com")
+		}},
+		{"DigestNotification", func() error {
+			return client.SendDigestNotification(context.Background(), "a@b.com", "A", []DigestVideoSummary{{Title: "V", ViewCount: 1}})
+		}},
+		{"OrgInvite", func() error {
+			return client.SendOrgInvite(context.Background(), "a@b.com", "Org", "Bob", "https://example.com/invite")
+		}},
+		{"RetentionWarning", func() error {
+			return client.SendRetentionWarning(context.Background(), "a@b.com", []RetentionVideoSummary{{Title: "V"}}, "2026-04-01")
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.fn(); err != nil {
+				t.Errorf("expected no error without Listmonk, got: %v", err)
+			}
+		})
 	}
 }
 
