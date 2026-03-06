@@ -1,4 +1,5 @@
 import { type Page, expect } from "@playwright/test";
+import { getAccessToken } from "./auth";
 import { queryRows } from "./db";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -12,6 +13,7 @@ export async function createWorkspace(
 ): Promise<{ id: string; slug: string }> {
   const response = await page.request.post("/api/organizations", {
     data: { name },
+    headers: { Authorization: `Bearer ${getAccessToken(page)}` },
   });
   if (!response.ok()) {
     throw new Error(`Create workspace failed: ${response.status()}`);
@@ -27,7 +29,10 @@ export async function inviteToWorkspace(
 ): Promise<{ acceptLink: string }> {
   const response = await page.request.post(
     `/api/organizations/${orgId}/invites`,
-    { data: { email, role } }
+    {
+      data: { email, role },
+      headers: { Authorization: `Bearer ${getAccessToken(page)}` },
+    }
   );
   if (!response.ok()) {
     throw new Error(
@@ -52,6 +57,7 @@ export async function acceptInviteViaAPI(
 ): Promise<void> {
   const response = await page.request.post("/api/invites/accept", {
     data: { token },
+    headers: { Authorization: `Bearer ${getAccessToken(page)}` },
   });
   if (!response.ok()) {
     throw new Error(

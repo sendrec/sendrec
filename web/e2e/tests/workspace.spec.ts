@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginViaAPI } from "../helpers/auth";
+import { loginViaAPI, getAccessToken } from "../helpers/auth";
 import { createWorkspace } from "../helpers/workspace";
 
 test.describe.serial("Workspace CRUD", () => {
@@ -29,6 +29,7 @@ test.describe.serial("Workspace CRUD", () => {
     const newName = "Renamed Workspace";
     const response = await page.request.patch(`/api/organizations/${workspaceId}`, {
       data: { name: newName },
+      headers: { Authorization: `Bearer ${getAccessToken(page)}` },
     });
     expect(response.ok()).toBeTruthy();
 
@@ -42,7 +43,9 @@ test.describe.serial("Workspace CRUD", () => {
   });
 
   test("delete workspace removes from org switcher", async ({ page }) => {
-    const response = await page.request.delete(`/api/organizations/${workspaceId}`);
+    const response = await page.request.delete(`/api/organizations/${workspaceId}`, {
+      headers: { Authorization: `Bearer ${getAccessToken(page)}` },
+    });
     expect(response.ok()).toBeTruthy();
 
     await page.goto("/");

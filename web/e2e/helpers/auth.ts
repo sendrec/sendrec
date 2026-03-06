@@ -59,7 +59,11 @@ export async function loginAsSecondUser(page: Page): Promise<void> {
     const response = await page.request.post("/api/auth/login", {
       data: { email: TEST_USER_2.email, password: TEST_USER_2.password },
     });
-    if (response.ok()) return;
+    if (response.ok()) {
+      const body = await response.json();
+      accessTokenStore.set(page, body.accessToken);
+      return;
+    }
     if (response.status() === 429) {
       await page.waitForTimeout(2000);
       continue;
@@ -74,7 +78,11 @@ export async function loginViaAPI(page: Page): Promise<void> {
     const response = await page.request.post("/api/auth/login", {
       data: { email: TEST_USER.email, password: TEST_USER.password },
     });
-    if (response.ok()) return;
+    if (response.ok()) {
+      const body = await response.json();
+      accessTokenStore.set(page, body.accessToken);
+      return;
+    }
     if (response.status() === 429) {
       await page.waitForTimeout(2000);
       continue;
@@ -82,4 +90,12 @@ export async function loginViaAPI(page: Page): Promise<void> {
     throw new Error(`Login API failed: ${response.status()}`);
   }
   throw new Error("Login API failed: exceeded retries (429)");
+}
+
+const accessTokenStore = new WeakMap<Page, string>();
+
+export function getAccessToken(page: Page): string {
+  const token = accessTokenStore.get(page);
+  if (!token) throw new Error("No access token — call loginViaAPI first");
+  return token;
 }

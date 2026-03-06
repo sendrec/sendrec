@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginViaAPI, loginAsSecondUser, TEST_USER_2 } from "../helpers/auth";
+import { loginViaAPI, loginAsSecondUser, getAccessToken, TEST_USER_2 } from "../helpers/auth";
 import {
   createWorkspace,
   inviteToWorkspace,
@@ -76,13 +76,16 @@ test.describe.serial("Workspace Viewer Role", () => {
 
   test("owner changes viewer to member, Record link appears", async ({ page }) => {
     await loginViaAPI(page);
-    const membersResp = await page.request.get(`/api/organizations/${workspaceId}/members`);
+    const authHeaders = { Authorization: `Bearer ${getAccessToken(page)}` };
+    const membersResp = await page.request.get(`/api/organizations/${workspaceId}/members`, {
+      headers: authHeaders,
+    });
     const members = await membersResp.json();
     const viewer = members.find((m: { email: string }) => m.email === TEST_USER_2.email);
 
     const response = await page.request.patch(
       `/api/organizations/${workspaceId}/members/${viewer.userId}`,
-      { data: { role: "member" } }
+      { data: { role: "member" }, headers: authHeaders }
     );
     expect(response.ok()).toBeTruthy();
 
@@ -94,13 +97,16 @@ test.describe.serial("Workspace Viewer Role", () => {
 
   test("owner changes member back to viewer, Record link hidden", async ({ page }) => {
     await loginViaAPI(page);
-    const membersResp = await page.request.get(`/api/organizations/${workspaceId}/members`);
+    const authHeaders = { Authorization: `Bearer ${getAccessToken(page)}` };
+    const membersResp = await page.request.get(`/api/organizations/${workspaceId}/members`, {
+      headers: authHeaders,
+    });
     const members = await membersResp.json();
     const member = members.find((m: { email: string }) => m.email === TEST_USER_2.email);
 
     const response = await page.request.patch(
       `/api/organizations/${workspaceId}/members/${member.userId}`,
-      { data: { role: "viewer" } }
+      { data: { role: "viewer" }, headers: authHeaders }
     );
     expect(response.ok()).toBeTruthy();
 
