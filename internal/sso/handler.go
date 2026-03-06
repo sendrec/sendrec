@@ -287,12 +287,16 @@ type ssoConfigRequest struct {
 }
 
 type ssoConfigResponse struct {
-	Provider     string `json:"provider"`
-	IssuerURL    string `json:"issuerUrl"`
-	ClientID     string `json:"clientId"`
-	ClientSecret string `json:"clientSecret"`
-	EnforceSSO   bool   `json:"enforceSso"`
-	Configured   bool   `json:"configured"`
+	Provider        string `json:"provider"`
+	IssuerURL       string `json:"issuerUrl,omitempty"`
+	ClientID        string `json:"clientId,omitempty"`
+	ClientSecret    string `json:"clientSecret,omitempty"`
+	EnforceSSO      bool   `json:"enforceSso"`
+	Configured      bool   `json:"configured"`
+	SAMLMetadataURL string `json:"samlMetadataUrl,omitempty"`
+	SAMLEntityID    string `json:"samlEntityId,omitempty"`
+	SAMLSSOURL      string `json:"samlSsoUrl,omitempty"`
+	SPMetadataURL   string `json:"spMetadataUrl,omitempty"`
 }
 
 // SaveConfig upserts the workspace SSO configuration for the caller's organization.
@@ -436,12 +440,16 @@ func (h *Handler) saveSAMLConfig(w http.ResponseWriter, r *http.Request, orgID s
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	orgID := chi.URLParam(r, "orgId")
 
-	var provider, issuerURL, clientID string
+	var provider string
+	var issuerURL, clientID, samlMetadataURL, samlEntityID, samlSSOURL *string
 	var enforceSSO bool
 	err := h.db.QueryRow(r.Context(),
-		"SELECT provider, issuer_url, client_id, enforce_sso FROM organization_sso_configs WHERE organization_id = $1",
+		`SELECT provider, issuer_url, client_id, enforce_sso,
+		        saml_metadata_url, saml_entity_id, saml_sso_url
+		 FROM organization_sso_configs WHERE organization_id = $1`,
 		orgID,
-	).Scan(&provider, &issuerURL, &clientID, &enforceSSO)
+	).Scan(&provider, &issuerURL, &clientID, &enforceSSO,
+		&samlMetadataURL, &samlEntityID, &samlSSOURL)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			httputil.WriteJSON(w, http.StatusOK, ssoConfigResponse{Configured: false})
@@ -452,14 +460,34 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httputil.WriteJSON(w, http.StatusOK, ssoConfigResponse{
-		Provider:     provider,
-		IssuerURL:    issuerURL,
-		ClientID:     clientID,
-		ClientSecret: "******",
-		EnforceSSO:   enforceSSO,
-		Configured:   true,
-	})
+	resp := ssoConfigResponse{
+		Provider:   provider,
+		EnforceSSO: enforceSSO,
+		Configured: true,
+	}
+
+	if provider == "saml" {
+		if samlMetadataURL != nil {
+			resp.SAMLMetadataURL = *samlMetadataURL
+		}
+		if samlEntityID != nil {
+			resp.SAMLEntityID = *samlEntityID
+		}
+		if samlSSOURL != nil {
+			resp.SAMLSSOURL = *samlSSOURL
+		}
+		resp.SPMetadataURL = h.baseURL + "/api/auth/saml/" + orgID + "/metadata"
+	} else {
+		if issuerURL != nil {
+			resp.IssuerURL = *issuerURL
+		}
+		if clientID != nil {
+			resp.ClientID = *clientID
+		}
+		resp.ClientSecret = "******"
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, resp)
 }
 
 // DeleteConfig removes the workspace SSO configuration for the caller's organization.

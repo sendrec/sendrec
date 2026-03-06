@@ -65,6 +65,10 @@ func jsonEscape(s string) string {
 	return string(b)
 }
 
+func strPtr(s string) *string {
+	return &s
+}
+
 func TestProviders_ReturnsEnabledList(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
@@ -521,10 +525,10 @@ func TestGetConfig_Success(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT provider, issuer_url, client_id, enforce_sso FROM organization_sso_configs`).
+	mock.ExpectQuery(`SELECT provider, issuer_url, client_id, enforce_sso`).
 		WithArgs("org-1").
-		WillReturnRows(pgxmock.NewRows([]string{"provider", "issuer_url", "client_id", "enforce_sso"}).
-			AddRow("oidc", "https://accounts.google.com", "client-123", true))
+		WillReturnRows(pgxmock.NewRows([]string{"provider", "issuer_url", "client_id", "enforce_sso", "saml_metadata_url", "saml_entity_id", "saml_sso_url"}).
+			AddRow("oidc", strPtr("https://accounts.google.com"), strPtr("client-123"), true, nil, nil, nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/sso/config", nil)
 	req = requestWithOrg(req, "org-1", "admin")
@@ -569,7 +573,7 @@ func TestGetConfig_NotConfigured(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT provider, issuer_url, client_id, enforce_sso FROM organization_sso_configs`).
+	mock.ExpectQuery(`SELECT provider, issuer_url, client_id, enforce_sso`).
 		WithArgs("org-1").
 		WillReturnError(pgx.ErrNoRows)
 
@@ -590,6 +594,61 @@ func TestGetConfig_NotConfigured(t *testing.T) {
 
 	if resp.Configured {
 		t.Error("configured = true, want false")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestGetConfig_SAML(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT provider, issuer_url, client_id, enforce_sso`).
+		WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"provider", "issuer_url", "client_id", "enforce_sso", "saml_metadata_url", "saml_entity_id", "saml_sso_url"}).
+			AddRow("saml", nil, nil, false, strPtr("https://idp.example.com/metadata"), strPtr("https://idp.example.com"), strPtr("https://idp.example.com/sso")))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/config", nil)
+	req = requestWithOrg(req, "org-1", "admin")
+
+	rec := httptest.NewRecorder()
+	handler.GetConfig(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp ssoConfigResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !resp.Configured {
+		t.Error("configured = false, want true")
+	}
+	if resp.Provider != "saml" {
+		t.Errorf("provider = %q, want %q", resp.Provider, "saml")
+	}
+	if resp.SAMLMetadataURL != "https://idp.example.com/metadata" {
+		t.Errorf("samlMetadataUrl = %q, want %q", resp.SAMLMetadataURL, "https://idp.example.com/metadata")
+	}
+	if resp.SAMLEntityID != "https://idp.example.com" {
+		t.Errorf("samlEntityId = %q, want %q", resp.SAMLEntityID, "https://idp.example.com")
+	}
+	if resp.SAMLSSOURL != "https://idp.example.com/sso" {
+		t.Errorf("samlSsoUrl = %q, want %q", resp.SAMLSSOURL, "https://idp.example.com/sso")
+	}
+	if resp.SPMetadataURL != testBaseURL+"/api/auth/saml/org-1/metadata" {
+		t.Errorf("spMetadataUrl = %q, want %q", resp.SPMetadataURL, testBaseURL+"/api/auth/saml/org-1/metadata")
+	}
+	// OIDC fields should be empty for SAML config.
+	if resp.IssuerURL != "" {
+		t.Errorf("issuerUrl = %q, want empty", resp.IssuerURL)
+	}
+	if resp.ClientSecret != "" {
+		t.Errorf("clientSecret = %q, want empty", resp.ClientSecret)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
