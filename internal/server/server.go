@@ -18,6 +18,7 @@ import (
 	"github.com/sendrec/sendrec/internal/integration"
 	"github.com/sendrec/sendrec/internal/organization"
 	"github.com/sendrec/sendrec/internal/ratelimit"
+	"github.com/sendrec/sendrec/internal/scim"
 	"github.com/sendrec/sendrec/internal/sso"
 	"github.com/sendrec/sendrec/internal/video"
 	"github.com/sendrec/sendrec/internal/webhook"
@@ -77,6 +78,7 @@ type Server struct {
 	orgHandler          *organization.Handler
 	integrationHandler  *integration.Handler
 	ssoHandler          *sso.Handler
+	scimHandler         *scim.Handler
 	db                  database.DBTX
 	billingHandlers     *billing.Handlers
 	webFS               fs.FS
@@ -162,6 +164,7 @@ func New(cfg Config) *Server {
 
 		encKey := integration.DeriveKey(jwtSecret)
 		s.ssoHandler = sso.NewHandler(cfg.DB, jwtSecret, baseURL, secureCookies, encKey)
+		s.scimHandler = scim.NewHandler(cfg.DB, baseURL)
 
 		if cfg.GoogleClientID != "" {
 			googleProvider, err := sso.NewOIDCProvider(context.Background(), sso.OIDCConfig{
@@ -272,6 +275,20 @@ func (s *Server) routes() {
 				r.Get("/{orgId}/metadata", s.ssoHandler.SPMetadata)
 			})
 		}
+
+		// SCIM provisioning routes
+		if s.scimHandler != nil {
+			s.router.Route("/api/organizations/{orgId}/scim/v2", func(r chi.Router) {
+				r.Use(scim.BearerAuth(s.db))
+				r.Get("/ServiceProviderConfig", s.scimHandler.ServiceProviderConfig)
+				r.Get("/Schemas", s.scimHandler.Schemas)
+				r.Get("/Users", s.scimHandler.ListUsers)
+				r.Get("/Users/{id}", s.scimHandler.GetUser)
+				r.Post("/Users", s.scimHandler.CreateUser)
+				r.Patch("/Users/{id}", s.scimHandler.PatchUser)
+				r.Delete("/Users/{id}", s.scimHandler.DeleteUser)
+			})
+		}
 	}
 
 	if s.authHandler != nil {
@@ -314,6 +331,9 @@ func (s *Server) routes() {
 					r.Get("/sso", s.ssoHandler.GetConfig)
 					r.Put("/sso", s.ssoHandler.SaveConfig)
 					r.Delete("/sso", s.ssoHandler.DeleteConfig)
+					r.Get("/scim-token", s.ssoHandler.GetSCIMToken)
+					r.Post("/scim-token", s.ssoHandler.GenerateSCIMToken)
+					r.Delete("/scim-token", s.ssoHandler.RevokeSCIMToken)
 				}
 			})
 		})
