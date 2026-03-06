@@ -166,15 +166,9 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp.Name = name
-	resp.SubscriptionPlan = plan
+	resp.SubscriptionPlan = "free"
 	resp.CreatedAt = createdAt.Format(time.RFC3339)
 	resp.UpdatedAt = updatedAt.Format(time.RFC3339)
-
-	if plan != "free" {
-		_, _ = h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = $1, plan_inherited_from = $2 WHERE id = $3",
-			plan, userID, resp.ID)
-	}
 
 	httputil.WriteJSON(w, http.StatusCreated, resp)
 }

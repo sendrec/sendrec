@@ -270,43 +270,25 @@ describe("OrgSettings", () => {
     expect(screen.getByText(/Revoke/)).toBeInTheDocument();
   });
 
-  it("shows Pro badge and owner plan message when effective plan comes from owner", async () => {
+  it("shows upgrade CTA when workspace plan is free", async () => {
     mockApiFetch
       .mockResolvedValueOnce(mockOrg)
       .mockResolvedValueOnce([ownerMember, regularMember])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ plan: "pro", planInherited: true });
-    renderOrgSettings();
-
-    await waitFor(() => {
-      expect(screen.getByText("Pro")).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/Inherited from your personal plan/)).toBeInTheDocument();
-    expect(screen.queryByText("Upgrade to Pro")).not.toBeInTheDocument();
-  });
-
-  it("shows upgrade CTA when both workspace and effective plan are free", async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(mockOrg)
-      .mockResolvedValueOnce([ownerMember, regularMember])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ plan: "free", planInherited: false });
+      .mockResolvedValueOnce({ plan: "free" });
     renderOrgSettings();
 
     await waitFor(() => {
       expect(screen.getByText("Upgrade to Pro")).toBeInTheDocument();
     });
-
-    expect(screen.queryByText(/Inherited from your personal plan/)).not.toBeInTheDocument();
   });
 
-  it("shows manage subscription when workspace has its own Pro plan", async () => {
+  it("shows manage subscription when workspace has Pro plan", async () => {
     mockApiFetch
       .mockResolvedValueOnce(mockOrg)
       .mockResolvedValueOnce([ownerMember, regularMember])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ plan: "pro", planInherited: false, portalUrl: "https://portal.example.com" });
+      .mockResolvedValueOnce({ plan: "pro", portalUrl: "https://portal.example.com" });
     renderOrgSettings();
 
     await waitFor(() => {
@@ -314,7 +296,6 @@ describe("OrgSettings", () => {
     });
 
     expect(screen.getByText("Cancel subscription")).toBeInTheDocument();
-    expect(screen.queryByText(/Inherited from your personal plan/)).not.toBeInTheDocument();
   });
 
   it("renders Data Retention select", async () => {
@@ -425,27 +406,13 @@ describe("OrgSettings", () => {
     expect(screen.queryByText("Single Sign-On")).not.toBeInTheDocument();
   });
 
-  it("shows Inherited badge when planInherited is true", async () => {
+
+  it("hides upgrade cards for paid plan", async () => {
     mockApiFetch
       .mockResolvedValueOnce(mockOrg)
       .mockResolvedValueOnce([ownerMember, regularMember])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ plan: "pro", planInherited: true });
-    renderOrgSettings();
-
-    await waitFor(() => {
-      expect(screen.getByText(/Inherited from your personal plan/)).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("Pro")).toBeInTheDocument();
-  });
-
-  it("hides upgrade cards for paid non-inherited plan", async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(mockOrg)
-      .mockResolvedValueOnce([ownerMember, regularMember])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ plan: "pro", planInherited: false });
+      .mockResolvedValueOnce({ plan: "pro" });
     renderOrgSettings();
 
     await waitFor(() => {
@@ -453,7 +420,6 @@ describe("OrgSettings", () => {
     });
 
     expect(screen.queryByText("Upgrade to Pro")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Inherited/)).not.toBeInTheDocument();
   });
 
   it("gates SSO on billing.plan === business", async () => {
@@ -470,7 +436,7 @@ describe("OrgSettings", () => {
       .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
       .mockResolvedValueOnce([ownerMember, regularMember])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ plan: "business", planInherited: false })
+      .mockResolvedValueOnce({ plan: "business" })
       .mockResolvedValueOnce({ issuerUrl: "", clientId: "", configured: false, enforceSso: false });
     renderOrgSettings();
 

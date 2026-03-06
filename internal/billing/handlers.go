@@ -120,7 +120,6 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 
 type billingResponse struct {
 	Plan               string  `json:"plan"`
-	PlanInherited      bool    `json:"planInherited"`
 	SubscriptionID     *string `json:"subscriptionId"`
 	SubscriptionStatus *string `json:"subscriptionStatus"`
 	PortalURL          *string `json:"portalUrl"`
@@ -287,12 +286,11 @@ func (h *Handlers) GetOrgBilling(w http.ResponseWriter, r *http.Request) {
 	var plan string
 	var subscriptionID *string
 	var customerID *string
-	var planInheritedFrom *string
 
 	err = h.db.QueryRow(r.Context(),
-		"SELECT subscription_plan, creem_subscription_id, creem_customer_id, plan_inherited_from FROM organizations WHERE id = $1",
+		"SELECT subscription_plan, creem_subscription_id, creem_customer_id FROM organizations WHERE id = $1",
 		orgID,
-	).Scan(&plan, &subscriptionID, &customerID, &planInheritedFrom)
+	).Scan(&plan, &subscriptionID, &customerID)
 	if err != nil {
 		slog.Error("failed to get org billing info", "error", err, "org_id", orgID)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to get billing info")
@@ -300,8 +298,7 @@ func (h *Handlers) GetOrgBilling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := billingResponse{
-		Plan:          plan,
-		PlanInherited: planInheritedFrom != nil,
+		Plan: plan,
 	}
 
 	if subscriptionID != nil {
@@ -477,7 +474,7 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 		}
 
 		_, err := h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3, plan_inherited_from = NULL, updated_at = now() WHERE id = $4",
+			"UPDATE organizations SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3, updated_at = now() WHERE id = $4",
 			plan, payload.Object.ID, payload.Object.Customer.ID, orgID,
 		)
 		if err != nil {
@@ -507,11 +504,6 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
 			return
 		}
-
-		// Propagate plan change to grandfathered orgs
-		_, _ = h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = $1, updated_at = now() WHERE plan_inherited_from = $2",
-			plan, userID)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -540,11 +532,6 @@ func (h *Handlers) handleSubscriptionCanceled(r *http.Request, w http.ResponseWr
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
 			return
 		}
-
-		// Downgrade grandfathered orgs
-		_, _ = h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = 'free', updated_at = now() WHERE plan_inherited_from = $1",
-			userID)
 	}
 
 	w.WriteHeader(http.StatusOK)

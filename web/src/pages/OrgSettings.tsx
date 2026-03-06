@@ -32,7 +32,6 @@ interface Invite {
 
 interface OrgBilling {
   plan: string;
-  planInherited: boolean;
   subscriptionStatus?: string;
   portalUrl?: string;
 }
@@ -616,13 +615,7 @@ export function OrgSettings() {
             </span>
           </div>
 
-          {billing.planInherited && (
-            <p className="card-description">
-              Inherited from your personal plan. Upgrade the workspace directly for independent billing.
-            </p>
-          )}
-
-          {billing.plan === "free" && !billing.planInherited && !billing.subscriptionStatus && (
+          {billing.plan === "free" && !billing.subscriptionStatus && (
             <>
               <p className="card-description">
                 Upgrade for unlimited videos and recording duration.

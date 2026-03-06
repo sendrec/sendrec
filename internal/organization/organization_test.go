@@ -72,11 +72,6 @@ func TestCreate(t *testing.T) {
 		WithArgs("org-1", testUserID).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
-	// Pro user: org inherits plan
-	mock.ExpectExec(`UPDATE organizations SET subscription_plan`).
-		WithArgs("pro", testUserID, "org-1").
-		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
-
 	body, _ := json.Marshal(createOrgRequest{Name: "Acme Corp"})
 
 	r := chi.NewRouter()
@@ -102,8 +97,8 @@ func TestCreate(t *testing.T) {
 	if resp.Slug != "acme-corp" {
 		t.Errorf("expected slug %q, got %q", "acme-corp", resp.Slug)
 	}
-	if resp.SubscriptionPlan != "pro" {
-		t.Errorf("expected subscriptionPlan %q, got %q", "pro", resp.SubscriptionPlan)
+	if resp.SubscriptionPlan != "free" {
+		t.Errorf("expected subscriptionPlan %q, got %q", "free", resp.SubscriptionPlan)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
