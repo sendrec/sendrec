@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -258,6 +259,12 @@ func (p *SAMLProvider) Exchange(_ context.Context, samlResponse string) (*UserIn
 
 	assertion, err := p.sp.ParseResponse(req, []string{""})
 	if err != nil {
+		// crewjam/saml hides details in InvalidResponseError.PrivateErr;
+		// surface the private error for server-side logging.
+		var invalidResp *saml.InvalidResponseError
+		if errors.As(err, &invalidResp) && invalidResp.PrivateErr != nil {
+			return nil, fmt.Errorf("parse SAML response: %v: %w", invalidResp.PrivateErr, err)
+		}
 		return nil, fmt.Errorf("parse SAML response: %w", err)
 	}
 
