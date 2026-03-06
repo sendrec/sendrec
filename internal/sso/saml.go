@@ -210,22 +210,32 @@ func ptrString(s string) *string {
 
 // AuthURL generates a SAML authentication request URL that redirects the user
 // to the IdP. The state parameter is passed as RelayState.
+// This satisfies the Provider interface but discards the request ID.
 func (p *SAMLProvider) AuthURL(state string) string {
+	redirectURL, _, _ := p.AuthRequestURL(state)
+	return redirectURL
+}
+
+// AuthRequestURL generates a SAML authentication request URL and returns
+// both the redirect URL and the AuthnRequest ID. The handler must store
+// the request ID so it can be passed to ExchangeWithRequestID for
+// InResponseTo validation.
+func (p *SAMLProvider) AuthRequestURL(state string) (string, string, error) {
 	authReq, err := p.sp.MakeAuthenticationRequest(
 		p.sp.GetSSOBindingLocation(saml.HTTPRedirectBinding),
 		saml.HTTPRedirectBinding,
 		saml.HTTPPostBinding,
 	)
 	if err != nil {
-		return ""
+		return "", "", fmt.Errorf("make AuthnRequest: %w", err)
 	}
 
 	redirectURL, err := authReq.Redirect(state, &p.sp)
 	if err != nil {
-		return ""
+		return "", "", fmt.Errorf("build redirect URL: %w", err)
 	}
 
-	return redirectURL.String()
+	return redirectURL.String(), authReq.ID, nil
 }
 
 // SAML attribute URIs and short names used to extract email and display name
@@ -247,8 +257,19 @@ var (
 )
 
 // Exchange validates a base64-encoded SAMLResponse and extracts user identity
-// claims from the resulting assertion.
+// claims from the resulting assertion. This satisfies the Provider interface
+// but skips InResponseTo validation. Prefer ExchangeWithRequestID.
 func (p *SAMLProvider) Exchange(_ context.Context, samlResponse string) (*UserInfo, error) {
+	return p.exchange(samlResponse, nil)
+}
+
+// ExchangeWithRequestID validates a SAMLResponse with InResponseTo checking
+// against the given request ID from the original AuthnRequest.
+func (p *SAMLProvider) ExchangeWithRequestID(_ context.Context, samlResponse, requestID string) (*UserInfo, error) {
+	return p.exchange(samlResponse, []string{requestID})
+}
+
+func (p *SAMLProvider) exchange(samlResponse string, requestIDs []string) (*UserInfo, error) {
 	req, err := http.NewRequest(http.MethodPost, p.sp.AcsURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("build synthetic request: %w", err)
@@ -257,7 +278,7 @@ func (p *SAMLProvider) Exchange(_ context.Context, samlResponse string) (*UserIn
 		"SAMLResponse": {samlResponse},
 	}
 
-	assertion, err := p.sp.ParseResponse(req, []string{""})
+	assertion, err := p.sp.ParseResponse(req, requestIDs)
 	if err != nil {
 		// crewjam/saml hides details in InvalidResponseError.PrivateErr;
 		// surface the private error for server-side logging.

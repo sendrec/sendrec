@@ -780,7 +780,7 @@ func TestInitiateOrgSSO_SAML(t *testing.T) {
 		t.Fatalf("Location = %q, want to contain IdP SSO URL %q", location, samlCfg.SSOURL)
 	}
 
-	// Verify the sso_state cookie was set with SameSite=None.
+	// Verify the sso_state cookie was set with SameSite=None and contains state|requestID.
 	var foundStateCookie bool
 	for _, c := range rec.Result().Cookies() {
 		if c.Name == "sso_state" {
@@ -790,6 +790,10 @@ func TestInitiateOrgSSO_SAML(t *testing.T) {
 			}
 			if !c.Secure {
 				t.Error("sso_state cookie Secure = false, want true")
+			}
+			parts := strings.SplitN(c.Value, "|", 2)
+			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+				t.Errorf("sso_state cookie value = %q, want 'state|requestID' format", c.Value)
 			}
 		}
 	}

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -594,12 +595,19 @@ func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Set sso_state cookie for SAML ACS callback RelayState validation.
-		// SameSite=None is required because the IdP POSTs back cross-origin to our ACS.
-		// Browsers won't include SameSite=Lax cookies on cross-site POST requests.
+		redirectURL, requestID, err := samlProvider.AuthRequestURL(state)
+		if err != nil {
+			slog.Error("sso: failed to build SAML AuthnRequest", "error", err)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to initiate SSO")
+			return
+		}
+
+		// Store state + requestID in cookie. The requestID is needed for
+		// InResponseTo validation when the IdP POSTs back to the ACS.
+		// SameSite=None is required because the IdP POSTs back cross-origin.
 		http.SetCookie(w, &http.Cookie{
 			Name:     "sso_state",
-			Value:    state,
+			Value:    state + "|" + requestID,
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   true,
@@ -607,7 +615,7 @@ func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 			MaxAge:   300,
 		})
 
-		http.Redirect(w, r, samlProvider.AuthURL(state), http.StatusFound)
+		http.Redirect(w, r, redirectURL, http.StatusFound)
 		return
 	}
 
@@ -814,7 +822,15 @@ func (h *Handler) OrgSAMLCallback(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 	})
 
-	if relayState == "" || relayState != stateCookie.Value {
+	// Cookie value is "state|requestID" — split to extract both.
+	cookieParts := strings.SplitN(stateCookie.Value, "|", 2)
+	cookieState := cookieParts[0]
+	var samlRequestID string
+	if len(cookieParts) == 2 {
+		samlRequestID = cookieParts[1]
+	}
+
+	if relayState == "" || relayState != cookieState {
 		h.redirectWithError(w, r, "invalid state parameter")
 		return
 	}
@@ -855,7 +871,7 @@ func (h *Handler) OrgSAMLCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	info, err := samlProvider.Exchange(r.Context(), samlResponse)
+	info, err := samlProvider.ExchangeWithRequestID(r.Context(), samlResponse, samlRequestID)
 	if err != nil {
 		slog.Error("sso: SAML exchange failed", "orgID", orgID, "error", err)
 		h.redirectWithError(w, r, "authentication failed")
