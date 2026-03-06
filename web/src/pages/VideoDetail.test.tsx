@@ -68,6 +68,18 @@ vi.mock("../components/DocumentModal", () => ({
   ),
 }));
 
+const mockUseOrganization = vi.fn(() => ({
+  organizations: [],
+  selectedOrg: null,
+  selectedOrgId: null,
+  setSelectedOrgId: vi.fn(),
+  refreshOrganizations: vi.fn(),
+}));
+
+vi.mock("../hooks/useOrganization", () => ({
+  useOrganization: () => mockUseOrganization(),
+}));
+
 function makeVideo(overrides: Record<string, unknown> = {}) {
   return {
     id: "v1",

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
+import { useOrganization } from "../hooks/useOrganization";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { TrimModal } from "../components/TrimModal";
 import { FillerRemovalModal } from "../components/FillerRemovalModal";
@@ -174,6 +175,8 @@ function relativeTime(isoDate: string): string {
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { selectedOrg } = useOrganization();
+  const isViewer = selectedOrg?.role === "viewer";
 
   const [video, setVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
@@ -954,24 +957,26 @@ export function VideoDetail() {
                 >
                   {video.title}
                 </h1>
-                <button
-                  onClick={() => {
-                    setEditingTitle(true);
-                    setEditTitle(video.title);
-                  }}
-                  aria-label="Edit title"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 4,
-                    color: "var(--color-text-secondary)",
-                    fontSize: 16,
-                    flexShrink: 0,
-                  }}
-                >
-                  &#9998;
-                </button>
+                {!isViewer && (
+                  <button
+                    onClick={() => {
+                      setEditingTitle(true);
+                      setEditTitle(video.title);
+                    }}
+                    aria-label="Edit title"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 4,
+                      color: "var(--color-text-secondary)",
+                      fontSize: 16,
+                      flexShrink: 0,
+                    }}
+                  >
+                    &#9998;
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1084,15 +1089,17 @@ export function VideoDetail() {
             Download
           </a>
         )}
-        <button
-          className="detail-btn"
-          onClick={togglePin}
-          aria-label={video.pinned ? "Unpin video" : "Pin video"}
-        >
-          <svg viewBox="0 0 24 24" fill={video.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h-6v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/><line x1="14" y1="6" x2="14" y2="2"/><line x1="10" y1="6" x2="10" y2="2"/></svg>
-          {video.pinned ? "Unpin" : "Pin"}
-        </button>
-        {integrations.length > 0 &&
+        {!isViewer && (
+          <button
+            className="detail-btn"
+            onClick={togglePin}
+            aria-label={video.pinned ? "Unpin video" : "Pin video"}
+          >
+            <svg viewBox="0 0 24 24" fill={video.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h-6v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/><line x1="14" y1="6" x2="14" y2="2"/><line x1="10" y1="6" x2="10" y2="2"/></svg>
+            {video.pinned ? "Unpin" : "Pin"}
+          </button>
+        )}
+        {!isViewer && integrations.length > 0 &&
           (integrations.length === 1 ? (
             <button
               onClick={() => createIssue(integrations[0].provider)}
@@ -1241,6 +1248,7 @@ export function VideoDetail() {
           </div>
         </div>
 
+        {!isViewer && (<>
         <div className="detail-setting-row">
           <span className="detail-setting-label">Password</span>
           <div className="detail-setting-value">
@@ -1382,6 +1390,7 @@ export function VideoDetail() {
             </button>
           </div>
         )}
+        </>)}
       </div>
 
       {/* AI */}
@@ -1399,7 +1408,7 @@ export function VideoDetail() {
               {video.transcriptStatus === "no_audio" && "No audio"}
               {video.transcriptStatus === "failed" && "Failed"}
             </span>
-            {(video.transcriptStatus === "none" || video.transcriptStatus === "ready" || video.transcriptStatus === "failed" || video.transcriptStatus === "no_audio") && (
+            {!isViewer && (video.transcriptStatus === "none" || video.transcriptStatus === "ready" || video.transcriptStatus === "failed" || video.transcriptStatus === "no_audio") && (
               <>
                 {limits?.transcriptionEnabled && (
                   <select
@@ -1435,7 +1444,7 @@ export function VideoDetail() {
           </div>
         )}
 
-        {limits?.aiEnabled && (
+        {!isViewer && limits?.aiEnabled && (
           <div className="detail-setting-row">
             <span className="detail-setting-label">Summary</span>
             <div className="detail-setting-value">
@@ -1472,7 +1481,7 @@ export function VideoDetail() {
           </div>
         )}
 
-        {limits?.aiEnabled && (
+        {!isViewer && limits?.aiEnabled && (
           <div className="detail-setting-row">
             <span className="detail-setting-label">Document</span>
             <div className="detail-setting-value">
@@ -1526,7 +1535,7 @@ export function VideoDetail() {
       </div>
 
       {/* Editing */}
-      <div className="video-detail-section">
+      {!isViewer && <div className="video-detail-section">
         <h2 className="video-detail-section-title">Editing</h2>
 
         {video.suggestedTitle && (
@@ -1591,10 +1600,10 @@ export function VideoDetail() {
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Organize */}
-      <div className="video-detail-section">
+      {!isViewer && <div className="video-detail-section">
         <h2 className="video-detail-section-title">Organize</h2>
 
         <div className="detail-setting-row">
@@ -1721,10 +1730,10 @@ export function VideoDetail() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Call to Action */}
-      <div className="video-detail-section">
+      {!isViewer && <div className="video-detail-section">
         <h2 className="video-detail-section-title">Call to Action</h2>
 
         <div className="detail-setting-row">
@@ -1815,7 +1824,7 @@ export function VideoDetail() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Comments */}
       <div className="video-detail-section">
@@ -1851,28 +1860,32 @@ export function VideoDetail() {
                 </div>
                 <div className="comment-body">{comment.body}</div>
               </div>
-              <button
-                className="comment-delete"
-                onClick={() => handleDeleteComment(comment.id)}
-                aria-label="Delete comment"
-              >
-                Delete
-              </button>
+              {!isViewer && (
+                <button
+                  className="comment-delete"
+                  onClick={() => handleDeleteComment(comment.id)}
+                  aria-label="Delete comment"
+                >
+                  Delete
+                </button>
+              )}
             </div>
           ))
         )}
       </div>
 
       {/* Danger Zone */}
-      <div className="danger-zone">
-        <button
-          onClick={deleteVideo}
-          className="detail-btn detail-btn--danger"
-          style={{ padding: "8px 20px" }}
-        >
-          Delete video
-        </button>
-      </div>
+      {!isViewer && (
+        <div className="danger-zone">
+          <button
+            onClick={deleteVideo}
+            className="detail-btn detail-btn--danger"
+            style={{ padding: "8px 20px" }}
+          >
+            Delete video
+          </button>
+        </div>
+      )}
 
       {/* Branding Modal */}
       {brandingOpen && (
