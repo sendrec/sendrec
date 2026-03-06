@@ -3,7 +3,6 @@ import { loginViaAPI, loginAsSecondUser, getAccessToken, TEST_USER_2 } from "../
 import {
   createWorkspace,
   inviteToWorkspace,
-  getInviteToken,
   acceptInviteViaAPI,
   switchToWorkspace,
   uploadTestVideo,
@@ -22,8 +21,7 @@ test.describe.serial("Workspace Viewer Role", () => {
     await switchToWorkspace(page, workspaceName);
     await uploadTestVideo(page);
 
-    await inviteToWorkspace(page, workspaceId, TEST_USER_2.email, "viewer");
-    const token = await getInviteToken(TEST_USER_2.email);
+    const token = await inviteToWorkspace(page, workspaceId, TEST_USER_2.email, "viewer");
     await loginAsSecondUser(page);
     await acceptInviteViaAPI(page, token);
   });

@@ -1,6 +1,5 @@
 import { type Page, expect } from "@playwright/test";
 import { getAccessToken } from "./auth";
-import { queryRows } from "./db";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
@@ -26,7 +25,7 @@ export async function inviteToWorkspace(
   orgId: string,
   email: string,
   role: string
-): Promise<{ acceptLink: string }> {
+): Promise<string> {
   const response = await page.request.post(
     `/api/organizations/${orgId}/invites`,
     {
@@ -39,16 +38,11 @@ export async function inviteToWorkspace(
       `Invite failed: ${response.status()} ${await response.text()}`
     );
   }
-  return response.json();
-}
-
-export async function getInviteToken(email: string): Promise<string> {
-  const rows = await queryRows<{ token: string }>(
-    "SELECT token FROM organization_invites WHERE email = $1 ORDER BY created_at DESC LIMIT 1",
-    [email]
-  );
-  if (rows.length === 0) throw new Error(`No invite found for ${email}`);
-  return rows[0].token;
+  const body = await response.json();
+  const url = new URL(body.acceptLink);
+  const token = url.searchParams.get("token");
+  if (!token) throw new Error("No token in acceptLink");
+  return token;
 }
 
 export async function acceptInviteViaAPI(

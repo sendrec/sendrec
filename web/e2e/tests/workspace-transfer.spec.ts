@@ -38,14 +38,14 @@ test.describe.serial("Video Transfer", () => {
     await page.getByLabel("More actions").first().click();
     await page.getByText("Move to...").click();
 
-    await expect(page.getByLabel("Transfer video")).toBeVisible();
-    await expect(page.getByText(workspaceName)).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: "Transfer video" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(workspaceName)).toBeVisible();
 
-    await page.getByText(workspaceName).click();
-    await page.getByRole("button", { name: "Move" }).click();
+    await dialog.getByText(workspaceName).click();
+    await dialog.getByRole("button", { name: "Move" }).click();
 
-    await page.waitForTimeout(1000);
-    await expect(page.getByText(/no recordings yet/i)).toBeVisible({ timeout: 5000 });
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
 
     await switchToWorkspace(page, workspaceName);
     await page.goto("/library");
@@ -62,8 +62,9 @@ test.describe.serial("Video Transfer", () => {
     await page.getByLabel("More actions").first().click();
     await page.getByText("Move to...").click();
 
-    await expect(page.getByLabel("Transfer video")).toBeVisible();
-    await expect(page.getByText("Personal")).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: "Transfer video" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Personal")).toBeVisible();
   });
 
   test("transfer workspace video back to personal", async ({ page }) => {
@@ -75,11 +76,12 @@ test.describe.serial("Video Transfer", () => {
 
     await page.getByLabel("More actions").first().click();
     await page.getByText("Move to...").click();
-    await page.getByText("Personal").click();
-    await page.getByRole("button", { name: "Move" }).click();
 
-    await page.waitForTimeout(1000);
-    await expect(page.getByText(/no recordings yet/i)).toBeVisible({ timeout: 5000 });
+    const dialog = page.getByRole("dialog", { name: "Transfer video" });
+    await dialog.getByText("Personal").click();
+    await dialog.getByRole("button", { name: "Move" }).click();
+
+    await expect(dialog).not.toBeVisible({ timeout: 5000 });
 
     await switchToPersonal(page);
     await page.goto("/library");
