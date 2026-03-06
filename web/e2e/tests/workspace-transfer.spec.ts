@@ -9,7 +9,7 @@ import {
 
 test.describe.serial("Video Transfer", () => {
   let workspaceId: string;
-  const workspaceName = "Transfer Test Workspace";
+  const workspaceName = `Transfer Test Workspace ${Date.now()}`;
 
   test("setup: create workspace and upload video in personal", async ({ page }) => {
     await loginViaAPI(page);

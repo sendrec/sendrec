@@ -6,11 +6,12 @@ import {
   acceptInviteViaAPI,
   switchToWorkspace,
   uploadTestVideo,
+  navigateToOrgSettings,
 } from "../helpers/workspace";
 
 test.describe.serial("Workspace Viewer Role", () => {
   let workspaceId: string;
-  const workspaceName = "Viewer Test Workspace";
+  const workspaceName = `Viewer Test Workspace ${Date.now()}`;
 
   test("setup: create workspace, upload video, invite viewer", async ({ page }) => {
     await loginViaAPI(page);
@@ -28,7 +29,7 @@ test.describe.serial("Workspace Viewer Role", () => {
 
   test("viewer appears in members list", async ({ page }) => {
     await loginViaAPI(page);
-    await page.goto(`/organizations/${workspaceId}/settings`);
+    await navigateToOrgSettings(page, workspaceId);
     await expect(page.getByLabel("Workspace name")).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(TEST_USER_2.email)).toBeVisible({ timeout: 5000 });
     await expect(page.getByText("viewer")).toBeVisible();

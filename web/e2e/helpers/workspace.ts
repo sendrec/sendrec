@@ -75,6 +75,12 @@ export async function switchToPersonal(page: Page): Promise<void> {
   await page.waitForTimeout(500);
 }
 
+export async function navigateToOrgSettings(page: Page, orgId: string): Promise<void> {
+  await page.goto("/");
+  await page.evaluate((id) => localStorage.setItem("sendrec-org-id", id), orgId);
+  await page.goto(`/organizations/${orgId}/settings`);
+}
+
 export async function uploadTestVideo(page: Page): Promise<void> {
   await page.goto("/?tab=upload");
 

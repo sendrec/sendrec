@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { loginViaAPI, getAccessToken } from "../helpers/auth";
-import { createWorkspace } from "../helpers/workspace";
+import { createWorkspace, navigateToOrgSettings } from "../helpers/workspace";
 
 test.describe.serial("Workspace CRUD", () => {
   let workspaceId: string;
-  const workspaceName = "E2E Test Workspace";
+  const workspaceName = `E2E Test Workspace ${Date.now()}`;
 
   test.beforeEach(async ({ page }) => {
     await loginViaAPI(page);
@@ -21,7 +21,7 @@ test.describe.serial("Workspace CRUD", () => {
   });
 
   test("workspace starts on Free plan", async ({ page }) => {
-    await page.goto(`/organizations/${workspaceId}/settings`);
+    await navigateToOrgSettings(page, workspaceId);
     await expect(page.getByText("Free")).toBeVisible({ timeout: 5000 });
   });
 
@@ -33,13 +33,13 @@ test.describe.serial("Workspace CRUD", () => {
     });
     expect(response.ok()).toBeTruthy();
 
-    await page.goto(`/organizations/${workspaceId}/settings`);
+    await navigateToOrgSettings(page, workspaceId);
     await expect(page.getByLabel("Workspace name")).toBeVisible({ timeout: 10000 });
     await expect(page.getByLabel("Workspace name")).toHaveValue(newName);
   });
 
   test("workspace settings shows owner in members list", async ({ page }) => {
-    await page.goto(`/organizations/${workspaceId}/settings`);
+    await navigateToOrgSettings(page, workspaceId);
     await expect(page.getByText("e2e@test.sendrec.local")).toBeVisible({ timeout: 5000 });
   });
 
