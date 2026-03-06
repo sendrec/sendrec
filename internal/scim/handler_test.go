@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 )
 
@@ -63,5 +65,106 @@ func TestSchemas(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("got status %d, want 200", rec.Code)
+	}
+}
+
+func TestCreateUser_NewUser(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	// resolveUser step 1: external identity not found
+	mock.ExpectQuery(`SELECT user_id FROM external_identities WHERE provider = \$1 AND external_id = \$2`).
+		WithArgs("org-1", "ext-123").
+		WillReturnError(pgx.ErrNoRows)
+
+	// resolveUser step 2: user not found by email
+	mock.ExpectQuery(`SELECT id, email_verified FROM users WHERE email = \$1`).
+		WithArgs("jane@example.com").
+		WillReturnError(pgx.ErrNoRows)
+
+	// resolveUser step 3: create user
+	mock.ExpectQuery(`INSERT INTO users`).
+		WithArgs("jane@example.com", "", "Jane Doe").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
+
+	// Link external identity
+	mock.ExpectExec(`INSERT INTO external_identities`).
+		WithArgs("user-uuid-1", "org-1", "ext-123", "jane@example.com").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	// Add to org
+	mock.ExpectExec(`INSERT INTO organization_members`).
+		WithArgs("org-1", "user-uuid-1", "member").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	// fetchSCIMUser
+	mock.ExpectQuery(`SELECT u.id, u.email, u.name FROM users u`).
+		WithArgs("user-uuid-1", "org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email", "name"}).AddRow("user-uuid-1", "jane@example.com", "Jane Doe"))
+
+	body := `{
+		"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+		"userName": "jane@example.com",
+		"name": {"formatted": "Jane Doe"},
+		"externalId": "ext-123",
+		"active": true
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/scim+json")
+	req = withOrgID(req, "org-1")
+	rec := httptest.NewRecorder()
+
+	handler.CreateUser(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("got status %d, want 201; body: %s", rec.Code, rec.Body.String())
+	}
+
+	var user SCIMUser
+	json.NewDecoder(rec.Body).Decode(&user)
+	if user.ID != "user-uuid-1" {
+		t.Errorf("ID = %q, want user-uuid-1", user.ID)
+	}
+	if user.UserName != "jane@example.com" {
+		t.Errorf("UserName = %q, want jane@example.com", user.UserName)
+	}
+}
+
+func TestCreateUser_ExistingUser(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	// resolveUser step 1: external identity found
+	mock.ExpectQuery(`SELECT user_id FROM external_identities WHERE provider = \$1 AND external_id = \$2`).
+		WithArgs("org-1", "ext-123").
+		WillReturnRows(pgxmock.NewRows([]string{"user_id"}).AddRow("existing-user"))
+
+	// Already a member — ON CONFLICT DO NOTHING
+	mock.ExpectExec(`INSERT INTO organization_members`).
+		WithArgs("org-1", "existing-user", "member").
+		WillReturnResult(pgxmock.NewResult("INSERT", 0))
+
+	// Fetch user details for response
+	mock.ExpectQuery(`SELECT u.id, u.email, u.name FROM users u`).
+		WithArgs("existing-user", "org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email", "name"}).AddRow("existing-user", "jane@example.com", "Jane Doe"))
+
+	body := `{
+		"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+		"userName": "jane@example.com",
+		"externalId": "ext-123",
+		"active": true
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/scim+json")
+	req = withOrgID(req, "org-1")
+	rec := httptest.NewRecorder()
+
+	handler.CreateUser(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want 200; body: %s", rec.Code, rec.Body.String())
 	}
 }
