@@ -34,7 +34,8 @@ test.describe.serial("Workspace CRUD", () => {
     expect(response.ok()).toBeTruthy();
 
     await page.goto(`/organizations/${workspaceId}/settings`);
-    await expect(page.getByLabel("Workspace name")).toHaveValue(newName, { timeout: 5000 });
+    await expect(page.getByLabel("Workspace name")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByLabel("Workspace name")).toHaveValue(newName);
   });
 
   test("workspace settings shows owner in members list", async ({ page }) => {

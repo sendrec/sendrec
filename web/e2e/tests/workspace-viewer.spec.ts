@@ -29,6 +29,7 @@ test.describe.serial("Workspace Viewer Role", () => {
   test("viewer appears in members list", async ({ page }) => {
     await loginViaAPI(page);
     await page.goto(`/organizations/${workspaceId}/settings`);
+    await expect(page.getByLabel("Workspace name")).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(TEST_USER_2.email)).toBeVisible({ timeout: 5000 });
     await expect(page.getByText("viewer")).toBeVisible();
   });
