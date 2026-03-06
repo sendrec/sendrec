@@ -746,6 +746,62 @@ func TestInitiateOrgSSO_NoConfig(t *testing.T) {
 	}
 }
 
+func TestInitiateOrgSSO_SAML(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	// Parse the test metadata to get a valid certificate for the mock row.
+	samlCfg, err := ParseSAMLMetadataFromXML([]byte(testSAMLMetadataXML))
+	if err != nil {
+		t.Fatalf("parse test metadata: %v", err)
+	}
+
+	entityID := samlCfg.EntityID
+	ssoURL := samlCfg.SSOURL
+	cert := samlCfg.Certificate
+	mock.ExpectQuery(`SELECT o.id, c.provider, c.issuer_url, c.client_id, c.client_secret_encrypted`).
+		WithArgs("user@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{
+			"id", "provider", "issuer_url", "client_id", "client_secret_encrypted",
+			"saml_entity_id", "saml_sso_url", "saml_certificate",
+		}).AddRow("org-1", "saml", (*string)(nil), (*string)(nil), (*string)(nil),
+			&entityID, &ssoURL, &cert))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/org/initiate?email=user@example.com", nil)
+	rec := httptest.NewRecorder()
+	handler.InitiateOrgSSO(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusFound, rec.Body.String())
+	}
+
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, samlCfg.SSOURL) {
+		t.Fatalf("Location = %q, want to contain IdP SSO URL %q", location, samlCfg.SSOURL)
+	}
+
+	// Verify the sso_state cookie was set with SameSite=None.
+	var foundStateCookie bool
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "sso_state" {
+			foundStateCookie = true
+			if c.SameSite != http.SameSiteNoneMode {
+				t.Errorf("sso_state cookie SameSite = %d, want SameSiteNoneMode (%d)", c.SameSite, http.SameSiteNoneMode)
+			}
+			if !c.Secure {
+				t.Error("sso_state cookie Secure = false, want true")
+			}
+		}
+	}
+	if !foundStateCookie {
+		t.Error("sso_state cookie not set")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 // --- Task 9: Connected Accounts API Tests ---
 
 func TestListIdentities_Success(t *testing.T) {
@@ -1371,11 +1427,13 @@ func TestOrgCallback_Success(t *testing.T) {
 		t.Fatalf("encrypt client secret: %v", err)
 	}
 
-	// Load SSO config for the organization.
+	// Load SSO config for the organization (columns are nullable since migration 000056).
+	issuerURL := server.URL
+	clientID := "test-client-id"
 	mock.ExpectQuery(`SELECT issuer_url, client_id, client_secret_encrypted FROM organization_sso_configs`).
 		WithArgs("org-1").
 		WillReturnRows(pgxmock.NewRows([]string{"issuer_url", "client_id", "client_secret_encrypted"}).
-			AddRow(server.URL, "test-client-id", encryptedSecret))
+			AddRow(&issuerURL, &clientID, &encryptedSecret))
 
 	// resolveUser: external identity lookup -- not found.
 	mock.ExpectQuery(`SELECT user_id FROM external_identities WHERE provider = \$1 AND external_id = \$2`).

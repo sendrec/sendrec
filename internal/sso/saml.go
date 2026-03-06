@@ -73,7 +73,8 @@ func ParseSAMLMetadataFromURL(metadataURL string) (*SAMLConfig, error) {
 		return nil, fmt.Errorf("fetch SAML metadata: HTTP %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	const maxMetadataSize = 1 << 20 // 1 MB
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxMetadataSize))
 	if err != nil {
 		return nil, fmt.Errorf("read SAML metadata response: %w", err)
 	}
@@ -97,11 +98,12 @@ func findSSOURL(services []saml.Endpoint) string {
 }
 
 // findSigningCertificate returns the base64-encoded certificate data from the
-// first KeyDescriptor with use="signing". Whitespace is stripped from the
-// raw certificate data.
+// first KeyDescriptor with use="signing" or unspecified use (empty string).
+// Some IdPs like Azure AD/Entra ID omit the use attribute. Whitespace is
+// stripped from the raw certificate data.
 func findSigningCertificate(descriptors []saml.KeyDescriptor) string {
 	for _, kd := range descriptors {
-		if kd.Use != "signing" {
+		if kd.Use != "signing" && kd.Use != "" {
 			continue
 		}
 		for _, cert := range kd.KeyInfo.X509Data.X509Certificates {

@@ -595,13 +595,15 @@ func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Set sso_state cookie for SAML ACS callback RelayState validation.
+		// SameSite=None is required because the IdP POSTs back cross-origin to our ACS.
+		// Browsers won't include SameSite=Lax cookies on cross-site POST requests.
 		http.SetCookie(w, &http.Cookie{
 			Name:     "sso_state",
 			Value:    state,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   h.secureCookies,
-			SameSite: http.SameSiteLaxMode,
+			Secure:   true,
+			SameSite: http.SameSiteNoneMode,
 			MaxAge:   300,
 		})
 
@@ -709,8 +711,8 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 
 	orgID := orgCookie.Value
 
-	// Load SSO config for the organization.
-	var issuerURL, clientID, encryptedSecret string
+	// Load SSO config for the organization (OIDC columns are nullable since migration 000056).
+	var issuerURL, clientID, encryptedSecret *string
 	err = h.db.QueryRow(r.Context(),
 		"SELECT issuer_url, client_id, client_secret_encrypted FROM organization_sso_configs WHERE organization_id = $1",
 		orgID,
@@ -721,7 +723,12 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clientSecret, err := integration.Decrypt(h.encryptionKey, encryptedSecret)
+	if issuerURL == nil || clientID == nil || encryptedSecret == nil {
+		h.redirectWithError(w, r, "SSO configuration is not OIDC")
+		return
+	}
+
+	clientSecret, err := integration.Decrypt(h.encryptionKey, *encryptedSecret)
 	if err != nil {
 		slog.Error("sso: failed to decrypt client secret", "error", err)
 		h.redirectWithError(w, r, "authentication failed")
@@ -729,8 +736,8 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	provider, err := NewOIDCProvider(r.Context(), OIDCConfig{
-		IssuerURL:    issuerURL,
-		ClientID:     clientID,
+		IssuerURL:    *issuerURL,
+		ClientID:     *clientID,
 		ClientSecret: clientSecret,
 		RedirectURL:  h.baseURL + "/api/auth/sso/org/callback",
 	})
@@ -796,14 +803,14 @@ func (h *Handler) OrgSAMLCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clear the state cookie immediately.
+	// Clear the state cookie immediately (must match SameSite=None from initiation).
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sso_state",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   h.secureCookies,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		MaxAge:   -1,
 	})
 
