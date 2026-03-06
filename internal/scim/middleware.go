@@ -2,10 +2,12 @@ package scim
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -41,7 +43,7 @@ func BearerAuth(db database.DBTX) func(http.Handler) http.Handler {
 			}
 
 			hash := sha256.Sum256([]byte(token))
-			if hex.EncodeToString(hash[:]) != storedHash {
+			if subtle.ConstantTimeCompare([]byte(hex.EncodeToString(hash[:])), []byte(storedHash)) != 1 {
 				writeError(w, http.StatusUnauthorized, "invalid token")
 				return
 			}
@@ -56,7 +58,7 @@ func writeError(w http.ResponseWriter, status int, detail string) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(SCIMError{
 		Schemas: []string{ErrorSchema},
-		Status:  http.StatusText(status),
+		Status:  strconv.Itoa(status),
 		Detail:  detail,
 	})
 }

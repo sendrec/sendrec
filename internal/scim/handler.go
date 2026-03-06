@@ -141,6 +141,9 @@ func (h *Handler) resolveUser(ctx context.Context, orgID, externalID, email, nam
 		email,
 	).Scan(&userID, &emailVerified)
 	if err == nil {
+		if !emailVerified {
+			return "", false, fmt.Errorf("email not verified")
+		}
 		h.db.Exec(ctx,
 			"INSERT INTO external_identities (user_id, provider, external_id, email) VALUES ($1, $2, $3, $4) ON CONFLICT (provider, external_id) DO NOTHING",
 			userID, orgID, externalID, email,
