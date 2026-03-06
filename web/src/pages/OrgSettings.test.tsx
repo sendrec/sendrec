@@ -445,6 +445,128 @@ describe("OrgSettings", () => {
     });
   });
 
+  it("SSO form shows protocol toggle with OIDC and SAML options", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business" })
+      .mockResolvedValueOnce({ provider: "oidc", issuerUrl: "", clientId: "", configured: false, enforceSso: false });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Single Sign-On")).toBeInTheDocument();
+    });
+
+    const oidcRadio = screen.getByRole("radio", { name: "OIDC" });
+    const samlRadio = screen.getByRole("radio", { name: "SAML" });
+    expect(oidcRadio).toBeInTheDocument();
+    expect(samlRadio).toBeInTheDocument();
+  });
+
+  it("SSO form shows SAML fields when SAML is selected", async () => {
+    const user = userEvent.setup();
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business" })
+      .mockResolvedValueOnce({ provider: "oidc", issuerUrl: "", clientId: "", configured: false, enforceSso: false });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Single Sign-On")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("radio", { name: "SAML" }));
+
+    expect(screen.getByLabelText("Metadata URL")).toBeInTheDocument();
+    expect(screen.getByLabelText("Or paste metadata XML")).toBeInTheDocument();
+  });
+
+  it("SSO form shows OIDC fields when OIDC is selected", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business" })
+      .mockResolvedValueOnce({ provider: "oidc", issuerUrl: "", clientId: "", configured: false, enforceSso: false });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Single Sign-On")).toBeInTheDocument();
+    });
+
+    expect(screen.getByLabelText("Issuer URL")).toBeInTheDocument();
+    expect(screen.getByLabelText("Client ID")).toBeInTheDocument();
+    expect(screen.getByLabelText("Client Secret")).toBeInTheDocument();
+  });
+
+  it("SSO form loads existing SAML config", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "admin", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "admin", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([adminMember, ownerMember])
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found"))
+      .mockResolvedValueOnce({
+        provider: "saml",
+        configured: true,
+        enforceSso: false,
+        samlMetadataUrl: "https://idp.example.com/metadata",
+        samlEntityId: "https://idp.example.com/entity",
+        samlSsoUrl: "https://idp.example.com/sso",
+        spMetadataUrl: "https://app.sendrec.eu/saml/org-1/metadata",
+      });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Single Sign-On")).toBeInTheDocument();
+    });
+
+    const samlRadio = screen.getByRole("radio", { name: "SAML" });
+    expect(samlRadio).toBeChecked();
+
+    expect(screen.getByDisplayValue("https://idp.example.com/entity")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("https://idp.example.com/sso")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("https://app.sendrec.eu/saml/org-1/metadata")).toBeInTheDocument();
+  });
+
   it("invite dropdown includes Viewer option", async () => {
     mockOwnerResponses();
     renderOrgSettings();
