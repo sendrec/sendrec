@@ -1,12 +1,14 @@
 package sso
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -113,9 +115,12 @@ func findSigningCertificate(descriptors []saml.KeyDescriptor) string {
 }
 
 // parseCertificate decodes a base64-encoded X.509 certificate from SAML
-// metadata into an *x509.Certificate.
+// metadata into an *x509.Certificate. It tolerates missing padding and
+// embedded whitespace, which are common in SAML metadata.
 func parseCertificate(certBase64 string) (*x509.Certificate, error) {
-	decoded, err := base64.StdEncoding.DecodeString(certBase64)
+	cleaned := strings.NewReplacer(" ", "", "\n", "", "\r", "", "\t", "").Replace(certBase64)
+
+	decoded, err := base64.RawStdEncoding.DecodeString(strings.TrimRight(cleaned, "="))
 	if err != nil {
 		return nil, fmt.Errorf("decode certificate base64: %w", err)
 	}
@@ -126,4 +131,174 @@ func parseCertificate(certBase64 string) (*x509.Certificate, error) {
 	}
 
 	return cert, nil
+}
+
+// SAMLProvider implements the Provider interface for SAML 2.0 identity
+// providers using the crewjam/saml service provider.
+type SAMLProvider struct {
+	sp saml.ServiceProvider
+}
+
+// NewSAMLProvider creates a SAMLProvider from the given base URL, organisation
+// ID, and IdP configuration. It parses the IdP certificate and constructs a
+// crewjam/saml ServiceProvider with the correct entity ID, ACS URL, and IdP
+// metadata.
+func NewSAMLProvider(baseURL, orgID string, cfg *SAMLConfig) (*SAMLProvider, error) {
+	cert, err := parseCertificate(cfg.Certificate)
+	if err != nil {
+		return nil, fmt.Errorf("parse IdP certificate: %w", err)
+	}
+
+	metadataPath := baseURL + "/api/auth/saml/" + orgID + "/metadata"
+	acsPath := baseURL + "/api/auth/saml/" + orgID + "/acs"
+
+	metadataURL, err := url.Parse(metadataPath)
+	if err != nil {
+		return nil, fmt.Errorf("parse metadata URL: %w", err)
+	}
+
+	acsURL, err := url.Parse(acsPath)
+	if err != nil {
+		return nil, fmt.Errorf("parse ACS URL: %w", err)
+	}
+
+	sp := saml.ServiceProvider{
+		EntityID:    metadataPath,
+		MetadataURL: *metadataURL,
+		AcsURL:      *acsURL,
+		IDPMetadata: &saml.EntityDescriptor{
+			EntityID: cfg.EntityID,
+			IDPSSODescriptors: []saml.IDPSSODescriptor{
+				{
+					SingleSignOnServices: []saml.Endpoint{
+						{
+							Binding:  saml.HTTPRedirectBinding,
+							Location: cfg.SSOURL,
+						},
+					},
+					SSODescriptor: saml.SSODescriptor{
+						RoleDescriptor: saml.RoleDescriptor{
+							KeyDescriptors: []saml.KeyDescriptor{
+								{
+									Use: "signing",
+									KeyInfo: saml.KeyInfo{
+										X509Data: saml.X509Data{
+											X509Certificates: []saml.X509Certificate{
+												{Data: cfg.Certificate},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		IDPCertificate: ptrString(base64.StdEncoding.EncodeToString(cert.Raw)),
+	}
+
+	return &SAMLProvider{sp: sp}, nil
+}
+
+func ptrString(s string) *string {
+	return &s
+}
+
+// AuthURL generates a SAML authentication request URL that redirects the user
+// to the IdP. The state parameter is passed as RelayState.
+func (p *SAMLProvider) AuthURL(state string) string {
+	authReq, err := p.sp.MakeAuthenticationRequest(
+		p.sp.GetSSOBindingLocation(saml.HTTPRedirectBinding),
+		saml.HTTPRedirectBinding,
+		saml.HTTPPostBinding,
+	)
+	if err != nil {
+		return ""
+	}
+
+	redirectURL, err := authReq.Redirect(state, &p.sp)
+	if err != nil {
+		return ""
+	}
+
+	return redirectURL.String()
+}
+
+// SAML attribute URIs and short names used to extract email and display name
+// from assertion attribute statements.
+var (
+	emailAttributeNames = []string{
+		"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+		"email",
+		"Email",
+		"mail",
+	}
+	nameAttributeNames = []string{
+		"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+		"displayName",
+		"name",
+		"Name",
+		"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+	}
+)
+
+// Exchange validates a base64-encoded SAMLResponse and extracts user identity
+// claims from the resulting assertion.
+func (p *SAMLProvider) Exchange(_ context.Context, samlResponse string) (*UserInfo, error) {
+	req, err := http.NewRequest(http.MethodPost, p.sp.AcsURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("build synthetic request: %w", err)
+	}
+	req.PostForm = url.Values{
+		"SAMLResponse": {samlResponse},
+	}
+
+	assertion, err := p.sp.ParseResponse(req, []string{""})
+	if err != nil {
+		return nil, fmt.Errorf("parse SAML response: %w", err)
+	}
+
+	email := extractAttribute(assertion, emailAttributeNames)
+	name := extractAttribute(assertion, nameAttributeNames)
+
+	nameID := ""
+	if assertion.Subject != nil && assertion.Subject.NameID != nil {
+		nameID = assertion.Subject.NameID.Value
+	}
+
+	if email == "" && nameID != "" && strings.Contains(nameID, "@") {
+		email = nameID
+	}
+	if email == "" {
+		return nil, fmt.Errorf("no email found in SAML assertion")
+	}
+
+	externalID := nameID
+	if externalID == "" {
+		externalID = email
+	}
+
+	return &UserInfo{
+		ExternalID: externalID,
+		Email:      email,
+		Name:       name,
+	}, nil
+}
+
+// extractAttribute searches assertion attribute statements for the first
+// matching attribute name and returns its value.
+func extractAttribute(assertion *saml.Assertion, names []string) string {
+	for _, stmt := range assertion.AttributeStatements {
+		for _, attr := range stmt.Attributes {
+			for _, target := range names {
+				if attr.Name == target {
+					if len(attr.Values) > 0 && attr.Values[0].Value != "" {
+						return attr.Values[0].Value
+					}
+				}
+			}
+		}
+	}
+	return ""
 }

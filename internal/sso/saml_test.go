@@ -1,8 +1,10 @@
 package sso
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -13,7 +15,7 @@ const testSAMLMetadataXML = `<?xml version="1.0"?>
     <KeyDescriptor use="signing">
       <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
         <ds:X509Data>
-          <ds:X509Certificate>MIIDpDCCAoygAwIBAgIGAX0zjYiPMA0GCSqGSIb3DQEBCwUAMIGSMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxEzARBgNVBAMMCmRldi04NDI4NTcxHDAaBgkqhkiG9w0BCQEWDWluZm9Ab2t0YS5jb20wHhcNMjEwMTA1MTcwMjI3WhcNMzEwMTA1MTcwMzI3WjCBkjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBE9rdGExFDASBgNVBAsMC1NTT1Byb3ZpZGVyMRMwEQYDVQQDDApkZXYtODQyODU3MRwwGgYJKoZIhvcNAQkBFg1pbmZvQG9rdGEuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2kGLOaSVCxMR0jNDw8PSXO7kkxMO6hKl17OEFgGkhMOBZ0kNpMgSJgUUNJOxjmNSP8aRnRJFBOqXnEF1JFBX0MI0GxEu1MxejqVP9PjWUPVQEWLhGbh6aEsnI1T9Sq7hQmbxLWeX03RoIUJSt9ICOI0r3TBdJuXkHwHB5B+HQKWM1SyBk+vVNq7aGIKhTz+8hUozkv4K2YPzCSf5eHzVjwdNqOpjINdLEKfDBSjzKrOljBCXCSflxCezd80kMySL5prl+XJ6yeEZ5xQf/MGDM5F2DOaAfXNvEVTOz0zNNOMEfS+FzJC1wElszKlMPBx4bJq5LVF+SVzf1QIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQBIAHLmI/7MX/OJSNz7cR+HJ+BQ9NVS3J1fOtSYO0mRIZVK9aQyzASPSazyXL4IH8arXKSPz2q7YvHMHLJg7g+Y2yEfGjPn5MZk+M9iHAnIUH+C69UFBR4NLXLV7j7sSR6LMjMIBMbFEWSeXpHzJqfMs5cY/crgBDuJt6l07jBEELeXEyOCq6SvJIGbPDtVCxL7qRZ3LBhMWJlUZ+gQEzKMDL/MCHrGWVW4rbTLXRnLh0plRanGlKRhOQJPnvmDqdEBY15TZzYBN69v2K+GhdlN0b/CQCQAB7N8e9Fdc9H0mWRWYaXMNjCOcELj+JxE7BR7nRJqsxncToh03H</ds:X509Certificate>
+          <ds:X509Certificate>MIICwTCCAamgAwIBAgIBATANBgkqhkiG9w0BAQsFADAaMRgwFgYDVQQDEw9pZHAuZXhhbXBsZS5jb20wHhcNMjYwMzA2MTgxOTEzWhcNMzYwMzAzMTkxOTEzWjAaMRgwFgYDVQQDEw9pZHAuZXhhbXBsZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCSfurTzXUu6cPlYMHmVrG1E868TWLBUp1WtXmE4hRSDm5LH6OYtsHn9Itz70wpcTEbThTyTsqMybkJkadFKVtuYooOfgJvljMfV3tXOndKuLhYeNI/OJp+K8Wlj3ft24Rs2LJnpkMFynMlHTminigBs56wFSLTDJamGANX5T3Cn6V5SxkZyK42BmfdxRUrE72c6o2steTuMYWjEkpObnYidcY0WSi7uoPvYC5ysP7w69RiMe4j65iEd7xuK82wpScgdV+ERtepwW2Kcxk5t0z9j4SLE5AiaruPkKl2zeYZaJS+9d6XUsPKlAlrtwSv9kl/qY5Jy5wOhGEZNOZ1pmDzAgMBAAGjEjAQMA4GA1UdDwEB/wQEAwIHgDANBgkqhkiG9w0BAQsFAAOCAQEANjUsNdU2gSnOX222b9wApF8aLIIeH5ubLt/bGIVog7ul7tuDanbP8PNP7uYC8UPFcKT4H2fmyOvZ/KpGcngDYJXZyVyWSaKuRLr9p+0AO2sNMYC42pcj7pqoREPeGbFUt5WbrGYVcOaod44SNjkuJpy/b+OjqHqI8WU4kN1UH7NSQkpX8lVFRaV1RCVwOsYiF4AzpgOMsBuP2omau8wy5V1+jrNtwnorS66OOaFi5kNtm/i34CcVwkA1pSapcMT3L2hdo7nbocq0o9dAzTDAlV6SM/PV9nOTzHH1I579L7eWJZylx9VmSJaFdXEB4Bf+nNizD0tnfUdjO4Xc9J3TjA==</ds:X509Certificate>
         </ds:X509Data>
       </ds:KeyInfo>
     </KeyDescriptor>
@@ -79,5 +81,47 @@ func TestParseSAMLMetadataFromURL_BadURL(t *testing.T) {
 	_, err := ParseSAMLMetadataFromURL("http://127.0.0.1:1")
 	if err == nil {
 		t.Fatal("expected error for unreachable URL, got nil")
+	}
+}
+
+func TestNewSAMLProvider(t *testing.T) {
+	cfg, err := ParseSAMLMetadataFromXML([]byte(testSAMLMetadataXML))
+	if err != nil {
+		t.Fatalf("parse metadata: %v", err)
+	}
+	provider, err := NewSAMLProvider("http://localhost:8080", "org-1", cfg)
+	if err != nil {
+		t.Fatalf("NewSAMLProvider() error: %v", err)
+	}
+	if provider == nil {
+		t.Fatal("NewSAMLProvider() returned nil")
+	}
+}
+
+func TestSAMLProvider_AuthURL(t *testing.T) {
+	cfg, _ := ParseSAMLMetadataFromXML([]byte(testSAMLMetadataXML))
+	provider, _ := NewSAMLProvider("http://localhost:8080", "org-1", cfg)
+
+	authURL := provider.AuthURL("test-state-123")
+	if authURL == "" {
+		t.Fatal("AuthURL() returned empty string")
+	}
+	// Should contain the IdP SSO URL
+	if !strings.Contains(authURL, "idp.example.com/sso") {
+		t.Errorf("AuthURL() = %q, want to contain IdP SSO URL", authURL)
+	}
+	// RelayState should be present
+	if !strings.Contains(authURL, "RelayState=") {
+		t.Errorf("AuthURL() = %q, want RelayState parameter", authURL)
+	}
+}
+
+func TestSAMLProvider_Exchange_InvalidResponse(t *testing.T) {
+	cfg, _ := ParseSAMLMetadataFromXML([]byte(testSAMLMetadataXML))
+	provider, _ := NewSAMLProvider("http://localhost:8080", "org-1", cfg)
+
+	_, err := provider.Exchange(context.Background(), "not-a-valid-saml-response")
+	if err == nil {
+		t.Fatal("Exchange() expected error for invalid SAML response")
 	}
 }
