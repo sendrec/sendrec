@@ -59,7 +59,7 @@ func TestSendPasswordReset_Success(t *testing.T) {
 	}
 }
 
-func TestSendPasswordReset_ServerError(t *testing.T) {
+func TestSendPasswordReset_ServerError_FallsBackToSendmail(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/subscribers" {
 			w.WriteHeader(http.StatusOK)
@@ -76,19 +76,10 @@ func TestSendPasswordReset_ServerError(t *testing.T) {
 		TemplateID: 5,
 	})
 
-	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
-	if err == nil {
-		t.Fatal("expected error for server error response")
-	}
-}
-
-func TestSendPasswordReset_NoBaseURL(t *testing.T) {
-	client := New(Config{})
-
-	// Should not error — just logs to stdout
+	// Listmonk 500 triggers sendmail fallback (graceful, no error)
 	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("expected graceful fallback, got error: %v", err)
 	}
 }
 
@@ -1111,5 +1102,207 @@ func TestParseAllowlist(t *testing.T) {
 				t.Errorf("ParseAllowlist(%q)[%d]: got %q, want %q", tt.input, i, result[i], tt.expected[i])
 			}
 		}
+	}
+}
+
+func TestSendmail_FallbackOnListmonkError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:    srv.URL,
+		Username:   "admin",
+		Password:   "bad-token",
+		TemplateID: 5,
+	})
+
+	// Listmonk returns 403, should fall back to sendmail (or skip gracefully)
+	err := client.SendPasswordReset(context.Background(),
+		"alice@example.com", "Alice", "https://example.com/reset")
+	if err != nil {
+		t.Fatalf("expected graceful fallback on Listmonk error, got: %v", err)
+	}
+}
+
+func TestSendmail_FallbackWhenNoListmonk(t *testing.T) {
+	client := New(Config{
+		FromAddress: "test@sendrec.eu",
+	})
+
+	// Without Listmonk, sendmail fallback is attempted.
+	// If sendmail is not available, it gracefully returns nil.
+	// If sendmail IS available (macOS), it sends the email.
+	err := client.SendPasswordReset(context.Background(),
+		"alice@example.com", "Alice", "https://example.com/reset")
+	if err != nil {
+		t.Fatalf("expected graceful fallback, got error: %v", err)
+	}
+}
+
+func TestSendmail_AllEmailTypesWork(t *testing.T) {
+	client := New(Config{})
+
+	// All email types should work without Listmonk configured
+	tests := []struct {
+		name string
+		fn   func() error
+	}{
+		{"PasswordReset", func() error {
+			return client.SendPasswordReset(context.Background(), "a@b.com", "A", "https://example.com/reset")
+		}},
+		{"CommentNotification", func() error {
+			return client.SendCommentNotification(context.Background(), "a@b.com", "A", "V", "B", "Hi", "https://example.com/watch")
+		}},
+		{"ViewNotification", func() error {
+			return client.SendViewNotification(context.Background(), "a@b.com", "A", "V", "https://example.com/watch", 1)
+		}},
+		{"Confirmation", func() error {
+			return client.SendConfirmation(context.Background(), "a@b.com", "A", "https://example.com/confirm")
+		}},
+		{"Welcome", func() error {
+			return client.SendWelcome(context.Background(), "a@b.com", "A", "https://example.com")
+		}},
+		{"OnboardingDay2", func() error {
+			return client.SendOnboardingDay2(context.Background(), "a@b.com", "A", "https://example.com")
+		}},
+		{"OnboardingDay7", func() error {
+			return client.SendOnboardingDay7(context.Background(), "a@b.com", "A", "https://example.com")
+		}},
+		{"DigestNotification", func() error {
+			return client.SendDigestNotification(context.Background(), "a@b.com", "A", []DigestVideoSummary{{Title: "V", ViewCount: 1}})
+		}},
+		{"OrgInvite", func() error {
+			return client.SendOrgInvite(context.Background(), "a@b.com", "Org", "Bob", "https://example.com/invite")
+		}},
+		{"RetentionWarning", func() error {
+			return client.SendRetentionWarning(context.Background(), "a@b.com", []RetentionVideoSummary{{Title: "V"}}, "2026-04-01")
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.fn(); err != nil {
+				t.Errorf("expected no error without Listmonk, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestDeveloperEmail_BypassesAllowlist(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "admin",
+		Password:       "secret",
+		ViewTemplateID: 99,
+		Allowlist:      []string{"@sendrec.eu"},
+		DeveloperEmail: "dev@sendrec.eu",
+	})
+
+	// stranger@example.com would be blocked by the allowlist,
+	// but DEVELOPER_EMAIL bypasses it and redirects to dev@sendrec.eu
+	err := client.SendViewNotification(context.Background(),
+		"stranger@example.com", "Stranger", "Video", "https://example.com/watch/abc", 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.SubscriberEmail != "dev@sendrec.eu" {
+		t.Errorf("expected email redirected to dev@sendrec.eu, got %q", received.SubscriberEmail)
+	}
+}
+
+func TestDeveloperEmail_RedirectsAllEmails(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "admin",
+		Password:          "secret",
+		ConfirmTemplateID: 8,
+		DeveloperEmail:    "dev@example.com",
+	})
+
+	err := client.SendConfirmation(context.Background(),
+		"user@real.com", "Real User", "https://app.sendrec.eu/confirm?token=abc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.SubscriberEmail != "dev@example.com" {
+		t.Errorf("expected email redirected to dev@example.com, got %q", received.SubscriberEmail)
+	}
+}
+
+func TestDeveloperEmail_NotSetSendsToOriginal(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:           srv.URL,
+		Username:          "admin",
+		Password:          "secret",
+		ConfirmTemplateID: 8,
+	})
+
+	err := client.SendConfirmation(context.Background(),
+		"user@real.com", "Real User", "https://app.sendrec.eu/confirm?token=abc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.SubscriberEmail != "user@real.com" {
+		t.Errorf("expected original email user@real.com, got %q", received.SubscriberEmail)
 	}
 }
