@@ -3,6 +3,7 @@ package sso
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
@@ -1064,4 +1065,100 @@ func (h *Handler) UnlinkIdentity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// GenerateSCIMToken creates a new SCIM bearer token for the organization,
+// replacing any existing token.
+func (h *Handler) GenerateSCIMToken(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	orgID := chi.URLParam(r, "orgId")
+
+	var role string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+		orgID, userID,
+	).Scan(&role)
+	if err != nil || (role != "owner" && role != "admin") {
+		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
+		return
+	}
+
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "generate token failed")
+		return
+	}
+	token := "scim_" + hex.EncodeToString(b)
+
+	hash := sha256.Sum256([]byte(token))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	if _, err := h.db.Exec(r.Context(),
+		`INSERT INTO organization_scim_tokens (organization_id, token_hash)
+		 VALUES ($1, $2)
+		 ON CONFLICT (organization_id) DO UPDATE SET token_hash = EXCLUDED.token_hash, created_at = now()`,
+		orgID, tokenHash,
+	); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "save token failed")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"token": token})
+}
+
+// RevokeSCIMToken deletes the SCIM bearer token for the organization.
+func (h *Handler) RevokeSCIMToken(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	orgID := chi.URLParam(r, "orgId")
+
+	var role string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+		orgID, userID,
+	).Scan(&role)
+	if err != nil || (role != "owner" && role != "admin") {
+		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
+		return
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		"DELETE FROM organization_scim_tokens WHERE organization_id = $1",
+		orgID,
+	); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "revoke token failed")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"message": "SCIM token revoked"})
+}
+
+// GetSCIMToken returns whether a SCIM token is configured and when it was created.
+func (h *Handler) GetSCIMToken(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	orgID := chi.URLParam(r, "orgId")
+
+	var role string
+	err := h.db.QueryRow(r.Context(),
+		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+		orgID, userID,
+	).Scan(&role)
+	if err != nil || (role != "owner" && role != "admin") {
+		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
+		return
+	}
+
+	var createdAt time.Time
+	err = h.db.QueryRow(r.Context(),
+		"SELECT created_at FROM organization_scim_tokens WHERE organization_id = $1",
+		orgID,
+	).Scan(&createdAt)
+	if err != nil {
+		httputil.WriteJSON(w, http.StatusOK, map[string]interface{}{"configured": false})
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"configured": true,
+		"createdAt":  createdAt,
+	})
 }

@@ -1563,3 +1563,108 @@ func TestUnlinkIdentity_AllowedWithPassword(t *testing.T) {
 	}
 }
 
+// --- SCIM Token Management Tests ---
+
+func TestGenerateSCIMToken(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("admin"))
+
+	mock.ExpectExec(`INSERT INTO organization_scim_tokens`).
+		WithArgs("org-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/organizations/org-1/scim-token", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+
+	rec := callWithChiParam(handler.GenerateSCIMToken, http.MethodPost, "/", "orgId", "org-1", req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("got status %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]string
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp["token"] == "" {
+		t.Error("expected token in response")
+	}
+	if !strings.HasPrefix(resp["token"], "scim_") {
+		t.Errorf("token %q should start with scim_", resp["token"])
+	}
+}
+
+func TestGenerateSCIMToken_Forbidden(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("member"))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/organizations/org-1/scim-token", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+
+	rec := callWithChiParam(handler.GenerateSCIMToken, http.MethodPost, "/", "orgId", "org-1", req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("got status %d, want 403", rec.Code)
+	}
+}
+
+func TestRevokeSCIMToken(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("owner"))
+
+	mock.ExpectExec(`DELETE FROM organization_scim_tokens WHERE organization_id = \$1`).
+		WithArgs("org-1").
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/organizations/org-1/scim-token", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+
+	rec := callWithChiParam(handler.RevokeSCIMToken, http.MethodDelete, "/", "orgId", "org-1", req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("got status %d, want 200", rec.Code)
+	}
+}
+
+func TestGetSCIMToken_Configured(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("admin"))
+
+	mock.ExpectQuery(`SELECT created_at FROM organization_scim_tokens WHERE organization_id = \$1`).
+		WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"created_at"}).AddRow(time.Now()))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/organizations/org-1/scim-token", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+
+	rec := callWithChiParam(handler.GetSCIMToken, http.MethodGet, "/", "orgId", "org-1", req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("got status %d, want 200", rec.Code)
+	}
+
+	var resp map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp["configured"] != true {
+		t.Error("expected configured to be true")
+	}
+}
+
