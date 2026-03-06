@@ -66,13 +66,13 @@ export async function switchToWorkspace(
 ): Promise<void> {
   await page.getByLabel("Switch workspace").click();
   await page.getByRole("option", { name: workspaceName }).click();
-  await page.waitForTimeout(500);
+  await expect(page.getByLabel("Switch workspace")).toContainText(workspaceName);
 }
 
 export async function switchToPersonal(page: Page): Promise<void> {
   await page.getByLabel("Switch workspace").click();
   await page.getByRole("option", { name: "Personal" }).click();
-  await page.waitForTimeout(500);
+  await expect(page.getByLabel("Switch workspace")).toContainText("Personal");
 }
 
 export async function navigateToOrgSettings(page: Page, orgId: string): Promise<void> {

@@ -146,7 +146,7 @@ export function TransferDialog({ videoId, videoTitle, onTransferred, onCancel }:
           </button>
           <button
             onClick={handleTransfer}
-            disabled={targetOrgId === null && !!selectedOrgId ? false : targetOrgId === null ? true : transferring}
+            disabled={transferring || (targetOrgId === null && !selectedOrgId)}
             style={{
               background: "var(--color-accent)",
               color: "#fff",

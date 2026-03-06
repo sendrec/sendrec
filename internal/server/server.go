@@ -420,9 +420,12 @@ func (s *Server) routes() {
 			r.Use(organization.Middleware(s.db))
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/", s.videoHandler.ListFolders)
-			r.Post("/", s.videoHandler.CreateFolder)
-			r.Put("/{id}", s.videoHandler.UpdateFolder)
-			r.Delete("/{id}", s.videoHandler.DeleteFolder)
+			r.Group(func(r chi.Router) {
+				r.Use(organization.RequireWriter)
+				r.Post("/", s.videoHandler.CreateFolder)
+				r.Put("/{id}", s.videoHandler.UpdateFolder)
+				r.Delete("/{id}", s.videoHandler.DeleteFolder)
+			})
 		})
 
 		s.router.Route("/api/tags", func(r chi.Router) {
@@ -430,22 +433,28 @@ func (s *Server) routes() {
 			r.Use(organization.Middleware(s.db))
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/", s.videoHandler.ListTags)
-			r.Post("/", s.videoHandler.CreateTag)
-			r.Put("/{id}", s.videoHandler.UpdateTag)
-			r.Delete("/{id}", s.videoHandler.DeleteTag)
+			r.Group(func(r chi.Router) {
+				r.Use(organization.RequireWriter)
+				r.Post("/", s.videoHandler.CreateTag)
+				r.Put("/{id}", s.videoHandler.UpdateTag)
+				r.Delete("/{id}", s.videoHandler.DeleteTag)
+			})
 		})
 
 		s.router.Route("/api/playlists", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/", s.videoHandler.ListPlaylists)
-			r.Post("/", s.videoHandler.CreatePlaylist)
 			r.Get("/{id}", s.videoHandler.GetPlaylist)
-			r.Patch("/{id}", s.videoHandler.UpdatePlaylist)
-			r.Delete("/{id}", s.videoHandler.DeletePlaylist)
-			r.Post("/{id}/videos", s.videoHandler.AddPlaylistVideos)
-			r.Delete("/{id}/videos/{videoId}", s.videoHandler.RemovePlaylistVideo)
-			r.Patch("/{id}/videos/reorder", s.videoHandler.ReorderPlaylistVideos)
+			r.Group(func(r chi.Router) {
+				r.Use(organization.RequireWriter)
+				r.Post("/", s.videoHandler.CreatePlaylist)
+				r.Patch("/{id}", s.videoHandler.UpdatePlaylist)
+				r.Delete("/{id}", s.videoHandler.DeletePlaylist)
+				r.Post("/{id}/videos", s.videoHandler.AddPlaylistVideos)
+				r.Delete("/{id}/videos/{videoId}", s.videoHandler.RemovePlaylistVideo)
+				r.Patch("/{id}/videos/reorder", s.videoHandler.ReorderPlaylistVideos)
+			})
 		})
 
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)

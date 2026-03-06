@@ -1769,4 +1769,89 @@ describe("VideoDetail", () => {
     expect(screen.getByText("Unpin")).toBeInTheDocument();
     expect(screen.getByText("Pinned")).toBeInTheDocument();
   });
+
+  describe("viewer role restrictions", () => {
+    beforeEach(() => {
+      mockUseOrganization.mockReturnValue({
+        selectedOrg: { id: "org1", name: "Test Org", role: "viewer" },
+        organizations: [],
+        selectedOrgId: "org1",
+        setSelectedOrgId: vi.fn(),
+        refreshOrganizations: vi.fn(),
+      });
+    });
+
+    it("hides edit title button for viewer", async () => {
+      setupDefaultMocks();
+      renderVideoDetail("v1");
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+      expect(screen.queryByLabelText("Edit title")).not.toBeInTheDocument();
+    });
+
+    it("hides pin button for viewer", async () => {
+      setupDefaultMocks();
+      renderVideoDetail("v1");
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+      expect(screen.queryByLabelText("Pin video")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Unpin video")).not.toBeInTheDocument();
+    });
+
+    it("hides delete video button for viewer", async () => {
+      setupDefaultMocks();
+      renderVideoDetail("v1");
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("Delete video")).not.toBeInTheDocument();
+    });
+
+    it("hides Editing section for viewer", async () => {
+      setupDefaultMocks();
+      renderVideoDetail("v1");
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("Editing")).not.toBeInTheDocument();
+    });
+
+    it("hides Organize section for viewer", async () => {
+      setupDefaultMocks();
+      renderVideoDetail("v1");
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("Organize")).not.toBeInTheDocument();
+    });
+
+    it("hides Call to Action section for viewer", async () => {
+      setupDefaultMocks();
+      renderVideoDetail("v1");
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("Call to Action")).not.toBeInTheDocument();
+    });
+
+    it("still shows copy share link for viewer", async () => {
+      setupDefaultMocks();
+      renderVideoDetail("v1");
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+      expect(screen.getByText("Copy share link")).toBeInTheDocument();
+    });
+
+    it("still shows view analytics for viewer", async () => {
+      setupDefaultMocks();
+      renderVideoDetail("v1");
+      await waitFor(() => {
+        expect(screen.getByText("My Recording")).toBeInTheDocument();
+      });
+      expect(screen.getByText("View analytics")).toBeInTheDocument();
+    });
+  });
 });
