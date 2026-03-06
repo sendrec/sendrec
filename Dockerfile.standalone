@@ -19,7 +19,7 @@ RUN git clone --depth 1 --branch v1.8.3 https://github.com/ggerganov/whisper.cpp
     cmake --build build --target whisper-cli -j$(nproc)
 
 # Stage 3: Build Go binary
-FROM golang:1.25-alpine AS backend
+FROM golang:1.26.1-alpine AS backend
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download

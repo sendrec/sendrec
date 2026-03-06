@@ -1155,14 +1155,21 @@ Attribute mapping (sent in SAML assertion):
                 </div>
               )}
 
-              <details style={{ marginTop: "1rem" }}>
-                <summary style={{ cursor: "pointer", fontWeight: 500 }}>Setup Guide</summary>
-                <div style={{ marginTop: "0.75rem", fontSize: "0.9rem", lineHeight: 1.6 }}>
-                  <p><strong>SCIM Base URL:</strong> <code>{window.location.origin}/api/organizations/{orgId}/scim/v2</code></p>
-                  <p><strong>Authentication:</strong> HTTP Header — <code>Authorization: Bearer &lt;token&gt;</code></p>
-                  <p><strong>Okta:</strong> In your Okta app → Provisioning → SCIM connector, paste the Base URL and Bearer Token.</p>
-                  <p><strong>Azure AD:</strong> In Enterprise Applications → your app → Provisioning, set Tenant URL to the Base URL and Secret Token to the Bearer Token.</p>
-                </div>
+              <details className="settings-details">
+                <summary>Setup Guide</summary>
+                <pre>{`SCIM Base URL:
+  ${window.location.origin}/api/organizations/${orgId}/scim/v2
+
+Authentication:
+  Authorization: Bearer <token>
+
+Okta:
+  In your Okta app -> Provisioning -> SCIM connector,
+  paste the Base URL and Bearer Token.
+
+Azure AD:
+  In Enterprise Applications -> your app -> Provisioning,
+  set Tenant URL to the Base URL and Secret Token to the Bearer Token.`}</pre>
               </details>
 
               <div className="btn-row" style={{ marginTop: "1rem" }}>

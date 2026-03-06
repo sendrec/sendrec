@@ -633,6 +633,7 @@ describe("OrgSettings", () => {
     expect(screen.getByText("SCIM Provisioning")).toBeInTheDocument();
     expect(screen.getByText("SCIM Base URL")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Regenerate Token" })).toBeInTheDocument();
+    expect(screen.getByText("Setup Guide").closest("details")).toHaveClass("settings-details");
   });
 
   it("clears generated SCIM token when switching workspaces", async () => {
