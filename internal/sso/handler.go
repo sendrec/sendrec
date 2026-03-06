@@ -519,7 +519,7 @@ func (h *Handler) DeleteConfig(w http.ResponseWriter, r *http.Request) {
 
 // InitiateOrgSSO starts the SSO flow for a user based on their email's
 // organization membership. It looks up the SSO config for the organization
-// the user belongs to and redirects to the OIDC provider.
+// the user belongs to and redirects to the identity provider.
 // If orgId is provided, it scopes the lookup to that specific organization.
 func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 	email := r.URL.Query().Get("email")
@@ -528,39 +528,94 @@ func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var orgID, issuerURL, clientID, encryptedSecret string
+	var orgID string
+	var configProvider string
+	var issuerURL, clientID, encryptedSecret *string
+	var samlEntityID, samlSSOURL, samlCertificate *string
+
 	orgFilter := r.URL.Query().Get("org")
 	if orgFilter != "" {
 		err := h.db.QueryRow(r.Context(),
-			`SELECT o.id, c.issuer_url, c.client_id, c.client_secret_encrypted
+			`SELECT o.id, c.provider, c.issuer_url, c.client_id, c.client_secret_encrypted,
+			        c.saml_entity_id, c.saml_sso_url, c.saml_certificate
 			 FROM organization_sso_configs c
 			 JOIN organizations o ON o.id = c.organization_id
 			 JOIN organization_members m ON m.organization_id = o.id
 			 JOIN users u ON u.id = m.user_id
 			 WHERE u.email = $1 AND o.id = $2`,
 			email, orgFilter,
-		).Scan(&orgID, &issuerURL, &clientID, &encryptedSecret)
+		).Scan(&orgID, &configProvider, &issuerURL, &clientID, &encryptedSecret,
+			&samlEntityID, &samlSSOURL, &samlCertificate)
 		if err != nil {
 			httputil.WriteError(w, http.StatusNotFound, "no SSO configuration found for this workspace")
 			return
 		}
 	} else {
 		err := h.db.QueryRow(r.Context(),
-			`SELECT o.id, c.issuer_url, c.client_id, c.client_secret_encrypted
+			`SELECT o.id, c.provider, c.issuer_url, c.client_id, c.client_secret_encrypted,
+			        c.saml_entity_id, c.saml_sso_url, c.saml_certificate
 			 FROM organization_sso_configs c
 			 JOIN organizations o ON o.id = c.organization_id
 			 JOIN organization_members m ON m.organization_id = o.id
 			 JOIN users u ON u.id = m.user_id
 			 WHERE u.email = $1 LIMIT 1`,
 			email,
-		).Scan(&orgID, &issuerURL, &clientID, &encryptedSecret)
+		).Scan(&orgID, &configProvider, &issuerURL, &clientID, &encryptedSecret,
+			&samlEntityID, &samlSSOURL, &samlCertificate)
 		if err != nil {
 			httputil.WriteError(w, http.StatusNotFound, "no SSO configuration found for this email")
 			return
 		}
 	}
 
-	clientSecret, err := integration.Decrypt(h.encryptionKey, encryptedSecret)
+	state, err := generateState()
+	if err != nil {
+		slog.Error("sso: failed to generate state", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to initiate SSO")
+		return
+	}
+
+	if configProvider == "saml" {
+		if samlEntityID == nil || samlSSOURL == nil || samlCertificate == nil {
+			slog.Error("sso: incomplete SAML config", "orgID", orgID)
+			httputil.WriteError(w, http.StatusInternalServerError, "incomplete SAML configuration")
+			return
+		}
+
+		samlProvider, err := NewSAMLProvider(h.baseURL, orgID, &SAMLConfig{
+			EntityID:    *samlEntityID,
+			SSOURL:      *samlSSOURL,
+			Certificate: *samlCertificate,
+		})
+		if err != nil {
+			slog.Error("sso: failed to create SAML provider", "error", err)
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to initiate SSO")
+			return
+		}
+
+		// Set sso_state cookie for SAML ACS callback RelayState validation.
+		http.SetCookie(w, &http.Cookie{
+			Name:     "sso_state",
+			Value:    state,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   h.secureCookies,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   300,
+		})
+
+		http.Redirect(w, r, samlProvider.AuthURL(state), http.StatusFound)
+		return
+	}
+
+	// OIDC flow.
+	if issuerURL == nil || clientID == nil || encryptedSecret == nil {
+		slog.Error("sso: incomplete OIDC config", "orgID", orgID)
+		httputil.WriteError(w, http.StatusInternalServerError, "incomplete OIDC configuration")
+		return
+	}
+
+	clientSecret, err := integration.Decrypt(h.encryptionKey, *encryptedSecret)
 	if err != nil {
 		slog.Error("sso: failed to decrypt client secret", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to initiate SSO")
@@ -568,20 +623,13 @@ func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	provider, err := NewOIDCProvider(r.Context(), OIDCConfig{
-		IssuerURL:    issuerURL,
-		ClientID:     clientID,
+		IssuerURL:    *issuerURL,
+		ClientID:     *clientID,
 		ClientSecret: clientSecret,
 		RedirectURL:  h.baseURL + "/api/auth/sso/org/callback",
 	})
 	if err != nil {
 		slog.Error("sso: failed to create OIDC provider", "error", err)
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to initiate SSO")
-		return
-	}
-
-	state, err := generateState()
-	if err != nil {
-		slog.Error("sso: failed to generate state", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to initiate SSO")
 		return
 	}
@@ -717,6 +765,113 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
 	if err != nil {
 		slog.Error("sso: org issue tokens failed", "error", err)
+		h.redirectWithError(w, r, "failed to create session")
+		return
+	}
+
+	h.setRefreshTokenCookie(w, refreshToken)
+	redirectURL := h.baseURL + "/login?sso_token=" + url.QueryEscape(accessToken)
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+// OrgSAMLCallback handles the SAML ACS (Assertion Consumer Service) POST for
+// workspace SSO login. It validates the RelayState against the sso_state cookie,
+// loads the SAML config, validates the SAMLResponse, resolves the user,
+// auto-provisions organization membership, and issues tokens.
+func (h *Handler) OrgSAMLCallback(w http.ResponseWriter, r *http.Request) {
+	orgID := chi.URLParam(r, "orgId")
+
+	if err := r.ParseForm(); err != nil {
+		h.redirectWithError(w, r, "invalid form data")
+		return
+	}
+
+	samlResponse := r.FormValue("SAMLResponse")
+	relayState := r.FormValue("RelayState")
+
+	stateCookie, err := r.Cookie("sso_state")
+	if err != nil {
+		h.redirectWithError(w, r, "missing state cookie")
+		return
+	}
+
+	// Clear the state cookie immediately.
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sso_state",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   h.secureCookies,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+
+	if relayState == "" || relayState != stateCookie.Value {
+		h.redirectWithError(w, r, "invalid state parameter")
+		return
+	}
+
+	// Load SAML config for the organization.
+	var configProvider string
+	var samlEntityID, samlSSOURL, samlCertificate *string
+	err = h.db.QueryRow(r.Context(),
+		`SELECT provider, saml_entity_id, saml_sso_url, saml_certificate
+		 FROM organization_sso_configs WHERE organization_id = $1`,
+		orgID,
+	).Scan(&configProvider, &samlEntityID, &samlSSOURL, &samlCertificate)
+	if err != nil {
+		slog.Error("sso: SAML callback config not found", "orgID", orgID, "error", err)
+		h.redirectWithError(w, r, "SSO configuration not found")
+		return
+	}
+
+	if configProvider != "saml" {
+		h.redirectWithError(w, r, "SSO configuration is not SAML")
+		return
+	}
+
+	if samlEntityID == nil || samlSSOURL == nil || samlCertificate == nil {
+		slog.Error("sso: incomplete SAML config for callback", "orgID", orgID)
+		h.redirectWithError(w, r, "incomplete SAML configuration")
+		return
+	}
+
+	samlProvider, err := NewSAMLProvider(h.baseURL, orgID, &SAMLConfig{
+		EntityID:    *samlEntityID,
+		SSOURL:      *samlSSOURL,
+		Certificate: *samlCertificate,
+	})
+	if err != nil {
+		slog.Error("sso: failed to create SAML provider for callback", "error", err)
+		h.redirectWithError(w, r, "authentication failed")
+		return
+	}
+
+	info, err := samlProvider.Exchange(r.Context(), samlResponse)
+	if err != nil {
+		slog.Error("sso: SAML exchange failed", "orgID", orgID, "error", err)
+		h.redirectWithError(w, r, "authentication failed")
+		return
+	}
+
+	userID, err := h.resolveUser(r.Context(), orgID, info)
+	if err != nil {
+		slog.Error("sso: SAML resolve user failed", "orgID", orgID, "error", err)
+		h.redirectWithError(w, r, err.Error())
+		return
+	}
+
+	// Auto-add user as organization member.
+	if _, err := h.db.Exec(r.Context(),
+		"INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+		orgID, userID,
+	); err != nil {
+		slog.Error("sso: failed to add org member", "orgID", orgID, "userID", userID, "error", err)
+	}
+
+	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
+	if err != nil {
+		slog.Error("sso: SAML issue tokens failed", "error", err)
 		h.redirectWithError(w, r, "failed to create session")
 		return
 	}

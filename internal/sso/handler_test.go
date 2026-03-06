@@ -728,7 +728,7 @@ func TestInitiateOrgSSO_NoConfig(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT o.id, c.issuer_url, c.client_id, c.client_secret_encrypted`).
+	mock.ExpectQuery(`SELECT o.id, c.provider, c.issuer_url, c.client_id, c.client_secret_encrypted`).
 		WithArgs("user@example.com").
 		WillReturnError(pgx.ErrNoRows)
 
@@ -1056,6 +1056,128 @@ func TestOrgCallback_ClearsStateCookies(t *testing.T) {
 }
 
 // --- Additional SSO Config Tests ---
+
+// --- OrgSAMLCallback Tests ---
+
+func TestOrgSAMLCallback_MissingStateCookie(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	body := "SAMLResponse=dGVzdA==&RelayState=some-state"
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/saml/org-1/acs", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	handler.OrgSAMLCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error=", location)
+	}
+}
+
+func TestOrgSAMLCallback_StateMismatch(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	body := "SAMLResponse=dGVzdA==&RelayState=wrong-state"
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/saml/org-1/acs", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: "correct-state"})
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	handler.OrgSAMLCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error=", location)
+	}
+}
+
+func TestOrgSAMLCallback_ConfigNotFound(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT provider, saml_entity_id, saml_sso_url, saml_certificate`).
+		WithArgs("org-1").
+		WillReturnError(pgx.ErrNoRows)
+
+	state := "valid-saml-state"
+	body := "SAMLResponse=dGVzdA==&RelayState=" + state
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/saml/org-1/acs", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	handler.OrgSAMLCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error=", location)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestOrgSAMLCallback_NotSAMLConfig(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT provider, saml_entity_id, saml_sso_url, saml_certificate`).
+		WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"provider", "saml_entity_id", "saml_sso_url", "saml_certificate"}).
+			AddRow("oidc", nil, nil, nil))
+
+	state := "valid-saml-state"
+	body := "SAMLResponse=dGVzdA==&RelayState=" + state
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/saml/org-1/acs", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	handler.OrgSAMLCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	location := rec.Header().Get("Location")
+	if !strings.Contains(location, "sso_error=") {
+		t.Fatalf("Location = %q, want sso_error=", location)
+	}
+	if !strings.Contains(location, "not+SAML") || !strings.Contains(location, "not%20SAML") {
+		// Check for either URL encoding form.
+		if !strings.Contains(location, "not+SAML") && !strings.Contains(location, "not%20SAML") {
+			t.Fatalf("Location = %q, want 'not SAML' in error", location)
+		}
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
 
 func TestSaveConfig_WithEnforcement(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
