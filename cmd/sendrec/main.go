@@ -99,6 +99,7 @@ func main() {
 		OrgInviteTemplateID:          int(getEnvInt64("LISTMONK_ORG_INVITE_TEMPLATE_ID", 0)),
 		RetentionWarningTemplateID:   int(getEnvInt64("LISTMONK_RETENTION_WARNING_TEMPLATE_ID", 0)),
 		Allowlist:                    email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
+		DeveloperEmail:               os.Getenv("DEVELOPER_EMAIL"),
 	})
 
 	aiEnabled := getEnv("AI_ENABLED", "false") == "true"

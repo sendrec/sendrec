@@ -26,6 +26,7 @@ type Config struct {
 	OrgInviteTemplateID          int
 	RetentionWarningTemplateID   int
 	Allowlist                    []string
+	DeveloperEmail               string
 }
 
 type Client struct {
@@ -98,8 +99,15 @@ func (c *Client) isAllowed(recipientEmail string) bool {
 	return false
 }
 
+func (c *Client) resolveRecipient(email string) string {
+	if c.config.DeveloperEmail != "" {
+		return c.config.DeveloperEmail
+	}
+	return email
+}
+
 func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
-	body := subscriberRequest{Email: email, Name: name, Status: "enabled"}
+	body := subscriberRequest{Email: c.resolveRecipient(email), Name: name, Status: "enabled"}
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return
@@ -118,6 +126,7 @@ func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
 }
 
 func (c *Client) sendTx(ctx context.Context, body txRequest) error {
+	body.SubscriberEmail = c.resolveRecipient(body.SubscriberEmail)
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshal email request: %w", err)
