@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router-dom";
 import { OrgSettings } from "./OrgSettings";
 import { expectNoA11yViolations } from "../test-utils/a11y";
 
@@ -633,6 +633,99 @@ describe("OrgSettings", () => {
     expect(screen.getByText("SCIM Provisioning")).toBeInTheDocument();
     expect(screen.getByText("SCIM Base URL")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Regenerate Token" })).toBeInTheDocument();
+  });
+
+  it("clears generated SCIM token when switching workspaces", async () => {
+    const user = userEvent.setup();
+    const org1Context = {
+      orgs: [
+        { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 },
+        { id: "org-2", name: "Beta Corp", slug: "beta-corp", subscriptionPlan: "business", role: "owner", memberCount: 2 },
+      ],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    };
+    const org2Context = {
+      ...org1Context,
+      selectedOrg: { id: "org-2", name: "Beta Corp", slug: "beta-corp", subscriptionPlan: "business", role: "owner", memberCount: 2 },
+      selectedOrgId: "org-2",
+    };
+    let currentOrgContext = org1Context;
+    mockUseOrganization.mockImplementation(() => currentOrgContext);
+
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business" })
+      .mockResolvedValueOnce({ issuerUrl: "", clientId: "", configured: false, enforceSso: false })
+      .mockResolvedValueOnce({ configured: false })
+      .mockResolvedValueOnce({ token: "scim_org_1_token" })
+      .mockResolvedValueOnce({ ...mockOrg, id: "org-2", name: "Beta Corp", slug: "beta-corp", subscriptionPlan: "business" })
+      .mockResolvedValueOnce([ownerMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business" })
+      .mockResolvedValueOnce({ issuerUrl: "", clientId: "", configured: false, enforceSso: false })
+      .mockResolvedValueOnce({ configured: true, createdAt: "2026-03-07T00:00:00Z" });
+
+    const router = createMemoryRouter(
+      [
+        { path: "/organizations/:id/settings", element: <OrgSettings /> },
+      ],
+      { initialEntries: ["/organizations/org-1/settings"] },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Generate SCIM Token" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Generate SCIM Token" }));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("scim_org_1_token")).toBeInTheDocument();
+    });
+
+    currentOrgContext = org2Context;
+    await act(async () => {
+      await router.navigate("/organizations/org-2/settings");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("SCIM Base URL")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByDisplayValue("scim_org_1_token")).not.toBeInTheDocument();
+  });
+
+  it("shows SCIM status load errors", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business" })
+      .mockResolvedValueOnce({ issuerUrl: "", clientId: "", configured: false, enforceSso: false })
+      .mockRejectedValueOnce(new Error("SCIM status unavailable"));
+
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to load SCIM status")).toBeInTheDocument();
+    });
   });
 
   it("hides SCIM section for non-business plan", async () => {

@@ -2,6 +2,8 @@ package server_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -378,6 +380,55 @@ func TestPasswordRouteRequiresAuth(t *testing.T) {
 	}
 }
 
+func TestSCIMPutUserRouteRequiresAuth(t *testing.T) {
+	srv, mock := newServerWithDB(t)
+
+	token := "scim_test_token_123"
+	hash := sha256.Sum256([]byte(token))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	mock.ExpectQuery(`SELECT st\.token_hash, o\.subscription_plan FROM organization_scim_tokens st JOIN organizations o ON o\.id = st\.organization_id WHERE st\.organization_id = \$1`).
+		WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"token_hash", "subscription_plan"}).AddRow(tokenHash, "business"))
+
+	mock.ExpectExec(`UPDATE users SET email = \$1, name = \$2 WHERE id = \$3`).
+		WithArgs("jane.updated@example.com", "Jane Updated", "user-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	mock.ExpectExec(`INSERT INTO organization_members`).
+		WithArgs("org-1", "user-1", "member").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	mock.ExpectExec(`INSERT INTO external_identities`).
+		WithArgs("user-1", "org-1", "ext-123", "jane.updated@example.com").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	mock.ExpectQuery(`SELECT`).
+		WithArgs("user-1", "org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email", "name", "external_id", "active"}).
+			AddRow("user-1", "jane.updated@example.com", "Jane Updated", "ext-123", true))
+
+	req := httptest.NewRequest(http.MethodPut, "/api/organizations/org-1/scim/v2/Users/user-1", strings.NewReader(`{
+		"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+		"userName": "jane.updated@example.com",
+		"name": {"formatted": "Jane Updated"},
+		"externalId": "ext-123",
+		"active": true
+	}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/scim+json")
+
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for registered SCIM PUT route, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("expected SCIM PUT handler queries to run: %v", err)
+	}
+}
+
 func TestVerifyWatchPasswordRouteRegistered(t *testing.T) {
 	srv, mock := newServerWithDB(t)
 
@@ -561,6 +612,15 @@ func TestDocsEnabledWhenConfigured(t *testing.T) {
 	rec = executeRequest(srv, http.MethodGet, "/api/docs/openapi.yaml")
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200 for /api/docs/openapi.yaml when enabled, got %d", rec.Code)
+	}
+}
+
+func TestSCIMPutUserRouteRegistered(t *testing.T) {
+	srv, _ := newServerWithDB(t)
+
+	rec := executeRequest(srv, http.MethodPut, "/api/organizations/org-1/scim/v2/Users/user-1")
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for registered SCIM PUT route without bearer token, got %d", rec.Code)
 	}
 }
 

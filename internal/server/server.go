@@ -285,6 +285,7 @@ func (s *Server) routes() {
 				r.Get("/Users", s.scimHandler.ListUsers)
 				r.Get("/Users/{id}", s.scimHandler.GetUser)
 				r.Post("/Users", s.scimHandler.CreateUser)
+				r.Put("/Users/{id}", s.scimHandler.ReplaceUser)
 				r.Patch("/Users/{id}", s.scimHandler.PatchUser)
 				r.Delete("/Users/{id}", s.scimHandler.DeleteUser)
 			})

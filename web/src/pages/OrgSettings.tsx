@@ -129,6 +129,14 @@ export function OrgSettings() {
   useEffect(() => {
     if (!orgId || !canManage || selectedOrgId !== orgId) return;
 
+    setLoading(true);
+    setError("");
+    setScimConfigured(false);
+    setScimCreatedAt("");
+    setScimToken("");
+    setScimError("");
+    setScimMessage("");
+
     Promise.all([
       apiFetch<OrgDetail>(`/api/organizations/${orgId}`),
       apiFetch<Member[]>(`/api/organizations/${orgId}/members`),
@@ -176,14 +184,20 @@ export function OrgSettings() {
             );
             if (scimData) {
               setScimConfigured(scimData.configured);
-              if (scimData.createdAt) setScimCreatedAt(scimData.createdAt);
+              setScimCreatedAt(scimData.createdAt || "");
+              setScimToken("");
             }
-          } catch { /* SCIM not available */ }
+          } catch {
+            setScimConfigured(false);
+            setScimCreatedAt("");
+            setScimToken("");
+            setScimError("Failed to load SCIM status");
+          }
         }
       })
       .catch(() => setError("Failed to load workspace"))
       .finally(() => setLoading(false));
-  }, [orgId, canManage]);
+  }, [orgId, canManage, selectedOrgId]);
 
   async function handleGeneralSave(event: FormEvent) {
     event.preventDefault();
@@ -347,6 +361,7 @@ export function OrgSettings() {
   async function handleGenerateScimToken() {
     setScimError("");
     setScimMessage("");
+    setScimToken("");
     setScimGenerating(true);
     try {
       const resp = await apiFetch<{ token: string }>(
@@ -1093,7 +1108,11 @@ Attribute mapping (sent in SAML assertion):
             <>
               <div className="form-field">
                 <label className="form-label">Status</label>
-                <p>Active (created {new Date(scimCreatedAt).toLocaleDateString()})</p>
+                <p>
+                  {scimCreatedAt
+                    ? `Active (created ${new Date(scimCreatedAt).toLocaleDateString()})`
+                    : "Active"}
+                </p>
               </div>
 
               <div className="form-field">

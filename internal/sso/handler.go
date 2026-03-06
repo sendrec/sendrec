@@ -1067,19 +1067,40 @@ func (h *Handler) UnlinkIdentity(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func (h *Handler) ensureSCIMAdminAccess(w http.ResponseWriter, r *http.Request, orgID, userID string) bool {
+	var role, subscriptionPlan string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT om.role, o.subscription_plan
+		 FROM organization_members om
+		 JOIN organizations o ON o.id = om.organization_id
+		 WHERE om.organization_id = $1 AND om.user_id = $2`,
+		orgID, userID,
+	).Scan(&role, &subscriptionPlan)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
+			return false
+		}
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to load organization access")
+		return false
+	}
+	if role != "owner" && role != "admin" {
+		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
+		return false
+	}
+	if subscriptionPlan != "business" {
+		httputil.WriteError(w, http.StatusForbidden, "business plan required")
+		return false
+	}
+	return true
+}
+
 // GenerateSCIMToken creates a new SCIM bearer token for the organization,
 // replacing any existing token.
 func (h *Handler) GenerateSCIMToken(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	orgID := chi.URLParam(r, "orgId")
-
-	var role string
-	err := h.db.QueryRow(r.Context(),
-		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
-		orgID, userID,
-	).Scan(&role)
-	if err != nil || (role != "owner" && role != "admin") {
-		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
+	if !h.ensureSCIMAdminAccess(w, r, orgID, userID) {
 		return
 	}
 
@@ -1110,14 +1131,7 @@ func (h *Handler) GenerateSCIMToken(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) RevokeSCIMToken(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	orgID := chi.URLParam(r, "orgId")
-
-	var role string
-	err := h.db.QueryRow(r.Context(),
-		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
-		orgID, userID,
-	).Scan(&role)
-	if err != nil || (role != "owner" && role != "admin") {
-		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
+	if !h.ensureSCIMAdminAccess(w, r, orgID, userID) {
 		return
 	}
 
@@ -1136,23 +1150,20 @@ func (h *Handler) RevokeSCIMToken(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetSCIMToken(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	orgID := chi.URLParam(r, "orgId")
-
-	var role string
-	err := h.db.QueryRow(r.Context(),
-		"SELECT role FROM organization_members WHERE organization_id = $1 AND user_id = $2",
-		orgID, userID,
-	).Scan(&role)
-	if err != nil || (role != "owner" && role != "admin") {
-		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
+	if !h.ensureSCIMAdminAccess(w, r, orgID, userID) {
 		return
 	}
 
 	var createdAt time.Time
-	err = h.db.QueryRow(r.Context(),
+	err := h.db.QueryRow(r.Context(),
 		"SELECT created_at FROM organization_scim_tokens WHERE organization_id = $1",
 		orgID,
 	).Scan(&createdAt)
 	if err != nil {
+		if err != pgx.ErrNoRows {
+			httputil.WriteError(w, http.StatusInternalServerError, "failed to load token status")
+			return
+		}
 		httputil.WriteJSON(w, http.StatusOK, map[string]interface{}{"configured": false})
 		return
 	}

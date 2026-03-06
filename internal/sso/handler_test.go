@@ -1569,9 +1569,9 @@ func TestGenerateSCIMToken(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT role FROM organization_members`).
+	mock.ExpectQuery(`SELECT om\.role, o\.subscription_plan FROM organization_members om JOIN organizations o ON o\.id = om\.organization_id`).
 		WithArgs("org-1", "user-1").
-		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("admin"))
+		WillReturnRows(pgxmock.NewRows([]string{"role", "subscription_plan"}).AddRow("admin", "business"))
 
 	mock.ExpectExec(`INSERT INTO organization_scim_tokens`).
 		WithArgs("org-1", pgxmock.AnyArg()).
@@ -1588,7 +1588,9 @@ func TestGenerateSCIMToken(t *testing.T) {
 	}
 
 	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if resp["token"] == "" {
 		t.Error("expected token in response")
 	}
@@ -1601,9 +1603,9 @@ func TestGenerateSCIMToken_Forbidden(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT role FROM organization_members`).
+	mock.ExpectQuery(`SELECT om\.role, o\.subscription_plan FROM organization_members om JOIN organizations o ON o\.id = om\.organization_id`).
 		WithArgs("org-1", "user-1").
-		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("member"))
+		WillReturnRows(pgxmock.NewRows([]string{"role", "subscription_plan"}).AddRow("member", "business"))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/organizations/org-1/scim-token", nil)
 	ctx := auth.ContextWithUserID(req.Context(), "user-1")
@@ -1620,9 +1622,9 @@ func TestRevokeSCIMToken(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT role FROM organization_members`).
+	mock.ExpectQuery(`SELECT om\.role, o\.subscription_plan FROM organization_members om JOIN organizations o ON o\.id = om\.organization_id`).
 		WithArgs("org-1", "user-1").
-		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("owner"))
+		WillReturnRows(pgxmock.NewRows([]string{"role", "subscription_plan"}).AddRow("owner", "business"))
 
 	mock.ExpectExec(`DELETE FROM organization_scim_tokens WHERE organization_id = \$1`).
 		WithArgs("org-1").
@@ -1643,9 +1645,9 @@ func TestGetSCIMToken_Configured(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
-	mock.ExpectQuery(`SELECT role FROM organization_members`).
+	mock.ExpectQuery(`SELECT om\.role, o\.subscription_plan FROM organization_members om JOIN organizations o ON o\.id = om\.organization_id`).
 		WithArgs("org-1", "user-1").
-		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("admin"))
+		WillReturnRows(pgxmock.NewRows([]string{"role", "subscription_plan"}).AddRow("admin", "business"))
 
 	mock.ExpectQuery(`SELECT created_at FROM organization_scim_tokens WHERE organization_id = \$1`).
 		WithArgs("org-1").
@@ -1662,9 +1664,52 @@ func TestGetSCIMToken_Configured(t *testing.T) {
 	}
 
 	var resp map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	if resp["configured"] != true {
 		t.Error("expected configured to be true")
 	}
 }
 
+func TestGenerateSCIMToken_RequiresBusinessPlan(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT om\.role, o\.subscription_plan FROM organization_members om JOIN organizations o ON o\.id = om\.organization_id`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role", "subscription_plan"}).AddRow("admin", "pro"))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/organizations/org-1/scim-token", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+
+	rec := callWithChiParam(handler.GenerateSCIMToken, http.MethodPost, "/", "orgId", "org-1", req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("got status %d, want 403", rec.Code)
+	}
+}
+
+func TestGetSCIMToken_QueryErrorReturns500(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT om\.role, o\.subscription_plan FROM organization_members om JOIN organizations o ON o\.id = om\.organization_id`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role", "subscription_plan"}).AddRow("admin", "business"))
+
+	mock.ExpectQuery(`SELECT created_at FROM organization_scim_tokens WHERE organization_id = \$1`).
+		WithArgs("org-1").
+		WillReturnError(pgx.ErrTxClosed)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/organizations/org-1/scim-token", nil)
+	ctx := auth.ContextWithUserID(req.Context(), "user-1")
+	req = req.WithContext(ctx)
+
+	rec := callWithChiParam(handler.GetSCIMToken, http.MethodGet, "/", "orgId", "org-1", req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("got status %d, want 500; body: %s", rec.Code, rec.Body.String())
+	}
+}

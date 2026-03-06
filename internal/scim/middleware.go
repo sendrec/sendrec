@@ -29,16 +29,24 @@ func BearerAuth(db database.DBTX) func(http.Handler) http.Handler {
 			token := strings.TrimPrefix(authHeader, "Bearer ")
 
 			var storedHash string
+			var subscriptionPlan string
 			err := db.QueryRow(r.Context(),
-				"SELECT token_hash FROM organization_scim_tokens WHERE organization_id = $1",
+				`SELECT st.token_hash, o.subscription_plan
+				 FROM organization_scim_tokens st
+				 JOIN organizations o ON o.id = st.organization_id
+				 WHERE st.organization_id = $1`,
 				orgID,
-			).Scan(&storedHash)
+			).Scan(&storedHash, &subscriptionPlan)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					writeError(w, http.StatusUnauthorized, "SCIM not configured for this organization")
 					return
 				}
 				writeError(w, http.StatusInternalServerError, "internal error")
+				return
+			}
+			if subscriptionPlan != "business" {
+				writeError(w, http.StatusForbidden, "business plan required")
 				return
 			}
 
