@@ -59,6 +59,12 @@ func callWithChiParam(handler http.HandlerFunc, method, path, paramName, paramVa
 	return rec
 }
 
+// jsonEscape encodes a string as a JSON-safe value (with surrounding quotes).
+func jsonEscape(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}
+
 func TestProviders_ReturnsEnabledList(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
@@ -1037,6 +1043,66 @@ func TestSaveConfig_ViewerBlocked(t *testing.T) {
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestSaveConfig_SAML_MetadataXML(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("admin"))
+
+	mock.ExpectExec(`INSERT INTO organization_sso_configs`).
+		WithArgs("org-1", false, "", "https://idp.example.com", "https://idp.example.com/sso", pgxmock.AnyArg(), testSAMLMetadataXML).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body := `{"provider":"saml","samlMetadataXml":` + jsonEscape(testSAMLMetadataXML) + `}`
+	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
+	req = requestWithOrg(req, "org-1", "admin")
+
+	rec := httptest.NewRecorder()
+	handler.SaveConfig(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp["status"] != "ok" {
+		t.Errorf("status = %q, want %q", resp["status"], "ok")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSaveConfig_SAML_MissingMetadata(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("admin"))
+
+	body := `{"provider":"saml"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/sso/config", strings.NewReader(body))
+	req = requestWithOrg(req, "org-1", "admin")
+
+	rec := httptest.NewRecorder()
+	handler.SaveConfig(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
 	}
 }
 

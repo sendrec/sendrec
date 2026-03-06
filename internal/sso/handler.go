@@ -277,10 +277,13 @@ func newTokenID() (string, error) {
 }
 
 type ssoConfigRequest struct {
-	IssuerURL    string `json:"issuerUrl"`
-	ClientID     string `json:"clientId"`
-	ClientSecret string `json:"clientSecret"`
-	EnforceSSO   bool   `json:"enforceSso"`
+	Provider        string `json:"provider"`
+	IssuerURL       string `json:"issuerUrl"`
+	ClientID        string `json:"clientId"`
+	ClientSecret    string `json:"clientSecret"`
+	EnforceSSO      bool   `json:"enforceSso"`
+	SAMLMetadataURL string `json:"samlMetadataUrl"`
+	SAMLMetadataXML string `json:"samlMetadataXml"`
 }
 
 type ssoConfigResponse struct {
@@ -293,6 +296,7 @@ type ssoConfigResponse struct {
 }
 
 // SaveConfig upserts the workspace SSO configuration for the caller's organization.
+// It dispatches to saveOIDCConfig or saveSAMLConfig based on the provider field.
 func (h *Handler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	orgID := chi.URLParam(r, "orgId")
@@ -313,6 +317,15 @@ func (h *Handler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Provider == "saml" {
+		h.saveSAMLConfig(w, r, orgID, &req)
+		return
+	}
+
+	h.saveOIDCConfig(w, r, orgID, &req)
+}
+
+func (h *Handler) saveOIDCConfig(w http.ResponseWriter, r *http.Request, orgID string, req *ssoConfigRequest) {
 	if req.IssuerURL == "" || req.ClientID == "" {
 		httputil.WriteError(w, http.StatusBadRequest, "issuer_url and client_id are required")
 		return
@@ -340,17 +353,78 @@ func (h *Handler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := h.db.Exec(r.Context(),
-		`INSERT INTO organization_sso_configs (organization_id, provider, issuer_url, client_id, client_secret_encrypted, enforce_sso)
-		 VALUES ($1, 'oidc', $2, $3, $4, $5)
+		`INSERT INTO organization_sso_configs (organization_id, provider, issuer_url, client_id, client_secret_encrypted, enforce_sso,
+		     saml_metadata_url, saml_entity_id, saml_sso_url, saml_certificate, saml_metadata_xml)
+		 VALUES ($1, 'oidc', $2, $3, $4, $5, NULL, NULL, NULL, NULL, NULL)
 		 ON CONFLICT (organization_id) DO UPDATE
-		 SET issuer_url = EXCLUDED.issuer_url,
+		 SET provider = 'oidc',
+		     issuer_url = EXCLUDED.issuer_url,
 		     client_id = EXCLUDED.client_id,
 		     client_secret_encrypted = EXCLUDED.client_secret_encrypted,
 		     enforce_sso = EXCLUDED.enforce_sso,
+		     saml_metadata_url = NULL,
+		     saml_entity_id = NULL,
+		     saml_sso_url = NULL,
+		     saml_certificate = NULL,
+		     saml_metadata_xml = NULL,
 		     updated_at = now()`,
 		orgID, req.IssuerURL, req.ClientID, encryptedSecret, req.EnforceSSO,
 	); err != nil {
 		slog.Error("sso: failed to upsert SSO config", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to save SSO config")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) saveSAMLConfig(w http.ResponseWriter, r *http.Request, orgID string, req *ssoConfigRequest) {
+	if req.SAMLMetadataURL == "" && req.SAMLMetadataXML == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "saml_metadata_url or saml_metadata_xml is required")
+		return
+	}
+
+	var cfg *SAMLConfig
+	var metadataXML string
+	if req.SAMLMetadataXML != "" {
+		var err error
+		cfg, err = ParseSAMLMetadataFromXML([]byte(req.SAMLMetadataXML))
+		if err != nil {
+			slog.Error("sso: failed to parse SAML metadata XML", "error", err)
+			httputil.WriteError(w, http.StatusBadRequest, "invalid SAML metadata XML")
+			return
+		}
+		metadataXML = req.SAMLMetadataXML
+	} else {
+		var err error
+		cfg, err = ParseSAMLMetadataFromURL(req.SAMLMetadataURL)
+		if err != nil {
+			slog.Error("sso: failed to fetch SAML metadata", "error", err)
+			httputil.WriteError(w, http.StatusBadRequest, "failed to fetch SAML metadata from URL")
+			return
+		}
+	}
+
+	if _, err := h.db.Exec(r.Context(),
+		`INSERT INTO organization_sso_configs (organization_id, provider, enforce_sso,
+		     saml_metadata_url, saml_entity_id, saml_sso_url, saml_certificate, saml_metadata_xml,
+		     issuer_url, client_id, client_secret_encrypted)
+		 VALUES ($1, 'saml', $2, $3, $4, $5, $6, $7, NULL, NULL, NULL)
+		 ON CONFLICT (organization_id) DO UPDATE
+		 SET provider = 'saml',
+		     enforce_sso = EXCLUDED.enforce_sso,
+		     saml_metadata_url = EXCLUDED.saml_metadata_url,
+		     saml_entity_id = EXCLUDED.saml_entity_id,
+		     saml_sso_url = EXCLUDED.saml_sso_url,
+		     saml_certificate = EXCLUDED.saml_certificate,
+		     saml_metadata_xml = EXCLUDED.saml_metadata_xml,
+		     issuer_url = NULL,
+		     client_id = NULL,
+		     client_secret_encrypted = NULL,
+		     updated_at = now()`,
+		orgID, req.EnforceSSO, req.SAMLMetadataURL, cfg.EntityID, cfg.SSOURL, cfg.Certificate, metadataXML,
+	); err != nil {
+		slog.Error("sso: failed to upsert SAML config", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to save SSO config")
 		return
 	}
