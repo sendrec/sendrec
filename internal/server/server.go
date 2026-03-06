@@ -264,6 +264,13 @@ func (s *Server) routes() {
 				r.Get("/{provider}", s.ssoHandler.Initiate)
 				r.Get("/{provider}/callback", s.ssoHandler.Callback)
 			})
+
+			// SAML routes (outside /api/auth/sso to avoid {provider} conflict)
+			s.router.Route("/api/auth/saml", func(r chi.Router) {
+				r.Use(authLimiter.Middleware)
+				r.Post("/{orgId}/acs", s.ssoHandler.OrgSAMLCallback)
+				r.Get("/{orgId}/metadata", s.ssoHandler.SPMetadata)
+			})
 		}
 	}
 
