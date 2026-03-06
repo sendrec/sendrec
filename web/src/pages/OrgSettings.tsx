@@ -850,6 +850,28 @@ export function OrgSettings() {
                   placeholder={ssoConfigured ? "Unchanged" : ""}
                 />
               </div>
+              <details className="settings-details">
+                <summary>OIDC setup guide</summary>
+                <pre>{`1. In your IdP (Google, Okta, Auth0, Azure AD, etc.),
+   create an OAuth2/OpenID Connect application.
+
+2. Set the redirect URI to:
+   ${window.location.origin}/api/auth/sso/org/callback
+
+3. Copy the following into the fields above:
+   • Issuer URL — your IdP's OpenID discovery URL
+     (e.g. https://accounts.google.com)
+   • Client ID — from the application you created
+   • Client Secret — from the application you created
+
+4. Click "Save SSO settings" and test the login flow.
+
+Common issuer URLs:
+  Google:   https://accounts.google.com
+  Okta:     https://your-org.okta.com
+  Auth0:    https://your-tenant.auth0.com
+  Azure AD: https://login.microsoftonline.com/{tenant}/v2.0`}</pre>
+              </details>
             </>
           ) : (
             <>
@@ -903,6 +925,34 @@ export function OrgSettings() {
                   <small className="form-hint">Provide this URL to your IdP administrator</small>
                 </div>
               )}
+              <details className="settings-details">
+                <summary>SAML setup guide</summary>
+                <pre>{`1. In your IdP (Okta, Auth0, Azure AD, OneLogin, etc.),
+   create a SAML 2.0 application.
+
+2. Configure the IdP with these SP values:
+   • SP Entity ID / Audience:
+     ${window.location.origin}/api/auth/saml/${orgId}/metadata
+   • ACS URL (Assertion Consumer Service):
+     ${window.location.origin}/api/auth/saml/${orgId}/acs
+   • NameID format: Email address
+   ${spMetadataUrl ? `\n   Or import the SP Metadata URL shown above — your
+   IdP will auto-configure from it.` : `\n   After saving, the SP Metadata URL will be shown
+   above — your IdP can auto-configure from it.`}
+
+3. From your IdP, copy the metadata URL and paste it
+   in "Metadata URL" above. Or download the metadata
+   XML and paste it in the text area.
+
+4. Click "Save SSO settings". The IdP Entity ID and
+   SSO URL will be extracted automatically.
+
+5. Test the login flow by signing in with SSO.
+
+Attribute mapping (sent in SAML assertion):
+  email — required (NameID or attribute)
+  name  — optional (displayName or name)`}</pre>
+              </details>
             </>
           )}
 
