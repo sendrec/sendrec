@@ -47,7 +47,9 @@ func TestServiceProviderConfig(t *testing.T) {
 	}
 
 	var body map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&body)
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
 	schemas := body["schemas"].([]interface{})
 	if schemas[0] != SPConfigSchema {
 		t.Errorf("schema = %q, want %q", schemas[0], SPConfigSchema)
@@ -123,7 +125,9 @@ func TestCreateUser_NewUser(t *testing.T) {
 	}
 
 	var user SCIMUser
-	json.NewDecoder(rec.Body).Decode(&user)
+	if err := json.NewDecoder(rec.Body).Decode(&user); err != nil {
+		t.Fatal(err)
+	}
 	if user.ID != "user-uuid-1" {
 		t.Errorf("ID = %q, want user-uuid-1", user.ID)
 	}
@@ -193,7 +197,9 @@ func TestGetUser(t *testing.T) {
 	}
 
 	var user SCIMUser
-	json.NewDecoder(rec.Body).Decode(&user)
+	if err := json.NewDecoder(rec.Body).Decode(&user); err != nil {
+		t.Fatal(err)
+	}
 	if user.UserName != "jane@example.com" {
 		t.Errorf("UserName = %q, want jane@example.com", user.UserName)
 	}
@@ -246,7 +252,9 @@ func TestListUsers(t *testing.T) {
 	}
 
 	var resp SCIMListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp.TotalResults != 2 {
 		t.Errorf("TotalResults = %d, want 2", resp.TotalResults)
 	}
@@ -280,7 +288,9 @@ func TestListUsers_FilterByUserName(t *testing.T) {
 	}
 
 	var resp SCIMListResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
 	if resp.TotalResults != 1 {
 		t.Errorf("TotalResults = %d, want 1", resp.TotalResults)
 	}

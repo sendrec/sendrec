@@ -56,7 +56,7 @@ func BearerAuth(db database.DBTX) func(http.Handler) http.Handler {
 func writeError(w http.ResponseWriter, status int, detail string) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(SCIMError{
+	_ = json.NewEncoder(w).Encode(SCIMError{
 		Schemas: []string{ErrorSchema},
 		Status:  strconv.Itoa(status),
 		Detail:  detail,

@@ -26,7 +26,7 @@ func NewHandler(db database.DBTX, baseURL string) *Handler {
 func (h *Handler) writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func (h *Handler) ServiceProviderConfig(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +144,7 @@ func (h *Handler) resolveUser(ctx context.Context, orgID, externalID, email, nam
 		if !emailVerified {
 			return "", false, fmt.Errorf("email not verified")
 		}
-		h.db.Exec(ctx,
+		_, _ = h.db.Exec(ctx,
 			"INSERT INTO external_identities (user_id, provider, external_id, email) VALUES ($1, $2, $3, $4) ON CONFLICT (provider, external_id) DO NOTHING",
 			userID, orgID, externalID, email,
 		)
@@ -160,7 +160,7 @@ func (h *Handler) resolveUser(ctx context.Context, orgID, externalID, email, nam
 		return "", false, fmt.Errorf("create user: %w", err)
 	}
 
-	h.db.Exec(ctx,
+	_, _ = h.db.Exec(ctx,
 		"INSERT INTO external_identities (user_id, provider, external_id, email) VALUES ($1, $2, $3, $4) ON CONFLICT (provider, external_id) DO NOTHING",
 		userID, orgID, externalID, email,
 	)
@@ -313,7 +313,7 @@ func (h *Handler) PatchUser(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			if !active {
-				h.db.Exec(r.Context(),
+				_, _ = h.db.Exec(r.Context(),
 					"DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2",
 					orgID, userID,
 				)
@@ -321,21 +321,21 @@ func (h *Handler) PatchUser(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// Reactivate
-			h.db.Exec(r.Context(),
+			_, _ = h.db.Exec(r.Context(),
 				"INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
 				orgID, userID, "member",
 			)
 
 		case "name.formatted":
 			if name, ok := op.Value.(string); ok {
-				h.db.Exec(r.Context(),
+				_, _ = h.db.Exec(r.Context(),
 					"UPDATE users SET name = $1 WHERE id = $2", name, userID,
 				)
 			}
 
 		case "userName":
 			if email, ok := op.Value.(string); ok {
-				h.db.Exec(r.Context(),
+				_, _ = h.db.Exec(r.Context(),
 					"UPDATE users SET email = $1 WHERE id = $2", email, userID,
 				)
 			}
@@ -354,7 +354,7 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	orgID := chi.URLParam(r, "orgId")
 	userID := chi.URLParam(r, "id")
 
-	h.db.Exec(r.Context(),
+	_, _ = h.db.Exec(r.Context(),
 		"DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2",
 		orgID, userID,
 	)
