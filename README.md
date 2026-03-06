@@ -60,8 +60,9 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 - **Email gate** — require viewer email before watching, per-viewer analytics with email, completion tracking
 - **SEO** — OpenGraph tags, Twitter Cards, VideoObject JSON-LD, canonical URLs, robots.txt
 - **Subscription billing** — optional Creem integration for free/Pro tiers, webhook-based plan activation, customer portal
-- **Integrations** — Nextcloud (oEmbed + API keys), per-user API keys, OpenAPI docs
-- **Team workspaces** — shared video libraries with role-based access (owner/admin/member), email invites, workspace-level branding and billing
+- **Integrations** — Jira and GitHub issue creation, Nextcloud (oEmbed + API keys), per-user API keys, OpenAPI docs
+- **Team workspaces** — shared video libraries with role-based access (owner/admin/member/viewer), email invites, workspace-level branding and billing, video transfer between personal and workspace scopes
+- **SSO** — Google, Microsoft, and GitHub social login; workspace OIDC and SAML 2.0; SCIM 2.0 provisioning for automated user lifecycle management
 - **Self-hostable** — single Go binary, Docker Compose, PostgreSQL, S3-compatible storage
 
 ## Quick Start
