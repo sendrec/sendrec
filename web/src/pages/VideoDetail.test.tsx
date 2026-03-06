@@ -69,9 +69,9 @@ vi.mock("../components/DocumentModal", () => ({
 }));
 
 const mockUseOrganization = vi.fn(() => ({
-  organizations: [],
-  selectedOrg: null,
-  selectedOrgId: null,
+  organizations: [] as Array<{ id: string; name: string; role: string }>,
+  selectedOrg: null as { id: string; name: string; role: string } | null,
+  selectedOrgId: null as string | null,
   setSelectedOrgId: vi.fn(),
   refreshOrganizations: vi.fn(),
 }));
