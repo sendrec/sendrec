@@ -58,9 +58,10 @@ test.describe.serial("Workspace Viewer Role", () => {
     await expect(page.locator(".video-card").first()).toBeVisible({ timeout: 15000 });
 
     await page.getByLabel("More actions").first().click();
-    await expect(page.getByText("Analytics")).toBeVisible();
-    await expect(page.getByText("Download")).toBeVisible();
-    await expect(page.getByText("Delete")).not.toBeVisible();
+    const dropdown = page.locator(".dropdown-menu");
+    await expect(dropdown.getByText("Analytics")).toBeVisible();
+    await expect(dropdown.getByText("Download")).toBeVisible();
+    await expect(dropdown.getByText("Delete")).not.toBeVisible();
   });
 
   test("viewer does not see Move to... in dropdown", async ({ page }) => {
@@ -71,7 +72,8 @@ test.describe.serial("Workspace Viewer Role", () => {
     await expect(page.locator(".video-card").first()).toBeVisible({ timeout: 15000 });
 
     await page.getByLabel("More actions").first().click();
-    await expect(page.getByText("Move to...")).not.toBeVisible();
+    const dropdown = page.locator(".dropdown-menu");
+    await expect(dropdown.getByText("Move to...")).not.toBeVisible();
   });
 
   test("owner changes viewer to member, Record link appears", async ({ page }) => {
