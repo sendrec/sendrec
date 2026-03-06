@@ -6771,3 +6771,61 @@ func TestLimits_OrgFree(t *testing.T) {
 		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
 }
+
+func TestLimits_ViewerExcludedFromMemberCount(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
+
+	// Free org plan triggers member count queries
+	expectOrgPlanQuery(mock, "free")
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos WHERE organization_id`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
+	expectPlanQuery(mock, "free")
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE user_id`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
+
+	// This query must contain "role != 'viewer'" to exclude viewers from the count.
+	// The org has 5 total members but only 3 non-viewer members.
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id = \$1 AND role != 'viewer'`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(3))
+	mock.ExpectQuery(`SELECT retention_days FROM organizations WHERE id = \$1`).
+		WithArgs(testOrgID).
+		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(0))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedOrgRequest(t, http.MethodGet, "/api/videos/limits", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp limitsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.OrgMembersUsed != 3 {
+		t.Errorf("expected orgMembersUsed 3 (viewers excluded), got %d", resp.OrgMembersUsed)
+	}
+	if resp.MaxOrgMembers != 3 {
+		t.Errorf("expected maxOrgMembers 3 (free plan limit), got %d", resp.MaxOrgMembers)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}

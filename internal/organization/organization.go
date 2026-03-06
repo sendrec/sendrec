@@ -184,7 +184,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(r.Context(),
 		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.retention_days, om.role,
-		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id) AS member_count
+		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND role != 'viewer') AS member_count
 		 FROM organizations o
 		 JOIN organization_members om ON om.organization_id = o.id
 		 WHERE om.user_id = $1
@@ -218,7 +218,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	var createdAt, updatedAt time.Time
 	err := h.db.QueryRow(r.Context(),
 		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.retention_days, o.created_at, o.updated_at, om.role,
-		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id) AS member_count
+		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND role != 'viewer') AS member_count
 		 FROM organizations o
 		 JOIN organization_members om ON om.organization_id = o.id
 		 WHERE o.id = $1 AND om.user_id = $2`,
@@ -352,7 +352,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow(r.Context(),
 		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.retention_days, o.created_at, o.updated_at,
 		        (SELECT role FROM organization_members WHERE organization_id = o.id AND user_id = $2) AS role,
-		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id) AS member_count
+		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND role != 'viewer') AS member_count
 		 FROM organizations o
 		 WHERE o.id = $1`,
 		orgID, userID,

@@ -13,12 +13,15 @@ vi.mock("react-router-dom", async () => {
 
 const { MockApiError, mockApiFetch, mockSetAccessToken } = vi.hoisted(() => {
   class MockApiError extends Error {
+    public readonly data: Record<string, unknown>;
     constructor(
       public readonly status: number,
-      message: string
+      message: string,
+      data: Record<string, unknown> = {}
     ) {
       super(message);
       this.name = "ApiError";
+      this.data = data;
     }
   }
   return {
@@ -205,5 +208,51 @@ describe("Login", () => {
     await vi.waitFor(() => {
       expect(screen.getByText("Account not found")).toBeInTheDocument();
     });
+  });
+
+  it("shows workspace SSO button on sso_required error", async () => {
+    const user = userEvent.setup();
+    mockApiFetch.mockRejectedValueOnce(
+      new MockApiError(403, "sso_required", { orgId: "org-123", orgName: "Acme Corp" })
+    );
+    renderLogin();
+
+    await user.type(screen.getByLabelText("Email"), "alice@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(screen.getByText('"Acme Corp" requires SSO sign-in')).toBeInTheDocument();
+
+    const ssoLink = screen.getByText("Sign in with SSO for Acme Corp");
+    expect(ssoLink.closest("a")).toHaveAttribute(
+      "href",
+      "/api/auth/sso/org?email=alice%40example.com&org=org-123"
+    );
+
+    expect(screen.getByText("or")).toBeInTheDocument();
+  });
+
+  it("hides workspace SSO button after successful regular login", async () => {
+    const user = userEvent.setup();
+    mockApiFetch
+      .mockRejectedValueOnce(
+        new MockApiError(403, "sso_required", { orgId: "org-123", orgName: "Acme Corp" })
+      )
+      .mockResolvedValueOnce({ accessToken: "tok-456" });
+    renderLogin();
+
+    await user.type(screen.getByLabelText("Email"), "alice@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(screen.getByText("Sign in with SSO for Acme Corp")).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText("Password"));
+    await user.type(screen.getByLabelText("Password"), "correctpass1");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(mockSetAccessToken).toHaveBeenCalledWith("tok-456");
+    expect(mockNavigate).toHaveBeenCalledWith("/");
+    expect(screen.queryByText("Sign in with SSO for Acme Corp")).not.toBeInTheDocument();
   });
 });

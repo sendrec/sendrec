@@ -548,6 +548,49 @@ func TestUpdate_RetentionDays_Invalid(t *testing.T) {
 	}
 }
 
+func TestListOrganizations_ViewerExcludedFromCount(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, testBaseURL)
+
+	// The List query counts organization_members excluding viewers.
+	// An org with 3 owners/admins/members + 2 viewers → member_count = 3.
+	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, om\.role`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "role", "member_count"}).
+			AddRow("org-1", "Acme Corp", "acme-corp", "free", 0, "owner", int64(3)))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/organizations", handler.List)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/organizations", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var items []orgListItem
+	if err := json.Unmarshal(rec.Body.Bytes(), &items); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 organization, got %d", len(items))
+	}
+	// The List handler excludes viewers from member count (same as Limits handler).
+	if items[0].MemberCount != 3 {
+		t.Errorf("expected memberCount 3 (excluding viewers), got %d", items[0].MemberCount)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
 func TestGenerateSlug(t *testing.T) {
 	tests := []struct {
 		name string

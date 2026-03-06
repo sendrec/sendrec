@@ -1040,6 +1040,118 @@ func TestSaveConfig_ViewerBlocked(t *testing.T) {
 	}
 }
 
+func TestOrgCallback_Success(t *testing.T) {
+	server, _ := newOIDCTestServer(t)
+	defer server.Close()
+
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	encryptedSecret, err := integration.Encrypt(testEncryptionKey, "test-client-secret")
+	if err != nil {
+		t.Fatalf("encrypt client secret: %v", err)
+	}
+
+	// Load SSO config for the organization.
+	mock.ExpectQuery(`SELECT issuer_url, client_id, client_secret_encrypted FROM organization_sso_configs`).
+		WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"issuer_url", "client_id", "client_secret_encrypted"}).
+			AddRow(server.URL, "test-client-id", encryptedSecret))
+
+	// resolveUser: external identity lookup -- not found.
+	mock.ExpectQuery(`SELECT user_id FROM external_identities WHERE provider = \$1 AND external_id = \$2`).
+		WithArgs("org-1", "oidc-user-123").
+		WillReturnError(pgx.ErrNoRows)
+
+	// resolveUser: user lookup by email -- not found.
+	mock.ExpectQuery(`SELECT id, email_verified FROM users WHERE email = \$1`).
+		WithArgs("oidc@example.com").
+		WillReturnError(pgx.ErrNoRows)
+
+	// resolveUser: create user.
+	mock.ExpectQuery(`INSERT INTO users`).
+		WithArgs("oidc@example.com", "", "OIDC User").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-sso"))
+
+	// resolveUser: create external identity.
+	mock.ExpectExec(`INSERT INTO external_identities`).
+		WithArgs("user-uuid-sso", "org-1", "oidc-user-123", "oidc@example.com").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	// Auto-add user as organization member.
+	mock.ExpectExec(`INSERT INTO organization_members`).
+		WithArgs("org-1", "user-uuid-sso").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	// issueTokens: insert refresh token.
+	mock.ExpectExec(`INSERT INTO refresh_tokens`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-sso", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	state := "valid-org-state-12345"
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/org/callback?code=auth-code&state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	req.AddCookie(&http.Cookie{Name: "sso_org", Value: "org-1"})
+
+	rec := httptest.NewRecorder()
+	handler.OrgCallback(rec, req)
+
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusFound, rec.Body.String())
+	}
+
+	location := rec.Header().Get("Location")
+	if location == "" {
+		t.Fatal("Location header is empty")
+	}
+
+	if !strings.Contains(location, "/login?sso_token=") {
+		t.Fatalf("Location = %q, want to contain /login?sso_token=", location)
+	}
+
+	// Verify access token is valid.
+	parsed, parseErr := url.Parse(location)
+	if parseErr != nil {
+		t.Fatalf("parse location URL: %v", parseErr)
+	}
+	accessToken := parsed.Query().Get("sso_token")
+	claims, claimsErr := auth.ValidateToken(testJWTSecret, accessToken)
+	if claimsErr != nil {
+		t.Fatalf("access token validation failed: %v", claimsErr)
+	}
+	if claims.UserID != "user-uuid-sso" {
+		t.Errorf("claims.UserID = %q, want %q", claims.UserID, "user-uuid-sso")
+	}
+
+	// Verify refresh token cookie was set.
+	var refreshCookie *http.Cookie
+	var stateCleared, orgCleared bool
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "refresh_token" && c.Value != "" {
+			refreshCookie = c
+		}
+		if c.Name == "sso_state" && c.MaxAge < 0 {
+			stateCleared = true
+		}
+		if c.Name == "sso_org" && c.MaxAge < 0 {
+			orgCleared = true
+		}
+	}
+	if refreshCookie == nil {
+		t.Fatal("refresh_token cookie not set")
+	}
+	if !stateCleared {
+		t.Error("sso_state cookie was not cleared")
+	}
+	if !orgCleared {
+		t.Error("sso_org cookie was not cleared")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestUnlinkIdentity_AllowedWithPassword(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()

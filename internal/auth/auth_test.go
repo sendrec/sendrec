@@ -815,6 +815,103 @@ func TestLogin_OwnerExemptFromSSO(t *testing.T) {
 	}
 }
 
+func TestLogin_MultipleEnforcedOrgs_BlocksWithFirst(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctpassword"), bcrypt.DefaultCost)
+
+	mock.ExpectQuery(`SELECT id, password, email_verified FROM users WHERE email`).
+		WithArgs("alice@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "password", "email_verified"}).
+			AddRow("user-uuid-1", string(hashedPassword), true))
+
+	// User is member (not owner) of two orgs with SSO enforced; LIMIT 1 returns first
+	mock.ExpectQuery(`SELECT o.id, o.name FROM organization_sso_configs`).
+		WithArgs("user-uuid-1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name"}).AddRow("org-first", "First Corp"))
+
+	body := `{"email":"alice@example.com","password":"correctpassword"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.Login(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp["error"] != "sso_required" {
+		t.Errorf("expected error 'sso_required', got %q", resp["error"])
+	}
+	if resp["orgId"] != "org-first" {
+		t.Errorf("expected orgId 'org-first', got %q", resp["orgId"])
+	}
+	if resp["orgName"] != "First Corp" {
+		t.Errorf("expected orgName 'First Corp', got %q", resp["orgName"])
+	}
+	if !strings.Contains(resp["message"].(string), "First Corp") {
+		t.Errorf("expected message to contain org name 'First Corp', got %q", resp["message"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+func TestLogin_EnforcedSSO_OwnerOfOneOrgMemberOfAnother(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("correctpassword"), bcrypt.DefaultCost)
+
+	mock.ExpectQuery(`SELECT id, password, email_verified FROM users WHERE email`).
+		WithArgs("bob@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "password", "email_verified"}).
+			AddRow("user-uuid-2", string(hashedPassword), true))
+
+	// User owns org-a (excluded by WHERE role != 'owner'), but is member of org-b.
+	// The query only returns org-b because the owner role is filtered out.
+	mock.ExpectQuery(`SELECT o.id, o.name FROM organization_sso_configs`).
+		WithArgs("user-uuid-2").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name"}).AddRow("org-b", "Beta Inc"))
+
+	body := `{"email":"bob@example.com","password":"correctpassword"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.Login(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp["error"] != "sso_required" {
+		t.Errorf("expected error 'sso_required', got %q", resp["error"])
+	}
+	if resp["orgId"] != "org-b" {
+		t.Errorf("expected orgId 'org-b', got %q", resp["orgId"])
+	}
+	if resp["orgName"] != "Beta Inc" {
+		t.Errorf("expected orgName 'Beta Inc', got %q", resp["orgName"])
+	}
+	if !strings.Contains(resp["message"].(string), "Beta Inc") {
+		t.Errorf("expected message to contain org name 'Beta Inc', got %q", resp["message"])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
 // --- Refresh ---
 
 func TestRefresh_Success(t *testing.T) {
