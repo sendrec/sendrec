@@ -59,7 +59,7 @@ func TestSendPasswordReset_Success(t *testing.T) {
 	}
 }
 
-func TestSendPasswordReset_ServerError(t *testing.T) {
+func TestSendPasswordReset_ServerError_FallsBackToSendmail(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/subscribers" {
 			w.WriteHeader(http.StatusOK)
@@ -76,9 +76,10 @@ func TestSendPasswordReset_ServerError(t *testing.T) {
 		TemplateID: 5,
 	})
 
+	// Listmonk 500 triggers sendmail fallback (graceful, no error)
 	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
-	if err == nil {
-		t.Fatal("expected error for server error response")
+	if err != nil {
+		t.Fatalf("expected graceful fallback, got error: %v", err)
 	}
 }
 
@@ -1101,6 +1102,31 @@ func TestParseAllowlist(t *testing.T) {
 				t.Errorf("ParseAllowlist(%q)[%d]: got %q, want %q", tt.input, i, result[i], tt.expected[i])
 			}
 		}
+	}
+}
+
+func TestSendmail_FallbackOnListmonkError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:    srv.URL,
+		Username:   "admin",
+		Password:   "bad-token",
+		TemplateID: 5,
+	})
+
+	// Listmonk returns 403, should fall back to sendmail (or skip gracefully)
+	err := client.SendPasswordReset(context.Background(),
+		"alice@example.com", "Alice", "https://example.com/reset")
+	if err != nil {
+		t.Fatalf("expected graceful fallback on Listmonk error, got: %v", err)
 	}
 }
 

@@ -153,12 +153,14 @@ func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("send email: %w", err)
+		slog.Warn("listmonk request failed, falling back to sendmail", "error", err)
+		return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("listmonk returned status %d", resp.StatusCode)
+		slog.Warn("listmonk returned error, falling back to sendmail", "status", resp.StatusCode)
+		return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
 	}
 
 	return nil
