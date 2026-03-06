@@ -583,6 +583,69 @@ describe("OrgSettings", () => {
     expect(viewerOption!.getAttribute("value")).toBe("viewer");
   });
 
+  it("shows SCIM section for business plan", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business" })
+      .mockResolvedValueOnce({ issuerUrl: "", clientId: "", configured: false, enforceSso: false })
+      .mockResolvedValueOnce({ configured: false });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("SCIM Provisioning")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Generate SCIM Token" })).toBeInTheDocument();
+  });
+
+  it("shows SCIM token status when configured", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "business", role: "owner", memberCount: 3 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "business" })
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business" })
+      .mockResolvedValueOnce({ issuerUrl: "", clientId: "", configured: false, enforceSso: false })
+      .mockResolvedValueOnce({ configured: true, createdAt: "2026-03-06T00:00:00Z" });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Active/)).toBeInTheDocument();
+    });
+    expect(screen.getByText("SCIM Provisioning")).toBeInTheDocument();
+    expect(screen.getByText("SCIM Base URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate Token" })).toBeInTheDocument();
+  });
+
+  it("hides SCIM section for non-business plan", async () => {
+    mockOwnerResponses();
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("SCIM Provisioning")).not.toBeInTheDocument();
+  });
+
   it("role dropdown includes viewer for non-owner members", async () => {
     mockOwnerResponses();
     renderOrgSettings();
