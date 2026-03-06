@@ -32,7 +32,7 @@ test.describe.serial("Workspace Viewer Role", () => {
     await navigateToOrgSettings(page, workspaceId);
     await expect(page.getByLabel("Workspace name")).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(TEST_USER_2.email)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByLabel(`Role for ${TEST_USER_2.email}`)).toHaveValue("viewer");
+    await expect(page.getByLabel(`Role for ${TEST_USER_2.name}`)).toHaveValue("viewer");
   });
 
   test("viewer can browse library", async ({ page }) => {
