@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -114,7 +115,7 @@ jobs:
         run: go build -o bin/sendrec ./cmd/sendrec
 
   e2e:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
