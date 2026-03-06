@@ -1,0 +1,52 @@
+import { test, expect } from "@playwright/test";
+import { loginViaAPI } from "../helpers/auth";
+import { createWorkspace } from "../helpers/workspace";
+
+test.describe.serial("Workspace CRUD", () => {
+  let workspaceId: string;
+  const workspaceName = "E2E Test Workspace";
+
+  test.beforeEach(async ({ page }) => {
+    await loginViaAPI(page);
+  });
+
+  test("create workspace shows in org switcher", async ({ page }) => {
+    await page.goto("/");
+    const ws = await createWorkspace(page, workspaceName);
+    workspaceId = ws.id;
+
+    await page.goto("/");
+    await page.getByLabel("Switch workspace").click();
+    await expect(page.getByRole("option", { name: workspaceName })).toBeVisible();
+  });
+
+  test("workspace starts on Free plan", async ({ page }) => {
+    await page.goto(`/organizations/${workspaceId}/settings`);
+    await expect(page.getByText("Free")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("rename workspace", async ({ page }) => {
+    const newName = "Renamed Workspace";
+    const response = await page.request.patch(`/api/organizations/${workspaceId}`, {
+      data: { name: newName },
+    });
+    expect(response.ok()).toBeTruthy();
+
+    await page.goto(`/organizations/${workspaceId}/settings`);
+    await expect(page.locator(`input[value="${newName}"]`)).toBeVisible({ timeout: 5000 });
+  });
+
+  test("workspace settings shows owner in members list", async ({ page }) => {
+    await page.goto(`/organizations/${workspaceId}/settings`);
+    await expect(page.getByText("e2e@test.sendrec.local")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("delete workspace removes from org switcher", async ({ page }) => {
+    const response = await page.request.delete(`/api/organizations/${workspaceId}`);
+    expect(response.ok()).toBeTruthy();
+
+    await page.goto("/");
+    await page.getByLabel("Switch workspace").click();
+    await expect(page.getByRole("option", { name: "Renamed Workspace" })).not.toBeVisible();
+  });
+});

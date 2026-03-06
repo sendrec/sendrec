@@ -25,7 +25,9 @@ export async function truncateAllTables(): Promise<void> {
              folders, tags, video_tags, notification_preferences,
              api_keys, webhook_deliveries, user_branding,
              cta_clicks, view_milestones, video_viewers,
-             segment_engagement
+             segment_engagement, organizations, organization_members,
+             organization_invites, sso_configs, social_identities,
+             playlists, playlist_videos
     CASCADE
   `);
 }
