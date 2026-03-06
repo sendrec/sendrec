@@ -31,6 +31,12 @@ type Handlers struct {
 }
 
 func NewHandlers(db database.DBTX, creem *Client, baseURL, proProductID, orgProProductID, businessProductID, orgBusinessProductID, webhookSecret string) *Handlers {
+	if orgProProductID == "" {
+		orgProProductID = proProductID
+	}
+	if orgBusinessProductID == "" {
+		orgBusinessProductID = businessProductID
+	}
 	return &Handlers{
 		db:                   db,
 		creem:                creem,
