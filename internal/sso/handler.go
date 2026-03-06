@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -879,6 +880,59 @@ func (h *Handler) OrgSAMLCallback(w http.ResponseWriter, r *http.Request) {
 	h.setRefreshTokenCookie(w, refreshToken)
 	redirectURL := h.baseURL + "/login?sso_token=" + url.QueryEscape(accessToken)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+// SPMetadata serves the SAML Service Provider metadata XML for the given
+// organization. Identity providers use this to configure their side of the
+// SAML trust relationship.
+func (h *Handler) SPMetadata(w http.ResponseWriter, r *http.Request) {
+	orgID := chi.URLParam(r, "orgId")
+
+	var samlEntityID, samlSSOURL, samlCertificate *string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT saml_entity_id, saml_sso_url, saml_certificate
+		 FROM organization_sso_configs
+		 WHERE organization_id = $1 AND provider = 'saml'`,
+		orgID,
+	).Scan(&samlEntityID, &samlSSOURL, &samlCertificate)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			httputil.WriteError(w, http.StatusNotFound, "SAML configuration not found")
+			return
+		}
+		slog.Error("sso: failed to load SAML config for SP metadata", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to load SAML configuration")
+		return
+	}
+
+	if samlEntityID == nil || samlSSOURL == nil || samlCertificate == nil {
+		httputil.WriteError(w, http.StatusNotFound, "incomplete SAML configuration")
+		return
+	}
+
+	samlProvider, err := NewSAMLProvider(h.baseURL, orgID, &SAMLConfig{
+		EntityID:    *samlEntityID,
+		SSOURL:      *samlSSOURL,
+		Certificate: *samlCertificate,
+	})
+	if err != nil {
+		slog.Error("sso: failed to create SAML provider for SP metadata", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate SP metadata")
+		return
+	}
+
+	metadata := samlProvider.sp.Metadata()
+	xmlBytes, err := xml.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		slog.Error("sso: failed to marshal SP metadata", "error", err)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to generate SP metadata")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/samlmetadata+xml")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(xml.Header))
+	_, _ = w.Write(xmlBytes)
 }
 
 type identityResponse struct {

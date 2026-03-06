@@ -1179,6 +1179,78 @@ func TestOrgSAMLCallback_NotSAMLConfig(t *testing.T) {
 	}
 }
 
+// --- SPMetadata Tests ---
+
+func TestSPMetadata_ReturnsXML(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	// Parse test metadata to get the certificate.
+	cfg, err := ParseSAMLMetadataFromXML([]byte(testSAMLMetadataXML))
+	if err != nil {
+		t.Fatalf("parse test metadata: %v", err)
+	}
+
+	mock.ExpectQuery(`SELECT saml_entity_id, saml_sso_url, saml_certificate`).
+		WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"saml_entity_id", "saml_sso_url", "saml_certificate"}).
+			AddRow(strPtr(cfg.EntityID), strPtr(cfg.SSOURL), strPtr(cfg.Certificate)))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/saml/org-1/metadata", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	handler.SPMetadata(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	contentType := rec.Header().Get("Content-Type")
+	if contentType != "application/samlmetadata+xml" {
+		t.Errorf("Content-Type = %q, want %q", contentType, "application/samlmetadata+xml")
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "EntityDescriptor") {
+		t.Errorf("response body does not contain EntityDescriptor: %s", body[:min(200, len(body))])
+	}
+	if !strings.Contains(body, "AssertionConsumerService") {
+		t.Errorf("response body does not contain AssertionConsumerService: %s", body[:min(200, len(body))])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSPMetadata_NotFound(t *testing.T) {
+	handler, mock := newTestHandlerWithKey(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT saml_entity_id, saml_sso_url, saml_certificate`).
+		WithArgs("org-1").
+		WillReturnError(pgx.ErrNoRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/saml/org-1/metadata", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	handler.SPMetadata(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusNotFound, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestSaveConfig_WithEnforcement(t *testing.T) {
 	handler, mock := newTestHandlerWithKey(t)
 	defer mock.Close()
