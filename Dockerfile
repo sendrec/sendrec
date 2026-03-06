@@ -6,15 +6,7 @@ RUN corepack enable && pnpm install --frozen-lockfile
 COPY web/ .
 RUN pnpm build
 
-# Stage 2: Build whisper.cpp
-FROM alpine:3.21 AS whisper
-RUN apk add --no-cache build-base cmake git
-WORKDIR /build
-RUN git clone --depth 1 --branch v1.8.3 https://github.com/ggerganov/whisper.cpp.git . && \
-    cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF && \
-    cmake --build build --target whisper-cli -j$(nproc)
-
-# Stage 3: Build Go binary
+# Stage 2: Build Go binary
 FROM golang:1.25-alpine AS backend
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -24,16 +16,11 @@ COPY --from=frontend /app/web/dist ./web/dist
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${VERSION}" -o sendrec ./cmd/sendrec
 
-# Stage 4: Final image
-FROM alpine:3.21
-RUN apk add --no-cache ca-certificates ffmpeg libstdc++
-RUN addgroup -S sendrec && adduser -S sendrec -G sendrec
-WORKDIR /app
+# Stage 3: Final image (base includes whisper-cli, ffmpeg, RNNoise model)
+ARG BASE_IMAGE=alexneamtu/sendrec-base:latest
+FROM ${BASE_IMAGE}
 COPY --from=backend /app/sendrec .
-COPY --from=whisper /build/build/bin/whisper-cli /usr/local/bin/whisper-cli
 COPY docker-entrypoint.sh .
-RUN mkdir -p /app/models && \
-    wget -q -O /app/models/std.rnnn https://github.com/richardpl/arnndn-models/raw/master/std.rnnn
 USER sendrec
 EXPOSE 8080
 ENTRYPOINT ["./docker-entrypoint.sh"]
