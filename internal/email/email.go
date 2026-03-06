@@ -84,6 +84,9 @@ func ParseAllowlist(s string) []string {
 }
 
 func (c *Client) isAllowed(recipientEmail string) bool {
+	if c.config.DeveloperEmail != "" {
+		return true
+	}
 	if len(c.config.Allowlist) == 0 {
 		return true
 	}

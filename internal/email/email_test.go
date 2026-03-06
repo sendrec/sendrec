@@ -1168,6 +1168,46 @@ func TestSendmail_AllEmailTypesWork(t *testing.T) {
 	}
 }
 
+func TestDeveloperEmail_BypassesAllowlist(t *testing.T) {
+	var received txRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/subscribers" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("unmarshal body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:        srv.URL,
+		Username:       "admin",
+		Password:       "secret",
+		ViewTemplateID: 99,
+		Allowlist:      []string{"@sendrec.eu"},
+		DeveloperEmail: "dev@sendrec.eu",
+	})
+
+	// stranger@example.com would be blocked by the allowlist,
+	// but DEVELOPER_EMAIL bypasses it and redirects to dev@sendrec.eu
+	err := client.SendViewNotification(context.Background(),
+		"stranger@example.com", "Stranger", "Video", "https://example.com/watch/abc", 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if received.SubscriberEmail != "dev@sendrec.eu" {
+		t.Errorf("expected email redirected to dev@sendrec.eu, got %q", received.SubscriberEmail)
+	}
+}
+
 func TestDeveloperEmail_RedirectsAllEmails(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
