@@ -288,6 +288,77 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) PatchUser(w http.ResponseWriter, r *http.Request) {
+	orgID := chi.URLParam(r, "orgId")
+	userID := chi.URLParam(r, "id")
+
+	var patch SCIMPatchOp
+	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	for _, op := range patch.Operations {
+		if op.Op != "replace" {
+			continue
+		}
+
+		switch op.Path {
+		case "active":
+			active, ok := op.Value.(bool)
+			if !ok {
+				continue
+			}
+			if !active {
+				h.db.Exec(r.Context(),
+					"DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+					orgID, userID,
+				)
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			// Reactivate
+			h.db.Exec(r.Context(),
+				"INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+				orgID, userID, "member",
+			)
+
+		case "name.formatted":
+			if name, ok := op.Value.(string); ok {
+				h.db.Exec(r.Context(),
+					"UPDATE users SET name = $1 WHERE id = $2", name, userID,
+				)
+			}
+
+		case "userName":
+			if email, ok := op.Value.(string); ok {
+				h.db.Exec(r.Context(),
+					"UPDATE users SET email = $1 WHERE id = $2", email, userID,
+				)
+			}
+		}
+	}
+
+	user, err := h.fetchSCIMUser(r.Context(), userID, orgID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "User not found")
+		return
+	}
+	h.writeJSON(w, http.StatusOK, user)
+}
+
+func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	orgID := chi.URLParam(r, "orgId")
+	userID := chi.URLParam(r, "id")
+
+	h.db.Exec(r.Context(),
+		"DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+		orgID, userID,
+	)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // parseUserNameFilter extracts email from `userName eq "user@example.com"`.
 func parseUserNameFilter(filter string) string {
 	if filter == "" {

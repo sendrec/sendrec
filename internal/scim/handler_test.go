@@ -285,3 +285,116 @@ func TestListUsers_FilterByUserName(t *testing.T) {
 		t.Errorf("TotalResults = %d, want 1", resp.TotalResults)
 	}
 }
+
+func TestPatchUser_Deactivate(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectExec(`DELETE FROM organization_members WHERE organization_id = \$1 AND user_id = \$2`).
+		WithArgs("org-1", "user-1").
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	body := `{
+		"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+		"Operations": [{"op": "replace", "path": "active", "value": false}]
+	}`
+
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	rctx.URLParams.Add("id", "user-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rec := httptest.NewRecorder()
+
+	handler.PatchUser(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("got status %d, want 204; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPatchUser_Reactivate(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectExec(`INSERT INTO organization_members`).
+		WithArgs("org-1", "user-1", "member").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	mock.ExpectQuery(`SELECT u.id, u.email, u.name FROM users u`).
+		WithArgs("user-1", "org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email", "name"}).
+			AddRow("user-1", "jane@example.com", "Jane"))
+
+	body := `{
+		"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+		"Operations": [{"op": "replace", "path": "active", "value": true}]
+	}`
+
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	rctx.URLParams.Add("id", "user-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rec := httptest.NewRecorder()
+
+	handler.PatchUser(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("got status %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPatchUser_UpdateName(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectExec(`UPDATE users SET name = \$1`).
+		WithArgs("Jane Updated", "user-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	mock.ExpectQuery(`SELECT u.id, u.email, u.name FROM users u`).
+		WithArgs("user-1", "org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email", "name"}).
+			AddRow("user-1", "jane@example.com", "Jane Updated"))
+
+	body := `{
+		"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+		"Operations": [{"op": "replace", "path": "name.formatted", "value": "Jane Updated"}]
+	}`
+
+	req := httptest.NewRequest(http.MethodPatch, "/", strings.NewReader(body))
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	rctx.URLParams.Add("id", "user-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rec := httptest.NewRecorder()
+
+	handler.PatchUser(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("got status %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDeleteUser(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectExec(`DELETE FROM organization_members WHERE organization_id = \$1 AND user_id = \$2`).
+		WithArgs("org-1", "user-1").
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	rctx.URLParams.Add("id", "user-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rec := httptest.NewRecorder()
+
+	handler.DeleteUser(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("got status %d, want 204", rec.Code)
+	}
+}
