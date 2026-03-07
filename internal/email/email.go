@@ -320,11 +320,13 @@ func (c *Client) SendWelcome(ctx context.Context, toEmail, toName, dashboardURL 
 		Data: map[string]any{
 			"name":         toName,
 			"dashboardURL": dashboardURL,
+			"githubURL":    "https://github.com/sendrec/sendrec",
 		},
 		ContentType: "html",
 		subject:     "Welcome to SendRec",
 		Body: fmt.Sprintf(
-			`<p>Hi %s,</p><p>Welcome to SendRec! Your account is ready.</p><p><a href="%s">Go to dashboard</a></p>`,
+			`<p>Hi %s,</p><p>Welcome to SendRec! Your account is ready.</p><p><a href="%s">Go to dashboard</a></p>`+
+				`<p style="margin-top:16px;font-size:13px;color:#64748b;">SendRec is open source. If you find it useful, <a href="https://github.com/sendrec/sendrec">star us on GitHub</a>!</p>`,
 			toName, dashboardURL,
 		),
 	}

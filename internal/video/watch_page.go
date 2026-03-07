@@ -1654,7 +1654,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{end}}
         </script>
         {{end}}
-        {{if eq .SubscriptionPlan "pro"}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Shared via <a href="https://sendrec.eu">SendRec</a>{{if not .Branding.FooterText}} — open-source video messaging{{end}}</p>{{end}}
+        {{if or (eq .SubscriptionPlan "pro") (eq .SubscriptionPlan "business")}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}<a href="https://sendrec.eu">Recorded with SendRec</a> — free and open source</p>{{end}}
     </div>
 {{.AnalyticsScript}}
 </body>

@@ -2936,11 +2936,14 @@ func TestWatchPageFreeUserAlwaysShowsSendRecBadge(t *testing.T) {
 	}
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "Shared via") {
-		t.Error("free user with custom footer should still show 'Shared via SendRec'")
+	if !strings.Contains(body, "Recorded with SendRec") {
+		t.Error("free user with custom footer should still show 'Recorded with SendRec'")
 	}
-	if !strings.Contains(body, "sendrec.eu") {
+	if !strings.Contains(body, `href="https://sendrec.eu"`) {
 		t.Error("free user should have SendRec link in footer")
+	}
+	if !strings.Contains(body, "free and open source") {
+		t.Error("free user footer should include 'free and open source'")
 	}
 }
 
@@ -2987,8 +2990,56 @@ func TestWatchPageProUserCanRemoveSendRecBadge(t *testing.T) {
 	if !strings.Contains(body, "Pro Company Footer") {
 		t.Error("pro user should see their custom footer")
 	}
-	if strings.Contains(body, "Shared via") {
-		t.Error("pro user with custom footer should NOT show 'Shared via SendRec'")
+	if strings.Contains(body, "Recorded with SendRec") {
+		t.Error("pro user with custom footer should NOT show 'Recorded with SendRec'")
+	}
+}
+
+func TestWatchPageBusinessUserCanRemoveSendRecBadge(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "biz-badge-tkn"
+	customFooter := "Business Company Footer"
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"video-id", "Test Video", "file.webm", "User", time.Now(), (*time.Time)(nil),
+			(*string)(nil), (*string)(nil), "anonymous",
+			(*string)(nil), (*string)(nil), "none",
+			"user-id", "user@test.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), &customFooter, (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+			false,
+			(*string)(nil), (*string)(nil), "none",
+			0,
+			"business",
+			"ready",
+			(*string)(nil),
+		))
+	expectViewRecording(mock, "video-id")
+
+	req := watchPageRequest(shareToken)
+	rec := serveWatchPage(handler, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Business Company Footer") {
+		t.Error("business user should see their custom footer")
+	}
+	if strings.Contains(body, "Recorded with SendRec") {
+		t.Error("business user with custom footer should NOT show 'Recorded with SendRec'")
 	}
 }
 

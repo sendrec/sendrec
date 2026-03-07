@@ -3,6 +3,7 @@
 The async video platform built for Europe. Open source, GDPR native, EU hosted.
 
 ![SendRec — The async video platform built for Europe](.github/screenshots/landing-hero.png)
+<!-- TODO: Add animated demo GIF showing record → share → watch flow -->
 
 ## What is SendRec?
 
@@ -67,14 +68,56 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 
 ## Quick Start
 
+### Docker Compose
+
+Create a `docker-compose.yml` and run `docker compose up -d`:
+
+```yaml
+services:
+  sendrec:
+    image: ghcr.io/sendrec/sendrec:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://sendrec:secret@postgres:5432/sendrec?sslmode=disable
+      - JWT_SECRET=change-me-to-a-long-random-string
+      - BASE_URL=http://localhost:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: sendrec
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: sendrec
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sendrec"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+volumes:
+  db-data:
+```
+
+Open http://localhost:8080, register an account, and start recording.
+
+For S3 storage, transcription, and production setup, see the [Self-Hosting Guide](SELF-HOSTING.md).
+
+### One-Click Deploy
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/sendrec)
+
+### From Source
+
 ```bash
 git clone https://github.com/sendrec/sendrec.git
 cd sendrec
 cp .env.example .env
 docker compose -f docker-compose.dev.yml up --build
 ```
-
-Open http://localhost:8080, register an account, and start recording.
 
 ## Development
 

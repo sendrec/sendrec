@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -644,6 +645,9 @@ func TestSendWelcome_Success(t *testing.T) {
 	if received.Data["dashboardURL"] != "https://app.sendrec.eu/dashboard" {
 		t.Errorf("expected dashboardURL, got %v", received.Data["dashboardURL"])
 	}
+	if received.Data["githubURL"] != "https://github.com/sendrec/sendrec" {
+		t.Errorf("expected githubURL, got %v", received.Data["githubURL"])
+	}
 }
 
 func TestSendWelcome_FallbackBodyWhenTemplateIDZero(t *testing.T) {
@@ -676,6 +680,9 @@ func TestSendWelcome_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 	}
 	if received.Body == "" {
 		t.Error("expected inline body when template ID is zero")
+	}
+	if !strings.Contains(received.Body, "github.com/sendrec/sendrec") {
+		t.Error("expected GitHub star link in fallback welcome body")
 	}
 }
 
