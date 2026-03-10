@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
-import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ConfirmDialog, ConfirmDialogState } from "../components/ConfirmDialog";
 import { LimitsResponse } from "../types/limits";
 import { formatDate } from "../utils/format";
 
@@ -29,10 +29,7 @@ export function Playlists() {
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
-  const [confirmDialog, setConfirmDialog] = useState<{
-    message: string;
-    onConfirm: () => void;
-  } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 

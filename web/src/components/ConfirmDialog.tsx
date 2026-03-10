@@ -1,12 +1,15 @@
 import { useEffect, useRef } from "react";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 
-interface ConfirmDialogProps {
+export interface ConfirmDialogState {
   message: string;
   onConfirm: () => void;
-  onCancel: () => void;
   confirmLabel?: string;
   danger?: boolean;
+}
+
+interface ConfirmDialogProps extends ConfirmDialogState {
+  onCancel: () => void;
 }
 
 export function ConfirmDialog({

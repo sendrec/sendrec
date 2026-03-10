@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
-import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ConfirmDialog, ConfirmDialogState } from "../components/ConfirmDialog";
 import { useOrganization } from "../hooks/useOrganization";
 
 interface OrgDetail {
@@ -112,12 +112,7 @@ export function OrgSettings() {
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const [confirmDialog, setConfirmDialog] = useState<{
-    message: string;
-    confirmLabel?: string;
-    danger?: boolean;
-    onConfirm: () => void;
-  } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   useEffect(() => {
     if (orgsLoading) return;

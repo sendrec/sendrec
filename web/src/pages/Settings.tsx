@@ -4,7 +4,7 @@ import { apiFetch, setAccessToken } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
-import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ConfirmDialog, ConfirmDialogState } from "../components/ConfirmDialog";
 import { LimitsResponse } from "../types/limits";
 import { providerLabel } from "../utils/sso";
 
@@ -124,12 +124,7 @@ export function Settings() {
   const [billingEnabled, setBillingEnabled] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [canceling, setCanceling] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    message: string;
-    onConfirm: () => void;
-    confirmLabel?: string;
-    danger?: boolean;
-  } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [billingMessage, setBillingMessage] = useState("");
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
   const [transcriptionLanguage, setTranscriptionLanguage] = useState("auto");
@@ -1854,10 +1849,7 @@ function DangerZone() {
   const navigate = useNavigate();
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  const [confirmDialog, setConfirmDialog] = useState<{
-    message: string;
-    onConfirm: () => void;
-  } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   async function handleSignOut() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
