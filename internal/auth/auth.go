@@ -19,6 +19,7 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
 	"github.com/sendrec/sendrec/internal/languages"
+	"github.com/sendrec/sendrec/internal/validate"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -120,13 +121,8 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Password) < 8 {
-		httputil.WriteError(w, http.StatusBadRequest, "password must be at least 8 characters")
-		return
-	}
-
-	if len(req.Password) > 72 {
-		httputil.WriteError(w, http.StatusBadRequest, "password must be at most 72 characters")
+	if msg := validate.Password(req.Password); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -392,13 +388,8 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Password) < 8 {
-		httputil.WriteError(w, http.StatusBadRequest, "password must be at least 8 characters")
-		return
-	}
-
-	if len(req.Password) > 72 {
-		httputil.WriteError(w, http.StatusBadRequest, "password must be at most 72 characters")
+	if msg := validate.Password(req.Password); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -649,9 +640,8 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if hasRetentionChange {
-		validRetentionDays := map[int]bool{0: true, 30: true, 60: true, 90: true, 180: true, 365: true}
-		if !validRetentionDays[*req.RetentionDays] {
-			httputil.WriteError(w, http.StatusBadRequest, "invalid retention days: must be 0, 30, 60, 90, 180, or 365")
+		if msg := validate.RetentionDays(*req.RetentionDays); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 		if _, err := h.db.Exec(r.Context(),
@@ -669,13 +659,8 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if len(req.NewPassword) < 8 {
-			httputil.WriteError(w, http.StatusBadRequest, "password must be at least 8 characters")
-			return
-		}
-
-		if len(req.NewPassword) > 72 {
-			httputil.WriteError(w, http.StatusBadRequest, "password must be at most 72 characters")
+		if msg := validate.Password(req.NewPassword); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 
