@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { useOrganization } from "../hooks/useOrganization";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
+import { useToast } from "../hooks/useToast";
 import { TrimModal } from "../components/TrimModal";
 import { FillerRemovalModal } from "../components/FillerRemovalModal";
 import { SilenceRemovalModal } from "../components/SilenceRemovalModal";
 import { DocumentModal } from "../components/DocumentModal";
+import { Toast } from "../components/Toast";
 import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
-import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ConfirmDialog, ConfirmDialogState } from "../components/ConfirmDialog";
 import { PromptDialog } from "../components/PromptDialog";
 import { LimitsResponse } from "../types/limits";
 import type { Video, VideoTag, Folder, Tag } from "../types/video";
@@ -109,8 +111,7 @@ export function VideoDetail() {
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
 
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toast = useToast();
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -124,12 +125,7 @@ export function VideoDetail() {
   const [showSilenceModal, setShowSilenceModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [documentContent, setDocumentContent] = useState<string | null>(null);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    message: string;
-    onConfirm: () => void;
-    confirmLabel?: string;
-    danger?: boolean;
-  } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [promptDialog, setPromptDialog] = useState<{
     title: string;
     onSubmit: (value: string) => void;
@@ -219,12 +215,6 @@ export function VideoDetail() {
       .catch(() => {});
   }, [id]);
 
-  function showToast(message: string) {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(message);
-    toastTimer.current = setTimeout(() => setToast(null), 2000);
-  }
-
   async function createIssue(provider: string) {
     if (!video) return;
     setCreatingIssue(true);
@@ -235,11 +225,11 @@ export function VideoDetail() {
         { method: "POST", body: JSON.stringify({ provider }) },
       );
       if (result) {
-        showToast(`Issue created: ${result.issueKey}`);
+        toast.show(`Issue created: ${result.issueKey}`);
         window.open(result.issueUrl, "_blank", "noopener");
       }
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to create issue");
+      toast.show(err instanceof Error ? err.message : "Failed to create issue");
     } finally {
       setCreatingIssue(false);
     }
@@ -263,14 +253,14 @@ export function VideoDetail() {
   async function copyLink() {
     if (!video) return;
     await copyToClipboard(video.shareUrl);
-    showToast("Link copied");
+    toast.show("Link copied");
   }
 
   async function copyEmbed() {
     if (!video) return;
     const snippet = `<iframe src="${window.location.origin}/embed/${video.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
     await copyToClipboard(snippet);
-    showToast("Embed code copied");
+    toast.show("Embed code copied");
   }
 
   async function toggleDownload() {
@@ -304,7 +294,7 @@ export function VideoDetail() {
     });
     if (resp) {
       setVideo((prev) => (prev ? { ...prev, pinned: resp.pinned } : prev));
-      showToast(resp.pinned ? "Video pinned" : "Video unpinned");
+      toast.show(resp.pinned ? "Video pinned" : "Video unpinned");
     }
   }
 
@@ -322,7 +312,7 @@ export function VideoDetail() {
     if (!video) return;
     await apiFetch(`/api/videos/${video.id}/extend`, { method: "POST" });
     await refetchVideo();
-    showToast("Link extended");
+    toast.show("Link extended");
   }
 
   function addPassword() {
@@ -383,9 +373,9 @@ export function VideoDetail() {
         prev ? { ...prev, ctaText, ctaUrl } : prev,
       );
       setCtaFormOpen(false);
-      showToast("CTA saved");
+      toast.show("CTA saved");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to save CTA");
+      toast.show(err instanceof Error ? err.message : "Failed to save CTA");
     }
   }
 
@@ -399,7 +389,7 @@ export function VideoDetail() {
       prev ? { ...prev, ctaText: null, ctaUrl: null } : prev,
     );
     setCtaFormOpen(false);
-    showToast("CTA removed");
+    toast.show("CTA removed");
   }
 
   async function saveTitle() {
@@ -427,7 +417,7 @@ export function VideoDetail() {
       prev ? { ...prev, transcriptStatus: "pending" } : prev,
     );
     setTranscriptSegments([]);
-    showToast("Transcription queued");
+    toast.show("Transcription queued");
   }
 
   async function summarize() {
@@ -436,7 +426,7 @@ export function VideoDetail() {
     setVideo((prev) =>
       prev ? { ...prev, summaryStatus: "pending" } : prev,
     );
-    showToast("Summary queued");
+    toast.show("Summary queued");
   }
 
   async function viewDocument() {
@@ -454,7 +444,7 @@ export function VideoDetail() {
     setVideo((prev) =>
       prev ? { ...prev, documentStatus: "pending" } : prev,
     );
-    showToast("Document generation queued");
+    toast.show("Document generation queued");
   }
 
   useEffect(() => {
@@ -480,7 +470,7 @@ export function VideoDetail() {
         ? { ...prev, title: prev.suggestedTitle!, suggestedTitle: null }
         : prev,
     );
-    showToast("Title updated");
+    toast.show("Title updated");
   }
 
   async function dismissSuggestedTitle() {
@@ -516,7 +506,7 @@ export function VideoDetail() {
       });
       if (!uploadResp.ok) return;
       await refetchVideo();
-      showToast("Thumbnail updated");
+      toast.show("Thumbnail updated");
     } finally {
       setUploadingThumbnail(false);
     }
@@ -530,7 +520,7 @@ export function VideoDetail() {
         method: "DELETE",
       });
       await refetchVideo();
-      showToast("Thumbnail reset");
+      toast.show("Thumbnail reset");
     } finally {
       setUploadingThumbnail(false);
     }
@@ -2042,7 +2032,7 @@ export function VideoDetail() {
               prev ? { ...prev, status: "processing" } : prev,
             );
             setShowFillerModal(false);
-            showToast("Removing filler words...");
+            toast.show("Removing filler words...");
           }}
         />
       )}
@@ -2059,7 +2049,7 @@ export function VideoDetail() {
               prev ? { ...prev, status: "processing" } : prev,
             );
             setShowSilenceModal(false);
-            showToast("Removing silent pauses...");
+            toast.show("Removing silent pauses...");
           }}
         />
       )}
@@ -2072,31 +2062,7 @@ export function VideoDetail() {
         />
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: "fixed",
-            bottom: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--color-surface)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: "10px 20px",
-            fontSize: 14,
-            fontWeight: 500,
-            zIndex: 200,
-            boxShadow: "0 4px 16px var(--color-shadow)",
-            pointerEvents: "none",
-          }}
-        >
-          {toast}
-        </div>
-      )}
+      <Toast message={toast.message} />
 
       {confirmDialog && (
         <ConfirmDialog

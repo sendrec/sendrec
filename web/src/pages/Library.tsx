@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
-import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ConfirmDialog, ConfirmDialogState } from "../components/ConfirmDialog";
+import { Toast } from "../components/Toast";
 import { TransferDialog } from "../components/TransferDialog";
 import { useOrganization } from "../hooks/useOrganization";
+import { useToast } from "../hooks/useToast";
 import { LimitsResponse } from "../types/limits";
 import type { Video, VideoTag, Folder, Tag } from "../types/video";
 import { formatDuration, formatDate, expiryLabel } from "../utils/format";
@@ -21,8 +23,7 @@ export function Library() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toast = useToast();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -44,12 +45,7 @@ export function Library() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
   const [transferVideoId, setTransferVideoId] = useState<string | null>(null);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    message: string;
-    onConfirm: () => void;
-    confirmLabel?: string;
-    danger?: boolean;
-  } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [viewMode, setViewModeState] = useState<"grid" | "list">(() => {
     const stored = localStorage.getItem("library-view");
     return stored === "list" ? "list" : "grid";
@@ -167,12 +163,6 @@ export function Library() {
     fetchVideosAndLimits(searchQuery, filter);
   }
 
-  function showToast(message: string) {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(message);
-    toastTimer.current = setTimeout(() => setToast(null), 2000);
-  }
-
   function deleteVideo(id: string) {
     setConfirmDialog({
       message: "Delete this recording? This cannot be undone.",
@@ -194,7 +184,7 @@ export function Library() {
 
   async function copyLink(shareUrl: string) {
     await copyToClipboard(shareUrl);
-    showToast("Link copied");
+    toast.show("Link copied");
   }
 
   async function togglePin(id: string) {
@@ -202,10 +192,10 @@ export function Library() {
       const resp = await apiFetch<{ pinned: boolean }>(`/api/videos/${id}/pin`, { method: "PUT" });
       if (resp) {
         setVideos((prev) => prev.map((v) => v.id === id ? { ...v, pinned: resp.pinned } : v));
-        showToast(resp.pinned ? "Video pinned" : "Video unpinned");
+        toast.show(resp.pinned ? "Video pinned" : "Video unpinned");
       }
     } catch {
-      showToast("Failed to update pin");
+      toast.show("Failed to update pin");
     }
   }
 
@@ -293,11 +283,11 @@ export function Library() {
             method: "POST",
             body: JSON.stringify({ videoIds: Array.from(selectedIds) }),
           });
-          showToast(`Deleted ${count} video(s)`);
+          toast.show(`Deleted ${count} video(s)`);
           setSelectedIds(new Set());
           fetchVideosAndLimits(searchQuery, activeFilter);
         } catch {
-          showToast("Failed to delete videos");
+          toast.show("Failed to delete videos");
         } finally {
           setBatchLoading(false);
         }
@@ -312,12 +302,12 @@ export function Library() {
         method: "POST",
         body: JSON.stringify({ videoIds: Array.from(selectedIds), folderId }),
       });
-      showToast("Moved videos");
+      toast.show("Moved videos");
       setSelectedIds(new Set());
       fetchVideosAndLimits(searchQuery, activeFilter);
       fetchFoldersAndTags();
     } catch {
-      showToast("Failed to move videos");
+      toast.show("Failed to move videos");
     } finally {
       setBatchLoading(false);
     }
@@ -330,12 +320,12 @@ export function Library() {
         method: "POST",
         body: JSON.stringify({ videoIds: Array.from(selectedIds), tagIds }),
       });
-      showToast("Updated tags");
+      toast.show("Updated tags");
       setSelectedIds(new Set());
       fetchVideosAndLimits(searchQuery, activeFilter);
       fetchFoldersAndTags();
     } catch {
-      showToast("Failed to update tags");
+      toast.show("Failed to update tags");
     } finally {
       setBatchLoading(false);
     }
@@ -874,30 +864,7 @@ export function Library() {
         </div>
       </div>
 
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: "fixed",
-            bottom: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--color-surface)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: "10px 20px",
-            fontSize: 14,
-            fontWeight: 500,
-            zIndex: 200,
-            boxShadow: "0 4px 16px var(--color-shadow)",
-            pointerEvents: "none",
-          }}
-        >
-          {toast}
-        </div>
-      )}
+      <Toast message={toast.message} />
 
       {confirmDialog && (
         <ConfirmDialog
@@ -915,7 +882,7 @@ export function Library() {
           videoTitle={videos.find((v) => v.id === transferVideoId)?.title ?? "Untitled"}
           onTransferred={() => {
             setTransferVideoId(null);
-            showToast("Video moved");
+            toast.show("Video moved");
             fetchVideosAndLimits(searchQuery, activeFilter);
           }}
           onCancel={() => setTransferVideoId(null)}

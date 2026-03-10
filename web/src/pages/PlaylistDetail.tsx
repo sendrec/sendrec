@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
-import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ConfirmDialog, ConfirmDialogState } from "../components/ConfirmDialog";
 import { PromptDialog } from "../components/PromptDialog";
+import { Toast } from "../components/Toast";
+import { useToast } from "../hooks/useToast";
 import { formatDuration } from "../utils/format";
 import { copyToClipboard } from "../utils/clipboard";
 
@@ -66,14 +68,8 @@ export function PlaylistDetail() {
 
   const [videoSearch, setVideoSearch] = useState("");
 
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    message: string;
-    onConfirm: () => void;
-    confirmLabel?: string;
-    danger?: boolean;
-  } | null>(null);
+  const toast = useToast();
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [promptDialog, setPromptDialog] = useState<{
     title: string;
     onSubmit: (value: string) => void;
@@ -99,12 +95,6 @@ export function PlaylistDetail() {
   useEffect(() => {
     fetchPlaylist();
   }, [fetchPlaylist]);
-
-  function showToast(message: string) {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(message);
-    toastTimer.current = setTimeout(() => setToast(null), 2000);
-  }
 
   async function saveTitle() {
     if (!playlist) return;
@@ -144,7 +134,7 @@ export function PlaylistDetail() {
       body: JSON.stringify({ isShared: newValue }),
     });
     await fetchPlaylist();
-    showToast(newValue ? "Sharing enabled" : "Sharing disabled");
+    toast.show(newValue ? "Sharing enabled" : "Sharing disabled");
   }
 
   async function toggleEmailGate() {
@@ -172,7 +162,7 @@ export function PlaylistDetail() {
           body: JSON.stringify({ sharePassword: password }),
         });
         setPlaylist((prev) => (prev ? { ...prev, hasPassword: true } : prev));
-        showToast("Password set");
+        toast.show("Password set");
       },
     });
   }
@@ -190,7 +180,7 @@ export function PlaylistDetail() {
           body: JSON.stringify({ sharePassword: "" }),
         });
         setPlaylist((prev) => (prev ? { ...prev, hasPassword: false } : prev));
-        showToast("Password removed");
+        toast.show("Password removed");
       },
     });
   }
@@ -260,9 +250,9 @@ export function PlaylistDetail() {
       setShowAddVideos(false);
       setSelectedVideoIds(new Set());
       await fetchPlaylist();
-      showToast(`Added ${selectedVideoIds.size} video(s)`);
+      toast.show(`Added ${selectedVideoIds.size} video(s)`);
     } catch {
-      showToast("Failed to add videos");
+      toast.show("Failed to add videos");
     } finally {
       setAddingVideos(false);
     }
@@ -694,7 +684,7 @@ export function PlaylistDetail() {
                 <button
                   onClick={() => {
                     copyToClipboard(playlist.shareUrl!);
-                    showToast("Link copied");
+                    toast.show("Link copied");
                   }}
                   className="detail-btn"
                 >
@@ -729,7 +719,7 @@ export function PlaylistDetail() {
                     copyToClipboard(
                       `<iframe src="${window.location.origin}/embed/playlist/${playlist.shareToken}" width="800" height="450" frameborder="0" allowfullscreen></iframe>`,
                     );
-                    showToast("Embed code copied");
+                    toast.show("Embed code copied");
                   }}
                   className="detail-btn"
                 >
@@ -944,31 +934,7 @@ export function PlaylistDetail() {
         </div>
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: "fixed",
-            bottom: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--color-surface)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 8,
-            padding: "10px 20px",
-            fontSize: 14,
-            fontWeight: 500,
-            zIndex: 200,
-            boxShadow: "0 4px 16px var(--color-shadow)",
-            pointerEvents: "none",
-          }}
-        >
-          {toast}
-        </div>
-      )}
+      <Toast message={toast.message} />
 
       {confirmDialog && (
         <ConfirmDialog
