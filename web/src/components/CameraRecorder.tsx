@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRecording, MIN_RECORDING_SECONDS, MIN_RECORDING_BYTES } from "../hooks/useRecording";
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
-
-const MIN_RECORDING_SECONDS = 1;
-const MIN_RECORDING_BYTES = 1024;
-
-type RecordingState = "idle" | "countdown" | "recording" | "paused" | "stopped";
 
 interface CameraRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
@@ -14,9 +10,6 @@ interface CameraRecorderProps {
 }
 
 export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurationSeconds = 0 }: CameraRecorderProps) {
-  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
-  const [duration, setDuration] = useState(0);
-  const [countdownValue, setCountdownValue] = useState(3);
   const countdownEnabled = useRef(localStorage.getItem("recording-countdown") !== "false");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -25,11 +18,6 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const startTimeRef = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>);
-  const countdownTimerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>);
-  const pauseStartRef = useRef(0);
-  const totalPausedRef = useRef(0);
   const mimeTypeRef = useRef("");
 
   const stopStream = useCallback(() => {
@@ -39,26 +27,40 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     }
   }, []);
 
-  const elapsedSeconds = useCallback(() => {
-    return Math.floor((Date.now() - startTimeRef.current - totalPausedRef.current) / 1000);
-  }, []);
+  // Stable refs for callbacks passed to useRecording to avoid stale closure issues
+  const stopRecordingRef = useRef<() => void>(() => {});
+  const beginRecordingRef = useRef<() => void>(() => {});
 
-  const startTimer = useCallback(() => {
-    timerRef.current = setInterval(() => {
-      setDuration(elapsedSeconds());
-    }, 1000);
-  }, [elapsedSeconds]);
+  const recording = useRecording(
+    maxDurationSeconds,
+    () => beginRecordingRef.current(),
+    () => stopRecordingRef.current(),
+  );
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       if (mediaRecorderRef.current.state === "paused") {
-        totalPausedRef.current += Date.now() - pauseStartRef.current;
+        recording.totalPausedRef.current += Date.now() - recording.pauseStartRef.current;
       }
       mediaRecorderRef.current.stop();
     }
-    clearInterval(timerRef.current);
-    setRecordingState("stopped");
-  }, []);
+    recording.stopTimer();
+    recording.setState("stopped");
+  }, [recording]);
+
+  const beginRecording = useCallback(() => {
+    clearInterval(recording.countdownTimerRef.current);
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.start(1000);
+    }
+    recording.startTimeRef.current = Date.now();
+    recording.setState("recording");
+    recording.startTimer();
+  }, [recording]);
+
+  // Keep stable callback refs up to date
+  stopRecordingRef.current = stopRecording;
+  beginRecordingRef.current = beginRecording;
 
   useEffect(() => {
     async function startPreview() {
@@ -81,45 +83,12 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     startPreview();
   }, [facingMode, stopStream]);
 
-  const beginRecording = useCallback(() => {
-    clearInterval(countdownTimerRef.current);
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.start(1000);
-    }
-    startTimeRef.current = Date.now();
-    setDuration(0);
-    startTimer();
-    setRecordingState("recording");
-  }, [startTimer]);
-
-  useEffect(() => {
-    if (recordingState !== "countdown") return;
-    countdownTimerRef.current = setInterval(() => {
-      setCountdownValue((prev) => {
-        if (prev <= 1) {
-          beginRecording();
-          return 3;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(countdownTimerRef.current);
-  }, [recordingState, beginRecording]);
-
-  useEffect(() => {
-    if (
-      recordingState === "recording" &&
-      maxDurationSeconds > 0 &&
-      duration >= maxDurationSeconds
-    ) {
-      stopRecording();
-    }
-  }, [duration, maxDurationSeconds, recordingState, stopRecording]);
+  const stopTimerRef = useRef(recording.stopTimer);
+  stopTimerRef.current = recording.stopTimer;
 
   useEffect(() => {
     return () => {
-      clearInterval(timerRef.current);
-      clearInterval(countdownTimerRef.current);
+      stopTimerRef.current();
       stopStream();
     };
   }, [stopStream]);
@@ -137,8 +106,8 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     const recorder = new MediaRecorder(streamRef.current, { mimeType });
     mediaRecorderRef.current = recorder;
     chunksRef.current = [];
-    pauseStartRef.current = 0;
-    totalPausedRef.current = 0;
+    recording.pauseStartRef.current = 0;
+    recording.totalPausedRef.current = 0;
 
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -148,7 +117,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
 
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeType) });
-      const elapsed = elapsedSeconds();
+      const elapsed = recording.elapsedSeconds();
 
       if (elapsed < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES) {
         onRecordingError?.("Recording too short. Please record for at least 1 second.");
@@ -159,8 +128,8 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     };
 
     if (countdownEnabled.current) {
-      setCountdownValue(3);
-      setRecordingState("countdown");
+      recording.setCountdown(3);
+      recording.setState("countdown");
     } else {
       beginRecording();
     }
@@ -169,27 +138,23 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
   function pauseRecording() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.pause();
-      pauseStartRef.current = Date.now();
-      clearInterval(timerRef.current);
-      setRecordingState("paused");
+      recording.pauseStartRef.current = Date.now();
+      recording.stopTimer();
+      recording.setState("paused");
     }
   }
 
   function resumeRecording() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
-      totalPausedRef.current += Date.now() - pauseStartRef.current;
+      recording.totalPausedRef.current += Date.now() - recording.pauseStartRef.current;
       mediaRecorderRef.current.resume();
-      startTimer();
-      setRecordingState("recording");
+      recording.startTimer();
+      recording.setState("recording");
     }
   }
 
-  const isIdle = recordingState === "idle";
-  const isCountdown = recordingState === "countdown";
-  const isPaused = recordingState === "paused";
-  const isActive = !isIdle && recordingState !== "stopped";
-  const isRecording = recordingState === "recording" || isPaused;
-  const remaining = maxDurationSeconds > 0 ? maxDurationSeconds - duration : null;
+  const { elapsed: duration, countdown: countdownValue,
+    isIdle, isCountdown, isPaused, isActive, isRecording, remaining } = recording;
 
   if (cameraError) {
     return (
