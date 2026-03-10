@@ -5,57 +5,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { TransferDialog } from "../components/TransferDialog";
 import { useOrganization } from "../hooks/useOrganization";
 import { LimitsResponse } from "../types/limits";
-
-interface Video {
-  id: string;
-  title: string;
-  status: string;
-  duration: number;
-  shareToken: string;
-  shareUrl: string;
-  createdAt: string;
-  shareExpiresAt: string | null;
-  viewCount: number;
-  uniqueViewCount: number;
-  thumbnailUrl?: string;
-  hasPassword: boolean;
-  commentMode: string;
-  commentCount: number;
-  transcriptStatus: string;
-  viewNotification: string | null;
-  downloadEnabled: boolean;
-  emailGateEnabled: boolean;
-  ctaText: string | null;
-  ctaUrl: string | null;
-  suggestedTitle: string | null;
-  summaryStatus: string;
-  folderId: string | null;
-  pinned: boolean;
-  tags: VideoTag[];
-}
-
-
-interface Folder {
-  id: string;
-  name: string;
-  position: number;
-  videoCount: number;
-  createdAt: string;
-}
-
-interface Tag {
-  id: string;
-  name: string;
-  color: string | null;
-  videoCount: number;
-  createdAt: string;
-}
-
-interface VideoTag {
-  id: string;
-  name: string;
-  color: string | null;
-}
+import type { Video, VideoTag, Folder, Tag } from "../types/video";
 
 interface Playlist {
   id: string;

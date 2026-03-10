@@ -11,61 +11,7 @@ import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PromptDialog } from "../components/PromptDialog";
 import { LimitsResponse } from "../types/limits";
-
-interface VideoTag {
-  id: string;
-  name: string;
-  color: string | null;
-}
-
-interface Video {
-  id: string;
-  title: string;
-  status: string;
-  duration: number;
-  shareToken: string;
-  shareUrl: string;
-  createdAt: string;
-  shareExpiresAt: string | null;
-  viewCount: number;
-  uniqueViewCount: number;
-  thumbnailUrl?: string;
-  hasPassword: boolean;
-  commentMode: string;
-  commentCount: number;
-  transcriptStatus: string;
-  viewNotification: string | null;
-  downloadEnabled: boolean;
-  emailGateEnabled: boolean;
-  ctaText: string | null;
-  ctaUrl: string | null;
-  suggestedTitle: string | null;
-  summaryStatus: string;
-  document?: string;
-  documentStatus: string;
-  folderId: string | null;
-  transcriptionLanguage: string | null;
-  noiseReduction: boolean;
-  pinned: boolean;
-  tags: VideoTag[];
-  playlists: { id: string; title: string }[];
-}
-
-interface Folder {
-  id: string;
-  name: string;
-  position: number;
-  videoCount: number;
-  createdAt: string;
-}
-
-interface Tag {
-  id: string;
-  name: string;
-  color: string | null;
-  videoCount: number;
-  createdAt: string;
-}
+import type { Video, VideoTag, Folder, Tag } from "../types/video";
 
 interface PlaylistInfo {
   id: string;
@@ -734,14 +680,14 @@ export function VideoDetail() {
 
   async function togglePlaylist(playlistId: string) {
     if (!video) return;
-    const isInPlaylist = video.playlists.some((p) => p.id === playlistId);
+    const isInPlaylist = (video.playlists ?? []).some((p) => p.id === playlistId);
     if (isInPlaylist) {
       await apiFetch(`/api/playlists/${playlistId}/videos/${video.id}`, {
         method: "DELETE",
       });
       setVideo((prev) =>
         prev
-          ? { ...prev, playlists: prev.playlists.filter((p) => p.id !== playlistId) }
+          ? { ...prev, playlists: (prev.playlists ?? []).filter((p) => p.id !== playlistId) }
           : prev,
       );
     } else {
@@ -753,7 +699,7 @@ export function VideoDetail() {
       if (playlist) {
         setVideo((prev) =>
           prev
-            ? { ...prev, playlists: [...prev.playlists, { id: playlist.id, title: playlist.title }] }
+            ? { ...prev, playlists: [...(prev.playlists ?? []), { id: playlist.id, title: playlist.title }] }
             : prev,
         );
       }
@@ -1704,7 +1650,7 @@ export function VideoDetail() {
               {playlists
                 .filter((p) => !playlistSearch || p.title.toLowerCase().includes(playlistSearch.toLowerCase()))
                 .map((playlist) => {
-                  const active = video.playlists.some((vp) => vp.id === playlist.id);
+                  const active = (video.playlists ?? []).some((vp) => vp.id === playlist.id);
                   return (
                     <button
                       key={playlist.id}
