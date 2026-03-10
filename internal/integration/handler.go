@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/httputil"
 	"github.com/sendrec/sendrec/internal/organization"
 )
 
@@ -48,7 +49,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		userID,
 	)
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		httputil.WriteError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	defer rows.Close()
@@ -58,12 +59,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		var ig Integration
 		var configBytes []byte
 		if err := rows.Scan(&ig.ID, &ig.Provider, &configBytes, &ig.CreatedAt, &ig.UpdatedAt); err != nil {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			httputil.WriteError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 
 		if err := json.Unmarshal(configBytes, &ig.Config); err != nil {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			httputil.WriteError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 
@@ -81,29 +82,29 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 
 	if !validProviders[provider] {
-		http.Error(w, fmt.Sprintf("unsupported provider: %s", provider), http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, fmt.Sprintf("unsupported provider: %s", provider))
 		return
 	}
 
 	var config map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	if err := validateConfig(provider, config); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if err := h.preserveOrEncryptTokens(r, userID, provider, config); err != nil {
-		http.Error(w, "encryption error", http.StatusInternalServerError)
+		httputil.WriteError(w, http.StatusInternalServerError, "encryption error")
 		return
 	}
 
 	configJSON, err := json.Marshal(config)
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		httputil.WriteError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -112,7 +113,7 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 		userID, provider, configJSON,
 	)
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		httputil.WriteError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -126,7 +127,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 
 	if !validProviders[provider] {
-		http.Error(w, fmt.Sprintf("unsupported provider: %s", provider), http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, fmt.Sprintf("unsupported provider: %s", provider))
 		return
 	}
 
@@ -135,7 +136,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		userID, provider,
 	)
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		httputil.WriteError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -150,18 +151,18 @@ func (h *Handler) Test(w http.ResponseWriter, r *http.Request) {
 
 	config, err := h.loadConfig(r, userID, provider)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		httputil.WriteError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
 	creator, err := newCreator(provider, config)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if err := creator.ValidateConfig(r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -200,7 +201,7 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		).Scan(&title, &shareToken, &transcriptJSON)
 	}
 	if err != nil {
-		http.Error(w, "video not found", http.StatusNotFound)
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
 	}
 
@@ -208,19 +209,19 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		Provider string `json:"provider"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Provider == "" {
-		http.Error(w, "provider is required", http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, "provider is required")
 		return
 	}
 
 	config, err := h.loadConfig(r, userID, body.Provider)
 	if err != nil {
-		http.Error(w, "integration not configured", http.StatusNotFound)
+		httputil.WriteError(w, http.StatusNotFound, "integration not configured")
 		return
 	}
 
 	creator, err := newCreator(body.Provider, config)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -233,7 +234,7 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		VideoURL:    videoURL,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		httputil.WriteError(w, http.StatusBadGateway, err.Error())
 		return
 	}
 
