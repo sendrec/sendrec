@@ -157,14 +157,14 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
+	accessToken, refreshToken, err := auth.IssueTokens(r.Context(), h.db, h.jwtSecret, userID)
 	if err != nil {
 		slog.Error("sso: issue tokens failed", "error", err)
 		h.redirectWithError(w, r, "failed to create session")
 		return
 	}
 
-	h.setRefreshTokenCookie(w, refreshToken)
+	auth.SetRefreshTokenCookie(w, refreshToken, h.secureCookies)
 	redirectURL := h.baseURL + "/login?sso_token=" + url.QueryEscape(accessToken)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
@@ -223,60 +223,9 @@ func (h *Handler) resolveUser(ctx context.Context, providerName string, info *Us
 	return userID, nil
 }
 
-// issueTokens generates an access/refresh token pair and persists the
-// refresh token in the database. It reuses the auth package's exported
-// token generation functions for compatibility.
-func (h *Handler) issueTokens(ctx context.Context, userID string) (accessToken, refreshToken string, err error) {
-	tokenID, err := newTokenID()
-	if err != nil {
-		return "", "", err
-	}
-
-	expiresAt := time.Now().Add(auth.RefreshTokenDuration)
-	if _, err := h.db.Exec(ctx,
-		"INSERT INTO refresh_tokens (token_id, user_id, expires_at, revoked) VALUES ($1, $2, $3, false)",
-		tokenID, userID, expiresAt,
-	); err != nil {
-		return "", "", fmt.Errorf("store refresh token: %w", err)
-	}
-
-	accessToken, err = auth.GenerateAccessToken(h.jwtSecret, userID)
-	if err != nil {
-		return "", "", fmt.Errorf("generate access token: %w", err)
-	}
-
-	refreshToken, err = auth.GenerateRefreshToken(h.jwtSecret, userID, tokenID)
-	if err != nil {
-		return "", "", fmt.Errorf("generate refresh token: %w", err)
-	}
-
-	return accessToken, refreshToken, nil
-}
-
-func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   h.secureCookies,
-		SameSite: http.SameSiteStrictMode,
-		MaxAge:   int(auth.RefreshTokenDuration / time.Second),
-	})
-}
-
 func (h *Handler) redirectWithError(w http.ResponseWriter, r *http.Request, message string) {
 	redirectURL := h.baseURL + "/login?sso_error=" + url.QueryEscape(message)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
-}
-
-// newTokenID generates a random 16-byte hex-encoded token identifier.
-func newTokenID() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b[:]), nil
 }
 
 type ssoConfigRequest struct {
@@ -779,14 +728,14 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 		slog.Error("sso: failed to add org member", "orgID", orgID, "userID", userID, "error", err)
 	}
 
-	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
+	accessToken, refreshToken, err := auth.IssueTokens(r.Context(), h.db, h.jwtSecret, userID)
 	if err != nil {
 		slog.Error("sso: org issue tokens failed", "error", err)
 		h.redirectWithError(w, r, "failed to create session")
 		return
 	}
 
-	h.setRefreshTokenCookie(w, refreshToken)
+	auth.SetRefreshTokenCookie(w, refreshToken, h.secureCookies)
 	redirectURL := h.baseURL + "/login?sso_token=" + url.QueryEscape(accessToken)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
@@ -894,14 +843,14 @@ func (h *Handler) OrgSAMLCallback(w http.ResponseWriter, r *http.Request) {
 		slog.Error("sso: failed to add org member", "orgID", orgID, "userID", userID, "error", err)
 	}
 
-	accessToken, refreshToken, err := h.issueTokens(r.Context(), userID)
+	accessToken, refreshToken, err := auth.IssueTokens(r.Context(), h.db, h.jwtSecret, userID)
 	if err != nil {
 		slog.Error("sso: SAML issue tokens failed", "error", err)
 		h.redirectWithError(w, r, "failed to create session")
 		return
 	}
 
-	h.setRefreshTokenCookie(w, refreshToken)
+	auth.SetRefreshTokenCookie(w, refreshToken, h.secureCookies)
 	redirectURL := h.baseURL + "/login?sso_token=" + url.QueryEscape(accessToken)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }

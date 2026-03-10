@@ -776,14 +776,16 @@ func ContextWithOrg(ctx context.Context, orgID, role string) context.Context {
 	return ctx
 }
 
-func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
-	// Clear legacy cookie at old path to prevent duplicate cookies
+// SetRefreshTokenCookie sets the refresh token as an HTTP-only cookie at the
+// root path. It also clears the legacy cookie at /api/auth to prevent
+// duplicate cookies from older client sessions.
+func SetRefreshTokenCookie(w http.ResponseWriter, token string, secureCookies bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
 		Path:     "/api/auth",
 		HttpOnly: true,
-		Secure:   h.secureCookies,
+		Secure:   secureCookies,
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	})
@@ -792,34 +794,44 @@ func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   h.secureCookies,
+		Secure:   secureCookies,
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   int(RefreshTokenDuration / time.Second),
 	})
 }
 
-func (h *Handler) issueTokens(ctx context.Context, userID string) (accessToken, refreshToken string, err error) {
-	tokenID, err := newTokenID()
+func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
+	SetRefreshTokenCookie(w, token, h.secureCookies)
+}
+
+// IssueTokens generates an access/refresh token pair for the given user,
+// persists the refresh token in the database, and returns both tokens.
+func IssueTokens(ctx context.Context, db database.DBTX, jwtSecret, userID string) (accessToken, refreshToken string, err error) {
+	tokenID, err := NewTokenID()
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("generate token id: %w", err)
 	}
 
 	expiresAt := time.Now().Add(RefreshTokenDuration)
-	if _, err := h.db.Exec(ctx, "INSERT INTO refresh_tokens (token_id, user_id, expires_at, revoked) VALUES ($1, $2, $3, false)", tokenID, userID, expiresAt); err != nil {
-		return "", "", err
+	if _, err := db.Exec(ctx, "INSERT INTO refresh_tokens (token_id, user_id, expires_at, revoked) VALUES ($1, $2, $3, false)", tokenID, userID, expiresAt); err != nil {
+		return "", "", fmt.Errorf("store refresh token: %w", err)
 	}
 
-	accessToken, err = GenerateAccessToken(h.jwtSecret, userID)
+	accessToken, err = GenerateAccessToken(jwtSecret, userID)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("generate access token: %w", err)
 	}
 
-	refreshToken, err = GenerateRefreshToken(h.jwtSecret, userID, tokenID)
+	refreshToken, err = GenerateRefreshToken(jwtSecret, userID, tokenID)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("generate refresh token: %w", err)
 	}
 
 	return accessToken, refreshToken, nil
+}
+
+func (h *Handler) issueTokens(ctx context.Context, userID string) (accessToken, refreshToken string, err error) {
+	return IssueTokens(ctx, h.db, h.jwtSecret, userID)
 }
 
 func (h *Handler) validateStoredRefreshToken(ctx context.Context, userID, tokenID string) error {
@@ -840,7 +852,8 @@ func (h *Handler) revokeRefreshToken(ctx context.Context, tokenID string) error 
 	return err
 }
 
-func newTokenID() (string, error) {
+// NewTokenID generates a random 16-byte hex-encoded token identifier.
+func NewTokenID() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
