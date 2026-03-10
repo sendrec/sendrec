@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LimitsResponse } from "../types/limits";
+import { formatDate } from "../utils/format";
 
 interface Playlist {
   id: string;
@@ -18,10 +19,6 @@ interface Playlist {
   updatedAt: string;
 }
 
-
-function formatDate(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString("en-GB");
-}
 
 export function Playlists() {
   const navigate = useNavigate();

@@ -12,6 +12,8 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PromptDialog } from "../components/PromptDialog";
 import { LimitsResponse } from "../types/limits";
 import type { Video, VideoTag, Folder, Tag } from "../types/video";
+import { formatDuration, formatDate, expiryLabel } from "../utils/format";
+import { copyToClipboard } from "../utils/clipboard";
 
 interface PlaylistInfo {
   id: string;
@@ -55,35 +57,6 @@ interface CommentsResponse {
   commentMode: string;
 }
 
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
-}
-
-function formatDate(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString("en-GB");
-}
-
-function expiryLabel(shareExpiresAt: string | null): {
-  text: string;
-  expired: boolean;
-} {
-  if (shareExpiresAt === null) {
-    return { text: "Never expires", expired: false };
-  }
-  const expiry = new Date(shareExpiresAt);
-  const now = new Date();
-  if (expiry <= now) {
-    return { text: "Expired", expired: true };
-  }
-  const diffMs = expiry.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 1) {
-    return { text: "Expires tomorrow", expired: false };
-  }
-  return { text: `Expires in ${diffDays} days`, expired: false };
-}
 
 function viewCountLabel(viewCount: number, uniqueViewCount: number): string {
   if (viewCount === 0) {
@@ -284,21 +257,6 @@ export function VideoDetail() {
     const found = videos?.find((v) => v.id === id) ?? null;
     if (found) {
       setVideo(found);
-    }
-  }
-
-  async function copyToClipboard(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
     }
   }
 

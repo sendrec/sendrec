@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { apiFetch, getAccessToken } from "../api/client";
+import { formatChartDate } from "../utils/format";
 
 type View = "video" | "dashboard";
 type Range = "7d" | "30d" | "90d" | "all";
@@ -106,22 +107,6 @@ interface DashboardData {
   topVideos: DashboardTopVideo[];
 }
 
-function formatDate(isoDate: string): string {
-  if (!isoDate) return "";
-  const date = new Date(isoDate + "T00:00:00");
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-  });
-}
-
-function formatChartDate(isoDate: string): string {
-  const date = new Date(isoDate + "T00:00:00");
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-  });
-}
 
 function formatWatchTime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -513,7 +498,7 @@ function VideoAnalyticsView({
         <StatCard
           label="Peak Day"
           value={data.summary.peakDayViews}
-          sub={data.summary.peakDay ? formatDate(data.summary.peakDay) : undefined}
+          sub={data.summary.peakDay ? formatChartDate(data.summary.peakDay) : undefined}
         />
         <StatCard
           label="CTA Clicks"

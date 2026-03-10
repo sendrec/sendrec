@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PromptDialog } from "../components/PromptDialog";
+import { formatDuration } from "../utils/format";
+import { copyToClipboard } from "../utils/clipboard";
 
 interface PlaylistVideo {
   id: string;
@@ -39,12 +41,6 @@ interface LibraryVideo {
   shareToken: string;
   status: string;
   createdAt: string;
-}
-
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 export function PlaylistDetail() {
@@ -108,21 +104,6 @@ export function PlaylistDetail() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast(message);
     toastTimer.current = setTimeout(() => setToast(null), 2000);
-  }
-
-  async function copyToClipboard(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
-    }
   }
 
   async function saveTitle() {

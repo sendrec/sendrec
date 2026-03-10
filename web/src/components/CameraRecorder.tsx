@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
+import { formatDuration } from "../utils/format";
 
 const MIN_RECORDING_SECONDS = 1;
 const MIN_RECORDING_BYTES = 1024;
@@ -10,12 +11,6 @@ interface CameraRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
   onRecordingError?: (message: string) => void;
   maxDurationSeconds?: number;
-}
-
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${minutes}:${String(remaining).padStart(2, "0")}`;
 }
 
 export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurationSeconds = 0 }: CameraRecorderProps) {
