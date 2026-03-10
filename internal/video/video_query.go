@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"math"
 	"net/http"
 	"sort"
@@ -445,27 +444,16 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	viewerUserID := h.viewerUserIDFromRequest(r)
 
 	if r.URL.Query().Get("poll") != "transcript" {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			ip := clientIP(r)
-			hash := viewerHash(ip, r.UserAgent())
-			ref := categorizeReferrer(r.Header.Get("Referer"))
-			browser := parseBrowser(r.UserAgent())
-			device := parseDevice(r.UserAgent())
-			var country, city string
-			if h.geoResolver != nil {
-				country, city = h.geoResolver.Lookup(ip)
-			}
-			if _, err := h.db.Exec(ctx,
-				`INSERT INTO video_views (video_id, viewer_hash, referrer, browser, device, country, city)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-				videoID, hash, ref, browser, device, country, city,
-			); err != nil {
-				slog.Error("video: failed to record view", "video_id", videoID, "error", err)
-			}
-			h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
-		}()
+		h.recordViewAsync(r, viewParams{
+			videoID:          videoID,
+			ownerID:          ownerID,
+			ownerEmail:       ownerEmail,
+			ownerName:        creator,
+			title:            title,
+			shareToken:       shareToken,
+			viewerUserID:     viewerUserID,
+			viewNotification: viewNotification,
+		})
 	}
 
 	videoURL, err := h.storage.GenerateDownloadURL(r.Context(), fileKey, 1*time.Hour)

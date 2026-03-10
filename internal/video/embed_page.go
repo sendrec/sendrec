@@ -1,7 +1,6 @@
 package video
 
 import (
-	"context"
 	"encoding/json"
 	"html/template"
 	"log/slog"
@@ -628,27 +627,16 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 
 	viewerUserID := h.viewerUserIDFromRequest(r)
 
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		ip := clientIP(r)
-		hash := viewerHash(ip, r.UserAgent())
-		ref := categorizeReferrer(r.Header.Get("Referer"))
-		browser := parseBrowser(r.UserAgent())
-		device := parseDevice(r.UserAgent())
-		var country, city string
-		if h.geoResolver != nil {
-			country, city = h.geoResolver.Lookup(ip)
-		}
-		if _, err := h.db.Exec(ctx,
-			`INSERT INTO video_views (video_id, viewer_hash, referrer, browser, device, country, city)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-			videoID, hash, ref, browser, device, country, city,
-		); err != nil {
-			slog.Error("embed-page: failed to record view", "video_id", videoID, "error", err)
-		}
-		h.resolveAndNotify(ctx, videoID, ownerID, ownerEmail, creator, title, shareToken, viewerUserID, viewNotification)
-	}()
+	h.recordViewAsync(r, viewParams{
+		videoID:          videoID,
+		ownerID:          ownerID,
+		ownerEmail:       ownerEmail,
+		ownerName:        creator,
+		title:            title,
+		shareToken:       shareToken,
+		viewerUserID:     viewerUserID,
+		viewNotification: viewNotification,
+	})
 
 	if status == "processing" {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
