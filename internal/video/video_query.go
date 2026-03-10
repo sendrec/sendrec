@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/organization"
 	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/validate"
 )
@@ -127,7 +128,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 
 	maxVideos := h.maxVideosPerMonth
 	maxDuration := h.maxVideoDurationSeconds
-	if plan == "pro" || plan == "business" {
+	if plans.IsPaid(plan) {
 		maxVideos = 0
 		maxDuration = 0
 	}
@@ -148,7 +149,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 
 	maxPlaylists := h.maxPlaylists
 	var playlistsUsed int
-	if plan == "pro" || plan == "business" {
+	if plans.IsPaid(plan) {
 		maxPlaylists = 0
 	} else {
 		_ = h.db.QueryRow(r.Context(),
@@ -167,7 +168,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 	maxOrgsOwned := plans.Free.MaxOrgsOwned
 	maxOrgMembers := plans.Free.MaxOrgMembers
 	var orgsUsed, orgMembersUsed int
-	if userPlan == "pro" || userPlan == "business" {
+	if plans.IsPaid(userPlan) {
 		maxOrgsOwned = 0
 		maxOrgMembers = 0
 	} else {
@@ -178,7 +179,7 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if orgID != "" {
-		if plan == "pro" || plan == "business" {
+		if plans.IsPaid(plan) {
 			maxOrgMembers = 0
 		}
 		_ = h.db.QueryRow(r.Context(),
@@ -582,7 +583,7 @@ func orgVideoFilter(ctx context.Context, videoID string, baseArgs []any, suffix 
 	}
 	if orgID != "" {
 		role := auth.OrgRoleFromContext(ctx)
-		if role == "owner" || role == "admin" {
+		if organization.IsAdminOrOwner(role) {
 			n := len(baseArgs)
 			return fmt.Sprintf("id = $%d AND organization_id = $%d%s", n+1, n+2, sfx),
 				append(baseArgs, videoID, orgID)

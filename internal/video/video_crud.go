@@ -11,6 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/organization"
+	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/validate"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
@@ -54,7 +56,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	maxVideos := h.maxVideosPerMonth
 	maxDuration := h.maxVideoDurationSeconds
-	if plan == "pro" || plan == "business" {
+	if plans.IsPaid(plan) {
 		maxVideos = 0
 		maxDuration = 0
 	}
@@ -201,7 +203,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		plan, _ = h.getUserPlan(r.Context(), userID)
 	}
 	maxVideos := h.maxVideosPerMonth
-	if plan == "pro" || plan == "business" {
+	if plans.IsPaid(plan) {
 		maxVideos = 0
 	}
 
@@ -436,7 +438,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		var titleArgs []any
 		if orgID != "" {
 			role := auth.OrgRoleFromContext(r.Context())
-			if role == "owner" || role == "admin" {
+			if organization.IsAdminOrOwner(role) {
 				titleQuery = `UPDATE videos SET title = $1, updated_at = now() WHERE id = $2 AND organization_id = $3 AND status != 'deleted'`
 				titleArgs = []any{req.Title, videoID, orgID}
 			} else {
@@ -544,7 +546,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	var deleteArgs []any
 	if orgID != "" {
 		role := auth.OrgRoleFromContext(r.Context())
-		if role == "owner" || role == "admin" {
+		if organization.IsAdminOrOwner(role) {
 			deleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now() WHERE id = $1 AND organization_id = $2 AND status != 'deleted' RETURNING file_key, thumbnail_key, webcam_key, transcript_key, title`
 			deleteArgs = []any{videoID, orgID}
 		} else {

@@ -35,3 +35,7 @@ func Rank(plan string) int {
 		return 0
 	}
 }
+
+func IsPaid(plan string) bool {
+	return Rank(plan) > 0
+}
