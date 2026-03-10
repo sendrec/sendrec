@@ -93,14 +93,19 @@ type segmentsRequest struct {
 	Segments []int `json:"segments"`
 }
 
-func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
-	shareToken := chi.URLParam(r, "shareToken")
-
+func (h *Handler) lookupVideoByShareToken(ctx context.Context, shareToken string) (string, error) {
 	var videoID string
-	err := h.db.QueryRow(r.Context(),
+	err := h.db.QueryRow(ctx,
 		`SELECT id FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID)
+	return videoID, err
+}
+
+func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
+	shareToken := chi.URLParam(r, "shareToken")
+
+	videoID, err := h.lookupVideoByShareToken(r.Context(), shareToken)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -157,11 +162,7 @@ func (h *Handler) RecordMilestone(w http.ResponseWriter, r *http.Request) {
 
 	shareToken := chi.URLParam(r, "shareToken")
 
-	var videoID string
-	err := h.db.QueryRow(r.Context(),
-		`SELECT id FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
-		shareToken,
-	).Scan(&videoID)
+	videoID, err := h.lookupVideoByShareToken(r.Context(), shareToken)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -219,11 +220,7 @@ func (h *Handler) RecordSegments(w http.ResponseWriter, r *http.Request) {
 
 	shareToken := chi.URLParam(r, "shareToken")
 
-	var videoID string
-	err := h.db.QueryRow(r.Context(),
-		`SELECT id FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
-		shareToken,
-	).Scan(&videoID)
+	videoID, err := h.lookupVideoByShareToken(r.Context(), shareToken)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
