@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/httputil"
@@ -454,16 +453,6 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
         var storageKey = 'playlist_progress_{{.ShareToken}}';
         var aaToggle = document.getElementById('auto-advance-toggle');
         var aaTrack = document.getElementById('aa-toggle-track');
-        if (aaToggle) {
-            aaToggle.addEventListener('click', function() {
-                autoAdvance = !autoAdvance;
-                aaTrack.classList.toggle('active', autoAdvance);
-                aaToggle.setAttribute('aria-checked', autoAdvance ? 'true' : 'false');
-            });
-            aaToggle.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); aaToggle.click(); }
-            });
-        }
 
         var controls = document.getElementById('player-controls');
         var overlay = document.getElementById('player-overlay');
@@ -488,160 +477,7 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
         var shortcutsPanel = document.getElementById('shortcuts-panel');
         var hideTimer = null;
 
-        // --- Watched tracking ---
-        function loadWatchedSet() {
-            try {
-                var raw = localStorage.getItem(storageKey);
-                if (raw) { return new Set(JSON.parse(raw)); }
-            } catch(e) {}
-            return new Set();
-        }
-
-        function saveWatchedSet(s) {
-            try { localStorage.setItem(storageKey, JSON.stringify(Array.from(s))); } catch(e) {}
-        }
-
-        var watched = loadWatchedSet();
-
-        function updateWatchedBadges() {
-            listItems.forEach(function(li) {
-                var idx = parseInt(li.getAttribute('data-index'), 10);
-                var badge = li.querySelector('.watched-badge');
-                if (badge && videos[idx]) {
-                    if (watched.has(videos[idx].id)) { badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
-                }
-            });
-        }
-        updateWatchedBadges();
-
-        function markWatched(videoId) {
-            if (!watched.has(videoId)) {
-                watched.add(videoId);
-                saveWatchedSet(watched);
-                updateWatchedBadges();
-            }
-        }
-
-` + playerJS + `
-
-        // Mark watched at 80%
-        player.addEventListener('timeupdate', function() {
-            if (player.duration > 0 && player.currentTime / player.duration > 0.8) {
-                markWatched(videos[currentIndex].id);
-            }
-        });
-
-        // Playlist N/P key override
-        onPlayerKeyOverride = function(e) {
-            switch (e.key) {
-                case 'n':
-                case 'N':
-                    if (currentIndex < videos.length - 1) switchVideo(currentIndex + 1);
-                    e.preventDefault();
-                    return true;
-                case 'p':
-                case 'P':
-                    if (currentIndex > 0) switchVideo(currentIndex - 1);
-                    e.preventDefault();
-                    return true;
-            }
-            return false;
-        };
-
-        // Append N/P rows to shortcuts table
-        var shortcutsTable = document.getElementById('shortcuts-table');
-        if (shortcutsTable) {
-            var nextRow = document.createElement('tr');
-            nextRow.innerHTML = '<td>Next video</td><td><kbd>N</kbd></td>';
-            shortcutsTable.appendChild(nextRow);
-            var prevRow = document.createElement('tr');
-            prevRow.innerHTML = '<td>Previous video</td><td><kbd>P</kbd></td>';
-            shortcutsTable.appendChild(prevRow);
-        }
-
-        // --- Switch video ---
-        function switchVideo(index) {
-            if (index < 0 || index >= videos.length) return;
-            cancelCountdown();
-            currentIndex = index;
-            var v = videos[index];
-
-            seekProgress.style.width = '0%';
-            seekBuffered.style.width = '0%';
-            seekThumb.style.left = '0%';
-            timeCurrent.textContent = '0:00';
-            timeDuration.textContent = '0:00';
-            errorOverlay.classList.remove('visible');
-            spinner.classList.remove('visible');
-
-            player.src = v.videoUrl;
-            player.load();
-            player.play().catch(function() {});
-            listItems.forEach(function(li) {
-                li.classList.toggle('active', parseInt(li.getAttribute('data-index'), 10) === index);
-            });
-            var li = listItems[index];
-            if (li) { li.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-        }
-
-        listItems.forEach(function(li) {
-            li.addEventListener('click', function() {
-                switchVideo(parseInt(this.getAttribute('data-index'), 10));
-            });
-            li.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    switchVideo(parseInt(this.getAttribute('data-index'), 10));
-                }
-            });
-        });
-
-        // --- Next-video countdown ---
-        player.addEventListener('ended', function() {
-            markWatched(videos[currentIndex].id);
-            updatePlayBtn();
-            if (autoAdvance && currentIndex < videos.length - 1) {
-                startCountdown(currentIndex + 1);
-            }
-        });
-
-        function startCountdown(nextIndex) {
-            if (!autoAdvance) return;
-            var nextVideo = videos[nextIndex];
-            nextTitleEl.textContent = nextVideo.title;
-            nextOverlay.classList.remove('hidden');
-            var remaining = 5000;
-            var interval = 50;
-            progressEl.style.width = '100%';
-            if (nextCountdownEl) nextCountdownEl.textContent = 'Playing in 5...';
-            countdownTimer = setInterval(function() {
-                remaining -= interval;
-                progressEl.style.width = Math.max(0, (remaining / 5000) * 100) + '%';
-                var seconds = Math.ceil(remaining / 1000);
-                if (nextCountdownEl) nextCountdownEl.textContent = 'Playing in ' + seconds + '...';
-                if (remaining <= 0) {
-                    cancelCountdown();
-                    switchVideo(nextIndex);
-                }
-            }, interval);
-        }
-
-        function cancelCountdown() {
-            if (countdownTimer) {
-                clearInterval(countdownTimer);
-                countdownTimer = null;
-            }
-            nextOverlay.classList.add('hidden');
-        }
-
-        document.getElementById('btn-play-now').addEventListener('click', function() {
-            cancelCountdown();
-            switchVideo(currentIndex + 1);
-        });
-
-        document.getElementById('btn-cancel').addEventListener('click', function() {
-            cancelCountdown();
-        });
+` + playlistJS + `
     })();
     </script>
 </body>
@@ -840,55 +676,10 @@ func (h *Handler) PlaylistEmbedPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, err := h.db.Query(r.Context(),
-		`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id,
-		        v.thumbnail_key
-		 FROM playlist_videos pv
-		 JOIN videos v ON v.id = pv.video_id AND v.status IN ('ready', 'processing')
-		 WHERE pv.playlist_id = $1
-		 ORDER BY pv.position, v.created_at`,
-		playlistID,
-	)
+	videoItems, err := h.loadPlaylistVideos(r.Context(), playlistID)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
-	}
-	defer rows.Close()
-
-	videoItems := make([]playlistWatchVideoItem, 0)
-	for rows.Next() {
-		var id, videoTitle, videoShareToken, contentType, userID string
-		var duration int
-		var thumbnailKey *string
-
-		if err := rows.Scan(&id, &videoTitle, &duration, &videoShareToken, &contentType, &userID, &thumbnailKey); err != nil {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		videoURL, err := h.storage.GenerateDownloadURL(r.Context(), videoFileKey(userID, videoShareToken, contentType), 1*time.Hour)
-		if err != nil {
-			slog.Error("playlist-embed: failed to generate video URL", "video_id", id, "error", err)
-			continue
-		}
-
-		item := playlistWatchVideoItem{
-			ID:          id,
-			Title:       videoTitle,
-			Duration:    duration,
-			ShareToken:  videoShareToken,
-			VideoURL:    videoURL,
-			ContentType: contentType,
-		}
-
-		if thumbnailKey != nil {
-			thumbURL, err := h.storage.GenerateDownloadURL(r.Context(), *thumbnailKey, 1*time.Hour)
-			if err == nil {
-				item.ThumbnailURL = thumbURL
-			}
-		}
-
-		videoItems = append(videoItems, item)
 	}
 
 	videosJSONBytes, _ := json.Marshal(videoItems)

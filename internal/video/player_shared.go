@@ -732,6 +732,191 @@ const safariWarningHTML = `
         </div>
 `
 
+// playlistJS contains the shared JavaScript for both the playlist watch and embed pages.
+// It expects the following variables to be declared before this code runs:
+//   videos, currentIndex, player, container, listItems, countdownTimer, autoAdvance,
+//   storageKey, aaToggle, aaTrack, nextOverlay, nextTitleEl, progressEl, nextCountdownEl,
+//   controls, overlay, playBtn, overlayBtn, seekBar, seekProgress, seekBuffered, seekThumb,
+//   timeCurrent, timeDuration, muteBtn, volumeSlider, speedBtn, speedMenu, pipBtn,
+//   fullscreenBtn, spinner, errorOverlay, seekTooltip, shortcutsBtn, shortcutsPanel, hideTimer.
+//
+// Each page may define hook functions before this code runs:
+//   onPlaylistVideoSwitch(index, item) — called after every video switch; use for page-specific
+//     UI updates (e.g. updating title/counter elements, loading comments).
+//   onPlaylistInit() — called once during setup; use for page-specific initialisation
+//     (e.g. sidebar collapse button wiring, loading comments for the first video).
+const playlistJS = `
+        if (aaToggle) {
+            aaToggle.addEventListener('click', function() {
+                autoAdvance = !autoAdvance;
+                aaTrack.classList.toggle('active', autoAdvance);
+                aaToggle.setAttribute('aria-checked', autoAdvance ? 'true' : 'false');
+            });
+            aaToggle.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); aaToggle.click(); }
+            });
+        }
+
+        // --- Watched tracking ---
+        function loadWatchedSet() {
+            try {
+                var raw = localStorage.getItem(storageKey);
+                if (raw) { return new Set(JSON.parse(raw)); }
+            } catch(e) {}
+            return new Set();
+        }
+
+        function saveWatchedSet(s) {
+            try { localStorage.setItem(storageKey, JSON.stringify(Array.from(s))); } catch(e) {}
+        }
+
+        var watched = loadWatchedSet();
+
+        function updateWatchedBadges() {
+            listItems.forEach(function(li) {
+                var idx = parseInt(li.getAttribute('data-index'), 10);
+                var badge = li.querySelector('.watched-badge');
+                if (badge && videos[idx]) {
+                    if (watched.has(videos[idx].id)) { badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
+                }
+            });
+        }
+        updateWatchedBadges();
+
+        function markWatched(videoId) {
+            if (!watched.has(videoId)) {
+                watched.add(videoId);
+                saveWatchedSet(watched);
+                updateWatchedBadges();
+            }
+        }
+
+` + playerJS + `
+
+        // Mark watched at 80%
+        player.addEventListener('timeupdate', function() {
+            if (player.duration > 0 && player.currentTime / player.duration > 0.8) {
+                markWatched(videos[currentIndex].id);
+            }
+        });
+
+        // Playlist N/P key override
+        onPlayerKeyOverride = function(e) {
+            switch (e.key) {
+                case 'n':
+                case 'N':
+                    if (currentIndex < videos.length - 1) switchVideo(currentIndex + 1);
+                    e.preventDefault();
+                    return true;
+                case 'p':
+                case 'P':
+                    if (currentIndex > 0) switchVideo(currentIndex - 1);
+                    e.preventDefault();
+                    return true;
+            }
+            return false;
+        };
+
+        // Append N/P rows to shortcuts table
+        var shortcutsTable = document.getElementById('shortcuts-table');
+        if (shortcutsTable) {
+            var nextRow = document.createElement('tr');
+            nextRow.innerHTML = '<td>Next video</td><td><kbd>N</kbd></td>';
+            shortcutsTable.appendChild(nextRow);
+            var prevRow = document.createElement('tr');
+            prevRow.innerHTML = '<td>Previous video</td><td><kbd>P</kbd></td>';
+            shortcutsTable.appendChild(prevRow);
+        }
+
+        // --- Switch video ---
+        function switchVideo(index) {
+            if (index < 0 || index >= videos.length) return;
+            cancelCountdown();
+            currentIndex = index;
+            var v = videos[index];
+
+            seekProgress.style.width = '0%';
+            seekBuffered.style.width = '0%';
+            seekThumb.style.left = '0%';
+            timeCurrent.textContent = '0:00';
+            timeDuration.textContent = '0:00';
+            errorOverlay.classList.remove('visible');
+            spinner.classList.remove('visible');
+
+            player.src = v.videoUrl;
+            player.load();
+            player.play().catch(function() {});
+            listItems.forEach(function(li) {
+                li.classList.toggle('active', parseInt(li.getAttribute('data-index'), 10) === index);
+            });
+            var li = listItems[index];
+            if (li) { li.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+
+            if (typeof onPlaylistVideoSwitch === 'function') onPlaylistVideoSwitch(index, v);
+        }
+
+        listItems.forEach(function(li) {
+            li.addEventListener('click', function() {
+                switchVideo(parseInt(this.getAttribute('data-index'), 10));
+            });
+            li.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    switchVideo(parseInt(this.getAttribute('data-index'), 10));
+                }
+            });
+        });
+
+        // --- Next-video countdown ---
+        player.addEventListener('ended', function() {
+            markWatched(videos[currentIndex].id);
+            updatePlayBtn();
+            if (autoAdvance && currentIndex < videos.length - 1) {
+                startCountdown(currentIndex + 1);
+            }
+        });
+
+        function startCountdown(nextIndex) {
+            if (!autoAdvance) return;
+            var nextVideo = videos[nextIndex];
+            nextTitleEl.textContent = nextVideo.title;
+            nextOverlay.classList.remove('hidden');
+            var remaining = 5000;
+            var interval = 50;
+            progressEl.style.width = '100%';
+            if (nextCountdownEl) nextCountdownEl.textContent = 'Playing in 5...';
+            countdownTimer = setInterval(function() {
+                remaining -= interval;
+                progressEl.style.width = Math.max(0, (remaining / 5000) * 100) + '%';
+                var seconds = Math.ceil(remaining / 1000);
+                if (nextCountdownEl) nextCountdownEl.textContent = 'Playing in ' + seconds + '...';
+                if (remaining <= 0) {
+                    cancelCountdown();
+                    switchVideo(nextIndex);
+                }
+            }, interval);
+        }
+
+        function cancelCountdown() {
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+            nextOverlay.classList.add('hidden');
+        }
+
+        document.getElementById('btn-play-now').addEventListener('click', function() {
+            cancelCountdown();
+            switchVideo(currentIndex + 1);
+        });
+
+        document.getElementById('btn-cancel').addEventListener('click', function() {
+            cancelCountdown();
+        });
+
+        if (typeof onPlaylistInit === 'function') onPlaylistInit();
+`
+
 // safariWarningJS contains the shared JS snippet that detects Safari + WebM and shows the warning.
 // It checks <source type="video/webm">, src attributes ending in .webm, and for playlist pages,
 // the contentType field in the videos JSON data.
