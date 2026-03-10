@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/organization"
 )
 
 var validProviders = map[string]bool{
@@ -181,7 +182,7 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if orgID != "" {
 		role := auth.OrgRoleFromContext(r.Context())
-		if role == "owner" || role == "admin" {
+		if organization.IsAdminOrOwner(role) {
 			err = h.db.QueryRow(r.Context(),
 				"SELECT title, share_token, transcript_json FROM videos WHERE id = $1 AND organization_id = $2",
 				videoID, orgID,

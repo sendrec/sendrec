@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/organization"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
@@ -42,7 +43,7 @@ func (h *Handler) BatchDelete(w http.ResponseWriter, r *http.Request) {
 	var batchDeleteArgs []any
 	if orgID != "" {
 		role := auth.OrgRoleFromContext(r.Context())
-		if role == "owner" || role == "admin" {
+		if organization.IsAdminOrOwner(role) {
 			batchDeleteQuery = `UPDATE videos SET status = 'deleted', updated_at = now()
 			 WHERE id = ANY($1) AND organization_id = $2 AND status != 'deleted'
 			 RETURNING id, file_key, thumbnail_key, webcam_key, transcript_key, title`
@@ -187,7 +188,7 @@ func (h *Handler) BatchSetFolder(w http.ResponseWriter, r *http.Request) {
 	var folderArgs []any
 	if orgID != "" {
 		role := auth.OrgRoleFromContext(r.Context())
-		if role == "owner" || role == "admin" {
+		if organization.IsAdminOrOwner(role) {
 			folderQuery = `UPDATE videos SET folder_id = $1, updated_at = now() WHERE id = ANY($2) AND organization_id = $3 AND status != 'deleted'`
 			folderArgs = []any{folderID, req.VideoIDs, orgID}
 		} else {
@@ -264,7 +265,7 @@ func (h *Handler) BatchSetTags(w http.ResponseWriter, r *http.Request) {
 	var verifyArgs []any
 	if orgID != "" {
 		role := auth.OrgRoleFromContext(r.Context())
-		if role == "owner" || role == "admin" {
+		if organization.IsAdminOrOwner(role) {
 			verifyQuery = `SELECT COUNT(*) FROM videos WHERE id = ANY($1) AND organization_id = $2 AND status != 'deleted'`
 			verifyArgs = []any{req.VideoIDs, orgID}
 		} else {
