@@ -1,36 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { apiFetch } from "../api/client";
-import { useOrganization } from "../hooks/useOrganization";
-import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
-import { useToast } from "../hooks/useToast";
-import { TrimModal } from "../components/TrimModal";
-import { FillerRemovalModal } from "../components/FillerRemovalModal";
-import { SilenceRemovalModal } from "../components/SilenceRemovalModal";
-import { DocumentModal } from "../components/DocumentModal";
-import { Toast } from "../components/Toast";
-import { TRANSCRIPTION_LANGUAGES } from "../constants/languages";
-import { ConfirmDialog, ConfirmDialogState } from "../components/ConfirmDialog";
-import { PromptDialog } from "../components/PromptDialog";
-import { LimitsResponse } from "../types/limits";
-import type { Video, VideoTag, Folder, Tag } from "../types/video";
-import { formatDuration, formatDate, expiryLabel } from "../utils/format";
-import { copyToClipboard } from "../utils/clipboard";
+import { apiFetch } from "../../api/client";
+import { useOrganization } from "../../hooks/useOrganization";
+import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
+import { useToast } from "../../hooks/useToast";
+import { TrimModal } from "../../components/TrimModal";
+import { FillerRemovalModal } from "../../components/FillerRemovalModal";
+import { SilenceRemovalModal } from "../../components/SilenceRemovalModal";
+import { Toast } from "../../components/Toast";
+import { ConfirmDialog, ConfirmDialogState } from "../../components/ConfirmDialog";
+import type { Video, Folder, Tag } from "../../types/video";
+import { LimitsResponse } from "../../types/limits";
+import { formatDuration, formatDate, expiryLabel } from "../../utils/format";
+import { copyToClipboard } from "../../utils/clipboard";
+import { SharingSection } from "./SharingSection";
+import { TranscriptSection } from "./TranscriptSection";
+import { CommentsSection } from "./CommentsSection";
 
 interface PlaylistInfo {
   id: string;
   title: string;
   videoCount: number;
-}
-
-
-interface VideoBranding {
-  companyName: string | null;
-  colorBackground: string | null;
-  colorSurface: string | null;
-  colorText: string | null;
-  colorAccent: string | null;
-  footerText: string | null;
 }
 
 interface TranscriptSegment {
@@ -70,29 +60,6 @@ function viewCountLabel(viewCount: number, uniqueViewCount: number): string {
   return `${viewCount} views (${uniqueViewCount} unique)`;
 }
 
-function formatTimestamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function getInitials(name: string): string {
-  if (!name) return "?";
-  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
-}
-
-function relativeTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(isoDate).toLocaleDateString("en-GB");
-}
-
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -123,34 +90,12 @@ export function VideoDetail() {
   const [showTrimModal, setShowTrimModal] = useState(false);
   const [showFillerModal, setShowFillerModal] = useState(false);
   const [showSilenceModal, setShowSilenceModal] = useState(false);
-  const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [documentContent, setDocumentContent] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
-  const [promptDialog, setPromptDialog] = useState<{
-    title: string;
-    onSubmit: (value: string) => void;
-    placeholder?: string;
-    submitLabel?: string;
-  } | null>(null);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState(false);
-  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
-
   const titleIsDirty = editingTitle && video !== null && editTitle !== video.title;
   useUnsavedChanges(titleIsDirty);
-
-  const [brandingOpen, setBrandingOpen] = useState(false);
-  const [videoBranding, setVideoBranding] = useState<VideoBranding>({
-    companyName: null,
-    colorBackground: null,
-    colorSurface: null,
-    colorText: null,
-    colorAccent: null,
-    footerText: null,
-  });
-  const [savingBranding, setSavingBranding] = useState(false);
-  const [brandingMessage, setBrandingMessage] = useState("");
 
   const [integrations, setIntegrations] = useState<{ provider: string }[]>([]);
   const [issueDropdownOpen, setIssueDropdownOpen] = useState(false);
@@ -256,37 +201,6 @@ export function VideoDetail() {
     toast.show("Link copied");
   }
 
-  async function copyEmbed() {
-    if (!video) return;
-    const snippet = `<iframe src="${window.location.origin}/embed/${video.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
-    await copyToClipboard(snippet);
-    toast.show("Embed code copied");
-  }
-
-  async function toggleDownload() {
-    if (!video) return;
-    const newValue = !video.downloadEnabled;
-    await apiFetch(`/api/videos/${video.id}/download-enabled`, {
-      method: "PUT",
-      body: JSON.stringify({ downloadEnabled: newValue }),
-    });
-    setVideo((prev) =>
-      prev ? { ...prev, downloadEnabled: newValue } : prev,
-    );
-  }
-
-  async function toggleEmailGate() {
-    if (!video) return;
-    const newValue = !video.emailGateEnabled;
-    await apiFetch(`/api/videos/${video.id}/email-gate`, {
-      method: "PUT",
-      body: JSON.stringify({ enabled: newValue }),
-    });
-    setVideo((prev) =>
-      prev ? { ...prev, emailGateEnabled: newValue } : prev,
-    );
-  }
-
   async function togglePin() {
     if (!video) return;
     const resp = await apiFetch<{ pinned: boolean }>(`/api/videos/${video.id}/pin`, {
@@ -295,70 +209,6 @@ export function VideoDetail() {
     if (resp) {
       setVideo((prev) => (prev ? { ...prev, pinned: resp.pinned } : prev));
       toast.show(resp.pinned ? "Video pinned" : "Video unpinned");
-    }
-  }
-
-  async function toggleLinkExpiry() {
-    if (!video) return;
-    const neverExpires = video.shareExpiresAt !== null;
-    await apiFetch(`/api/videos/${video.id}/link-expiry`, {
-      method: "PUT",
-      body: JSON.stringify({ neverExpires }),
-    });
-    await refetchVideo();
-  }
-
-  async function extendVideo() {
-    if (!video) return;
-    await apiFetch(`/api/videos/${video.id}/extend`, { method: "POST" });
-    await refetchVideo();
-    toast.show("Link extended");
-  }
-
-  function addPassword() {
-    if (!video) return;
-    setPromptDialog({
-      title: "Enter a password for this video:",
-      placeholder: "Password",
-      submitLabel: "Set password",
-      onSubmit: async (password) => {
-        setPromptDialog(null);
-        await apiFetch(`/api/videos/${video.id}/password`, {
-          method: "PUT",
-          body: JSON.stringify({ password }),
-        });
-        setVideo((prev) => (prev ? { ...prev, hasPassword: true } : prev));
-      },
-    });
-  }
-
-  function removePassword() {
-    if (!video) return;
-    setConfirmDialog({
-      message: "Remove the password from this video?",
-      confirmLabel: "Remove",
-      danger: true,
-      onConfirm: async () => {
-        setConfirmDialog(null);
-        await apiFetch(`/api/videos/${video.id}/password`, {
-          method: "PUT",
-          body: JSON.stringify({ password: "" }),
-        });
-        setVideo((prev) => (prev ? { ...prev, hasPassword: false } : prev));
-      },
-    });
-  }
-
-  async function changeCommentMode(mode: string) {
-    if (!video) return;
-    try {
-      await apiFetch(`/api/videos/${video.id}/comment-mode`, {
-        method: "PUT",
-        body: JSON.stringify({ commentMode: mode }),
-      });
-      setVideo((prev) => (prev ? { ...prev, commentMode: mode } : prev));
-    } catch {
-      // select stays at previous value
     }
   }
 
@@ -406,47 +256,6 @@ export function VideoDetail() {
     setEditingTitle(false);
   }
 
-  async function retranscribe() {
-    if (!video) return;
-    const body = retranscribeLanguage !== "auto" ? { language: retranscribeLanguage } : undefined;
-    await apiFetch(`/api/videos/${video.id}/retranscribe`, {
-      method: "POST",
-      ...(body && { body: JSON.stringify(body) }),
-    });
-    setVideo((prev) =>
-      prev ? { ...prev, transcriptStatus: "pending" } : prev,
-    );
-    setTranscriptSegments([]);
-    toast.show("Transcription queued");
-  }
-
-  async function summarize() {
-    if (!video) return;
-    await apiFetch(`/api/videos/${video.id}/summarize`, { method: "POST" });
-    setVideo((prev) =>
-      prev ? { ...prev, summaryStatus: "pending" } : prev,
-    );
-    toast.show("Summary queued");
-  }
-
-  async function viewDocument() {
-    if (!video) return;
-    const data = await apiFetch<{ document?: string }>(`/api/watch/${video.shareToken}`);
-    if (data?.document) {
-      setDocumentContent(data.document);
-      setShowDocumentModal(true);
-    }
-  }
-
-  async function generateDocument() {
-    if (!video) return;
-    await apiFetch(`/api/videos/${video.id}/generate-document`, { method: "POST" });
-    setVideo((prev) =>
-      prev ? { ...prev, documentStatus: "pending" } : prev,
-    );
-    toast.show("Document generation queued");
-  }
-
   useEffect(() => {
     if (
       video?.status === "processing" ||
@@ -479,126 +288,6 @@ export function VideoDetail() {
     setVideo((prev) =>
       prev ? { ...prev, suggestedTitle: null } : prev,
     );
-  }
-
-  async function uploadThumbnail(file: File) {
-    if (!video) return;
-    if (file.size > 2 * 1024 * 1024) return;
-    const validTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!validTypes.includes(file.type)) return;
-    setUploadingThumbnail(true);
-    try {
-      const result = await apiFetch<{ uploadUrl: string }>(
-        `/api/videos/${video.id}/thumbnail`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            contentType: file.type,
-            contentLength: file.size,
-          }),
-        },
-      );
-      if (!result) return;
-      const uploadResp = await fetch(result.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!uploadResp.ok) return;
-      await refetchVideo();
-      toast.show("Thumbnail updated");
-    } finally {
-      setUploadingThumbnail(false);
-    }
-  }
-
-  async function resetThumbnail() {
-    if (!video) return;
-    setUploadingThumbnail(true);
-    try {
-      await apiFetch(`/api/videos/${video.id}/thumbnail`, {
-        method: "DELETE",
-      });
-      await refetchVideo();
-      toast.show("Thumbnail reset");
-    } finally {
-      setUploadingThumbnail(false);
-    }
-  }
-
-  async function changeNotification(value: string) {
-    if (!video) return;
-    const viewNotification = value === "" ? null : value;
-    try {
-      await apiFetch(`/api/videos/${video.id}/notifications`, {
-        method: "PUT",
-        body: JSON.stringify({ viewNotification }),
-      });
-      setVideo((prev) =>
-        prev ? { ...prev, viewNotification } : prev,
-      );
-    } catch {
-      // select stays at previous value
-    }
-  }
-
-  async function openBranding() {
-    if (!video) return;
-    setBrandingOpen(true);
-    setBrandingMessage("");
-    try {
-      const data = await apiFetch<VideoBranding>(
-        `/api/videos/${video.id}/branding`,
-      );
-      if (data) {
-        setVideoBranding(data);
-      } else {
-        setVideoBranding({
-          companyName: null,
-          colorBackground: null,
-          colorSurface: null,
-          colorText: null,
-          colorAccent: null,
-          footerText: null,
-        });
-      }
-    } catch {
-      setVideoBranding({
-        companyName: null,
-        colorBackground: null,
-        colorSurface: null,
-        colorText: null,
-        colorAccent: null,
-        footerText: null,
-      });
-    }
-  }
-
-  async function saveBranding() {
-    if (!video) return;
-    setSavingBranding(true);
-    setBrandingMessage("");
-    try {
-      await apiFetch(`/api/videos/${video.id}/branding`, {
-        method: "PUT",
-        body: JSON.stringify({
-          companyName: videoBranding.companyName || null,
-          colorBackground: videoBranding.colorBackground || null,
-          colorSurface: videoBranding.colorSurface || null,
-          colorText: videoBranding.colorText || null,
-          colorAccent: videoBranding.colorAccent || null,
-          footerText: videoBranding.footerText || null,
-        }),
-      });
-      setBrandingMessage("Saved");
-      setTimeout(() => setBrandingOpen(false), 1000);
-    } catch (err) {
-      setBrandingMessage(
-        err instanceof Error ? err.message : "Failed to save",
-      );
-    } finally {
-      setSavingBranding(false);
-    }
   }
 
   async function moveToFolder(folderId: string | null) {
@@ -737,7 +426,6 @@ export function VideoDetail() {
   }
 
   const expiry = expiryLabel(video.shareExpiresAt);
-  const embedSnippet = `<iframe src="${window.location.origin}/embed/${video.shareToken}" width="640" height="360" frameborder="0" allowfullscreen></iframe>`;
 
   return (
     <div className="page-container">
@@ -1083,350 +771,25 @@ export function VideoDetail() {
       </div>
 
       {/* Share Settings */}
-      <div className="video-detail-section">
-        <h2 className="video-detail-section-title">Share Settings</h2>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Share link</span>
-          {video.status === "processing" ? (
-            <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
-              Available once processing completes
-            </span>
-          ) : (
-            <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}>
-              <input
-                type="text"
-                readOnly
-                value={video.shareUrl}
-                aria-label="Share link"
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  padding: "6px 10px",
-                  fontSize: 13,
-                  background: "var(--color-bg)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 4,
-                  color: "var(--color-text)",
-                }}
-              />
-              <button onClick={copyLink} className="detail-btn">
-                Copy link
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Embed</span>
-          <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}>
-            <input
-              type="text"
-              readOnly
-              value={embedSnippet}
-              aria-label="Embed code"
-              style={{
-                flex: 1,
-                minWidth: 0,
-                padding: "6px 10px",
-                fontSize: 13,
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
-                borderRadius: 4,
-                color: "var(--color-text)",
-              }}
-            />
-            <button onClick={copyEmbed} className="detail-btn">
-              Copy embed
-            </button>
-          </div>
-        </div>
-
-        {!isViewer && (<>
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Password</span>
-          <div className="detail-setting-value">
-            <span>
-              {video.hasPassword ? "Password set" : "No password"}
-            </span>
-            {video.hasPassword ? (
-              <button onClick={removePassword} className="detail-btn">
-                Remove password
-              </button>
-            ) : (
-              <button onClick={addPassword} className="detail-btn">
-                Set password
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Expiry</span>
-          <div className="detail-setting-value">
-            <span>{expiry.text}</span>
-            <button onClick={toggleLinkExpiry} className="detail-btn">
-              {video.shareExpiresAt === null ? "Set expiry" : "Remove expiry"}
-            </button>
-            {video.shareExpiresAt !== null && (
-              <button onClick={extendVideo} className="detail-btn">
-                Extend
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Downloads</span>
-          <button
-            onClick={toggleDownload}
-            className={`detail-toggle${video.downloadEnabled ? " detail-toggle--active" : ""}`}
-          >
-            {video.downloadEnabled ? "Enabled" : "Disabled"}
-          </button>
-        </div>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Email gate</span>
-          <button
-            onClick={toggleEmailGate}
-            className={`detail-toggle${video.emailGateEnabled ? " detail-toggle--active" : ""}`}
-          >
-            {video.emailGateEnabled ? "Enabled" : "Disabled"}
-          </button>
-        </div>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Comments</span>
-          <select
-            aria-label="Comment mode"
-            value={video.commentMode}
-            onChange={(e) => changeCommentMode(e.target.value)}
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              color:
-                video.commentMode !== "disabled"
-                  ? "var(--color-accent)"
-                  : "var(--color-text-secondary)",
-              fontSize: 13,
-              padding: "4px 8px",
-              cursor: "pointer",
-            }}
-          >
-            <option value="disabled">Off</option>
-            <option value="anonymous">Anonymous</option>
-            <option value="name_required">Name required</option>
-            <option value="name_email_required">Name + email</option>
-          </select>
-        </div>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Thumbnail</span>
-          <div className="detail-setting-value">
-            <label style={{ cursor: uploadingThumbnail ? "default" : "pointer" }}>
-              <span className="detail-btn" role="button" tabIndex={0}>
-                {uploadingThumbnail ? "Uploading..." : "Upload"}
-              </span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                style={{ display: "none" }}
-                disabled={uploadingThumbnail}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) uploadThumbnail(file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            {video.thumbnailUrl && (
-              <button
-                onClick={resetThumbnail}
-                disabled={uploadingThumbnail}
-                className="detail-btn"
-              >
-                Reset thumbnail
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Notifications</span>
-          <select
-            aria-label="View notifications"
-            value={video.viewNotification ?? ""}
-            onChange={(e) => changeNotification(e.target.value)}
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 4,
-              color: "var(--color-text-secondary)",
-              fontSize: 13,
-              padding: "4px 8px",
-              cursor: "pointer",
-            }}
-          >
-            <option value="">Account default</option>
-            <option value="off">Off</option>
-            <option value="every">Every view</option>
-            <option value="digest">Daily digest</option>
-          </select>
-        </div>
-
-        {limits?.brandingEnabled && (
-          <div className="detail-setting-row">
-            <span className="detail-setting-label">Branding</span>
-            <button onClick={openBranding} className="detail-btn">
-              Customize
-            </button>
-          </div>
-        )}
-        </>)}
-      </div>
+      <SharingSection
+        video={video}
+        limits={limits}
+        isViewer={isViewer}
+        onVideoUpdate={setVideo}
+        onRefetchVideo={refetchVideo}
+      />
 
       {/* AI */}
-      <div className="video-detail-section">
-        <h2 className="video-detail-section-title">AI</h2>
-
-        <div className="detail-setting-row">
-          <span className="detail-setting-label">Transcript</span>
-          <div className="detail-setting-value">
-            <span>
-              {video.transcriptStatus === "none" && "Not started"}
-              {video.transcriptStatus === "pending" && "Pending..."}
-              {video.transcriptStatus === "processing" && "Transcribing..."}
-              {video.transcriptStatus === "ready" && "Ready"}
-              {video.transcriptStatus === "no_audio" && "No audio"}
-              {video.transcriptStatus === "failed" && "Failed"}
-            </span>
-            {!isViewer && (video.transcriptStatus === "none" || video.transcriptStatus === "ready" || video.transcriptStatus === "failed" || video.transcriptStatus === "no_audio") && (
-              <>
-                {limits?.transcriptionEnabled && (
-                  <select
-                    aria-label="Transcription language"
-                    value={retranscribeLanguage}
-                    onChange={(e) => setRetranscribeLanguage(e.target.value)}
-                    className="detail-select"
-                  >
-                    {TRANSCRIPTION_LANGUAGES.map((lang) => (
-                      <option key={lang.code} value={lang.code}>{lang.name}</option>
-                    ))}
-                  </select>
-                )}
-                <button onClick={retranscribe} className="detail-btn">
-                  {video.transcriptStatus === "none" ? "Transcribe" :
-                   video.transcriptStatus === "ready" ? "Redo transcript" : "Retry transcript"}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {video.transcriptStatus === "ready" && transcriptSegments.length > 0 && (
-          <div className="transcript-segments">
-            {transcriptSegments.map((seg, i) => (
-              <div key={i} className="transcript-segment">
-                <span className="transcript-segment-time">
-                  {formatTimestamp(seg.start)}
-                </span>
-                <span className="transcript-segment-text">{seg.text}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!isViewer && limits?.aiEnabled && (
-          <div className="detail-setting-row">
-            <span className="detail-setting-label">Summary</span>
-            <div className="detail-setting-value">
-              <span>
-                {video.summaryStatus === "none" && "Not started"}
-                {video.summaryStatus === "pending" && "Pending..."}
-                {video.summaryStatus === "processing" && "Summarizing..."}
-                {video.summaryStatus === "ready" && "Ready"}
-                {video.summaryStatus === "too_short" && "Transcript too short"}
-                {video.summaryStatus === "failed" && "Failed"}
-              </span>
-              <button
-                onClick={summarize}
-                disabled={
-                  video.transcriptStatus !== "ready" ||
-                  video.summaryStatus === "pending" ||
-                  video.summaryStatus === "processing"
-                }
-                className="detail-btn"
-                style={{
-                  opacity:
-                    video.transcriptStatus !== "ready" ||
-                    video.summaryStatus === "pending" ||
-                    video.summaryStatus === "processing"
-                      ? 0.5
-                      : undefined,
-                }}
-              >
-                {video.summaryStatus === "ready"
-                  ? "Re-summarize"
-                  : "Summarize"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!isViewer && limits?.aiEnabled && (
-          <div className="detail-setting-row">
-            <span className="detail-setting-label">Document</span>
-            <div className="detail-setting-value">
-              <span>
-                {video.documentStatus === "none" && "Not generated"}
-                {video.documentStatus === "pending" && "Pending..."}
-                {video.documentStatus === "processing" && "Generating..."}
-                {video.documentStatus === "ready" && "Ready"}
-                {video.documentStatus === "too_short" && "Transcript too short"}
-                {video.documentStatus === "failed" && "Failed"}
-              </span>
-              {video.documentStatus === "ready" ? (
-                <>
-                  <button
-                    onClick={viewDocument}
-                    className="detail-btn detail-btn--accent"
-                  >
-                    View
-                  </button>
-                  <button
-                    onClick={generateDocument}
-                    className="detail-btn"
-                  >
-                    Regenerate
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={generateDocument}
-                  disabled={
-                    video.transcriptStatus !== "ready" ||
-                    video.documentStatus === "pending" ||
-                    video.documentStatus === "processing"
-                  }
-                  className="detail-btn"
-                  style={{
-                    opacity:
-                      video.transcriptStatus !== "ready" ||
-                      video.documentStatus === "pending" ||
-                      video.documentStatus === "processing"
-                        ? 0.5
-                        : undefined,
-                  }}
-                >
-                  Generate
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      <TranscriptSection
+        video={video}
+        limits={limits}
+        isViewer={isViewer}
+        transcriptSegments={transcriptSegments}
+        retranscribeLanguage={retranscribeLanguage}
+        onRetranscribeLanguageChange={setRetranscribeLanguage}
+        onVideoUpdate={setVideo}
+        onTranscriptClear={() => setTranscriptSegments([])}
+      />
 
       {/* Editing */}
       {!isViewer && <div className="video-detail-section">
@@ -1721,52 +1084,11 @@ export function VideoDetail() {
       </div>}
 
       {/* Comments */}
-      <div className="video-detail-section">
-        <h2 className="video-detail-section-title">
-          Comments ({comments.length})
-        </h2>
-        {comments.length === 0 ? (
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>
-            No comments yet.
-          </p>
-        ) : (
-          comments.map((comment) => (
-            <div key={comment.id} className="comment-item">
-              <div className="comment-avatar">
-                {getInitials(comment.authorName)}
-              </div>
-              <div className="comment-content">
-                <div className="comment-header">
-                  <span className="comment-author">
-                    {comment.authorName || "Anonymous"}
-                  </span>
-                  <span className="comment-date">
-                    {relativeTime(comment.createdAt)}
-                  </span>
-                  {comment.videoTimestamp !== null && (
-                    <span className="comment-timestamp">
-                      @{formatTimestamp(comment.videoTimestamp)}
-                    </span>
-                  )}
-                  {comment.isPrivate && (
-                    <span className="comment-private">Private</span>
-                  )}
-                </div>
-                <div className="comment-body">{comment.body}</div>
-              </div>
-              {!isViewer && (
-                <button
-                  className="comment-delete"
-                  onClick={() => handleDeleteComment(comment.id)}
-                  aria-label="Delete comment"
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+      <CommentsSection
+        comments={comments}
+        isViewer={isViewer}
+        onDeleteComment={handleDeleteComment}
+      />
 
       {/* Danger Zone */}
       {!isViewer && (
@@ -1778,229 +1100,6 @@ export function VideoDetail() {
           >
             Delete video
           </button>
-        </div>
-      )}
-
-      {/* Branding Modal */}
-      {brandingOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "var(--color-overlay)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 100,
-          }}
-          onClick={() => setBrandingOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "var(--color-surface)",
-              borderRadius: 12,
-              padding: 24,
-              width: "calc(100vw - 32px)",
-              maxWidth: 400,
-              maxHeight: "80vh",
-              overflow: "auto",
-              border: "1px solid var(--color-border)",
-            }}
-          >
-            <h3
-              style={{
-                color: "var(--color-text)",
-                fontSize: 18,
-                margin: "0 0 16px",
-              }}
-            >
-              Video Branding
-            </h3>
-            <p
-              style={{
-                color: "var(--color-text-secondary)",
-                fontSize: 13,
-                margin: "0 0 16px",
-              }}
-            >
-              Override your account branding for this video. Leave empty to
-              inherit.
-            </p>
-
-            <label
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                marginBottom: 12,
-              }}
-            >
-              <span
-                style={{
-                  color: "var(--color-text-secondary)",
-                  fontSize: 13,
-                }}
-              >
-                Company name
-              </span>
-              <input
-                type="text"
-                value={videoBranding.companyName ?? ""}
-                onChange={(e) =>
-                  setVideoBranding({
-                    ...videoBranding,
-                    companyName: e.target.value || null,
-                  })
-                }
-                placeholder="Inherit from account"
-                maxLength={limits?.fieldLimits?.companyName ?? 200}
-                style={{
-                  background: "var(--color-bg)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 4,
-                  color: "var(--color-text)",
-                  padding: "8px 12px",
-                  fontSize: 14,
-                  width: "100%",
-                }}
-              />
-            </label>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 8,
-                marginBottom: 12,
-              }}
-            >
-              {(
-                [
-                  "colorBackground",
-                  "colorSurface",
-                  "colorText",
-                  "colorAccent",
-                ] as const
-              ).map((key) => {
-                const labels: Record<string, string> = {
-                  colorBackground: "Background",
-                  colorSurface: "Surface",
-                  colorText: "Text",
-                  colorAccent: "Accent",
-                };
-                return (
-                  <label
-                    key={key}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 4,
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: "var(--color-text-secondary)",
-                        fontSize: 13,
-                      }}
-                    >
-                      {labels[key]}
-                    </span>
-                    <input
-                      type="text"
-                      value={videoBranding[key] ?? ""}
-                      onChange={(e) =>
-                        setVideoBranding({
-                          ...videoBranding,
-                          [key]: e.target.value || null,
-                        })
-                      }
-                      placeholder="Inherit"
-                      style={{
-                        background: "var(--color-bg)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 4,
-                        color: "var(--color-text)",
-                        padding: "6px 10px",
-                        fontSize: 13,
-                        width: "100%",
-                      }}
-                    />
-                  </label>
-                );
-              })}
-            </div>
-
-            <label
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                marginBottom: 16,
-              }}
-            >
-              <span
-                style={{
-                  color: "var(--color-text-secondary)",
-                  fontSize: 13,
-                }}
-              >
-                Footer text
-              </span>
-              <input
-                type="text"
-                value={videoBranding.footerText ?? ""}
-                onChange={(e) =>
-                  setVideoBranding({
-                    ...videoBranding,
-                    footerText: e.target.value || null,
-                  })
-                }
-                placeholder="Inherit from account"
-                maxLength={limits?.fieldLimits?.footerText ?? 500}
-                style={{
-                  background: "var(--color-bg)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 4,
-                  color: "var(--color-text)",
-                  padding: "8px 12px",
-                  fontSize: 14,
-                  width: "100%",
-                }}
-              />
-            </label>
-
-            {brandingMessage && (
-              <p
-                style={{
-                  color:
-                    brandingMessage === "Saved"
-                      ? "var(--color-accent)"
-                      : "var(--color-error)",
-                  fontSize: 13,
-                  margin: "0 0 12px",
-                }}
-              >
-                {brandingMessage}
-              </p>
-            )}
-
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={saveBranding}
-                disabled={savingBranding}
-                className="detail-btn detail-btn--accent"
-              >
-                {savingBranding ? "Saving..." : "Save"}
-              </button>
-              <button
-                onClick={() => setBrandingOpen(false)}
-                className="detail-btn"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -2054,14 +1153,6 @@ export function VideoDetail() {
         />
       )}
 
-      {/* Document Modal */}
-      {showDocumentModal && documentContent && (
-        <DocumentModal
-          document={documentContent}
-          onClose={() => { setShowDocumentModal(false); setDocumentContent(null); }}
-        />
-      )}
-
       <Toast message={toast.message} />
 
       {confirmDialog && (
@@ -2071,16 +1162,6 @@ export function VideoDetail() {
           danger={confirmDialog.danger}
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}
-        />
-      )}
-
-      {promptDialog && (
-        <PromptDialog
-          title={promptDialog.title}
-          placeholder={promptDialog.placeholder}
-          submitLabel={promptDialog.submitLabel}
-          onSubmit={promptDialog.onSubmit}
-          onCancel={() => setPromptDialog(null)}
         />
       )}
     </div>
