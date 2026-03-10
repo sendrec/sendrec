@@ -46,6 +46,25 @@ func APIKeyName(s string) string  { return checkLen(s, MaxAPIKeyNameLength, "API
 func OrgName(s string) string     { return checkLen(s, MaxOrgNameLength, "organization name") }
 func OrgSlug(s string) string     { return checkLen(s, MaxOrgSlugLength, "organization slug") }
 
+var validRetentionDays = map[int]bool{0: true, 30: true, 60: true, 90: true, 180: true, 365: true}
+
+func RetentionDays(days int) string {
+	if !validRetentionDays[days] {
+		return "invalid retention days: must be 0, 30, 60, 90, 180, or 365"
+	}
+	return ""
+}
+
+func Password(password string) string {
+	if len(password) < 8 {
+		return "password must be at least 8 characters"
+	}
+	if len(password) > 72 {
+		return "password must be at most 72 characters"
+	}
+	return ""
+}
+
 // FieldLimits returns a map of field names to max lengths for the /api/limits endpoint.
 func FieldLimits() map[string]int {
 	return map[string]int{

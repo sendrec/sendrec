@@ -245,6 +245,48 @@ func TestOrgSlug(t *testing.T) {
 	}
 }
 
+func TestRetentionDays(t *testing.T) {
+	tests := []struct {
+		name  string
+		input int
+		want  string
+	}{
+		{"zero (disabled)", 0, ""},
+		{"30 days", 30, ""},
+		{"60 days", 60, ""},
+		{"90 days", 90, ""},
+		{"180 days", 180, ""},
+		{"365 days", 365, ""},
+		{"invalid 7", 7, "invalid retention days: must be 0, 30, 60, 90, 180, or 365"},
+		{"invalid 999", 999, "invalid retention days: must be 0, 30, 60, 90, 180, or 365"},
+	}
+	for _, tt := range tests {
+		if got := RetentionDays(tt.input); got != tt.want {
+			t.Errorf("RetentionDays(%q [input=%d]) = %q, want %q", tt.name, tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestPassword(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"valid 8 chars", "password", ""},
+		{"valid long", "averylongpassword123!", ""},
+		{"at max 72", string(make([]byte, 72)), ""},
+		{"too short 7", "passwor", "password must be at least 8 characters"},
+		{"empty", "", "password must be at least 8 characters"},
+		{"too long 73", string(make([]byte, 73)), "password must be at most 72 characters"},
+	}
+	for _, tt := range tests {
+		if got := Password(tt.input); got != tt.want {
+			t.Errorf("Password(%q [len=%d]) = %q, want %q", tt.name, len(tt.input), got, tt.want)
+		}
+	}
+}
+
 func TestFieldLimits(t *testing.T) {
 	fl := FieldLimits()
 	if fl["title"] != MaxTitleLength {

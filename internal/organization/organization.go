@@ -293,9 +293,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.RetentionDays != nil {
-		validRetentionDays := map[int]bool{0: true, 30: true, 60: true, 90: true, 180: true, 365: true}
-		if !validRetentionDays[*req.RetentionDays] {
-			httputil.WriteError(w, http.StatusBadRequest, "invalid retention days: must be 0, 30, 60, 90, 180, or 365")
+		if msg := validate.RetentionDays(*req.RetentionDays); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
 			return
 		}
 	}
