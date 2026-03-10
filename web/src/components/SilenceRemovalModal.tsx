@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { formatDuration } from "../utils/format";
 
 interface SilenceSegment {
   start: number;
@@ -13,12 +14,6 @@ interface SilenceRemovalModalProps {
   duration: number;
   onClose: () => void;
   onRemovalStarted: () => void;
-}
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: SilenceRemovalModalProps) {
@@ -228,7 +223,7 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
                 style={{ flexShrink: 0 }}
               />
               <span style={{ color: "var(--color-text-secondary)", fontFamily: "monospace", fontSize: 12, flexShrink: 0 }}>
-                [{formatTime(segment.start)} &ndash; {formatTime(segment.end)}]
+                [{formatDuration(segment.start)} &ndash; {formatDuration(segment.end)}]
               </span>
               <span style={{ color: "var(--color-text-secondary)", fontSize: 12 }}>
                 {(segment.end - segment.start).toFixed(1)}s

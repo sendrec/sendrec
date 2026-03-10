@@ -1,3 +1,5 @@
+import { formatDuration } from "../../utils/format";
+
 interface Comment {
   id: string;
   authorName: string;
@@ -6,12 +8,6 @@ interface Comment {
   isOwner: boolean;
   createdAt: string;
   videoTimestamp: number | null;
-}
-
-function formatTimestamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 function getInitials(name: string): string {
@@ -72,7 +68,7 @@ export function CommentsSection({
                 </span>
                 {comment.videoTimestamp !== null && (
                   <span className="comment-timestamp">
-                    @{formatTimestamp(comment.videoTimestamp)}
+                    @{formatDuration(comment.videoTimestamp)}
                   </span>
                 )}
                 {comment.isPrivate && (

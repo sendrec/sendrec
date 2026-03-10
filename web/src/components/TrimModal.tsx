@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { formatDuration } from "../utils/format";
 
 interface TranscriptSegment {
   start: number;
@@ -14,12 +15,6 @@ interface TrimModalProps {
   duration: number;
   onClose: () => void;
   onTrimStarted: () => void;
-}
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarted }: TrimModalProps) {
@@ -270,9 +265,9 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
             marginBottom: 16,
           }}
         >
-          <span>Start: {formatTime(startSeconds)}</span>
-          <span>Duration: {formatTime(endSeconds - startSeconds)}</span>
-          <span>End: {formatTime(endSeconds)}</span>
+          <span>Start: {formatDuration(startSeconds)}</span>
+          <span>Duration: {formatDuration(endSeconds - startSeconds)}</span>
+          <span>End: {formatDuration(endSeconds)}</span>
         </div>
 
         {segments.length > 0 && (
@@ -326,7 +321,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
                     }}
                   >
                     <span style={{ color: "var(--color-text-secondary)", marginRight: 8, fontFamily: "monospace", fontSize: 12 }}>
-                      [{formatTime(seg.start)}]
+                      [{formatDuration(seg.start)}]
                     </span>
                     <span style={{ color: "var(--color-text)" }}>{seg.text}</span>
                   </div>

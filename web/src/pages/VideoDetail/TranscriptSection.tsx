@@ -6,17 +6,12 @@ import { DocumentModal } from "../../components/DocumentModal";
 import { TRANSCRIPTION_LANGUAGES } from "../../constants/languages";
 import type { Video } from "../../types/video";
 import { LimitsResponse } from "../../types/limits";
+import { formatDuration } from "../../utils/format";
 
 interface TranscriptSegment {
   start: number;
   end: number;
   text: string;
-}
-
-function formatTimestamp(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 interface TranscriptSectionProps {
@@ -144,7 +139,7 @@ export function TranscriptSection({
               {transcriptSegments.map((seg, i) => (
                 <div key={i} className="transcript-segment">
                   <span className="transcript-segment-time">
-                    {formatTimestamp(seg.start)}
+                    {formatDuration(seg.start)}
                   </span>
                   <span className="transcript-segment-text">{seg.text}</span>
                 </div>

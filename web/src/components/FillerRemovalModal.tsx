@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { formatDuration } from "../utils/format";
 
 interface TranscriptSegment {
   start: number;
@@ -17,12 +18,6 @@ interface FillerRemovalModalProps {
 }
 
 const FILLER_PATTERN = /^\s*(?:um+|uh+|uhh+|hmm+|ah+|er+|you know|like|so|basically|actually|right|i mean)[.,!?\s]*$/i;
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStarted }: FillerRemovalModalProps) {
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
@@ -239,7 +234,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
                 style={{ flexShrink: 0 }}
               />
               <span style={{ color: "var(--color-text-secondary)", fontFamily: "monospace", fontSize: 12, flexShrink: 0 }}>
-                [{formatTime(filler.segment.start)}]
+                [{formatDuration(filler.segment.start)}]
               </span>
               <span style={{ color: "var(--color-error)" }}>
                 {filler.segment.text}
