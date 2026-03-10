@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,23 @@ import (
 )
 
 const maxWebhookBodyBytes = 64 * 1024
+
+// billingEntity identifies which table and entity ID a billing operation targets.
+// table must always be a hardcoded constant ("users" or "organizations"), never user input.
+type billingEntity struct {
+	table      string // "users" or "organizations"
+	entityID   string
+	tracksMods bool // true when the table has an updated_at column to refresh
+}
+
+var (
+	userEntity = func(userID string) billingEntity {
+		return billingEntity{table: "users", entityID: userID, tracksMods: false}
+	}
+	orgEntity = func(orgID string) billingEntity {
+		return billingEntity{table: "organizations", entityID: orgID, tracksMods: true}
+	}
+)
 
 type Handlers struct {
 	db                   database.DBTX
@@ -62,46 +80,25 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var productID string
-	switch req.Plan {
-	case "pro":
-		productID = h.proProductID
-	case "business":
-		productID = h.businessProductID
-	default:
-		httputil.WriteError(w, http.StatusBadRequest, "unsupported plan")
-		return
-	}
-
+	productID := h.resolveProductID(req.Plan, false)
 	if productID == "" {
-		httputil.WriteError(w, http.StatusBadRequest, "plan not configured")
+		if req.Plan != "pro" && req.Plan != "business" {
+			httputil.WriteError(w, http.StatusBadRequest, "unsupported plan")
+		} else {
+			httputil.WriteError(w, http.StatusBadRequest, "plan not configured")
+		}
 		return
 	}
 
-	// If user already has an active subscription, upgrade via Creem API (with proration)
-	var subscriptionID *string
-	_ = h.db.QueryRow(r.Context(),
-		"SELECT creem_subscription_id FROM users WHERE id = $1",
-		userID,
-	).Scan(&subscriptionID)
+	entity := userEntity(userID)
 
-	if subscriptionID != nil {
-		info, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, productID)
-		if err != nil {
-			slog.Error("failed to upgrade subscription", "error", err, "user_id", userID)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
-			return
-		}
-		plan := h.planFromProductID(productID)
-		_, err = h.db.Exec(r.Context(),
-			"UPDATE users SET subscription_plan = $1, creem_subscription_id = $2 WHERE id = $3",
-			plan, info.ID, userID,
-		)
-		if err != nil {
-			slog.Error("failed to update user plan after upgrade", "error", err, "user_id", userID)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
-			return
-		}
+	upgraded, plan, err := h.tryUpgradeExistingSubscription(r.Context(), entity, productID)
+	if err != nil {
+		slog.Error("failed to upgrade subscription", "error", err, "user_id", userID)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
+		return
+	}
+	if upgraded {
 		slog.Info("subscription upgraded", "user_id", userID, "plan", plan)
 		httputil.WriteJSON(w, http.StatusOK, map[string]string{"upgraded": plan})
 		return
@@ -116,80 +113,6 @@ func (h *Handlers) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, map[string]string{"checkoutUrl": checkoutURL})
-}
-
-type billingResponse struct {
-	Plan               string  `json:"plan"`
-	SubscriptionID     *string `json:"subscriptionId"`
-	SubscriptionStatus *string `json:"subscriptionStatus"`
-	PortalURL          *string `json:"portalUrl"`
-}
-
-func (h *Handlers) GetBilling(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
-
-	var plan string
-	var subscriptionID *string
-	var customerID *string
-
-	err := h.db.QueryRow(r.Context(),
-		"SELECT subscription_plan, creem_subscription_id, creem_customer_id FROM users WHERE id = $1",
-		userID,
-	).Scan(&plan, &subscriptionID, &customerID)
-	if err != nil {
-		slog.Error("failed to get billing info", "error", err)
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to get billing info")
-		return
-	}
-
-	resp := billingResponse{
-		Plan:           plan,
-		SubscriptionID: subscriptionID,
-	}
-
-	if subscriptionID != nil {
-		info, err := h.creem.GetSubscription(r.Context(), *subscriptionID)
-		if err != nil {
-			slog.Error("failed to get subscription info", "error", err)
-		} else {
-			if info.Customer.PortalURL != "" {
-				resp.PortalURL = &info.Customer.PortalURL
-			}
-			if info.Status != "" {
-				resp.SubscriptionStatus = &info.Status
-			}
-		}
-	}
-
-	httputil.WriteJSON(w, http.StatusOK, resp)
-}
-
-func (h *Handlers) CancelSubscription(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromContext(r.Context())
-
-	var subscriptionID *string
-	err := h.db.QueryRow(r.Context(),
-		"SELECT creem_subscription_id FROM users WHERE id = $1",
-		userID,
-	).Scan(&subscriptionID)
-	if err != nil {
-		slog.Error("failed to get subscription for cancel", "error", err)
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to get subscription")
-		return
-	}
-
-	if subscriptionID == nil {
-		httputil.WriteError(w, http.StatusBadRequest, "no active subscription")
-		return
-	}
-
-	if err := h.creem.CancelSubscription(r.Context(), *subscriptionID); err != nil {
-		slog.Error("failed to cancel subscription", "error", err)
-		httputil.WriteError(w, http.StatusInternalServerError, "failed to cancel subscription")
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handlers) CreateOrgCheckout(w http.ResponseWriter, r *http.Request) {
@@ -212,46 +135,25 @@ func (h *Handlers) CreateOrgCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var orgProductID string
-	switch req.Plan {
-	case "pro":
-		orgProductID = h.orgProProductID
-	case "business":
-		orgProductID = h.orgBusinessProductID
-	default:
-		httputil.WriteError(w, http.StatusBadRequest, "unsupported plan")
+	productID := h.resolveProductID(req.Plan, true)
+	if productID == "" {
+		if req.Plan != "pro" && req.Plan != "business" {
+			httputil.WriteError(w, http.StatusBadRequest, "unsupported plan")
+		} else {
+			httputil.WriteError(w, http.StatusBadRequest, "plan not configured")
+		}
 		return
 	}
 
-	if orgProductID == "" {
-		httputil.WriteError(w, http.StatusBadRequest, "plan not configured")
+	entity := orgEntity(orgID)
+
+	upgraded, plan, err := h.tryUpgradeExistingSubscription(r.Context(), entity, productID)
+	if err != nil {
+		slog.Error("failed to upgrade org subscription", "error", err, "org_id", orgID)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
 		return
 	}
-
-	// If org already has an active subscription, upgrade via Creem API (with proration)
-	var subscriptionID *string
-	_ = h.db.QueryRow(r.Context(),
-		"SELECT creem_subscription_id FROM organizations WHERE id = $1",
-		orgID,
-	).Scan(&subscriptionID)
-
-	if subscriptionID != nil {
-		info, err := h.creem.UpgradeSubscription(r.Context(), *subscriptionID, orgProductID)
-		if err != nil {
-			slog.Error("failed to upgrade org subscription", "error", err, "org_id", orgID)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to upgrade subscription")
-			return
-		}
-		plan := h.planFromProductID(orgProductID)
-		_, err = h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = $1, creem_subscription_id = $2, updated_at = now() WHERE id = $3",
-			plan, info.ID, orgID,
-		)
-		if err != nil {
-			slog.Error("failed to update org plan after upgrade", "error", err, "org_id", orgID)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
-			return
-		}
+	if upgraded {
 		slog.Info("org subscription upgraded", "org_id", orgID, "plan", plan)
 		httputil.WriteJSON(w, http.StatusOK, map[string]string{"upgraded": plan})
 		return
@@ -259,7 +161,7 @@ func (h *Handlers) CreateOrgCheckout(w http.ResponseWriter, r *http.Request) {
 
 	successURL := h.baseURL + "/organizations/" + orgID + "/settings?billing=success"
 	metadata := map[string]string{"userId": userID, "orgId": orgID}
-	checkoutURL, err := h.creem.CreateCheckoutWithMetadata(r.Context(), orgProductID, successURL, metadata)
+	checkoutURL, err := h.creem.CreateCheckoutWithMetadata(r.Context(), productID, successURL, metadata)
 	if err != nil {
 		slog.Error("failed to create org checkout", "error", err, "org_id", orgID)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create checkout")
@@ -267,6 +169,64 @@ func (h *Handlers) CreateOrgCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, map[string]string{"checkoutUrl": checkoutURL})
+}
+
+// resolveProductID returns the product ID for the given plan and whether it is an org plan.
+// Returns empty string when the plan is unknown or not configured.
+func (h *Handlers) resolveProductID(plan string, org bool) string {
+	switch plan {
+	case "pro":
+		if org {
+			return h.orgProProductID
+		}
+		return h.proProductID
+	case "business":
+		if org {
+			return h.orgBusinessProductID
+		}
+		return h.businessProductID
+	default:
+		return ""
+	}
+}
+
+// tryUpgradeExistingSubscription checks whether the entity already has an active subscription
+// and, if so, upgrades it via the Creem API and updates the database.
+// Returns (upgraded, plan, error). When upgraded is false, the caller should proceed to create a new checkout.
+func (h *Handlers) tryUpgradeExistingSubscription(ctx context.Context, entity billingEntity, productID string) (upgraded bool, plan string, err error) {
+	var subscriptionID *string
+	_ = h.db.QueryRow(ctx,
+		fmt.Sprintf("SELECT creem_subscription_id FROM %s WHERE id = $1", entity.table),
+		entity.entityID,
+	).Scan(&subscriptionID)
+
+	if subscriptionID == nil {
+		return false, "", nil
+	}
+
+	info, err := h.creem.UpgradeSubscription(ctx, *subscriptionID, productID)
+	if err != nil {
+		return false, "", err
+	}
+
+	plan = h.planFromProductID(productID)
+	if err := h.updateSubscriptionPlan(ctx, entity, plan, info.ID, ""); err != nil {
+		return false, "", err
+	}
+
+	return true, plan, nil
+}
+
+type billingResponse struct {
+	Plan               string  `json:"plan"`
+	SubscriptionID     *string `json:"subscriptionId"`
+	SubscriptionStatus *string `json:"subscriptionStatus"`
+	PortalURL          *string `json:"portalUrl"`
+}
+
+func (h *Handlers) GetBilling(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	h.fetchAndWriteBilling(w, r, userEntity(userID), true)
 }
 
 func (h *Handlers) GetOrgBilling(w http.ResponseWriter, r *http.Request) {
@@ -283,28 +243,35 @@ func (h *Handlers) GetOrgBilling(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.fetchAndWriteBilling(w, r, orgEntity(orgID), false)
+}
+
+// fetchAndWriteBilling retrieves billing info for the entity and writes a billingResponse.
+// includeSubscriptionID controls whether the subscriptionId field is populated in the response.
+func (h *Handlers) fetchAndWriteBilling(w http.ResponseWriter, r *http.Request, entity billingEntity, includeSubscriptionID bool) {
 	var plan string
 	var subscriptionID *string
 	var customerID *string
 
-	err = h.db.QueryRow(r.Context(),
-		"SELECT subscription_plan, creem_subscription_id, creem_customer_id FROM organizations WHERE id = $1",
-		orgID,
+	err := h.db.QueryRow(r.Context(),
+		fmt.Sprintf("SELECT subscription_plan, creem_subscription_id, creem_customer_id FROM %s WHERE id = $1", entity.table),
+		entity.entityID,
 	).Scan(&plan, &subscriptionID, &customerID)
 	if err != nil {
-		slog.Error("failed to get org billing info", "error", err, "org_id", orgID)
+		slog.Error("failed to get billing info", "error", err, "entity", entity.entityID)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to get billing info")
 		return
 	}
 
-	resp := billingResponse{
-		Plan: plan,
+	resp := billingResponse{Plan: plan}
+	if includeSubscriptionID {
+		resp.SubscriptionID = subscriptionID
 	}
 
 	if subscriptionID != nil {
 		info, err := h.creem.GetSubscription(r.Context(), *subscriptionID)
 		if err != nil {
-			slog.Error("failed to get org subscription info", "error", err, "org_id", orgID)
+			slog.Error("failed to get subscription info", "error", err, "entity", entity.entityID)
 		} else {
 			if info.Customer.PortalURL != "" {
 				resp.PortalURL = &info.Customer.PortalURL
@@ -316,6 +283,11 @@ func (h *Handlers) GetOrgBilling(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handlers) CancelSubscription(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	h.cancelEntitySubscription(w, r, userEntity(userID))
 }
 
 func (h *Handlers) CancelOrgSubscription(w http.ResponseWriter, r *http.Request) {
@@ -332,13 +304,18 @@ func (h *Handlers) CancelOrgSubscription(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	h.cancelEntitySubscription(w, r, orgEntity(orgID))
+}
+
+// cancelEntitySubscription fetches the active subscription for the entity and cancels it via Creem.
+func (h *Handlers) cancelEntitySubscription(w http.ResponseWriter, r *http.Request, entity billingEntity) {
 	var subscriptionID *string
-	err = h.db.QueryRow(r.Context(),
-		"SELECT creem_subscription_id FROM organizations WHERE id = $1",
-		orgID,
+	err := h.db.QueryRow(r.Context(),
+		fmt.Sprintf("SELECT creem_subscription_id FROM %s WHERE id = $1", entity.table),
+		entity.entityID,
 	).Scan(&subscriptionID)
 	if err != nil {
-		slog.Error("failed to get org subscription for cancel", "error", err, "org_id", orgID)
+		slog.Error("failed to get subscription for cancel", "error", err, "entity", entity.entityID)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to get subscription")
 		return
 	}
@@ -349,7 +326,7 @@ func (h *Handlers) CancelOrgSubscription(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := h.creem.CancelSubscription(r.Context(), *subscriptionID); err != nil {
-		slog.Error("failed to cancel org subscription", "error", err, "org_id", orgID)
+		slog.Error("failed to cancel subscription", "error", err, "entity", entity.entityID)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to cancel subscription")
 		return
 	}
@@ -365,10 +342,10 @@ type webhookPayload struct {
 }
 
 type webhookObject struct {
-	ID       string           `json:"id"`
-	Product  webhookProduct   `json:"product"`
-	Customer webhookCustomer  `json:"customer"`
-	Metadata webhookMetadata  `json:"metadata"`
+	ID       string          `json:"id"`
+	Product  webhookProduct  `json:"product"`
+	Customer webhookCustomer `json:"customer"`
+	Metadata webhookMetadata `json:"metadata"`
 }
 
 type webhookProduct struct {
@@ -460,50 +437,24 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 		return
 	}
 
-	if orgID != "" {
-		// Cancel previous subscription if upgrading to a higher plan
-		var oldSubID *string
-		_ = h.db.QueryRow(r.Context(),
-			"SELECT creem_subscription_id FROM organizations WHERE id = $1",
-			orgID,
-		).Scan(&oldSubID)
-		if oldSubID != nil && *oldSubID != payload.Object.ID {
-			if err := h.creem.CancelSubscription(r.Context(), *oldSubID); err != nil {
-				slog.Warn("failed to cancel old org subscription", "error", err, "old_sub", *oldSubID, "org_id", orgID)
-			}
-		}
+	entity := webhookEntity(userID, orgID)
 
-		_, err := h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3, updated_at = now() WHERE id = $4",
-			plan, payload.Object.ID, payload.Object.Customer.ID, orgID,
-		)
-		if err != nil {
-			slog.Error("failed to update org subscription", "error", err, "org_id", orgID)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
-			return
+	// Cancel the previous subscription when upgrading to a higher plan.
+	var oldSubID *string
+	_ = h.db.QueryRow(r.Context(),
+		fmt.Sprintf("SELECT creem_subscription_id FROM %s WHERE id = $1", entity.table),
+		entity.entityID,
+	).Scan(&oldSubID)
+	if oldSubID != nil && *oldSubID != payload.Object.ID {
+		if err := h.creem.CancelSubscription(r.Context(), *oldSubID); err != nil {
+			slog.Warn("failed to cancel old subscription", "error", err, "old_sub", *oldSubID, "entity", entity.entityID)
 		}
-	} else {
-		// Cancel previous subscription if upgrading to a higher plan
-		var oldSubID *string
-		_ = h.db.QueryRow(r.Context(),
-			"SELECT creem_subscription_id FROM users WHERE id = $1",
-			userID,
-		).Scan(&oldSubID)
-		if oldSubID != nil && *oldSubID != payload.Object.ID {
-			if err := h.creem.CancelSubscription(r.Context(), *oldSubID); err != nil {
-				slog.Warn("failed to cancel old user subscription", "error", err, "old_sub", *oldSubID, "user_id", userID)
-			}
-		}
+	}
 
-		_, err := h.db.Exec(r.Context(),
-			"UPDATE users SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3 WHERE id = $4",
-			plan, payload.Object.ID, payload.Object.Customer.ID, userID,
-		)
-		if err != nil {
-			slog.Error("failed to update subscription", "error", err)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
-			return
-		}
+	if err := h.updateSubscriptionPlan(r.Context(), entity, plan, payload.Object.ID, payload.Object.Customer.ID); err != nil {
+		slog.Error("failed to update subscription", "error", err, "entity", entity.entityID)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -512,29 +463,55 @@ func (h *Handlers) handleSubscriptionActivated(r *http.Request, w http.ResponseW
 // handleSubscriptionCanceled downgrades to free but preserves creem_subscription_id
 // and creem_customer_id for audit trail and potential re-subscription.
 func (h *Handlers) handleSubscriptionCanceled(r *http.Request, w http.ResponseWriter, userID, orgID string) {
-	if orgID != "" {
-		_, err := h.db.Exec(r.Context(),
-			"UPDATE organizations SET subscription_plan = $1, updated_at = now() WHERE id = $2",
-			"free", orgID,
-		)
-		if err != nil {
-			slog.Error("failed to cancel org subscription", "error", err, "org_id", orgID)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
-			return
-		}
+	entity := webhookEntity(userID, orgID)
+
+	var query string
+	if entity.tracksMods {
+		query = fmt.Sprintf("UPDATE %s SET subscription_plan = $1, updated_at = now() WHERE id = $2", entity.table)
 	} else {
-		_, err := h.db.Exec(r.Context(),
-			"UPDATE users SET subscription_plan = $1 WHERE id = $2",
-			"free", userID,
-		)
-		if err != nil {
-			slog.Error("failed to cancel subscription", "error", err)
-			httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
-			return
-		}
+		query = fmt.Sprintf("UPDATE %s SET subscription_plan = $1 WHERE id = $2", entity.table)
+	}
+
+	_, err := h.db.Exec(r.Context(), query, "free", entity.entityID)
+	if err != nil {
+		slog.Error("failed to downgrade subscription to free", "error", err, "entity", entity.entityID)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to update subscription")
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// webhookEntity selects the org entity when orgID is set, otherwise the user entity.
+func webhookEntity(userID, orgID string) billingEntity {
+	if orgID != "" {
+		return orgEntity(orgID)
+	}
+	return userEntity(userID)
+}
+
+// updateSubscriptionPlan writes plan and subscription/customer IDs to the entity's table.
+// When customerID is empty the creem_customer_id column is not updated.
+func (h *Handlers) updateSubscriptionPlan(ctx context.Context, entity billingEntity, plan, subscriptionID, customerID string) error {
+	var query string
+	var args []any
+
+	if customerID != "" && entity.tracksMods {
+		query = fmt.Sprintf("UPDATE %s SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3, updated_at = now() WHERE id = $4", entity.table)
+		args = []any{plan, subscriptionID, customerID, entity.entityID}
+	} else if customerID != "" {
+		query = fmt.Sprintf("UPDATE %s SET subscription_plan = $1, creem_subscription_id = $2, creem_customer_id = $3 WHERE id = $4", entity.table)
+		args = []any{plan, subscriptionID, customerID, entity.entityID}
+	} else if entity.tracksMods {
+		query = fmt.Sprintf("UPDATE %s SET subscription_plan = $1, creem_subscription_id = $2, updated_at = now() WHERE id = $3", entity.table)
+		args = []any{plan, subscriptionID, entity.entityID}
+	} else {
+		query = fmt.Sprintf("UPDATE %s SET subscription_plan = $1, creem_subscription_id = $2 WHERE id = $3", entity.table)
+		args = []any{plan, subscriptionID, entity.entityID}
+	}
+
+	_, err := h.db.Exec(ctx, query, args...)
+	return err
 }
 
 func (h *Handlers) verifySignature(body []byte, signature string) bool {
