@@ -61,6 +61,8 @@ func TestSendPasswordReset_Success(t *testing.T) {
 }
 
 func TestSendPasswordReset_ServerError_FallsBackToSendmail(t *testing.T) {
+	t.Setenv("PATH", "") // prevent real sendmail from being invoked
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/subscribers" {
 			w.WriteHeader(http.StatusOK)
