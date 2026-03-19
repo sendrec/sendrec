@@ -403,7 +403,7 @@ func (h *Handler) ListOwnerComments(w http.ResponseWriter, r *http.Request) {
 
 	var ownerID, commentMode string
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.user_id, v.comment_mode FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3`,
+		`SELECT user_id, comment_mode FROM videos WHERE id = $1 AND user_id = $2 AND organization_id IS NOT DISTINCT FROM $3`,
 		videoID, userID, orgScope(r.Context()),
 	).Scan(&ownerID, &commentMode)
 	if err != nil {

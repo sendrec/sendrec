@@ -1316,7 +1316,7 @@ func TestListOwnerComments_ReturnsAllComments(t *testing.T) {
 	now := time.Now()
 	commenterID := "commenter-1"
 
-	mock.ExpectQuery(`SELECT v\.user_id, v\.comment_mode FROM videos WHERE id = \$1 AND user_id = \$2`).
+	mock.ExpectQuery(`SELECT user_id, comment_mode FROM videos WHERE id = \$1 AND user_id = \$2`).
 		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"user_id", "comment_mode"}).AddRow(testUserID, "anonymous"))
 
@@ -1361,7 +1361,7 @@ func TestListOwnerComments_NotOwner_Returns404(t *testing.T) {
 
 	videoID := "video-123"
 
-	mock.ExpectQuery(`SELECT v\.user_id, v\.comment_mode FROM videos WHERE id = \$1 AND user_id = \$2`).
+	mock.ExpectQuery(`SELECT user_id, comment_mode FROM videos WHERE id = \$1 AND user_id = \$2`).
 		WithArgs(videoID, testUserID, (*string)(nil)).
 		WillReturnRows(pgxmock.NewRows([]string{"user_id", "comment_mode"}))
 
