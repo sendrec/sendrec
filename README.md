@@ -9,6 +9,21 @@ The async video platform built for Europe. Open source, GDPR native, EU hosted.
 
 SendRec is an open-source alternative to Loom for teams that need their data to stay in the EU. Record your screen, share videos with your team, and keep full control of your data.
 
+## How SendRec Compares
+
+| | SendRec | Loom | Cap | Zight |
+|---|---|---|---|---|
+| Open source | Yes (AGPL) | No | Yes (AGPL) | No |
+| Self-hostable | Yes | No | Yes | No |
+| Browser recording | Yes | Yes | No | Yes |
+| EU data residency | Yes | No | No | No |
+| Team workspaces | Yes | Yes | No | Limited |
+| SSO / SAML | Yes | Enterprise | No | Enterprise |
+| AI transcription | Yes (local) | $20/user | Paid | No |
+| Per-viewer analytics | Yes | Yes | No | No |
+| Free commercial use | Yes | N/A | No | N/A |
+| Pricing | €0–12/month | $15–20/user | $12/month | $9–11/user |
+
 ### Record
 
 Record your screen, camera, or both — directly in the browser. Works on Chrome, Safari, and Firefox. Records MP4 natively when supported, with automatic WebM fallback. A 3-2-1 countdown gives you time to prepare. Pause and resume, draw annotations live, flip between front and back cameras on mobile.
