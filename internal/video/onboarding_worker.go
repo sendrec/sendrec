@@ -21,9 +21,7 @@ func processOnboardingDay2(ctx context.Context, db database.DBTX, sender Onboard
 		   AND created_at < now() - interval '2 days'
 		   AND onboarding_day2_sent_at IS NULL
 		   AND NOT EXISTS (
-		     SELECT 1 FROM video_views WHERE video_id IN (
-		       SELECT id FROM videos WHERE user_id = users.id
-		     )
+		     SELECT 1 FROM videos WHERE user_id = users.id
 		   )
 		 LIMIT 50`)
 	if err != nil {
