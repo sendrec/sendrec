@@ -84,6 +84,7 @@ type Server struct {
 	webFS               fs.FS
 	enableDocs          bool
 	registrationEnabled bool
+	analyticsScript     string
 }
 
 func New(cfg Config) *Server {
@@ -96,7 +97,7 @@ func New(cfg Config) *Server {
 		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
 	}))
 
-	s := &Server{router: r, version: cfg.Version, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled}
+	s := &Server{router: r, version: cfg.Version, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, analyticsScript: cfg.AnalyticsScript}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -513,7 +514,7 @@ func (s *Server) routes() {
 	}
 
 	if s.webFS != nil {
-		spa := newSPAFileServer(s.webFS)
+		spa := newSPAFileServer(s.webFS, s.analyticsScript)
 		s.router.NotFound(spa.ServeHTTP)
 	}
 }
