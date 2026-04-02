@@ -566,6 +566,55 @@ func TestSPAReturns404ForMissingStaticFiles(t *testing.T) {
 	}
 }
 
+func TestSPAInjectsAnalyticsScript(t *testing.T) {
+	webFS := fstest.MapFS{
+		"index.html": {Data: []byte("<!DOCTYPE html><html><head><title>App</title></head><body></body></html>")},
+	}
+	script := `<script defer src="/script.js" data-website-id="test-123"></script>`
+	srv := server.New(server.Config{WebFS: webFS, AnalyticsScript: script})
+
+	rec := executeRequest(srv, http.MethodGet, "/")
+	body := rec.Body.String()
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if !strings.Contains(body, script) {
+		t.Errorf("expected analytics script in response body, got %q", body)
+	}
+	if !strings.Contains(body, script+"\n</head>") {
+		t.Errorf("expected analytics script before </head>, got %q", body)
+	}
+}
+
+func TestSPAOmitsAnalyticsScriptWhenEmpty(t *testing.T) {
+	srv := newServerWithSPA(testWebFS())
+	rec := executeRequest(srv, http.MethodGet, "/")
+
+	body := rec.Body.String()
+	if strings.Contains(body, "data-website-id") {
+		t.Errorf("expected no analytics script when not configured, got %q", body)
+	}
+}
+
+func TestSPAInjectsAnalyticsScriptOnFallbackRoutes(t *testing.T) {
+	webFS := fstest.MapFS{
+		"index.html": {Data: []byte("<!DOCTYPE html><html><head><title>App</title></head><body></body></html>")},
+	}
+	script := `<script defer src="/script.js" data-website-id="test-123"></script>`
+	srv := server.New(server.Config{WebFS: webFS, AnalyticsScript: script})
+
+	rec := executeRequest(srv, http.MethodGet, "/settings/profile")
+	body := rec.Body.String()
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if !strings.Contains(body, script) {
+		t.Errorf("expected analytics script on SPA fallback route, got %q", body)
+	}
+}
+
 // --- Route Registration (no SPA FS) ---
 
 func TestUnknownRouteReturns404WithoutSPA(t *testing.T) {

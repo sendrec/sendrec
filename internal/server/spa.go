@@ -8,14 +8,16 @@ import (
 )
 
 type spaFileServer struct {
-	fileServer http.Handler
-	fileSystem fs.FS
+	fileServer      http.Handler
+	fileSystem      fs.FS
+	analyticsScript string
 }
 
-func newSPAFileServer(fsys fs.FS) *spaFileServer {
+func newSPAFileServer(fsys fs.FS, analyticsScript string) *spaFileServer {
 	return &spaFileServer{
-		fileServer: http.FileServer(http.FS(fsys)),
-		fileSystem: fsys,
+		fileServer:      http.FileServer(http.FS(fsys)),
+		fileSystem:      fsys,
+		analyticsScript: analyticsScript,
 	}
 }
 
@@ -34,6 +36,11 @@ func (s *spaFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.URL.Path = "/"
 	}
 
+	if r.URL.Path == "/" && s.analyticsScript != "" {
+		s.serveIndexWithStatus(w, http.StatusOK)
+		return
+	}
+
 	s.fileServer.ServeHTTP(w, r)
 }
 
@@ -42,6 +49,9 @@ func (s *spaFileServer) serveIndexWithStatus(w http.ResponseWriter, status int) 
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
+	}
+	if s.analyticsScript != "" {
+		data = []byte(strings.Replace(string(data), "</head>", s.analyticsScript+"\n</head>", 1))
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
