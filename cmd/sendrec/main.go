@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -139,7 +140,7 @@ func main() {
 		TranscriptionEnabled:    getEnv("TRANSCRIPTION_ENABLED", "false") == "true",
 		NoiseReductionFilter:    os.Getenv("NOISE_REDUCTION_FILTER"),
 		AllowedFrameAncestors:   os.Getenv("ALLOWED_FRAME_ANCESTORS"),
-		AnalyticsScript:         os.Getenv("ANALYTICS_SCRIPT"),
+		AnalyticsScript:         strings.ReplaceAll(os.Getenv("ANALYTICS_SCRIPT"), `\"`, `"`),
 		EmailSender:             emailClient,
 		CommentNotifier:         emailClient,
 		ViewNotifier:            emailClient,
