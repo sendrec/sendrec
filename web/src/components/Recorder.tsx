@@ -23,6 +23,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const screenStreamRef = useRef<MediaStream | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
 
   const webcamStreamRef = useRef<MediaStream | null>(null);
   const webcamRecorderRef = useRef<MediaRecorder | null>(null);
@@ -68,13 +69,21 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
   }, []);
 
+  const stopMicStream = useCallback(() => {
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+    }
+  }, []);
+
   const stopAllStreams = useCallback(() => {
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((track) => track.stop());
       screenStreamRef.current = null;
     }
+    stopMicStream();
     stopWebcamStream();
-  }, [stopWebcamStream]);
+  }, [stopMicStream, stopWebcamStream]);
 
   // Stable refs for callbacks passed to useRecording to avoid stale closure issues
   const stopRecordingRef = useRef<() => void>(() => {});
@@ -206,6 +215,26 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       const screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
       screenStreamRef.current = screenStream;
 
+      // Capture microphone audio separately — getDisplayMedia only provides
+      // system/tab audio, never microphone input. We merge the mic track into
+      // a combined stream so MediaRecorder captures both video and voice.
+      let recordingStream = screenStream;
+      if (systemAudioEnabled) {
+        try {
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          micStreamRef.current = micStream;
+
+          const combinedTracks = [
+            ...screenStream.getVideoTracks(),
+            ...screenStream.getAudioTracks(),
+            ...micStream.getAudioTracks(),
+          ];
+          recordingStream = new MediaStream(combinedTracks);
+        } catch (micErr) {
+          console.warn("Microphone access denied, recording without mic audio", micErr);
+        }
+      }
+
       // Play screen stream on preview video first
       if (screenVideoRef.current) {
         screenVideoRef.current.srcObject = screenStream;
@@ -231,15 +260,14 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       // Start compositing loop (for visual preview only)
       startCompositing();
 
-      // Record the original display stream directly — NOT through the canvas.
-      // Canvas compositing freezes when the tab goes to the background because
-      // requestAnimationFrame/setInterval are throttled and the video element
-      // stops decoding frames. The raw getDisplayMedia stream keeps capturing
-      // regardless of tab visibility.
+      // Record the combined stream (screen video + system audio + mic audio)
+      // directly — NOT through the canvas. Canvas compositing freezes when the
+      // tab goes to the background because requestAnimationFrame/setInterval are
+      // throttled. The raw streams keep capturing regardless of tab visibility.
       const mimeType = getSupportedMimeType();
       mimeTypeRef.current = mimeType;
 
-      const recorder = new MediaRecorder(screenStream, {
+      const recorder = new MediaRecorder(recordingStream, {
         mimeType,
       });
       mediaRecorderRef.current = recorder;
@@ -323,7 +351,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         mimeTypeRef.current = webmMimeType;
         chunksRef.current = [];
 
-        const fallback = new MediaRecorder(screenStream, { mimeType: webmMimeType });
+        const fallback = new MediaRecorder(recordingStream, { mimeType: webmMimeType });
         mediaRecorderRef.current = fallback;
         fallback.ondataavailable = handleDataAvailable;
         fallback.onstop = handleStop;
