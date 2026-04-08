@@ -24,6 +24,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   const chunksRef = useRef<Blob[]>([]);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const webcamStreamRef = useRef<MediaStream | null>(null);
   const webcamRecorderRef = useRef<MediaRecorder | null>(null);
@@ -73,6 +74,10 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     if (micStreamRef.current) {
       micStreamRef.current.getTracks().forEach((track) => track.stop());
       micStreamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
     }
   }, []);
 
@@ -216,20 +221,32 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       screenStreamRef.current = screenStream;
 
       // Capture microphone audio separately — getDisplayMedia only provides
-      // system/tab audio, never microphone input. We merge the mic track into
-      // a combined stream so MediaRecorder captures both video and voice.
-      let recordingStream = screenStream;
+      // system/tab audio, never microphone input. MediaRecorder only records
+      // one audio track, so we use AudioContext to mix system + mic audio
+      // into a single track.
+      let recordingStream: MediaStream = screenStream;
       if (systemAudioEnabled) {
         try {
           const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
           micStreamRef.current = micStream;
 
-          const combinedTracks = [
+          const audioContext = new AudioContext();
+          audioContextRef.current = audioContext;
+          const destination = audioContext.createMediaStreamDestination();
+
+          // Connect system audio (if present) to the mixer
+          if (screenStream.getAudioTracks().length > 0) {
+            audioContext.createMediaStreamSource(screenStream).connect(destination);
+          }
+
+          // Connect microphone to the mixer
+          audioContext.createMediaStreamSource(micStream).connect(destination);
+
+          // Build recording stream: screen video + mixed audio
+          recordingStream = new MediaStream([
             ...screenStream.getVideoTracks(),
-            ...screenStream.getAudioTracks(),
-            ...micStream.getAudioTracks(),
-          ];
-          recordingStream = new MediaStream(combinedTracks);
+            ...destination.stream.getAudioTracks(),
+          ]);
         } catch (micErr) {
           console.warn("Microphone access denied, recording without mic audio", micErr);
         }
