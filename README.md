@@ -9,8 +9,6 @@ Open-source async video messaging. Self-host it on your own infrastructure.
 
 SendRec is an open-source alternative to Loom that you self-host on your own infrastructure. Record your screen, share videos with your team, and keep full control of your data. GDPR native, runs anywhere Docker runs.
 
-> **Note:** The hosted service at app.sendrec.eu is shutting down on August 31, 2026. SendRec continues as a fully open-source, self-hosted project.
-
 ## How SendRec Compares
 
 | | SendRec | Loom | Cap | Zight |
