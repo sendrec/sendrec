@@ -16,13 +16,21 @@ type OIDCConfig struct {
 	ClientSecret string
 	RedirectURL  string
 	Scopes       []string
+	// AllowedEmailDomains, when non-empty, restricts sign-in to users whose
+	// verified email address matches one of the listed domains exactly
+	// (case-insensitive, without a leading '@'; subdomains are not implied).
+	// The provider must emit an `email_verified` claim equal to true; missing
+	// or false is rejected. Configure per provider — the field is not shared
+	// across providers and currently only Google sets it from env vars.
+	AllowedEmailDomains []string
 }
 
 // OIDCProvider authenticates users via the OpenID Connect protocol.
 type OIDCProvider struct {
-	provider    *oidc.Provider
-	verifier    *oidc.IDTokenVerifier
-	oauthConfig oauth2.Config
+	provider            *oidc.Provider
+	verifier            *oidc.IDTokenVerifier
+	oauthConfig         oauth2.Config
+	allowedEmailDomains []string
 }
 
 // NewOIDCProvider performs OIDC discovery on the issuer URL and returns a
@@ -62,10 +70,53 @@ func NewOIDCProvider(ctx context.Context, cfg OIDCConfig) (*OIDCProvider, error)
 	verifier := provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
 
 	return &OIDCProvider{
-		provider:    provider,
-		verifier:    verifier,
-		oauthConfig: oauthCfg,
+		provider:            provider,
+		verifier:            verifier,
+		oauthConfig:         oauthCfg,
+		allowedEmailDomains: normalizeDomains(cfg.AllowedEmailDomains),
 	}, nil
+}
+
+func normalizeDomains(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(in))
+	for _, d := range in {
+		d = strings.TrimSpace(d)
+		d = strings.TrimPrefix(d, "@")
+		d = strings.ToLower(d)
+		if d != "" {
+			out = append(out, d)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// matchAllowedDomain reports whether the email's domain is in the allowlist.
+// emailVerified must be true; the caller is responsible for surfacing an error
+// when an unverified email is presented while the allowlist is active.
+func (p *OIDCProvider) checkEmailAllowed(email string, emailVerified bool) error {
+	if len(p.allowedEmailDomains) == 0 {
+		return nil
+	}
+	if !emailVerified {
+		return fmt.Errorf("email %q is not verified by the identity provider", email)
+	}
+	at := strings.LastIndex(email, "@")
+	if at < 0 || at == len(email)-1 {
+		return fmt.Errorf("email %q is malformed", email)
+	}
+	domain := strings.ToLower(email[at+1:])
+	for _, allowed := range p.allowedEmailDomains {
+		if domain == allowed {
+			return nil
+		}
+	}
+	return fmt.Errorf("email domain %q is not in the allowed list", domain)
 }
 
 // AuthURL returns the authorization URL the user should be redirected to.
@@ -97,12 +148,17 @@ func (p *OIDCProvider) extractFromIDToken(ctx context.Context, rawIDToken string
 	}
 
 	var claims struct {
-		Subject string `json:"sub"`
-		Email   string `json:"email"`
-		Name    string `json:"name"`
+		Subject       string `json:"sub"`
+		Email         string `json:"email"`
+		EmailVerified bool   `json:"email_verified"`
+		Name          string `json:"name"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("parse id token claims: %w", err)
+	}
+
+	if err := p.checkEmailAllowed(claims.Email, claims.EmailVerified); err != nil {
+		return nil, err
 	}
 
 	return &UserInfo{
@@ -121,10 +177,15 @@ func (p *OIDCProvider) extractFromUserInfo(ctx context.Context, token *oauth2.To
 	}
 
 	var claims struct {
-		Name string `json:"name"`
+		Name          string `json:"name"`
+		EmailVerified bool   `json:"email_verified"`
 	}
 	if err := userInfo.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("parse userinfo claims: %w", err)
+	}
+
+	if err := p.checkEmailAllowed(userInfo.Email, claims.EmailVerified); err != nil {
+		return nil, err
 	}
 
 	return &UserInfo{

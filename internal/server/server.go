@@ -63,6 +63,7 @@ type Config struct {
 	GeoIPDBPath             string
 	GoogleClientID          string
 	GoogleClientSecret      string
+	GoogleAllowedDomains    []string
 	MicrosoftClientID       string
 	MicrosoftClientSecret   string
 	GitHubSSOClientID       string
@@ -169,10 +170,11 @@ func New(cfg Config) *Server {
 
 		if cfg.GoogleClientID != "" {
 			googleProvider, err := sso.NewOIDCProvider(context.Background(), sso.OIDCConfig{
-				IssuerURL:    "https://accounts.google.com",
-				ClientID:     cfg.GoogleClientID,
-				ClientSecret: cfg.GoogleClientSecret,
-				RedirectURL:  baseURL + "/api/auth/sso/google/callback",
+				IssuerURL:           "https://accounts.google.com",
+				ClientID:            cfg.GoogleClientID,
+				ClientSecret:        cfg.GoogleClientSecret,
+				RedirectURL:         baseURL + "/api/auth/sso/google/callback",
+				AllowedEmailDomains: cfg.GoogleAllowedDomains,
 			})
 			if err == nil {
 				s.ssoHandler.RegisterProvider("google", googleProvider)

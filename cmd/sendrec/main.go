@@ -154,6 +154,7 @@ func main() {
 		CreemOrgBusinessProductID: creemOrgBusinessProductID,
 		GoogleClientID:          getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:      getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleAllowedDomains:    email.ParseAllowlist(getEnv("GOOGLE_AUTH_ALLOWED_DOMAINS", "")),
 		MicrosoftClientID:       getEnv("MICROSOFT_CLIENT_ID", ""),
 		MicrosoftClientSecret:   getEnv("MICROSOFT_CLIENT_SECRET", ""),
 		GitHubSSOClientID:       getEnv("GITHUB_SSO_CLIENT_ID", ""),
