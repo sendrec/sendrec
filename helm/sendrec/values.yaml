@@ -111,7 +111,7 @@ sendrec:
   livenessProbe:
     httpGet:
       path: /api/health
-      port: 8080
+      port: http
     initialDelaySeconds: 30
     periodSeconds: 30
     timeoutSeconds: 10
@@ -120,7 +120,7 @@ sendrec:
   readinessProbe:
     httpGet:
       path: /api/health
-      port: 8080
+      port: http
     initialDelaySeconds: 10
     periodSeconds: 15
     timeoutSeconds: 10
