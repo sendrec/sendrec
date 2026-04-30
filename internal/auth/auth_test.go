@@ -135,9 +135,18 @@ func TestRegister_Success_NoEmailBackend_AutoVerifies(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
 	}
 
-	resp := decodeMessageResponse(t, rec)
-	if !strings.Contains(resp.Message, "sign in") {
-		t.Errorf("expected message to indicate user can sign in, got %q", resp.Message)
+	var rr struct {
+		Message                   string `json:"message"`
+		RequiresEmailConfirmation bool   `json:"requiresEmailConfirmation"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &rr); err != nil {
+		t.Fatalf("decode register response: %v", err)
+	}
+	if !strings.Contains(rr.Message, "sign in") {
+		t.Errorf("expected message to indicate user can sign in, got %q", rr.Message)
+	}
+	if rr.RequiresEmailConfirmation {
+		t.Error("expected requiresEmailConfirmation=false for auto-verify path")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

@@ -121,6 +121,19 @@ components:
         message:
           type: string
 
+    RegisterResponse:
+      type: object
+      required: [message, requiresEmailConfirmation]
+      properties:
+        message:
+          type: string
+        requiresEmailConfirmation:
+          type: boolean
+          description: |-
+            When false, the account was created with `email_verified=true` because no
+            email backend (Listmonk / SMTP / sendmail) is configured. The client should
+            redirect to `/login` instead of `/check-email`.
+
     UserResponse:
       type: object
       required: [name, email]
@@ -1713,7 +1726,10 @@ paths:
     post:
       tags: [Authentication]
       summary: Register a new user
-      description: Rate limited to 0.5 requests per second with a burst of 5. Returns 403 when registration is disabled via `REGISTRATION_ENABLED=false`.
+      description: |-
+        Rate limited to 0.5 requests per second with a burst of 5. Returns 403 when registration is disabled via `REGISTRATION_ENABLED=false`.
+
+        When no email backend (Listmonk / SMTP / sendmail) is configured the account is created with `email_verified=true` and the response sets `requiresEmailConfirmation=false` so the client can route the user straight to login instead of the check-your-email page.
       operationId: register
       requestBody:
         required: true
@@ -1723,11 +1739,11 @@ paths:
               $ref: "#/components/schemas/RegisterRequest"
       responses:
         "201":
-          description: Account created. A confirmation email is sent.
+          description: Account created. The body's `requiresEmailConfirmation` field tells the client whether a confirmation email was sent.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MessageResponse"
+                $ref: "#/components/schemas/RegisterResponse"
         "400":
           description: Validation error
           content:
@@ -1907,7 +1923,10 @@ paths:
     post:
       tags: [Authentication]
       summary: Resend confirmation email
-      description: Always returns 200 to prevent email enumeration. If the email exists and is unverified, a new confirmation email is sent. Token expires in 24 hours.
+      description: |-
+        When an email backend is configured, returns 200 to prevent email enumeration; if the email exists and is unverified, a new confirmation email is sent (24-hour expiry).
+
+        When no email backend is configured the endpoint returns 400 with `email backend not configured` because new accounts auto-verify and resend has no effect.
       operationId: resendConfirmation
       requestBody:
         required: true
@@ -1923,7 +1942,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
         "400":
-          description: Validation error
+          description: Validation error or no email backend configured
           content:
             application/json:
               schema:

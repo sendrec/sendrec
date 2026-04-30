@@ -103,11 +103,12 @@ func main() {
 		DeveloperEmail:               os.Getenv("DEVELOPER_EMAIL"),
 		FromAddress:                  getEnv("EMAIL_FROM_ADDRESS", "noreply@sendrec.eu"),
 
-		SMTPHost:     os.Getenv("SMTP_HOST"),
-		SMTPPort:     int(getEnvInt64("SMTP_PORT", 587)),
-		SMTPUsername: os.Getenv("SMTP_USERNAME"),
-		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
-		SMTPTLS:      getEnv("SMTP_TLS", "starttls"),
+		SMTPHost:        os.Getenv("SMTP_HOST"),
+		SMTPPort:        int(getEnvInt64("SMTP_PORT", 587)),
+		SMTPUsername:    os.Getenv("SMTP_USERNAME"),
+		SMTPPassword:    os.Getenv("SMTP_PASSWORD"),
+		SMTPTLS:         getEnv("SMTP_TLS", "starttls"),
+		SendmailEnabled: getEnv("EMAIL_USE_SENDMAIL", "false") == "true",
 	})
 
 	logEmailBackend()
@@ -253,6 +254,8 @@ func logEmailBackend() {
 		slog.Info("email backend: listmonk", "url", os.Getenv("LISTMONK_URL"))
 	case os.Getenv("SMTP_HOST") != "":
 		slog.Info("email backend: smtp", "host", os.Getenv("SMTP_HOST"), "tls", getEnv("SMTP_TLS", "starttls"))
+	case getEnv("EMAIL_USE_SENDMAIL", "false") == "true":
+		slog.Info("email backend: sendmail")
 	default:
 		slog.Warn("email backend: none — new registrations will auto-verify; existing unverified users cannot log in until manually flipped via SQL: UPDATE users SET email_verified = true WHERE email_verified = false")
 	}

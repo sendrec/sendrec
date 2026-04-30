@@ -28,19 +28,23 @@ export function Register() {
     password: string;
     name: string;
   }) {
-    await apiFetch<{ message: string }>(
-      "/api/auth/register",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          name: data.name,
-        }),
-      }
-    );
+    const res = await apiFetch<{
+      message: string;
+      requiresEmailConfirmation?: boolean;
+    }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({
+        email: data.email,
+        password: data.password,
+        name: data.name,
+      }),
+    });
 
-    navigate("/check-email", { state: { email: data.email } });
+    if (res?.requiresEmailConfirmation === false) {
+      navigate("/login", { state: { email: data.email, justRegistered: true } });
+    } else {
+      navigate("/check-email", { state: { email: data.email } });
+    }
   }
 
   const redirect = searchParams.get("redirect");

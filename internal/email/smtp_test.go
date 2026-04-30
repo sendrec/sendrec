@@ -406,6 +406,50 @@ func TestSendTx_SMTP_StartTLSDefaultIsRequired(t *testing.T) {
 	}
 }
 
+func TestSendTx_SMTP_StalledServer_ContextCancelUnblocks(t *testing.T) {
+	// Fake server accepts but never speaks SMTP — caller must not hang.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			// Hold the connection open without writing the 220 banner.
+			go func(c net.Conn) {
+				time.Sleep(2 * time.Second)
+				_ = c.Close()
+			}(c)
+		}
+	}()
+
+	host, port := splitHostPort(t, ln.Addr().String())
+	client := New(Config{
+		SMTPHost:    host,
+		SMTPPort:    port,
+		SMTPTLS:     "none",
+		FromAddress: "noreply@sendrec.eu",
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err = client.SendPasswordReset(ctx, "alice@example.com", "Alice", "https://example.com/reset")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error from stalled SMTP server, got nil")
+	}
+	if elapsed > 1500*time.Millisecond {
+		t.Errorf("call took %v, expected <1.5s — context cancellation not honored", elapsed)
+	}
+}
+
 func TestHasBackend(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -415,8 +459,9 @@ func TestHasBackend(t *testing.T) {
 		{"no backend", Config{}, false},
 		{"listmonk only", Config{BaseURL: "https://listmonk.example"}, true},
 		{"smtp only", Config{SMTPHost: "smtp.example", SMTPPort: 587}, true},
-		{"both", Config{BaseURL: "https://listmonk.example", SMTPHost: "smtp.example"}, true},
-		{"smtp host without port", Config{SMTPHost: "smtp.example"}, true}, // host alone counts; port has default
+		{"sendmail only", Config{SendmailEnabled: true}, true},
+		{"both listmonk and smtp", Config{BaseURL: "https://listmonk.example", SMTPHost: "smtp.example"}, true},
+		{"smtp host alone", Config{SMTPHost: "smtp.example"}, true}, // SMTPPort defaults inside sendViaSMTP
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

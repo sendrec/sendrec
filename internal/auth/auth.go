@@ -81,6 +81,11 @@ type messageResponse struct {
 	Message string `json:"message"`
 }
 
+type registerResponse struct {
+	Message                    string `json:"message"`
+	RequiresEmailConfirmation  bool   `json:"requiresEmailConfirmation"`
+}
+
 const resetTokenExpiry = 1 * time.Hour
 const confirmTokenExpiry = 24 * time.Hour
 
@@ -154,7 +159,10 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if autoVerify {
-		httputil.WriteJSON(w, http.StatusCreated, messageResponse{Message: "Account created. You can sign in now."})
+		httputil.WriteJSON(w, http.StatusCreated, registerResponse{
+			Message:                   "Account created. You can sign in now.",
+			RequiresEmailConfirmation: false,
+		})
 		return
 	}
 
@@ -186,7 +194,10 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		slog.Error("register: failed to send confirmation email", "error", err)
 	}
 
-	httputil.WriteJSON(w, http.StatusCreated, messageResponse{Message: "Account created. Check your email to confirm your address."})
+	httputil.WriteJSON(w, http.StatusCreated, registerResponse{
+		Message:                   "Account created. Check your email to confirm your address.",
+		RequiresEmailConfirmation: true,
+	})
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {

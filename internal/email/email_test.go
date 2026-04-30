@@ -73,10 +73,11 @@ func TestSendPasswordReset_ServerError_FallsBackToSendmail(t *testing.T) {
 	defer srv.Close()
 
 	client := New(Config{
-		BaseURL:    srv.URL,
-		Username:   "admin",
-		Password:   "secret",
-		TemplateID: 5,
+		BaseURL:         srv.URL,
+		Username:        "admin",
+		Password:        "secret",
+		TemplateID:      5,
+		SendmailEnabled: true,
 	})
 
 	// Listmonk 500 triggers sendmail fallback (graceful, no error)
@@ -1125,10 +1126,11 @@ func TestSendmail_FallbackOnListmonkError(t *testing.T) {
 	defer srv.Close()
 
 	client := New(Config{
-		BaseURL:    srv.URL,
-		Username:   "admin",
-		Password:   "bad-token",
-		TemplateID: 5,
+		BaseURL:         srv.URL,
+		Username:        "admin",
+		Password:        "bad-token",
+		TemplateID:      5,
+		SendmailEnabled: true,
 	})
 
 	// Listmonk returns 403, should fall back to sendmail (or skip gracefully)
@@ -1141,7 +1143,8 @@ func TestSendmail_FallbackOnListmonkError(t *testing.T) {
 
 func TestSendmail_FallbackWhenNoListmonk(t *testing.T) {
 	client := New(Config{
-		FromAddress: "test@sendrec.eu",
+		FromAddress:     "test@sendrec.eu",
+		SendmailEnabled: true,
 	})
 
 	// Without Listmonk, sendmail fallback is attempted.
@@ -1155,7 +1158,7 @@ func TestSendmail_FallbackWhenNoListmonk(t *testing.T) {
 }
 
 func TestSendmail_AllEmailTypesWork(t *testing.T) {
-	client := New(Config{})
+	client := New(Config{SendmailEnabled: true})
 
 	// All email types should work without Listmonk configured
 	tests := []struct {

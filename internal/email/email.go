@@ -38,10 +38,16 @@ type Config struct {
 	SMTPPort     int
 	SMTPUsername string
 	SMTPPassword string
-	// SMTPTLS controls transport security: "auto" (default) tries STARTTLS,
-	// falls back to plaintext; "starttls" requires STARTTLS; "tls" uses
-	// implicit TLS (port 465); "none" forces plaintext.
+	// SMTPTLS controls transport security: "starttls" (default) requires
+	// STARTTLS; "tls" uses implicit TLS (port 465); "auto" tries STARTTLS and
+	// falls back to plaintext; "none" forces plaintext.
 	SMTPTLS string
+
+	// SendmailEnabled opts the deployment into the local sendmail(8) binary
+	// as a backend of last resort. Off by default — when no Listmonk/SMTP is
+	// configured and this flag is false, registrations auto-verify and
+	// transactional mail is dropped with a warning.
+	SendmailEnabled bool
 }
 
 type Client struct {
@@ -147,7 +153,7 @@ func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
 // HasBackend reports whether any email delivery backend is configured.
 // When false, registration code may skip the email-confirmation flow.
 func (c *Client) HasBackend() bool {
-	return c.config.BaseURL != "" || c.config.SMTPHost != ""
+	return c.config.BaseURL != "" || c.config.SMTPHost != "" || c.config.SendmailEnabled
 }
 
 func (c *Client) sendTx(ctx context.Context, body txRequest) error {
@@ -157,7 +163,11 @@ func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 		if c.config.SMTPHost != "" {
 			return c.sendViaSMTP(ctx, body.SubscriberEmail, body.subject, body.Body)
 		}
-		return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
+		if c.config.SendmailEnabled {
+			return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
+		}
+		slog.Warn("no email backend configured, dropping message", "to", body.SubscriberEmail, "subject", body.subject)
+		return nil
 	}
 
 	jsonBody, err := json.Marshal(body)
@@ -175,14 +185,20 @@ func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		slog.Warn("listmonk request failed, falling back to sendmail", "error", err)
-		return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
+		if c.config.SendmailEnabled {
+			slog.Warn("listmonk request failed, falling back to sendmail", "error", err)
+			return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
+		}
+		return fmt.Errorf("listmonk send: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		slog.Warn("listmonk returned error, falling back to sendmail", "status", resp.StatusCode)
-		return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
+		if c.config.SendmailEnabled {
+			slog.Warn("listmonk returned error, falling back to sendmail", "status", resp.StatusCode)
+			return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
+		}
+		return fmt.Errorf("listmonk send: status %d", resp.StatusCode)
 	}
 
 	return nil
@@ -220,6 +236,23 @@ func (c *Client) sendViaSMTP(ctx context.Context, to, subject, htmlBody string) 
 		return fmt.Errorf("smtp dial: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
+
+	// Bound the entire SMTP session: every read/write past this point inherits
+	// this deadline so a stalled relay cannot hang the request handler.
+	if err := conn.SetDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		return fmt.Errorf("smtp set deadline: %w", err)
+	}
+	// Honor caller cancellation: closing the conn forces in-flight reads/writes
+	// to return immediately.
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close()
+		case <-doneCh:
+		}
+	}()
 
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
