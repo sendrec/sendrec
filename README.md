@@ -132,14 +132,14 @@ sendrec:
   env:
     baseUrl: "https://sendrec.yourdomain.com"
     s3Endpoint: "https://s3.amazonaws.com"
-    s3PublicEndpoint: "https://cdn.yourdomain.com"
+    s3PublicEndpoint: "https://s3.amazonaws.com"
     s3Bucket: "your-bucket-name"
     s3Region: "eu-central-1"
     transcriptionEnabled: "false"
     googleAuthAllowedDomains: "example.com"
 
   secrets:
-    databaseUrl: "postgres://sendrec:secret@postgres:5432/sendrec?sslmode=disable"
+    databaseUrl: "postgres://sendrec:secret@postgres:5432/sendrec"
     jwtSecret: "change-me-to-a-long-random-string"
     s3AccessKey: "your-access-key"
     s3SecretKey: "your-secret-key"
@@ -148,7 +148,7 @@ sendrec:
 Install the chart:
 
 ```bash
-helm upgrade --install sendrec ./helm/sendrec \
+helm install sendrec ./helm/sendrec \
   --namespace sendrec \
   --create-namespace
 ```
