@@ -56,8 +56,16 @@ type Client struct {
 	sendmailAvailable bool
 }
 
+const defaultFromAddress = "noreply@sendrec.eu"
+
 func New(cfg Config) *Client {
 	cfg.SMTPTLS = normalizeSMTPTLS(cfg.SMTPTLS)
+	if cfg.SMTPPort == 0 {
+		cfg.SMTPPort = 587
+	}
+	if cfg.FromAddress == "" {
+		cfg.FromAddress = defaultFromAddress
+	}
 	c := &Client{
 		config: cfg,
 		http:   &http.Client{Timeout: 10 * time.Second},
@@ -207,13 +215,9 @@ func (c *Client) HasBackend() bool {
 func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 	body.SubscriberEmail = c.resolveRecipient(body.SubscriberEmail)
 
-	from := c.config.FromAddress
-	if from == "" {
-		from = "noreply@sendrec.eu"
-	}
 	// Validate at the boundary: covers SMTP, sendmail, and any future header
 	// surface (e.g. a Listmonk template that interpolates Data into Subject).
-	if err := validateMessageHeaders(from, body.SubscriberEmail, body.subject); err != nil {
+	if err := validateMessageHeaders(c.config.FromAddress, body.SubscriberEmail, body.subject); err != nil {
 		return err
 	}
 
@@ -289,17 +293,10 @@ func validateMessageHeaders(from, to, subject string) error {
 }
 
 func (c *Client) sendViaSMTP(ctx context.Context, to, subject, htmlBody string) error {
+	// SMTPTLS, SMTPPort and FromAddress are normalised at construction; trust them here.
 	host := c.config.SMTPHost
 	port := c.config.SMTPPort
-	if port == 0 {
-		port = 587
-	}
 	from := c.config.FromAddress
-	if from == "" {
-		from = "noreply@sendrec.eu"
-	}
-	// header CRLF rejection happens upstream in sendTx.
-	// SMTPTLS is normalized at construction; sendViaSMTP can trust it.
 	mode := c.config.SMTPTLS
 
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
@@ -387,14 +384,9 @@ func (c *Client) sendViaSendmail(ctx context.Context, to, subject, htmlBody stri
 		return nil
 	}
 
-	from := c.config.FromAddress
-	if from == "" {
-		from = "noreply@sendrec.eu"
-	}
-
 	// header CRLF rejection happens upstream in sendTx.
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
-		from, to, subject, htmlBody)
+		c.config.FromAddress, to, subject, htmlBody)
 
 	cmd := exec.CommandContext(ctx, "sendmail", "-t")
 	cmd.Stdin = strings.NewReader(msg)
