@@ -40,6 +40,10 @@ export function Register() {
       }),
     });
 
+    // Strict `=== false` is intentional: undefined (older server, malformed
+    // response) routes to /check-email so the user is told to look for the
+    // confirmation link, matching the pre-flag behaviour. Only an explicit
+    // `false` short-circuits to /login.
     if (res?.requiresEmailConfirmation === false) {
       navigate("/login", { state: { email: data.email, justRegistered: true } });
     } else {

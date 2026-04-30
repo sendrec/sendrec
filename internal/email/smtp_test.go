@@ -22,10 +22,6 @@ type fakeSMTPServer struct {
 	mu       sync.Mutex
 	captured []capturedMessage
 
-	// authConfig (optional) — when set, AUTH PLAIN is required
-	authUser, authPass string
-	requireAuth        bool
-
 	// responses — flip to inject failure cases
 	authShouldFail bool
 
@@ -65,14 +61,6 @@ func (s *fakeSMTPServer) Captured() []capturedMessage {
 	out := make([]capturedMessage, len(s.captured))
 	copy(out, s.captured)
 	return out
-}
-
-func (s *fakeSMTPServer) RequireAuth(user, pass string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.requireAuth = true
-	s.authUser = user
-	s.authPass = pass
 }
 
 func (s *fakeSMTPServer) FailAuth() {
