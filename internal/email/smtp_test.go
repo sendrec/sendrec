@@ -2,8 +2,10 @@ package email
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -486,9 +488,22 @@ func TestNew_SendmailEnabledButMissingBinary_DoesNotCountAsBackend(t *testing.T)
 	// PATH cleared so exec.LookPath("sendmail") fails inside New().
 	t.Setenv("PATH", "")
 
+	var logBuf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logBuf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
 	c := New(Config{SendmailEnabled: true})
 	if c.HasBackend() {
 		t.Error("HasBackend() must be false when sendmail is enabled but binary is missing")
+	}
+
+	out := logBuf.String()
+	if !strings.Contains(out, "email backend: none") {
+		t.Errorf("expected startup log to say 'email backend: none', got: %s", out)
+	}
+	if strings.Contains(out, "email backend: sendmail") {
+		t.Errorf("startup log incorrectly claims sendmail backend when binary is missing: %s", out)
 	}
 }
 

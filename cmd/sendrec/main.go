@@ -111,8 +111,6 @@ func main() {
 		SendmailEnabled: getEnv("EMAIL_USE_SENDMAIL", "false") == "true",
 	})
 
-	logEmailBackend()
-
 	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
 
 	slackClient := slackpkg.New(db.Pool)
@@ -248,15 +246,3 @@ func getEnvInt64(key string, fallback int64) int64 {
 	return fallback
 }
 
-func logEmailBackend() {
-	switch {
-	case os.Getenv("LISTMONK_URL") != "":
-		slog.Info("email backend: listmonk", "url", os.Getenv("LISTMONK_URL"))
-	case os.Getenv("SMTP_HOST") != "":
-		slog.Info("email backend: smtp", "host", os.Getenv("SMTP_HOST"), "tls", getEnv("SMTP_TLS", "starttls"))
-	case getEnv("EMAIL_USE_SENDMAIL", "false") == "true":
-		slog.Info("email backend: sendmail")
-	default:
-		slog.Warn("email backend: none — new registrations will auto-verify; existing unverified users cannot log in until manually flipped via SQL: UPDATE users SET email_verified = true WHERE email_verified = false")
-	}
-}

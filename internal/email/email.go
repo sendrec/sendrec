@@ -68,7 +68,28 @@ func New(cfg Config) *Client {
 			slog.Warn("EMAIL_USE_SENDMAIL=true but sendmail binary not found on PATH; treating as no backend", "error", err)
 		}
 	}
+	c.logBackend()
 	return c
+}
+
+// logBackend emits a single line describing the backend that will actually be
+// used at request time. Reflects the resolved state (e.g. SendmailEnabled but
+// missing binary -> "none"), not just the raw env vars.
+func (c *Client) logBackend() {
+	switch {
+	case c.config.BaseURL != "":
+		slog.Info("email backend: listmonk", "url", c.config.BaseURL)
+	case c.config.SMTPHost != "":
+		mode := c.config.SMTPTLS
+		if mode == "" {
+			mode = "starttls"
+		}
+		slog.Info("email backend: smtp", "host", c.config.SMTPHost, "tls", mode)
+	case c.sendmailAvailable:
+		slog.Info("email backend: sendmail")
+	default:
+		slog.Warn("email backend: none — new registrations will auto-verify; existing unverified users cannot log in until manually flipped via SQL: UPDATE users SET email_verified = true WHERE email_verified = false")
+	}
 }
 
 type txRequest struct {
