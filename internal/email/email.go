@@ -207,6 +207,16 @@ func (c *Client) HasBackend() bool {
 func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 	body.SubscriberEmail = c.resolveRecipient(body.SubscriberEmail)
 
+	from := c.config.FromAddress
+	if from == "" {
+		from = "noreply@sendrec.eu"
+	}
+	// Validate at the boundary: covers SMTP, sendmail, and any future header
+	// surface (e.g. a Listmonk template that interpolates Data into Subject).
+	if err := validateMessageHeaders(from, body.SubscriberEmail, body.subject); err != nil {
+		return err
+	}
+
 	if c.config.BaseURL == "" {
 		if c.config.SMTPHost != "" {
 			return c.sendViaSMTP(ctx, body.SubscriberEmail, body.subject, body.Body)
@@ -288,9 +298,7 @@ func (c *Client) sendViaSMTP(ctx context.Context, to, subject, htmlBody string) 
 	if from == "" {
 		from = "noreply@sendrec.eu"
 	}
-	if err := validateMessageHeaders(from, to, subject); err != nil {
-		return err
-	}
+	// header CRLF rejection happens upstream in sendTx.
 	// SMTPTLS is normalized at construction; sendViaSMTP can trust it.
 	mode := c.config.SMTPTLS
 
@@ -384,10 +392,7 @@ func (c *Client) sendViaSendmail(ctx context.Context, to, subject, htmlBody stri
 		from = "noreply@sendrec.eu"
 	}
 
-	if err := validateMessageHeaders(from, to, subject); err != nil {
-		return err
-	}
-
+	// header CRLF rejection happens upstream in sendTx.
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
 		from, to, subject, htmlBody)
 

@@ -372,7 +372,7 @@ Set `SMTP_HOST` to enable a direct SMTP relay (Gmail, SES, Postmark, your own se
 | `SMTP_PORT` | SMTP server port (default `587`) |
 | `SMTP_USERNAME` | Auth username (omit for unauthenticated relays) |
 | `SMTP_PASSWORD` | Auth password / app password |
-| `SMTP_TLS` | `starttls` (default — fails if server does not advertise STARTTLS), `tls` (implicit TLS, use port 465), `auto` (try STARTTLS, fall back to plaintext — **not recommended for credentials**), or `none` (plaintext) |
+| `SMTP_TLS` | `starttls` (default — fails if server does not advertise STARTTLS), `tls` (implicit TLS, use port 465), `auto` (try STARTTLS, fall back to plaintext — **not recommended for credentials**), or `none` (plaintext). Any other value (typo, whitespace, unsupported keyword) is coerced to `starttls` with a startup warning so a misconfigured `start_tls` cannot silently downgrade to plaintext. |
 | `EMAIL_FROM_ADDRESS` | `From:` address used for both Listmonk and SMTP (default `noreply@sendrec.eu`) |
 
 #### Sendmail (opt-in fallback)
