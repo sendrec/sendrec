@@ -62,8 +62,9 @@ func newOIDCTestServer(t *testing.T) (*httptest.Server, *rsa.PrivateKey) {
 		now := time.Now()
 		claims := struct {
 			josejwt.Claims
-			Email string `json:"email"`
-			Name  string `json:"name"`
+			Email         string `json:"email"`
+			EmailVerified bool   `json:"email_verified"`
+			Name          string `json:"name"`
 		}{
 			Claims: josejwt.Claims{
 				Issuer:    serverURL,
@@ -73,8 +74,9 @@ func newOIDCTestServer(t *testing.T) (*httptest.Server, *rsa.PrivateKey) {
 				Expiry:    josejwt.NewNumericDate(now.Add(time.Hour)),
 				NotBefore: josejwt.NewNumericDate(now.Add(-time.Minute)),
 			},
-			Email: "oidc@example.com",
-			Name:  "OIDC User",
+			Email:         "oidc@example.com",
+			EmailVerified: true,
+			Name:          "OIDC User",
 		}
 
 		rawToken, err := josejwt.Signed(signer).Claims(claims).Serialize()
@@ -251,5 +253,269 @@ func TestNewOIDCProvider_InvalidIssuer(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("NewOIDCProvider() expected error for invalid issuer")
+	}
+}
+
+// oidcTestOpts controls behavior of newOIDCTestServerWithEmail.
+type oidcTestOpts struct {
+	email           string
+	emailVerified   bool
+	useUserInfoOnly bool // if true, omit id_token from /token; rely on /userinfo
+}
+
+// newOIDCTestServerWithEmail starts an OIDC test server whose token and
+// userinfo endpoints emit a configurable email address and email_verified flag.
+// When opts.useUserInfoOnly is true, the /token endpoint omits id_token, forcing
+// the provider to fall back to the /userinfo endpoint.
+func newOIDCTestServerWithEmail(t *testing.T, opts oidcTestOpts) *httptest.Server {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+
+	var serverURL string
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                 serverURL,
+			"authorization_endpoint": serverURL + "/authorize",
+			"token_endpoint":         serverURL + "/token",
+			"userinfo_endpoint":      serverURL + "/userinfo",
+			"jwks_uri":               serverURL + "/jwks",
+			"id_token_signing_alg_values_supported": []string{"RS256"},
+		})
+	})
+	mux.HandleFunc("GET /jwks", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &privateKey.PublicKey, KeyID: "test-key", Algorithm: "RS256", Use: "sig"}}}
+		_ = json.NewEncoder(w).Encode(jwks)
+	})
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"access_token": "mock-access-token",
+			"token_type":   "Bearer",
+		}
+		if !opts.useUserInfoOnly {
+			signer, err := jose.NewSigner(
+				jose.SigningKey{Algorithm: jose.RS256, Key: privateKey},
+				(&jose.SignerOptions{}).WithHeader("kid", "test-key"),
+			)
+			if err != nil {
+				http.Error(w, "signer error", 500)
+				return
+			}
+			now := time.Now()
+			claims := struct {
+				josejwt.Claims
+				Email         string `json:"email"`
+				EmailVerified bool   `json:"email_verified"`
+				Name          string `json:"name"`
+			}{
+				Claims: josejwt.Claims{
+					Issuer:    serverURL,
+					Subject:   "oidc-user-123",
+					Audience:  josejwt.Audience{"test-client-id"},
+					IssuedAt:  josejwt.NewNumericDate(now),
+					Expiry:    josejwt.NewNumericDate(now.Add(time.Hour)),
+					NotBefore: josejwt.NewNumericDate(now.Add(-time.Minute)),
+				},
+				Email:         opts.email,
+				EmailVerified: opts.emailVerified,
+				Name:          "OIDC User",
+			}
+			rawToken, err := josejwt.Signed(signer).Claims(claims).Serialize()
+			if err != nil {
+				http.Error(w, "token error", 500)
+				return
+			}
+			resp["id_token"] = rawToken
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+	mux.HandleFunc("GET /userinfo", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"sub":            "oidc-user-123",
+			"email":          opts.email,
+			"email_verified": opts.emailVerified,
+			"name":           "OIDC User",
+		})
+	})
+
+	server := httptest.NewServer(mux)
+	serverURL = server.URL
+	return server
+}
+
+func TestOIDCProvider_Exchange_AllowedDomain_Match(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{email: "user@allowed.com", emailVerified: true})
+	defer server.Close()
+
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:           server.URL,
+		ClientID:            "test-client-id",
+		ClientSecret:        "test-client-secret",
+		RedirectURL:         "http://localhost/callback",
+		AllowedEmailDomains: []string{"allowed.com", "other.com"},
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	info, err := provider.Exchange(context.Background(), "code")
+	if err != nil {
+		t.Fatalf("Exchange() error: %v", err)
+	}
+	if info.Email != "user@allowed.com" {
+		t.Errorf("Email = %q, want %q", info.Email, "user@allowed.com")
+	}
+}
+
+func TestOIDCProvider_Exchange_AllowedDomain_NoMatch(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{email: "user@blocked.com", emailVerified: true})
+	defer server.Close()
+
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:           server.URL,
+		ClientID:            "test-client-id",
+		ClientSecret:        "test-client-secret",
+		RedirectURL:         "http://localhost/callback",
+		AllowedEmailDomains: []string{"allowed.com"},
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	if _, err := provider.Exchange(context.Background(), "code"); err == nil {
+		t.Fatal("Exchange() expected error for blocked domain, got nil")
+	} else if !strings.Contains(err.Error(), "not in the allowed list") {
+		t.Fatalf("Exchange() error = %v, want 'not in the allowed list'", err)
+	}
+}
+
+func TestOIDCProvider_Exchange_AllowedDomain_Unverified(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{email: "user@allowed.com", emailVerified: false})
+	defer server.Close()
+
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:           server.URL,
+		ClientID:            "test-client-id",
+		ClientSecret:        "test-client-secret",
+		RedirectURL:         "http://localhost/callback",
+		AllowedEmailDomains: []string{"allowed.com"},
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	if _, err := provider.Exchange(context.Background(), "code"); err == nil {
+		t.Fatal("Exchange() expected error for unverified email, got nil")
+	} else if !strings.Contains(err.Error(), "not verified") {
+		t.Fatalf("Exchange() error = %v, want 'not verified'", err)
+	}
+}
+
+func TestOIDCProvider_Exchange_AllowedDomain_CaseInsensitive(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{email: "User@Allowed.COM", emailVerified: true})
+	defer server.Close()
+
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:           server.URL,
+		ClientID:            "test-client-id",
+		ClientSecret:        "test-client-secret",
+		RedirectURL:         "http://localhost/callback",
+		AllowedEmailDomains: []string{"  @ALLOWED.com  ", ""},
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	if _, err := provider.Exchange(context.Background(), "code"); err != nil {
+		t.Fatalf("Exchange() should accept case-insensitive domain match, got: %v", err)
+	}
+}
+
+func TestOIDCProvider_Exchange_AllowedDomain_UserInfoPath_Match(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{
+		email:           "user@allowed.com",
+		emailVerified:   true,
+		useUserInfoOnly: true,
+	})
+	defer server.Close()
+
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:           server.URL,
+		ClientID:            "test-client-id",
+		ClientSecret:        "test-client-secret",
+		RedirectURL:         "http://localhost/callback",
+		AllowedEmailDomains: []string{"allowed.com"},
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	info, err := provider.Exchange(context.Background(), "code")
+	if err != nil {
+		t.Fatalf("Exchange() error: %v", err)
+	}
+	if info.Email != "user@allowed.com" {
+		t.Errorf("Email = %q, want %q", info.Email, "user@allowed.com")
+	}
+}
+
+func TestOIDCProvider_Exchange_AllowedDomain_UserInfoPath_NoMatch(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{
+		email:           "user@blocked.com",
+		emailVerified:   true,
+		useUserInfoOnly: true,
+	})
+	defer server.Close()
+
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:           server.URL,
+		ClientID:            "test-client-id",
+		ClientSecret:        "test-client-secret",
+		RedirectURL:         "http://localhost/callback",
+		AllowedEmailDomains: []string{"allowed.com"},
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	if _, err := provider.Exchange(context.Background(), "code"); err == nil {
+		t.Fatal("Exchange() expected error for blocked domain via userinfo, got nil")
+	} else if !strings.Contains(err.Error(), "not in the allowed list") {
+		t.Fatalf("Exchange() error = %v, want 'not in the allowed list'", err)
+	}
+}
+
+func TestOIDCProvider_Exchange_AllowedDomain_UserInfoPath_Unverified(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{
+		email:           "user@allowed.com",
+		emailVerified:   false,
+		useUserInfoOnly: true,
+	})
+	defer server.Close()
+
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:           server.URL,
+		ClientID:            "test-client-id",
+		ClientSecret:        "test-client-secret",
+		RedirectURL:         "http://localhost/callback",
+		AllowedEmailDomains: []string{"allowed.com"},
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	if _, err := provider.Exchange(context.Background(), "code"); err == nil {
+		t.Fatal("Exchange() expected error for unverified email via userinfo, got nil")
+	} else if !strings.Contains(err.Error(), "not verified") {
+		t.Fatalf("Exchange() error = %v, want 'not verified'", err)
 	}
 }

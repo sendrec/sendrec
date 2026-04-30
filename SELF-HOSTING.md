@@ -300,6 +300,7 @@ SendRec supports Google, Microsoft, and GitHub as social login providers via OAu
 | `MICROSOFT_CLIENT_SECRET` | Microsoft (Entra ID) OAuth 2.0 client secret |
 | `GITHUB_SSO_CLIENT_ID` | GitHub OAuth App client ID |
 | `GITHUB_SSO_CLIENT_SECRET` | GitHub OAuth App client secret |
+| `GOOGLE_AUTH_ALLOWED_DOMAINS` | Comma-separated list of email domains permitted to sign in with Google (e.g. `example.com,partner.com`). When set, only verified Google accounts whose email domain matches one of these entries can authenticate. Exact match only — `example.com` does **not** imply `mail.example.com`. Leave unset to allow any Google account |
 
 Configure the following authorized redirect URIs in each provider's console (replace `<your-base-url>` with your `BASE_URL`, no trailing slash):
 
