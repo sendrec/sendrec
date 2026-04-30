@@ -344,8 +344,8 @@ SendRec uses [Listmonk](https://listmonk.app) for transactional emails. Only the
 
 | Variable | Description |
 |----------|-------------|
-| `LISTMONK_BASE_URL` | Listmonk instance URL |
-| `LISTMONK_USERNAME` | Listmonk API username |
+| `LISTMONK_URL` | Listmonk instance URL |
+| `LISTMONK_USER` | Listmonk API username |
 | `LISTMONK_PASSWORD` | Listmonk API password |
 | `LISTMONK_TEMPLATE_ID` | Template ID for share link emails (optional — fallback sends plain email) |
 | `LISTMONK_COMMENT_TEMPLATE_ID` | Template ID for new comment notifications (optional) |
