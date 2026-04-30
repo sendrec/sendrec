@@ -30,9 +30,6 @@ Create a deployment-specific values file (for example `values-prod.yaml`) and ke
 
 ```yaml
 sendrec:
-  image:
-    tag: "v1.84.4"
-
   env:
     baseUrl: "https://sendrec.yourdomain.com"
     s3Endpoint: "https://s3.amazonaws.com"
