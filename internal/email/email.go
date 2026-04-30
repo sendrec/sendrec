@@ -17,21 +17,21 @@ import (
 )
 
 type Config struct {
-	BaseURL           string
-	Username          string
-	Password          string
-	TemplateID        int
-	CommentTemplateID int
-	ViewTemplateID    int
-	ConfirmTemplateID int
-	WelcomeTemplateID        int
-	OnboardingDay2TemplateID int
-	OnboardingDay7TemplateID int
-	OrgInviteTemplateID          int
-	RetentionWarningTemplateID   int
-	Allowlist                    []string
-	DeveloperEmail               string
-	FromAddress                  string
+	BaseURL                    string
+	Username                   string
+	Password                   string
+	TemplateID                 int
+	CommentTemplateID          int
+	ViewTemplateID             int
+	ConfirmTemplateID          int
+	WelcomeTemplateID          int
+	OnboardingDay2TemplateID   int
+	OnboardingDay7TemplateID   int
+	OrgInviteTemplateID        int
+	RetentionWarningTemplateID int
+	Allowlist                  []string
+	DeveloperEmail             string
+	FromAddress                string
 
 	// SMTP backend (used when Listmonk BaseURL not set).
 	SMTPHost     string
@@ -51,15 +51,24 @@ type Config struct {
 }
 
 type Client struct {
-	config Config
-	http   *http.Client
+	config            Config
+	http              *http.Client
+	sendmailAvailable bool
 }
 
 func New(cfg Config) *Client {
-	return &Client{
+	c := &Client{
 		config: cfg,
 		http:   &http.Client{Timeout: 10 * time.Second},
 	}
+	if cfg.SendmailEnabled {
+		if _, err := exec.LookPath("sendmail"); err == nil {
+			c.sendmailAvailable = true
+		} else {
+			slog.Warn("EMAIL_USE_SENDMAIL=true but sendmail binary not found on PATH; treating as no backend", "error", err)
+		}
+	}
+	return c
 }
 
 type txRequest struct {
@@ -150,10 +159,13 @@ func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
 	_ = resp.Body.Close()
 }
 
-// HasBackend reports whether any email delivery backend is configured.
+// HasBackend reports whether any email delivery backend is actually usable.
 // When false, registration code may skip the email-confirmation flow.
+// Note: SendmailEnabled alone is not enough — the binary must exist on PATH;
+// otherwise messages would be silently dropped and confirmation links would
+// never reach the user.
 func (c *Client) HasBackend() bool {
-	return c.config.BaseURL != "" || c.config.SMTPHost != "" || c.config.SendmailEnabled
+	return c.config.BaseURL != "" || c.config.SMTPHost != "" || c.sendmailAvailable
 }
 
 func (c *Client) sendTx(ctx context.Context, body txRequest) error {
@@ -163,7 +175,7 @@ func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 		if c.config.SMTPHost != "" {
 			return c.sendViaSMTP(ctx, body.SubscriberEmail, body.subject, body.Body)
 		}
-		if c.config.SendmailEnabled {
+		if c.sendmailAvailable {
 			return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
 		}
 		slog.Warn("no email backend configured, dropping message", "to", body.SubscriberEmail, "subject", body.subject)
@@ -185,7 +197,7 @@ func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		if c.config.SendmailEnabled {
+		if c.sendmailAvailable {
 			slog.Warn("listmonk request failed, falling back to sendmail", "error", err)
 			return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
 		}
@@ -194,13 +206,39 @@ func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		if c.config.SendmailEnabled {
+		if c.sendmailAvailable {
 			slog.Warn("listmonk returned error, falling back to sendmail", "status", resp.StatusCode)
 			return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
 		}
 		return fmt.Errorf("listmonk send: status %d", resp.StatusCode)
 	}
 
+	return nil
+}
+
+// rejectCRLF returns an error if v contains CR or LF, which would let an
+// attacker inject extra SMTP headers (e.g. Bcc:, From:) via user-controlled
+// values like organization names. Header values must be a single line.
+func rejectCRLF(field, v string) error {
+	if strings.ContainsAny(v, "\r\n") {
+		return fmt.Errorf("invalid %s header: contains CR/LF", field)
+	}
+	return nil
+}
+
+// validateMessageHeaders rejects any field that would expose a CRLF-injection
+// vector. Body is allowed to contain newlines (it is the message payload after
+// the blank-line separator).
+func validateMessageHeaders(from, to, subject string) error {
+	if err := rejectCRLF("From", from); err != nil {
+		return err
+	}
+	if err := rejectCRLF("To", to); err != nil {
+		return err
+	}
+	if err := rejectCRLF("Subject", subject); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -213,6 +251,9 @@ func (c *Client) sendViaSMTP(ctx context.Context, to, subject, htmlBody string) 
 	from := c.config.FromAddress
 	if from == "" {
 		from = "noreply@sendrec.eu"
+	}
+	if err := validateMessageHeaders(from, to, subject); err != nil {
+		return err
 	}
 	mode := strings.ToLower(c.config.SMTPTLS)
 	if mode == "" {
@@ -307,6 +348,10 @@ func (c *Client) sendViaSendmail(ctx context.Context, to, subject, htmlBody stri
 	from := c.config.FromAddress
 	if from == "" {
 		from = "noreply@sendrec.eu"
+	}
+
+	if err := validateMessageHeaders(from, to, subject); err != nil {
+		return err
 	}
 
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",

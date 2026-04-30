@@ -394,8 +394,8 @@ func TestSendTx_SMTP_StartTLSDefaultIsRequired(t *testing.T) {
 	host, port := splitHostPort(t, s.Addr())
 
 	client := New(Config{
-		SMTPHost:    host,
-		SMTPPort:    port,
+		SMTPHost: host,
+		SMTPPort: port,
 		// SMTPTLS intentionally unset
 		FromAddress: "noreply@sendrec.eu",
 	})
@@ -450,6 +450,60 @@ func TestSendTx_SMTP_StalledServer_ContextCancelUnblocks(t *testing.T) {
 	}
 }
 
+func TestSendTx_SMTP_RejectsCRLFInSubject(t *testing.T) {
+	s := newFakeSMTPServer(t)
+	host, port := splitHostPort(t, s.Addr())
+
+	client := New(Config{
+		SMTPHost:    host,
+		SMTPPort:    port,
+		SMTPTLS:     "none",
+		FromAddress: "noreply@sendrec.eu",
+	})
+
+	err := client.SendOrgInvite(context.Background(),
+		"alice@example.com",
+		"Evil Org\r\nBcc: attacker@evil.com",
+		"Mallory",
+		"https://example.com/invite/abc")
+	if err == nil {
+		t.Fatal("expected CRLF rejection, got nil")
+	}
+	if !strings.Contains(err.Error(), "CR/LF") {
+		t.Errorf("expected CR/LF rejection error, got: %v", err)
+	}
+	if got := s.Captured(); len(got) != 0 {
+		t.Errorf("expected no SMTP delivery on CRLF reject, got: %+v", got)
+	}
+}
+
+func TestSendTx_SMTP_RejectsCRLFInFrom(t *testing.T) {
+	s := newFakeSMTPServer(t)
+	host, port := splitHostPort(t, s.Addr())
+
+	client := New(Config{
+		SMTPHost:    host,
+		SMTPPort:    port,
+		SMTPTLS:     "none",
+		FromAddress: "noreply@sendrec.eu\r\nBcc: attacker@evil.com",
+	})
+
+	err := client.SendConfirmation(context.Background(), "alice@example.com", "Alice", "https://example.com/confirm")
+	if err == nil {
+		t.Fatal("expected CRLF rejection on From, got nil")
+	}
+}
+
+func TestNew_SendmailEnabledButMissingBinary_DoesNotCountAsBackend(t *testing.T) {
+	// PATH cleared so exec.LookPath("sendmail") fails inside New().
+	t.Setenv("PATH", "")
+
+	c := New(Config{SendmailEnabled: true})
+	if c.HasBackend() {
+		t.Error("HasBackend() must be false when sendmail is enabled but binary is missing")
+	}
+}
+
 func TestHasBackend(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -459,7 +513,9 @@ func TestHasBackend(t *testing.T) {
 		{"no backend", Config{}, false},
 		{"listmonk only", Config{BaseURL: "https://listmonk.example"}, true},
 		{"smtp only", Config{SMTPHost: "smtp.example", SMTPPort: 587}, true},
-		{"sendmail only", Config{SendmailEnabled: true}, true},
+		// "sendmail only" depends on exec.LookPath at runtime — covered separately by
+		// TestNew_SendmailEnabledButMissingBinary_DoesNotCountAsBackend and a positive
+		// case set via the unexported field below.
 		{"both listmonk and smtp", Config{BaseURL: "https://listmonk.example", SMTPHost: "smtp.example"}, true},
 		{"smtp host alone", Config{SMTPHost: "smtp.example"}, true}, // SMTPPort defaults inside sendViaSMTP
 	}
@@ -471,6 +527,15 @@ func TestHasBackend(t *testing.T) {
 			}
 		})
 	}
+
+	// Positive sendmail case: simulate the binary being available regardless of host.
+	t.Run("sendmail enabled and available", func(t *testing.T) {
+		c := New(Config{SendmailEnabled: true})
+		c.sendmailAvailable = true
+		if !c.HasBackend() {
+			t.Error("expected HasBackend()=true when SendmailEnabled and sendmail is on PATH")
+		}
+	})
 }
 
 func splitHostPort(t *testing.T, addr string) (string, int) {

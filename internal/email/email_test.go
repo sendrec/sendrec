@@ -79,6 +79,7 @@ func TestSendPasswordReset_ServerError_FallsBackToSendmail(t *testing.T) {
 		TemplateID:      5,
 		SendmailEnabled: true,
 	})
+	client.sendmailAvailable = true // pretend sendmail is on PATH regardless of CI environment
 
 	// Listmonk 500 triggers sendmail fallback (graceful, no error)
 	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
@@ -1132,6 +1133,7 @@ func TestSendmail_FallbackOnListmonkError(t *testing.T) {
 		TemplateID:      5,
 		SendmailEnabled: true,
 	})
+	client.sendmailAvailable = true
 
 	// Listmonk returns 403, should fall back to sendmail (or skip gracefully)
 	err := client.SendPasswordReset(context.Background(),

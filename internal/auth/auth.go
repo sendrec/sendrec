@@ -82,8 +82,8 @@ type messageResponse struct {
 }
 
 type registerResponse struct {
-	Message                    string `json:"message"`
-	RequiresEmailConfirmation  bool   `json:"requiresEmailConfirmation"`
+	Message                   string `json:"message"`
+	RequiresEmailConfirmation bool   `json:"requiresEmailConfirmation"`
 }
 
 const resetTokenExpiry = 1 * time.Hour

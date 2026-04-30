@@ -375,7 +375,23 @@ Set `SMTP_HOST` to enable a direct SMTP relay (Gmail, SES, Postmark, your own se
 | `SMTP_TLS` | `starttls` (default — fails if server does not advertise STARTTLS), `tls` (implicit TLS, use port 465), `auto` (try STARTTLS, fall back to plaintext — **not recommended for credentials**), or `none` (plaintext) |
 | `EMAIL_FROM_ADDRESS` | `From:` address used for both Listmonk and SMTP (default `noreply@sendrec.eu`) |
 
-**No email backend at all:** Leave both `LISTMONK_URL` and `SMTP_HOST` unset. New accounts skip email confirmation and can sign in immediately.
+#### Sendmail (opt-in fallback)
+
+If you run a local MTA (postfix, exim, etc.) and want SendRec to use the `sendmail(8)` binary, set:
+
+| Variable | Description |
+|----------|-------------|
+| `EMAIL_USE_SENDMAIL` | `true` to enable. Off by default. The binary must be on `$PATH` — if it isn't, the deployment is treated as having no email backend (registrations auto-verify). |
+
+When enabled, sendmail is also used as a fallback if Listmonk is set but the request fails.
+
+**No email backend at all:** Leave `LISTMONK_URL`, `SMTP_HOST`, and `EMAIL_USE_SENDMAIL` unset. New accounts skip email confirmation and can sign in immediately. Existing unverified users from a previous configuration will be blocked from login until `email_verified` is flipped manually:
+
+```sql
+UPDATE users SET email_verified = true WHERE email_verified = false;
+```
+
+**Upgrade note:** Pre-1.85 builds silently used `sendmail(8)` whenever Listmonk wasn't configured. With this release, sendmail is opt-in via `EMAIL_USE_SENDMAIL=true`. If your deployment relied on the implicit sendmail fallback, set the variable explicitly.
 
 ### Social login / SSO (optional)
 
