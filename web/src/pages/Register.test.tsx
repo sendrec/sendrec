@@ -22,9 +22,9 @@ function mockHealthResponse(registrationEnabled: boolean) {
   );
 }
 
-function renderRegister() {
+function renderRegister(initialEntries: string[] = ["/register"]) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <Register />
     </MemoryRouter>
   );
@@ -92,6 +92,27 @@ describe("Register", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/login", {
       state: { email: "alice@example.com", justRegistered: true },
     });
+  });
+
+  it("preserves ?redirect query when no-email-backend path lands on login", async () => {
+    mockHealthResponse(true);
+    const user = userEvent.setup();
+    mockApiFetch.mockResolvedValueOnce({
+      message: "Account created. You can sign in now.",
+      requiresEmailConfirmation: false,
+    });
+    renderRegister(["/register?redirect=%2Forganizations%2Finvites%2Fabc"]);
+
+    await user.type(await screen.findByLabelText("Name"), "Alice");
+    await user.type(screen.getByLabelText("Email"), "alice@example.com");
+    await user.type(screen.getByLabelText(/^Password/), "password123");
+    await user.type(screen.getByLabelText("Confirm password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      "/login?redirect=%2Forganizations%2Finvites%2Fabc",
+      { state: { email: "alice@example.com", justRegistered: true } }
+    );
   });
 
   it("has no accessibility violations", async () => {

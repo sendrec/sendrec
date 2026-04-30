@@ -57,6 +57,7 @@ type Client struct {
 }
 
 func New(cfg Config) *Client {
+	cfg.SMTPTLS = normalizeSMTPTLS(cfg.SMTPTLS)
 	c := &Client{
 		config: cfg,
 		http:   &http.Client{Timeout: 10 * time.Second},
@@ -72,6 +73,24 @@ func New(cfg Config) *Client {
 	return c
 }
 
+// normalizeSMTPTLS coerces the user-supplied SMTP_TLS value into one of the
+// four supported modes. Anything else (typo, whitespace, unknown value) is
+// rejected with a warning and replaced with the safe default `starttls`.
+// This prevents typos like `start_tls` from silently causing plaintext sends.
+func normalizeSMTPTLS(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if v == "" {
+		return "starttls"
+	}
+	switch v {
+	case "starttls", "tls", "auto", "none":
+		return v
+	default:
+		slog.Warn("unrecognized SMTP_TLS value; falling back to starttls", "value", v)
+		return "starttls"
+	}
+}
+
 // logBackend emits a single line describing the backend that will actually be
 // used at request time. Reflects the resolved state (e.g. SendmailEnabled but
 // missing binary -> "none"), not just the raw env vars.
@@ -80,11 +99,7 @@ func (c *Client) logBackend() {
 	case c.config.BaseURL != "":
 		slog.Info("email backend: listmonk", "url", c.config.BaseURL)
 	case c.config.SMTPHost != "":
-		mode := c.config.SMTPTLS
-		if mode == "" {
-			mode = "starttls"
-		}
-		slog.Info("email backend: smtp", "host", c.config.SMTPHost, "tls", mode)
+		slog.Info("email backend: smtp", "host", c.config.SMTPHost, "tls", c.config.SMTPTLS)
 	case c.sendmailAvailable:
 		slog.Info("email backend: sendmail")
 	default:
@@ -276,10 +291,8 @@ func (c *Client) sendViaSMTP(ctx context.Context, to, subject, htmlBody string) 
 	if err := validateMessageHeaders(from, to, subject); err != nil {
 		return err
 	}
-	mode := strings.ToLower(c.config.SMTPTLS)
-	if mode == "" {
-		mode = "starttls"
-	}
+	// SMTPTLS is normalized at construction; sendViaSMTP can trust it.
+	mode := c.config.SMTPTLS
 
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 

@@ -484,6 +484,52 @@ func TestSendTx_SMTP_RejectsCRLFInFrom(t *testing.T) {
 	}
 }
 
+func TestNormalizeSMTPTLS(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"", "starttls"},
+		{"  ", "starttls"},
+		{"starttls", "starttls"},
+		{"STARTTLS", "starttls"},
+		{" StartTLS ", "starttls"},
+		{"tls", "tls"},
+		{"auto", "auto"},
+		{"none", "none"},
+		{"start_tls", "starttls"}, // typo -> safe default
+		{"starttsl", "starttls"},  // typo -> safe default
+		{"plain", "starttls"},     // unsupported -> safe default
+		{"insecure", "starttls"},  // unsupported -> safe default
+	}
+	for _, tt := range tests {
+		if got := normalizeSMTPTLS(tt.in); got != tt.want {
+			t.Errorf("normalizeSMTPTLS(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestSendTx_SMTP_UnknownTLSMode_DoesNotPlainTextLeak(t *testing.T) {
+	// Server only advertises STARTTLS; client must require it because typo
+	// values normalize to "starttls", not silently fall through to plaintext.
+	s := newFakeNoSTARTTLSServer(t)
+	host, port := splitHostPort(t, s.Addr())
+
+	client := New(Config{
+		SMTPHost:    host,
+		SMTPPort:    port,
+		SMTPTLS:     "start_tls", // typo
+		FromAddress: "noreply@sendrec.eu",
+	})
+
+	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
+	if err == nil {
+		t.Fatal("expected typo SMTP_TLS to be normalized to starttls and fail when server lacks it")
+	}
+	if !strings.Contains(err.Error(), "STARTTLS") {
+		t.Errorf("expected STARTTLS error, got: %v", err)
+	}
+}
+
 func TestNew_SendmailEnabledButMissingBinary_DoesNotCountAsBackend(t *testing.T) {
 	// PATH cleared so exec.LookPath("sendmail") fails inside New().
 	t.Setenv("PATH", "")
