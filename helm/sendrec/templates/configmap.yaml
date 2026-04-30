@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-configmap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Chart.Name }}
+data:
+  BASE_URL: {{ .Values.sendrec.env.baseUrl | quote }}
+  S3_ENDPOINT: {{ .Values.sendrec.env.s3Endpoint | quote }}
+  S3_PUBLIC_ENDPOINT: {{ .Values.sendrec.env.s3PublicEndpoint | quote }}
+  S3_BUCKET: {{ .Values.sendrec.env.s3Bucket | quote }}
+  S3_REGION: {{ .Values.sendrec.env.s3Region | quote }}
+  AWS_REQUEST_CHECKSUM_CALCULATION: {{ .Values.sendrec.env.awsRequestChecksumCalculation | quote }}
+  AWS_RESPONSE_CHECKSUM_VALIDATION: {{ .Values.sendrec.env.awsResponseChecksumValidation | quote }}
+  MAX_UPLOAD_BYTES: {{ .Values.sendrec.env.maxUploadBytes | quote }}
+  MAX_VIDEOS_PER_MONTH: {{ .Values.sendrec.env.maxVideosPerMonth | quote }}
+  MAX_VIDEO_DURATION_SECONDS: {{ .Values.sendrec.env.maxVideoDurationSeconds | quote }}
+  MAX_PLAYLISTS: {{ .Values.sendrec.env.maxPlaylists | quote }}
+  API_DOCS_ENABLED: {{ .Values.sendrec.env.apiDocsEnabled | quote }}
+  BRANDING_ENABLED: {{ .Values.sendrec.env.brandingEnabled | quote }}
+  REGISTRATION_ENABLED: {{ .Values.sendrec.env.registrationEnabled | quote }}
+  TRANSCRIPTION_ENABLED: {{ .Values.sendrec.env.transcriptionEnabled | quote }}
+  WHISPER_MODEL_PATH: {{ .Values.sendrec.env.whisperModelPath | quote }}
+  AI_ENABLED: {{ .Values.sendrec.env.aiEnabled | quote }}
+  AI_BASE_URL: {{ .Values.sendrec.env.aiBaseUrl | quote }}
+  AI_MODEL: {{ .Values.sendrec.env.aiModel | quote }}
+  AI_TIMEOUT: {{ .Values.sendrec.env.aiTimeout | quote }}
+  ANALYTICS_SCRIPT: {{ .Values.sendrec.env.analyticsScript | quote }}
+  ALLOWED_FRAME_ANCESTORS: {{ .Values.sendrec.env.allowedFrameAncestors | quote }}
+  GOOGLE_AUTH_ALLOWED_DOMAINS: {{ .Values.sendrec.env.googleAuthAllowedDomains | quote }}
+  CREEM_PRO_PRODUCT_ID: {{ .Values.sendrec.env.creemProProductId | quote }}
+  LISTMONK_BASE_URL: {{ .Values.sendrec.env.listmonkBaseUrl | quote }}
+  LISTMONK_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkTemplateId | quote }}
+  LISTMONK_COMMENT_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkCommentTemplateId | quote }}
+  LISTMONK_VIEW_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkViewTemplateId | quote }}
+  LISTMONK_CONFIRM_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkConfirmTemplateId | quote }}
+  LISTMONK_WELCOME_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkWelcomeTemplateId | quote }}
+  LISTMONK_ONBOARDING_DAY2_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkOnboardingDay2TemplateId | quote }}
+  LISTMONK_ONBOARDING_DAY7_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkOnboardingDay7TemplateId | quote }}
+  LISTMONK_ORG_INVITE_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkOrgInviteTemplateId | quote }}
+  LISTMONK_RETENTION_WARNING_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkRetentionWarningTemplateId | quote }}
+  EMAIL_ALLOWLIST: {{ .Values.sendrec.env.emailAllowlist | quote }}

@@ -1,0 +1,24 @@
+apiVersion: v2
+name: sendrec
+description: A Helm chart for SendRec - screen recording and video sharing app
+type: application
+
+home: https://sendrec.eu
+
+sources:
+- https://github.com/sendrec/sendrec
+
+keywords:
+- video
+- recording
+- screen-recording
+- async-video
+- self-hosted
+- collaboration
+
+maintainers:
+- name: mark24slides
+- name: alexneamtu 
+
+version: "1.0.0"
+appVersion: "1.84.4"

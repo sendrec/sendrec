@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.sendrec.replicas }}
+{{- with .Values.sendrec.deploymentStrategy }}
+  strategy:
+{{ toYaml . | trim | indent 4 }}
+{{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+      instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+        instance: {{ .Release.Name }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- if or .Values.sendrec.deployment.extraInitContainers (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") }}
+      initContainers:
+        {{- if eq (toString .Values.sendrec.env.transcriptionEnabled) "true" }}
+        - name: download-whisper-model
+          image: {{ .Values.sendrec.transcription.initImage }}
+          command:
+            - sh
+            - -c
+            - |
+              curl -L -o {{ .Values.sendrec.transcription.modelPath }} \
+                {{ .Values.sendrec.transcription.modelUrl }}
+          volumeMounts:
+            - name: whisper-models
+              mountPath: /models
+        {{- end }}
+        {{- with .Values.sendrec.deployment.extraInitContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      containers:
+        {{- with .Values.sendrec.deployment.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: sendrec
+          image: {{ .Values.sendrec.image.repository }}:{{ .Values.sendrec.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.sendrec.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Chart.Name }}-configmap
+            - secretRef:
+                name: {{ .Chart.Name }}-secret
+          ports:
+            - containerPort: {{ .Values.sendrec.port }}
+              name: http
+              protocol: TCP
+          resources: {{- toYaml .Values.sendrec.resources | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.sendrec.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.sendrec.readinessProbe | nindent 12 }}
+          {{- if or .Values.sendrec.deployment.extraVolumeMounts (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") }}
+          volumeMounts:
+            {{- if eq (toString .Values.sendrec.env.transcriptionEnabled) "true" }}
+            - name: whisper-models
+              mountPath: /models
+            {{- end }}
+            {{- with .Values.sendrec.deployment.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+      {{- if or .Values.sendrec.deployment.extraVolumes (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") }}
+      volumes:
+        {{- if eq (toString .Values.sendrec.env.transcriptionEnabled) "true" }}
+        - name: whisper-models
+          {{- if eq .Values.sendrec.transcription.type "volume" }}
+          persistentVolumeClaim:
+            claimName: {{ .Chart.Name }}-whisper-pvc
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.sendrec.transcription.size }}
+          {{- end }}
+        {{- end }}
+        {{- with .Values.sendrec.deployment.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}

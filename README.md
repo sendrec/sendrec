@@ -121,6 +121,62 @@ Open http://localhost:8080, register an account, and start recording.
 
 For S3 storage, transcription, and production setup, see the [Self-Hosting Guide](SELF-HOSTING.md).
 
+### Helm Chart
+
+SendRec also ships with a Helm chart in [helm/sendrec](helm/sendrec) for Kubernetes deployments.
+
+Create your own values file such as `values-prod.yaml` and keep environment-specific settings there instead of editing the chart defaults in-place:
+
+```yaml
+sendrec:
+  env:
+    baseUrl: "https://sendrec.yourdomain.com"
+    s3Endpoint: "https://s3.amazonaws.com"
+    s3PublicEndpoint: "https://cdn.yourdomain.com"
+    s3Bucket: "your-bucket-name"
+    s3Region: "eu-central-1"
+    transcriptionEnabled: "false"
+    googleAuthAllowedDomains: "example.com"
+
+  secrets:
+    databaseUrl: "postgres://sendrec:secret@postgres:5432/sendrec?sslmode=disable"
+    jwtSecret: "change-me-to-a-long-random-string"
+    s3AccessKey: "your-access-key"
+    s3SecretKey: "your-secret-key"
+```
+
+Install the chart:
+
+```bash
+helm upgrade --install sendrec ./helm/sendrec \
+  --namespace sendrec \
+  --create-namespace
+```
+
+Preview the rendered manifests before applying changes:
+
+```bash
+helm template sendrec ./helm/sendrec -f values.yaml
+```
+
+Upgrade an existing release after changing your values file:
+
+```bash
+helm upgrade sendrec ./helm/sendrec \
+  --namespace sendrec
+```
+
+The chart configures:
+
+- A Deployment for the SendRec app
+- A ConfigMap for non-secret environment variables
+- A Secret for credentials and API keys
+- A Service and optional Ingress
+- An optional NetworkPolicy
+- Optional whisper model storage and init container when `sendrec.env.transcriptionEnabled="true"`
+
+For production setup details such as reverse proxying, object storage, and operational guidance, see the [Self-Hosting Guide](SELF-HOSTING.md).
+
 ### One-Click Deploy
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/sendrec)
@@ -177,9 +233,10 @@ After upload, the server generates a thumbnail with ffmpeg and enqueues the vide
 
 ## Self-Hosting
 
-SendRec runs on a single server with Docker Compose. See the **[Self-Hosting Guide](SELF-HOSTING.md)** for full setup instructions, including:
+SendRec can run either on a single server with Docker Compose or on Kubernetes with the included Helm chart. See the **[Self-Hosting Guide](SELF-HOSTING.md)** for full setup instructions, including:
 
 - Production Docker Compose configuration
+- Helm and Kubernetes configuration
 - Environment variables reference
 - Reverse proxy setup (Caddy example)
 - Enabling transcription with whisper.cpp

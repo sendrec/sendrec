@@ -1,0 +1,3 @@
+{{- with .Values.sendrec.extraResources }}
+{{- toYaml . | nindent 0 }}
+{{- end }}
