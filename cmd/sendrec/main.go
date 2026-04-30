@@ -102,6 +102,12 @@ func main() {
 		Allowlist:                    email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
 		DeveloperEmail:               os.Getenv("DEVELOPER_EMAIL"),
 		FromAddress:                  getEnv("EMAIL_FROM_ADDRESS", "noreply@sendrec.eu"),
+
+		SMTPHost:     os.Getenv("SMTP_HOST"),
+		SMTPPort:     int(getEnvInt64("SMTP_PORT", 587)),
+		SMTPUsername: os.Getenv("SMTP_USERNAME"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPTLS:      getEnv("SMTP_TLS", "auto"),
 	})
 
 	aiEnabled := getEnv("AI_ENABLED", "false") == "true"

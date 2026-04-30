@@ -3,10 +3,13 @@ package email
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/smtp"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -29,6 +32,16 @@ type Config struct {
 	Allowlist                    []string
 	DeveloperEmail               string
 	FromAddress                  string
+
+	// SMTP backend (used when Listmonk BaseURL not set).
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUsername string
+	SMTPPassword string
+	// SMTPTLS controls transport security: "auto" (default) tries STARTTLS,
+	// falls back to plaintext; "starttls" requires STARTTLS; "tls" uses
+	// implicit TLS (port 465); "none" forces plaintext.
+	SMTPTLS string
 }
 
 type Client struct {
@@ -131,10 +144,19 @@ func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
 	_ = resp.Body.Close()
 }
 
+// HasBackend reports whether any email delivery backend is configured.
+// When false, registration code may skip the email-confirmation flow.
+func (c *Client) HasBackend() bool {
+	return c.config.BaseURL != "" || c.config.SMTPHost != ""
+}
+
 func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 	body.SubscriberEmail = c.resolveRecipient(body.SubscriberEmail)
 
 	if c.config.BaseURL == "" {
+		if c.config.SMTPHost != "" {
+			return c.sendViaSMTP(ctx, body.SubscriberEmail, body.subject, body.Body)
+		}
 		return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
 	}
 
@@ -163,6 +185,81 @@ func (c *Client) sendTx(ctx context.Context, body txRequest) error {
 		return c.sendViaSendmail(ctx, body.SubscriberEmail, body.subject, body.Body)
 	}
 
+	return nil
+}
+
+func (c *Client) sendViaSMTP(ctx context.Context, to, subject, htmlBody string) error {
+	host := c.config.SMTPHost
+	port := c.config.SMTPPort
+	if port == 0 {
+		port = 587
+	}
+	from := c.config.FromAddress
+	if from == "" {
+		from = "noreply@sendrec.eu"
+	}
+	mode := strings.ToLower(c.config.SMTPTLS)
+	if mode == "" {
+		mode = "auto"
+	}
+
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+
+	var conn net.Conn
+	var err error
+	if mode == "tls" {
+		conn, err = tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: host})
+	} else {
+		conn, err = dialer.DialContext(ctx, "tcp", addr)
+	}
+	if err != nil {
+		return fmt.Errorf("smtp dial: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return fmt.Errorf("smtp client: %w", err)
+	}
+	defer func() { _ = client.Quit() }()
+
+	if mode == "starttls" || mode == "auto" {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(&tls.Config{ServerName: host}); err != nil {
+				return fmt.Errorf("smtp starttls: %w", err)
+			}
+		} else if mode == "starttls" {
+			return fmt.Errorf("smtp: server does not support STARTTLS")
+		}
+	}
+
+	if c.config.SMTPUsername != "" {
+		auth := smtp.PlainAuth("", c.config.SMTPUsername, c.config.SMTPPassword, host)
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("smtp auth: %w", err)
+		}
+	}
+
+	if err := client.Mail(from); err != nil {
+		return fmt.Errorf("smtp mail from: %w", err)
+	}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("smtp rcpt to: %w", err)
+	}
+	wc, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("smtp data: %w", err)
+	}
+	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
+		from, to, subject, htmlBody)
+	if _, err := wc.Write([]byte(msg)); err != nil {
+		return fmt.Errorf("smtp write: %w", err)
+	}
+	if err := wc.Close(); err != nil {
+		return fmt.Errorf("smtp close: %w", err)
+	}
 	return nil
 }
 

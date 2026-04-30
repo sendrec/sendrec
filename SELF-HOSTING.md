@@ -340,7 +340,11 @@ Enable subscription billing with [Creem](https://creem.io) (EU merchant of recor
 
 ### Email notifications (optional)
 
-SendRec uses [Listmonk](https://listmonk.app) for transactional emails. Only the base URL and credentials are required — all template IDs are optional. When a template ID is not set, a plain HTML fallback email is sent automatically.
+SendRec supports two email backends: [Listmonk](https://listmonk.app) (preferred when configured) and direct SMTP. If neither is configured, **email confirmation is automatically skipped** at signup so new users can sign in immediately.
+
+#### Listmonk
+
+Only the base URL and credentials are required — all template IDs are optional. When a template ID is not set, a plain HTML fallback email is sent automatically.
 
 | Variable | Description |
 |----------|-------------|
@@ -357,6 +361,21 @@ SendRec uses [Listmonk](https://listmonk.app) for transactional emails. Only the
 | `LISTMONK_ORG_INVITE_TEMPLATE_ID` | Template ID for workspace invitation emails (optional). Template variables: `{{ .Tx.Data.orgName }}`, `{{ .Tx.Data.inviterName }}`, `{{ .Tx.Data.acceptLink }}`. Bypasses the allowlist |
 | `LISTMONK_RETENTION_WARNING_TEMPLATE_ID` | Template ID for data retention warning emails (optional). Template variables: `{{ .Tx.Data.videos }}`, `{{ .Tx.Data.expiryDate }}`. Bypasses the allowlist |
 | `EMAIL_ALLOWLIST` | Comma-separated list of allowed recipient domains (`@example.com`) and addresses (`alice@example.com`). When set, emails are only sent to matching recipients (except confirmation, welcome, onboarding, invite, and retention emails). Useful for staging/preview environments |
+
+#### SMTP (used when Listmonk is not set)
+
+Set `SMTP_HOST` to enable a direct SMTP relay (Gmail, SES, Postmark, your own server). All transactional emails use the same plain HTML bodies as the Listmonk fallback.
+
+| Variable | Description |
+|----------|-------------|
+| `SMTP_HOST` | SMTP server hostname (e.g. `smtp.gmail.com`) |
+| `SMTP_PORT` | SMTP server port (default `587`) |
+| `SMTP_USERNAME` | Auth username (omit for unauthenticated relays) |
+| `SMTP_PASSWORD` | Auth password / app password |
+| `SMTP_TLS` | `auto` (default — STARTTLS if offered, plaintext otherwise), `starttls` (require STARTTLS), `tls` (implicit TLS, port 465), or `none` |
+| `EMAIL_FROM_ADDRESS` | `From:` address used for both Listmonk and SMTP (default `noreply@sendrec.eu`) |
+
+**No email backend at all:** Leave both `LISTMONK_URL` and `SMTP_HOST` unset. New accounts skip email confirmation and can sign in immediately.
 
 ### Social login / SSO (optional)
 
