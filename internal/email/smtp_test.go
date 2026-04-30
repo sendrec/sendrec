@@ -16,9 +16,8 @@ import (
 // fakeSMTPServer is a minimal in-memory SMTP server for tests.
 // Captures every message it receives and exposes them via Captured().
 type fakeSMTPServer struct {
-	listener   net.Listener
-	addr       string
-	requireTLS bool // not used yet; placeholder for future STARTTLS tests
+	listener net.Listener
+	addr     string
 
 	mu       sync.Mutex
 	captured []capturedMessage
@@ -291,6 +290,119 @@ func TestSendTx_SMTP_ConnectionError_ReturnsError(t *testing.T) {
 	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
 	if err == nil {
 		t.Fatal("expected SMTP connection error, got nil")
+	}
+}
+
+// fakeNoSTARTTLSServer behaves like fakeSMTPServer but does not advertise STARTTLS in EHLO.
+type fakeNoSTARTTLSServer struct {
+	listener net.Listener
+	addr     string
+	wg       sync.WaitGroup
+	closed   chan struct{}
+}
+
+func newFakeNoSTARTTLSServer(t *testing.T) *fakeNoSTARTTLSServer {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	s := &fakeNoSTARTTLSServer{listener: ln, addr: ln.Addr().String(), closed: make(chan struct{})}
+	s.wg.Add(1)
+	go s.acceptLoop()
+	t.Cleanup(s.Close)
+	return s
+}
+
+func (s *fakeNoSTARTTLSServer) Addr() string { return s.addr }
+
+func (s *fakeNoSTARTTLSServer) Close() {
+	select {
+	case <-s.closed:
+		return
+	default:
+	}
+	close(s.closed)
+	_ = s.listener.Close()
+	s.wg.Wait()
+}
+
+func (s *fakeNoSTARTTLSServer) acceptLoop() {
+	defer s.wg.Done()
+	for {
+		conn, err := s.listener.Accept()
+		if err != nil {
+			return
+		}
+		s.wg.Add(1)
+		go func(c net.Conn) {
+			defer s.wg.Done()
+			defer c.Close()
+			_ = c.SetDeadline(time.Now().Add(5 * time.Second))
+			r := bufio.NewReader(c)
+			w := bufio.NewWriter(c)
+			write := func(line string) {
+				_, _ = w.WriteString(line + "\r\n")
+				_ = w.Flush()
+			}
+			write("220 fake.smtp ESMTP")
+			for {
+				line, err := r.ReadString('\n')
+				if err != nil {
+					return
+				}
+				line = strings.TrimRight(line, "\r\n")
+				up := strings.ToUpper(line)
+				switch {
+				case strings.HasPrefix(up, "EHLO"), strings.HasPrefix(up, "HELO"):
+					write("250-fake.smtp")
+					write("250 8BITMIME") // intentionally NO STARTTLS
+				case strings.EqualFold(line, "QUIT"):
+					write("221 bye")
+					return
+				default:
+					write("500 not supported in this fake")
+				}
+			}
+		}(conn)
+	}
+}
+
+func TestSendTx_SMTP_StartTLSRequired_FailsIfServerDoesNotOffer(t *testing.T) {
+	s := newFakeNoSTARTTLSServer(t)
+	host, port := splitHostPort(t, s.Addr())
+
+	client := New(Config{
+		SMTPHost:    host,
+		SMTPPort:    port,
+		SMTPTLS:     "starttls",
+		FromAddress: "noreply@sendrec.eu",
+	})
+
+	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
+	if err == nil {
+		t.Fatal("expected error when STARTTLS required but server does not offer it")
+	}
+	if !strings.Contains(err.Error(), "STARTTLS") {
+		t.Errorf("expected STARTTLS error message, got: %v", err)
+	}
+}
+
+func TestSendTx_SMTP_StartTLSDefaultIsRequired(t *testing.T) {
+	// Empty SMTPTLS should default to "starttls" (S1 fix).
+	s := newFakeNoSTARTTLSServer(t)
+	host, port := splitHostPort(t, s.Addr())
+
+	client := New(Config{
+		SMTPHost:    host,
+		SMTPPort:    port,
+		// SMTPTLS intentionally unset
+		FromAddress: "noreply@sendrec.eu",
+	})
+
+	err := client.SendPasswordReset(context.Background(), "alice@example.com", "Alice", "https://example.com/reset")
+	if err == nil {
+		t.Fatal("expected default mode to require STARTTLS and error out when server lacks it")
 	}
 }
 

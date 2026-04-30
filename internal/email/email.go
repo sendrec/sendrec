@@ -200,17 +200,19 @@ func (c *Client) sendViaSMTP(ctx context.Context, to, subject, htmlBody string) 
 	}
 	mode := strings.ToLower(c.config.SMTPTLS)
 	if mode == "" {
-		mode = "auto"
+		mode = "starttls"
 	}
 
 	addr := net.JoinHostPort(host, strconv.Itoa(port))
 
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 
+	tlsConf := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
+
 	var conn net.Conn
 	var err error
 	if mode == "tls" {
-		conn, err = tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: host})
+		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConf)
 	} else {
 		conn, err = dialer.DialContext(ctx, "tcp", addr)
 	}
@@ -227,11 +229,11 @@ func (c *Client) sendViaSMTP(ctx context.Context, to, subject, htmlBody string) 
 
 	if mode == "starttls" || mode == "auto" {
 		if ok, _ := client.Extension("STARTTLS"); ok {
-			if err := client.StartTLS(&tls.Config{ServerName: host}); err != nil {
+			if err := client.StartTLS(tlsConf); err != nil {
 				return fmt.Errorf("smtp starttls: %w", err)
 			}
 		} else if mode == "starttls" {
-			return fmt.Errorf("smtp: server does not support STARTTLS")
+			return fmt.Errorf("smtp: server does not support STARTTLS (set SMTP_TLS=auto or none to allow plaintext)")
 		}
 	}
 

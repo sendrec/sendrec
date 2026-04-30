@@ -133,6 +133,9 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// autoVerify: when no email backend is configured, skip the confirmation
+	// flow so the user can sign in immediately. The non-autoVerify branch below
+	// relies on the inverse invariant (emailSender != nil && HasBackend()).
 	autoVerify := h.emailSender == nil || !h.emailSender.HasBackend()
 
 	var userID string

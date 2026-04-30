@@ -107,8 +107,10 @@ func main() {
 		SMTPPort:     int(getEnvInt64("SMTP_PORT", 587)),
 		SMTPUsername: os.Getenv("SMTP_USERNAME"),
 		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
-		SMTPTLS:      getEnv("SMTP_TLS", "auto"),
+		SMTPTLS:      getEnv("SMTP_TLS", "starttls"),
 	})
+
+	logEmailBackend()
 
 	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
 
@@ -243,4 +245,15 @@ func getEnvInt64(key string, fallback int64) int64 {
 		}
 	}
 	return fallback
+}
+
+func logEmailBackend() {
+	switch {
+	case os.Getenv("LISTMONK_URL") != "":
+		slog.Info("email backend: listmonk", "url", os.Getenv("LISTMONK_URL"))
+	case os.Getenv("SMTP_HOST") != "":
+		slog.Info("email backend: smtp", "host", os.Getenv("SMTP_HOST"), "tls", getEnv("SMTP_TLS", "starttls"))
+	default:
+		slog.Warn("email backend: none — new registrations will auto-verify; existing unverified users cannot log in until manually flipped via SQL: UPDATE users SET email_verified = true WHERE email_verified = false")
+	}
 }
