@@ -1,3 +1,4 @@
+{{- include "sendrec.validateRequired" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,7 +22,7 @@ spec:
         app: {{ .Chart.Name }}
         instance: {{ .Release.Name }}
       annotations:
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/secret: {{- if .Values.sendrec.existingSecret }} "external-secret" {{- else }} {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }} {{- end }}
         checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       {{- if or .Values.sendrec.deployment.extraInitContainers (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") }}
@@ -48,13 +49,13 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: sendrec
-          image: {{ .Values.sendrec.image.repository }}:{{ .Values.sendrec.image.tag | default .Chart.AppVersion }}
+          image: {{ .Values.sendrec.image.repository }}:{{ .Values.sendrec.image.tag | default (printf "v%s" .Chart.AppVersion) }}
           imagePullPolicy: {{ .Values.sendrec.image.pullPolicy }}
           envFrom:
             - configMapRef:
                 name: {{ .Chart.Name }}-configmap
             - secretRef:
-                name: {{ .Chart.Name }}-secret
+                name: {{ .Values.sendrec.existingSecret | default (printf "%s-secret" .Chart.Name) }}
           ports:
             - containerPort: {{ .Values.sendrec.port }}
               name: http

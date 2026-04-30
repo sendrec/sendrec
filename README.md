@@ -150,20 +150,22 @@ Install the chart:
 ```bash
 helm install sendrec ./helm/sendrec \
   --namespace sendrec \
-  --create-namespace
+  --create-namespace \
+  -f values-prod.yaml
 ```
 
 Preview the rendered manifests before applying changes:
 
 ```bash
-helm template sendrec ./helm/sendrec -f values.yaml
+helm template sendrec ./helm/sendrec -f values-prod.yaml
 ```
 
 Upgrade an existing release after changing your values file:
 
 ```bash
 helm upgrade sendrec ./helm/sendrec \
-  --namespace sendrec
+  --namespace sendrec \
+  -f values-prod.yaml
 ```
 
 The chart configures:

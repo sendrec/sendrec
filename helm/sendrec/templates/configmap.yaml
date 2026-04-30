@@ -7,6 +7,7 @@ metadata:
     app: {{ .Chart.Name }}
 data:
   BASE_URL: {{ .Values.sendrec.env.baseUrl | quote }}
+  PORT: {{ .Values.sendrec.port | quote }}
   S3_ENDPOINT: {{ .Values.sendrec.env.s3Endpoint | quote }}
   S3_PUBLIC_ENDPOINT: {{ .Values.sendrec.env.s3PublicEndpoint | quote }}
   S3_BUCKET: {{ .Values.sendrec.env.s3Bucket | quote }}
@@ -30,7 +31,7 @@ data:
   ALLOWED_FRAME_ANCESTORS: {{ .Values.sendrec.env.allowedFrameAncestors | quote }}
   GOOGLE_AUTH_ALLOWED_DOMAINS: {{ .Values.sendrec.env.googleAuthAllowedDomains | quote }}
   CREEM_PRO_PRODUCT_ID: {{ .Values.sendrec.env.creemProProductId | quote }}
-  LISTMONK_BASE_URL: {{ .Values.sendrec.env.listmonkBaseUrl | quote }}
+  LISTMONK_URL: {{ .Values.sendrec.env.listmonkBaseUrl | quote }}
   LISTMONK_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkTemplateId | quote }}
   LISTMONK_COMMENT_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkCommentTemplateId | quote }}
   LISTMONK_VIEW_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkViewTemplateId | quote }}

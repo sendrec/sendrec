@@ -51,7 +51,8 @@ sendrec:
 ```bash
 helm install sendrec ./helm/sendrec \
   --namespace sendrec \
-  --create-namespace
+  --create-namespace \
+  -f values-prod.yaml
 ```
 
 ### 3. Verify rollout
@@ -65,13 +66,14 @@ kubectl -n sendrec get svc
 
 ```bash
 helm upgrade sendrec ./helm/sendrec \
-  --namespace sendrec
+  --namespace sendrec \
+  -f values-prod.yaml
 ```
 
 ### Optional: preview rendered manifests
 
 ```bash
-helm template sendrec ./helm/sendrec
+helm template sendrec ./helm/sendrec -f values-prod.yaml
 ```
 
 ### Helm notes

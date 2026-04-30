@@ -97,6 +97,9 @@ sendrec:
     creemApiKey: ""            # Creem API key for billing integration
     creemWebhookSecret: ""     # Creem webhook signing secret
 
+  # Use an existing Kubernetes Secret name instead of creating upper secret
+  existingSecret: ""
+
   port: 8080
 
   resources:
@@ -160,7 +163,7 @@ sendrec:
         path: /
 
     tls: []
-    # Example TLS configuration with Cloudflare Origin CA certificate:
+    # Example TLS configuration:
     # - hosts:
     #     - sendrec.yourdomain.com
     #   secretName: yourdomain-tls-secret
