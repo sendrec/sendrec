@@ -1,0 +1,22 @@
+{{- if .Values.sendrec.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Chart.Name }}-networkpolicy
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+      instance: {{ .Release.Name }}
+  policyTypes:
+    {{- toYaml .Values.sendrec.networkPolicy.policyTypes | nindent 4 }}
+  {{- with .Values.sendrec.networkPolicy.ingress }}
+  ingress:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.sendrec.networkPolicy.egress }}
+  egress:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

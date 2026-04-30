@@ -1,0 +1,172 @@
+sendrec:
+  replicas: 1
+
+  image:
+    repository: ghcr.io/sendrec/sendrec
+    tag: "" # appVersion in Chart.yaml if empty
+    pullPolicy: Always
+
+  deploymentStrategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+
+  # Extra resources injected into the deployment pod
+  deployment:
+    extraInitContainers: []  # run before main container (e.g. migrations, wait-for)
+    extraContainers: []      # sidecar containers
+    extraVolumes: []         # pod-level volumes
+    extraVolumeMounts: []    # mounts on the main sendrec container
+
+  # Transcription model configuration, activation is controlled by env.transcriptionEnabled
+  transcription:
+    type: emptyDir           # volume type: emptyDir or volume (persistent volume)
+    size: 1Gi                # max size for the model volume (for emptyDir) or PVC storage request (for volume)
+    initImage: alpine/curl:8.17.0  # image for the model download init container
+    modelUrl: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+    modelPath: /models/ggml-small.bin
+
+  env:
+    baseUrl: "https://sendrec.yourdomain.com"
+
+    # Storage (S3-compatible)
+    s3Endpoint: "" # e.g. https://s3.amazonaws.com or https://<your-minio-endpoint>
+    s3PublicEndpoint: "" # e.g. https://cdn.yourdomain.com, used for generating public URLs to videos
+    s3Bucket: "" # e.g. your-bucket-name
+    s3Region: "" # e.g. us-east-1
+    awsRequestChecksumCalculation: "when_required"
+    awsResponseChecksumValidation: "when_required"
+
+    # Upload / recording limits (0 = unlimited)
+    maxUploadBytes: "524288000"   # 500 MB
+    maxVideosPerMonth: "0"
+    maxVideoDurationSeconds: "0"
+    maxPlaylists: "0"
+
+    # Features
+    apiDocsEnabled: "true"
+    brandingEnabled: "true"
+    registrationEnabled: "false"
+
+    # Transcription
+    transcriptionEnabled: "false"
+    whisperModelPath: "/models/ggml-small.bin"
+
+    # AI
+    aiEnabled: "false"
+    aiBaseUrl: ""
+    aiModel: "mistral-small-latest"
+    aiTimeout: "60s"
+
+    analyticsScript: ""
+
+    allowedFrameAncestors: "'self'"
+    googleAuthAllowedDomains: ""  # Comma-separated email domains allowed for Google SSO, e.g. example.com,example.org
+
+    # Billing (Creem)
+    creemProProductId: ""
+
+    # Email (Listmonk)
+    listmonkBaseUrl: ""
+    listmonkTemplateId: ""
+    listmonkCommentTemplateId: ""
+    listmonkViewTemplateId: ""
+    listmonkConfirmTemplateId: ""
+    listmonkWelcomeTemplateId: ""
+    listmonkOnboardingDay2TemplateId: ""
+    listmonkOnboardingDay7TemplateId: ""
+    listmonkOrgInviteTemplateId: ""
+    listmonkRetentionWarningTemplateId: ""
+    emailAllowlist: ""
+
+  secrets:
+    databaseUrl: ""            # Postgres connection string, e.g. postgres://user:pass@host:5432/db?sslmode=require
+    jwtSecret: ""              # Random secret used to sign JWTs (`openssl rand -hex 32`)
+    s3AccessKey: ""            # S3 access key ID for the configured bucket
+    s3SecretKey: ""            # S3 secret access key for the configured bucket
+    googleClientId: ""         # Google OAuth client ID, use /api/auth/sso/google/callback as the redirect URI path
+    googleClientSecret: ""     # Google OAuth client secret
+    microsoftClientId: ""      # Microsoft OAuth client ID, use /api/auth/sso/microsoft/callback as the redirect URI path
+    microsoftClientSecret: ""  # Microsoft OAuth client secret
+    githubSsoClientId: ""      # GitHub SSO OAuth client ID, use /api/auth/sso/github/callback as the redirect URI path
+    githubSsoClientSecret: ""  # GitHub SSO OAuth client secret
+    aiApiKey: ""               # API key for the configured AI provider
+    listmonkUsername: ""       # Listmonk API username
+    listmonkPassword: ""       # Listmonk API password
+    creemApiKey: ""            # Creem API key for billing integration
+    creemWebhookSecret: ""     # Creem webhook signing secret
+
+  # Use an existing Kubernetes Secret name instead of creating upper secret
+  existingSecret: ""
+
+  port: 8080
+
+  resources:
+    limits: {}
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  livenessProbe:
+    httpGet:
+      path: /api/health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+  # NetworkPolicy: restrict ingress to allowed sources only
+  networkPolicy:
+    enabled: false
+
+    policyTypes:
+      - Ingress
+
+    ingress: {}
+      # Example allowing ingress only from Traefik in the same cluster:
+      # - from:
+      #     - namespaceSelector:
+      #         matchLabels:
+      #           kubernetes.io/metadata.name: traefik
+
+    egress: {}
+
+  service:
+    port: 8080
+    type: ClusterIP
+
+  ingress:
+    enabled: true
+
+    className: "traefik"
+
+    annotations:
+      traefik.ingress.kubernetes.io/buffering-maxRequestBodyBytes: "536870912"  # 512 MB
+      traefik.ingress.kubernetes.io/buffering-maxResponseBodyBytes: "536870912"
+      traefik.ingress.kubernetes.io/buffering-memRequestBodyBytes: "1048576"
+      traefik.ingress.kubernetes.io/buffering-memResponseBodyBytes: "1048576"
+    pathType: ImplementationSpecific
+
+    hosts:
+      - name: sendrec.yourdomain.com
+        path: /
+
+    tls: []
+    # Example TLS configuration:
+    # - hosts:
+    #     - sendrec.yourdomain.com
+    #   secretName: yourdomain-tls-secret
+
+  # Arbitrary extra Kubernetes resources rendered as-is (e.g. CronJob, ConfigMap)
+  extraResources: []

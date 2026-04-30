@@ -1,0 +1,15 @@
+{{- if and (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") (eq .Values.sendrec.transcription.type "volume") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Chart.Name }}-whisper-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.sendrec.transcription.size }}
+{{- end }}

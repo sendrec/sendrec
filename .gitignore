@@ -1,6 +1,6 @@
 # Go
 bin/
-sendrec
+/sendrec
 
 # Node
 web/node_modules/

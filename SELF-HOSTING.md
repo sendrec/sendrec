@@ -13,6 +13,76 @@ docker compose -f docker-compose.dev.yml up --build
 
 Open http://localhost:8080, register an account, and start recording or uploading videos.
 
+## Kubernetes with Helm
+
+SendRec includes a Helm chart at `helm/sendrec` for Kubernetes deployments.
+
+### Prerequisites
+
+- Kubernetes cluster with an ingress controller (Traefik, nginx, etc.)
+- Helm 3
+- PostgreSQL database
+- S3-compatible object storage
+
+### 1. Create a values file
+
+Create a deployment-specific values file (for example `values-prod.yaml`) and keep your environment settings there:
+
+```yaml
+sendrec:
+  env:
+    baseUrl: "https://sendrec.yourdomain.com"
+    s3Endpoint: "https://s3.amazonaws.com"
+    s3PublicEndpoint: "https://s3.amazonaws.com"
+    s3Bucket: "recordings"
+    s3Region: "eu-central-1"
+    transcriptionEnabled: "false"
+    googleAuthAllowedDomains: "example.com"
+
+  secrets:
+    databaseUrl: "postgres://sendrec:secret@postgres:5432/sendrec"
+    jwtSecret: "change-me-to-a-long-random-string"
+    s3AccessKey: "your-access-key"
+    s3SecretKey: "your-secret-key"
+```
+
+### 2. Install the chart
+
+```bash
+helm install sendrec ./helm/sendrec \
+  --namespace sendrec \
+  --create-namespace \
+  -f values-prod.yaml
+```
+
+### 3. Verify rollout
+
+```bash
+kubectl -n sendrec get pods
+kubectl -n sendrec get svc
+```
+
+### 4. Upgrade after changes
+
+```bash
+helm upgrade sendrec ./helm/sendrec \
+  --namespace sendrec \
+  -f values-prod.yaml
+```
+
+### Optional: preview rendered manifests
+
+```bash
+helm template sendrec ./helm/sendrec -f values-prod.yaml
+```
+
+### Helm notes
+
+- Non-secret environment variables are configured under `sendrec.env` (camelCase keys).
+- Sensitive values are configured under `sendrec.secrets`.
+- Transcription model resources (init container, model volume, and optional PVC) are controlled by `sendrec.env.transcriptionEnabled`.
+- To persist the Whisper model, set `sendrec.transcription.type: volume`.
+
 ## Standalone binary
 
 SendRec is a single ~32 MB executable with the React frontend, database migrations, and HTML templates all embedded. No Docker required — just a PostgreSQL database and S3-compatible storage.
