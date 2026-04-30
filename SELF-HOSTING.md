@@ -288,6 +288,29 @@ SendRec uses [Listmonk](https://listmonk.app) for transactional emails. Only the
 | `LISTMONK_RETENTION_WARNING_TEMPLATE_ID` | Template ID for data retention warning emails (optional). Template variables: `{{ .Tx.Data.videos }}`, `{{ .Tx.Data.expiryDate }}`. Bypasses the allowlist |
 | `EMAIL_ALLOWLIST` | Comma-separated list of allowed recipient domains (`@example.com`) and addresses (`alice@example.com`). When set, emails are only sent to matching recipients (except confirmation, welcome, onboarding, invite, and retention emails). Useful for staging/preview environments |
 
+### Social login / SSO (optional)
+
+SendRec supports Google, Microsoft, and GitHub as social login providers via OAuth 2.0 / OIDC. Set the client ID and secret pair for each provider you want to enable; providers without credentials are simply not advertised on the login screen.
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLIENT_ID` | Google OAuth 2.0 client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 client secret |
+| `MICROSOFT_CLIENT_ID` | Microsoft (Entra ID) OAuth 2.0 client ID |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft (Entra ID) OAuth 2.0 client secret |
+| `GITHUB_SSO_CLIENT_ID` | GitHub OAuth App client ID |
+| `GITHUB_SSO_CLIENT_SECRET` | GitHub OAuth App client secret |
+
+Configure the following authorized redirect URIs in each provider's console (replace `<your-base-url>` with your `BASE_URL`, no trailing slash):
+
+| Provider | Redirect URI |
+|----------|--------------|
+| Google | `https://<your-base-url>/api/auth/sso/google/callback` |
+| Microsoft | `https://<your-base-url>/api/auth/sso/microsoft/callback` |
+| GitHub | `https://<your-base-url>/api/auth/sso/github/callback` |
+
+For SAML / per-organization OIDC enforcement, see the in-app workspace settings.
+
 ## S3_PUBLIC_ENDPOINT explained
 
 Video recordings and file uploads use presigned S3 URLs. The app generates these URLs using `S3_PUBLIC_ENDPOINT` so the browser can upload directly to storage (MP4, WebM, and MOV files are supported).
