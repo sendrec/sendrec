@@ -92,7 +92,7 @@ func (s *fakeSMTPServer) acceptLoop() {
 		s.wg.Add(1)
 		go func(c net.Conn) {
 			defer s.wg.Done()
-			defer c.Close()
+			defer func() { _ = c.Close() }()
 			_ = c.SetDeadline(time.Now().Add(5 * time.Second))
 			s.handle(c)
 		}(conn)
@@ -327,7 +327,7 @@ func (s *fakeNoSTARTTLSServer) acceptLoop() {
 		s.wg.Add(1)
 		go func(c net.Conn) {
 			defer s.wg.Done()
-			defer c.Close()
+			defer func() { _ = c.Close() }()
 			_ = c.SetDeadline(time.Now().Add(5 * time.Second))
 			r := bufio.NewReader(c)
 			w := bufio.NewWriter(c)
