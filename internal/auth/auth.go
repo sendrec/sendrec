@@ -33,6 +33,7 @@ type EmailSender interface {
 	SendPasswordReset(ctx context.Context, toEmail, toName, resetLink string) error
 	SendConfirmation(ctx context.Context, toEmail, toName, confirmLink string) error
 	SendWelcome(ctx context.Context, toEmail, toName, dashboardURL string) error
+	HasBackend() bool
 }
 
 type Handler struct {
@@ -78,6 +79,11 @@ type forgotPasswordRequest struct {
 
 type messageResponse struct {
 	Message string `json:"message"`
+}
+
+type registerResponse struct {
+	Message                   string `json:"message"`
+	RequiresEmailConfirmation bool   `json:"requiresEmailConfirmation"`
 }
 
 const resetTokenExpiry = 1 * time.Hour
@@ -132,10 +138,15 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// autoVerify: when no email backend is configured, skip the confirmation
+	// flow so the user can sign in immediately. The non-autoVerify branch below
+	// relies on the inverse invariant (emailSender != nil && HasBackend()).
+	autoVerify := h.emailSender == nil || !h.emailSender.HasBackend()
+
 	var userID string
 	err = h.db.QueryRow(r.Context(),
-		"INSERT INTO users (email, password, name) VALUES ($1, $2, $3) RETURNING id",
-		req.Email, string(hashedPassword), req.Name,
+		"INSERT INTO users (email, password, name, email_verified) VALUES ($1, $2, $3, $4) RETURNING id",
+		req.Email, string(hashedPassword), req.Name, autoVerify,
 	).Scan(&userID)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -144,6 +155,14 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create user")
+		return
+	}
+
+	if autoVerify {
+		httputil.WriteJSON(w, http.StatusCreated, registerResponse{
+			Message:                   "Account created. You can sign in now.",
+			RequiresEmailConfirmation: false,
+		})
 		return
 	}
 
@@ -171,13 +190,14 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	confirmLink := h.baseURL + "/confirm-email?token=" + rawToken
-	if h.emailSender != nil {
-		if err := h.emailSender.SendConfirmation(r.Context(), req.Email, req.Name, confirmLink); err != nil {
-			slog.Error("register: failed to send confirmation email", "error", err)
-		}
+	if err := h.emailSender.SendConfirmation(r.Context(), req.Email, req.Name, confirmLink); err != nil {
+		slog.Error("register: failed to send confirmation email", "error", err)
 	}
 
-	httputil.WriteJSON(w, http.StatusCreated, messageResponse{Message: "Account created. Check your email to confirm your address."})
+	httputil.WriteJSON(w, http.StatusCreated, registerResponse{
+		Message:                   "Account created. Check your email to confirm your address.",
+		RequiresEmailConfirmation: true,
+	})
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -328,6 +348,13 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := messageResponse{Message: "If an account with that email exists, we've sent a password reset link"}
+
+	// No email backend → reset link can't be delivered. Skip DB writes (avoid
+	// orphan tokens) and return the same generic message to avoid enumeration.
+	if h.emailSender == nil || !h.emailSender.HasBackend() {
+		httputil.WriteJSON(w, http.StatusOK, response)
+		return
+	}
 
 	var userID, userName string
 	err := h.db.QueryRow(r.Context(),
@@ -511,6 +538,11 @@ func (h *Handler) ResendConfirmation(w http.ResponseWriter, r *http.Request) {
 
 	if req.Email == "" {
 		httputil.WriteError(w, http.StatusBadRequest, "email is required")
+		return
+	}
+
+	if h.emailSender == nil || !h.emailSender.HasBackend() {
+		httputil.WriteError(w, http.StatusBadRequest, "email backend not configured")
 		return
 	}
 

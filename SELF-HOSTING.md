@@ -340,7 +340,11 @@ Enable subscription billing with [Creem](https://creem.io) (EU merchant of recor
 
 ### Email notifications (optional)
 
-SendRec uses [Listmonk](https://listmonk.app) for transactional emails. Only the base URL and credentials are required — all template IDs are optional. When a template ID is not set, a plain HTML fallback email is sent automatically.
+SendRec supports two email backends: [Listmonk](https://listmonk.app) (preferred when configured) and direct SMTP. If neither is configured, **email confirmation is automatically skipped** at signup so new users can sign in immediately.
+
+#### Listmonk
+
+Only the base URL and credentials are required — all template IDs are optional. When a template ID is not set, a plain HTML fallback email is sent automatically.
 
 | Variable | Description |
 |----------|-------------|
@@ -357,6 +361,37 @@ SendRec uses [Listmonk](https://listmonk.app) for transactional emails. Only the
 | `LISTMONK_ORG_INVITE_TEMPLATE_ID` | Template ID for workspace invitation emails (optional). Template variables: `{{ .Tx.Data.orgName }}`, `{{ .Tx.Data.inviterName }}`, `{{ .Tx.Data.acceptLink }}`. Bypasses the allowlist |
 | `LISTMONK_RETENTION_WARNING_TEMPLATE_ID` | Template ID for data retention warning emails (optional). Template variables: `{{ .Tx.Data.videos }}`, `{{ .Tx.Data.expiryDate }}`. Bypasses the allowlist |
 | `EMAIL_ALLOWLIST` | Comma-separated list of allowed recipient domains (`@example.com`) and addresses (`alice@example.com`). When set, emails are only sent to matching recipients (except confirmation, welcome, onboarding, invite, and retention emails). Useful for staging/preview environments |
+
+#### SMTP (used when Listmonk is not set)
+
+Set `SMTP_HOST` to enable a direct SMTP relay (Gmail, SES, Postmark, your own server). All transactional emails use the same plain HTML bodies as the Listmonk fallback.
+
+| Variable | Description |
+|----------|-------------|
+| `SMTP_HOST` | SMTP server hostname (e.g. `smtp.gmail.com`) |
+| `SMTP_PORT` | SMTP server port (default `587`) |
+| `SMTP_USERNAME` | Auth username (omit for unauthenticated relays) |
+| `SMTP_PASSWORD` | Auth password / app password |
+| `SMTP_TLS` | `starttls` (default — fails if server does not advertise STARTTLS), `tls` (implicit TLS, use port 465), `auto` (try STARTTLS, fall back to plaintext — **plaintext-only relays must be unauthenticated**: when `SMTP_USERNAME` is set, the Go stdlib refuses PLAIN auth on a non-TLS connection unless the host is `localhost`, so configure either `starttls`/`tls` for authenticated relays or omit credentials entirely), or `none` (plaintext, same auth restriction). Any other value (typo, whitespace, unsupported keyword) is coerced to `starttls` with a startup warning so a misconfigured `start_tls` cannot silently downgrade to plaintext. |
+| `EMAIL_FROM_ADDRESS` | `From:` address used for both Listmonk and SMTP (default `noreply@sendrec.eu`) |
+
+#### Sendmail (opt-in fallback)
+
+If you run a local MTA (postfix, exim, etc.) and want SendRec to use the `sendmail(8)` binary, set:
+
+| Variable | Description |
+|----------|-------------|
+| `EMAIL_USE_SENDMAIL` | `true` to enable. Off by default. The binary must be on `$PATH` — if it isn't, the deployment is treated as having no email backend (registrations auto-verify). |
+
+When enabled, sendmail is also used as a fallback if Listmonk is set but the request fails.
+
+**No email backend at all:** Leave `LISTMONK_URL`, `SMTP_HOST`, and `EMAIL_USE_SENDMAIL` unset. New accounts skip email confirmation and can sign in immediately. Existing unverified users from a previous configuration will be blocked from login until `email_verified` is flipped manually:
+
+```sql
+UPDATE users SET email_verified = true WHERE email_verified = false;
+```
+
+**Upgrade note:** Pre-1.85 builds silently used `sendmail(8)` whenever Listmonk wasn't configured. With this release, sendmail is opt-in via `EMAIL_USE_SENDMAIL=true`. If your deployment relied on the implicit sendmail fallback, set the variable explicitly.
 
 ### Social login / SSO (optional)
 

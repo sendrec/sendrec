@@ -20,9 +20,9 @@ import (
 	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/server"
 	slackpkg "github.com/sendrec/sendrec/internal/slack"
-	webhookpkg "github.com/sendrec/sendrec/internal/webhook"
 	"github.com/sendrec/sendrec/internal/storage"
 	"github.com/sendrec/sendrec/internal/video"
+	webhookpkg "github.com/sendrec/sendrec/internal/webhook"
 	"github.com/sendrec/sendrec/web"
 )
 
@@ -87,21 +87,28 @@ func main() {
 	}
 
 	emailClient := email.New(email.Config{
-		BaseURL:           os.Getenv("LISTMONK_URL"),
-		Username:          getEnv("LISTMONK_USER", "admin"),
-		Password:          os.Getenv("LISTMONK_PASSWORD"),
-		TemplateID:        int(getEnvInt64("LISTMONK_TEMPLATE_ID", 0)),
-		CommentTemplateID: int(getEnvInt64("LISTMONK_COMMENT_TEMPLATE_ID", 0)),
-		ViewTemplateID:    int(getEnvInt64("LISTMONK_VIEW_TEMPLATE_ID", 0)),
-		ConfirmTemplateID: int(getEnvInt64("LISTMONK_CONFIRM_TEMPLATE_ID", 0)),
-		WelcomeTemplateID:        int(getEnvInt64("LISTMONK_WELCOME_TEMPLATE_ID", 0)),
-		OnboardingDay2TemplateID: int(getEnvInt64("LISTMONK_ONBOARDING_DAY2_TEMPLATE_ID", 0)),
-		OnboardingDay7TemplateID: int(getEnvInt64("LISTMONK_ONBOARDING_DAY7_TEMPLATE_ID", 0)),
-		OrgInviteTemplateID:          int(getEnvInt64("LISTMONK_ORG_INVITE_TEMPLATE_ID", 0)),
-		RetentionWarningTemplateID:   int(getEnvInt64("LISTMONK_RETENTION_WARNING_TEMPLATE_ID", 0)),
-		Allowlist:                    email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
-		DeveloperEmail:               os.Getenv("DEVELOPER_EMAIL"),
-		FromAddress:                  getEnv("EMAIL_FROM_ADDRESS", "noreply@sendrec.eu"),
+		BaseURL:                    os.Getenv("LISTMONK_URL"),
+		Username:                   getEnv("LISTMONK_USER", "admin"),
+		Password:                   os.Getenv("LISTMONK_PASSWORD"),
+		TemplateID:                 int(getEnvInt64("LISTMONK_TEMPLATE_ID", 0)),
+		CommentTemplateID:          int(getEnvInt64("LISTMONK_COMMENT_TEMPLATE_ID", 0)),
+		ViewTemplateID:             int(getEnvInt64("LISTMONK_VIEW_TEMPLATE_ID", 0)),
+		ConfirmTemplateID:          int(getEnvInt64("LISTMONK_CONFIRM_TEMPLATE_ID", 0)),
+		WelcomeTemplateID:          int(getEnvInt64("LISTMONK_WELCOME_TEMPLATE_ID", 0)),
+		OnboardingDay2TemplateID:   int(getEnvInt64("LISTMONK_ONBOARDING_DAY2_TEMPLATE_ID", 0)),
+		OnboardingDay7TemplateID:   int(getEnvInt64("LISTMONK_ONBOARDING_DAY7_TEMPLATE_ID", 0)),
+		OrgInviteTemplateID:        int(getEnvInt64("LISTMONK_ORG_INVITE_TEMPLATE_ID", 0)),
+		RetentionWarningTemplateID: int(getEnvInt64("LISTMONK_RETENTION_WARNING_TEMPLATE_ID", 0)),
+		Allowlist:                  email.ParseAllowlist(os.Getenv("EMAIL_ALLOWLIST")),
+		DeveloperEmail:             os.Getenv("DEVELOPER_EMAIL"),
+		FromAddress:                getEnv("EMAIL_FROM_ADDRESS", "noreply@sendrec.eu"),
+
+		SMTPHost:        os.Getenv("SMTP_HOST"),
+		SMTPPort:        int(getEnvInt64("SMTP_PORT", 587)),
+		SMTPUsername:    os.Getenv("SMTP_USERNAME"),
+		SMTPPassword:    os.Getenv("SMTP_PASSWORD"),
+		SMTPTLS:         getEnv("SMTP_TLS", "starttls"),
+		SendmailEnabled: getEnv("EMAIL_USE_SENDMAIL", "false") == "true",
 	})
 
 	aiEnabled := getEnv("AI_ENABLED", "false") == "true"
@@ -121,44 +128,44 @@ func main() {
 	registrationEnabled := getEnv("REGISTRATION_ENABLED", "true") == "true"
 
 	srv := server.New(server.Config{
-		Version:                 version,
-		DB:                      db.Pool,
-		Pinger:                  db,
-		Storage:                 store,
-		WebFS:                   webFS,
-		JWTSecret:               jwtSecret,
-		BaseURL:                 baseURL,
-		RegistrationEnabled:     registrationEnabled,
-		MaxUploadBytes:          getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
-		MaxVideosPerMonth:       int(getEnvInt64("MAX_VIDEOS_PER_MONTH", int64(plans.Free.MaxVideosPerMonth))),
-		MaxVideoDurationSeconds: int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),
-		MaxPlaylists:            int(getEnvInt64("MAX_PLAYLISTS", int64(plans.Free.MaxPlaylists))),
-		S3PublicEndpoint:        os.Getenv("S3_PUBLIC_ENDPOINT"),
-		EnableDocs:              getEnv("API_DOCS_ENABLED", "false") == "true",
-		BrandingEnabled:         getEnv("BRANDING_ENABLED", "false") == "true",
-		AiEnabled:               aiEnabled,
-		TranscriptionEnabled:    getEnv("TRANSCRIPTION_ENABLED", "false") == "true",
-		NoiseReductionFilter:    os.Getenv("NOISE_REDUCTION_FILTER"),
-		AllowedFrameAncestors:   os.Getenv("ALLOWED_FRAME_ANCESTORS"),
-		AnalyticsScript:         strings.ReplaceAll(os.Getenv("ANALYTICS_SCRIPT"), `\"`, `"`),
-		EmailSender:             emailClient,
-		CommentNotifier:         emailClient,
-		ViewNotifier:            emailClient,
-		SlackNotifier:           slackClient,
-		WebhookClient:           webhookClient,
+		Version:                   version,
+		DB:                        db.Pool,
+		Pinger:                    db,
+		Storage:                   store,
+		WebFS:                     webFS,
+		JWTSecret:                 jwtSecret,
+		BaseURL:                   baseURL,
+		RegistrationEnabled:       registrationEnabled,
+		MaxUploadBytes:            getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
+		MaxVideosPerMonth:         int(getEnvInt64("MAX_VIDEOS_PER_MONTH", int64(plans.Free.MaxVideosPerMonth))),
+		MaxVideoDurationSeconds:   int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),
+		MaxPlaylists:              int(getEnvInt64("MAX_PLAYLISTS", int64(plans.Free.MaxPlaylists))),
+		S3PublicEndpoint:          os.Getenv("S3_PUBLIC_ENDPOINT"),
+		EnableDocs:                getEnv("API_DOCS_ENABLED", "false") == "true",
+		BrandingEnabled:           getEnv("BRANDING_ENABLED", "false") == "true",
+		AiEnabled:                 aiEnabled,
+		TranscriptionEnabled:      getEnv("TRANSCRIPTION_ENABLED", "false") == "true",
+		NoiseReductionFilter:      os.Getenv("NOISE_REDUCTION_FILTER"),
+		AllowedFrameAncestors:     os.Getenv("ALLOWED_FRAME_ANCESTORS"),
+		AnalyticsScript:           strings.ReplaceAll(os.Getenv("ANALYTICS_SCRIPT"), `\"`, `"`),
+		EmailSender:               emailClient,
+		CommentNotifier:           emailClient,
+		ViewNotifier:              emailClient,
+		SlackNotifier:             slackClient,
+		WebhookClient:             webhookClient,
 		CreemAPIKey:               creemAPIKey,
 		CreemWebhookSecret:        creemWebhookSecret,
 		CreemProProductID:         creemProProductID,
 		CreemOrgProProductID:      creemOrgProProductID,
 		CreemBusinessProductID:    creemBusinessProductID,
 		CreemOrgBusinessProductID: creemOrgBusinessProductID,
-		GoogleClientID:          getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret:      getEnv("GOOGLE_CLIENT_SECRET", ""),
-		GoogleAllowedDomains:    email.ParseAllowlist(getEnv("GOOGLE_AUTH_ALLOWED_DOMAINS", "")),
-		MicrosoftClientID:       getEnv("MICROSOFT_CLIENT_ID", ""),
-		MicrosoftClientSecret:   getEnv("MICROSOFT_CLIENT_SECRET", ""),
-		GitHubSSOClientID:       getEnv("GITHUB_SSO_CLIENT_ID", ""),
-		GitHubSSOClientSecret:   getEnv("GITHUB_SSO_CLIENT_SECRET", ""),
+		GoogleClientID:            getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:        getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleAllowedDomains:      email.ParseAllowlist(getEnv("GOOGLE_AUTH_ALLOWED_DOMAINS", "")),
+		MicrosoftClientID:         getEnv("MICROSOFT_CLIENT_ID", ""),
+		MicrosoftClientSecret:     getEnv("MICROSOFT_CLIENT_SECRET", ""),
+		GitHubSSOClientID:         getEnv("GITHUB_SSO_CLIENT_ID", ""),
+		GitHubSSOClientSecret:     getEnv("GITHUB_SSO_CLIENT_SECRET", ""),
 	})
 
 	if creemAPIKey != "" {

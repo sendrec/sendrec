@@ -23,28 +23,37 @@ export function Register() {
 
   if (!ready) return null;
 
+  const redirect = searchParams.get("redirect");
+  const loginPath = redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : "/login";
+
   async function handleRegister(data: {
     email: string;
     password: string;
     name: string;
   }) {
-    await apiFetch<{ message: string }>(
-      "/api/auth/register",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          name: data.name,
-        }),
-      }
-    );
+    const res = await apiFetch<{
+      message: string;
+      requiresEmailConfirmation?: boolean;
+    }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify({
+        email: data.email,
+        password: data.password,
+        name: data.name,
+      }),
+    });
 
-    navigate("/check-email", { state: { email: data.email } });
+    // Strict `=== false` is intentional: undefined (older server, malformed
+    // response) routes to /check-email so the user is told to look for the
+    // confirmation link, matching the pre-flag behaviour. Only an explicit
+    // `false` short-circuits to /login. Preserve `?redirect=...` so invite
+    // flows (AcceptInvite -> Register -> Login -> back to invite) keep working.
+    if (res?.requiresEmailConfirmation === false) {
+      navigate(loginPath, { state: { email: data.email, justRegistered: true } });
+    } else {
+      navigate("/check-email", { state: { email: data.email } });
+    }
   }
-
-  const redirect = searchParams.get("redirect");
-  const loginPath = redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : "/login";
 
   return (
     <AuthForm

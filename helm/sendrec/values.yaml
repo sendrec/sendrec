@@ -79,6 +79,13 @@ sendrec:
     listmonkOrgInviteTemplateId: ""
     listmonkRetentionWarningTemplateId: ""
     emailAllowlist: ""
+    emailFromAddress: ""
+
+    # Email (SMTP — used when listmonkBaseUrl is unset)
+    smtpHost: ""
+    smtpPort: ""               # default 587
+    smtpTls: ""                # starttls (default), tls, auto, or none
+    emailUseSendmail: ""       # "true" to enable local sendmail(8) as a fallback backend
 
   secrets:
     databaseUrl: ""            # Postgres connection string, e.g. postgres://user:pass@host:5432/db?sslmode=require
@@ -94,6 +101,8 @@ sendrec:
     aiApiKey: ""               # API key for the configured AI provider
     listmonkUsername: ""       # Listmonk API username
     listmonkPassword: ""       # Listmonk API password
+    smtpUsername: ""           # SMTP auth username (omit for unauthenticated relays)
+    smtpPassword: ""           # SMTP auth password / app password
     creemApiKey: ""            # Creem API key for billing integration
     creemWebhookSecret: ""     # Creem webhook signing secret
 

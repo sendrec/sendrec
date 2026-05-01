@@ -116,21 +116,14 @@ func TestRegister_Disabled(t *testing.T) {
 	}
 }
 
-func TestRegister_Success(t *testing.T) {
+func TestRegister_Success_NoEmailBackend_AutoVerifies(t *testing.T) {
 	handler, mock := newTestHandler(t)
 	defer mock.Close()
 
+	// No email sender configured -> user auto-verified, no email_confirmations row.
 	mock.ExpectQuery(`INSERT INTO users`).
-		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
+		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice", true).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
-
-	mock.ExpectExec(`UPDATE email_confirmations SET used_at`).
-		WithArgs("user-uuid-1").
-		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
-
-	mock.ExpectExec(`INSERT INTO email_confirmations`).
-		WithArgs(pgxmock.AnyArg(), "user-uuid-1", pgxmock.AnyArg()).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(body))
@@ -142,11 +135,49 @@ func TestRegister_Success(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
 	}
 
-	resp := decodeMessageResponse(t, rec)
-	if resp.Message == "" {
-		t.Error("expected non-empty message")
+	var rr struct {
+		Message                   string `json:"message"`
+		RequiresEmailConfirmation bool   `json:"requiresEmailConfirmation"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &rr); err != nil {
+		t.Fatalf("decode register response: %v", err)
+	}
+	if !strings.Contains(rr.Message, "sign in") {
+		t.Errorf("expected message to indicate user can sign in, got %q", rr.Message)
+	}
+	if rr.RequiresEmailConfirmation {
+		t.Error("expected requiresEmailConfirmation=false for auto-verify path")
 	}
 
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet mock expectations: %v", err)
+	}
+}
+
+func TestRegister_Success_StubBackendNoBackendFlag_AutoVerifies(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	// Sender attached but reports no backend -> auto-verify path.
+	sender := &mockEmailSender{noBackend: true}
+	handler.SetEmailSender(sender, "https://app.sendrec.eu")
+
+	mock.ExpectQuery(`INSERT INTO users`).
+		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice", true).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
+
+	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.Register(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+	if sender.lastConfirmLink != "" {
+		t.Errorf("expected no confirmation email when backend missing, got link=%q", sender.lastConfirmLink)
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet mock expectations: %v", err)
 	}
@@ -243,7 +274,7 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectQuery(`INSERT INTO users`).
-		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
+		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice", pgxmock.AnyArg()).
 		WillReturnError(&pgconn.PgError{Code: "23505"})
 
 	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
@@ -284,7 +315,7 @@ func TestRegister_DBError(t *testing.T) {
 	defer mock.Close()
 
 	mock.ExpectQuery(`INSERT INTO users`).
-		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
+		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice", pgxmock.AnyArg()).
 		WillReturnError(pgx.ErrTxClosed)
 
 	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
@@ -310,7 +341,7 @@ func TestRegister_SendsConfirmationEmail(t *testing.T) {
 	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
 
 	mock.ExpectQuery(`INSERT INTO users`).
-		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
+		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice", false).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
 
 	mock.ExpectExec(`UPDATE email_confirmations SET used_at`).
@@ -557,6 +588,42 @@ func TestResendConfirmation_MissingEmail(t *testing.T) {
 	}
 
 	_ = mock
+}
+
+func TestResendConfirmation_NoBackend_Returns400(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	// no email sender attached -> request should be rejected
+	body := `{"email":"alice@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/resend-confirmation", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResendConfirmation(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+	if msg := decodeErrorResponse(t, rec); !strings.Contains(msg, "email backend") {
+		t.Errorf("expected error mentioning email backend, got %q", msg)
+	}
+}
+
+func TestResendConfirmation_BackendDisabled_Returns400(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.SetEmailSender(&mockEmailSender{noBackend: true}, "https://app.sendrec.eu")
+
+	body := `{"email":"alice@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/resend-confirmation", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ResendConfirmation(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
 }
 
 // --- Login ---
@@ -1284,16 +1351,8 @@ func TestRegister_NoTokensIssued(t *testing.T) {
 	handler := NewHandler(mock, testSecret, true)
 
 	mock.ExpectQuery(`INSERT INTO users`).
-		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice").
+		WithArgs("alice@example.com", pgxmock.AnyArg(), "Alice", true).
 		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
-
-	mock.ExpectExec(`UPDATE email_confirmations SET used_at`).
-		WithArgs("user-uuid-1").
-		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
-
-	mock.ExpectExec(`INSERT INTO email_confirmations`).
-		WithArgs(pgxmock.AnyArg(), "user-uuid-1", pgxmock.AnyArg()).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	body := `{"email":"alice@example.com","password":"strongpass123","name":"Alice"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(body))
@@ -1330,7 +1389,10 @@ type mockEmailSender struct {
 	lastDashboardURL string
 	welcomeCalled    bool
 	sendErr          error
+	noBackend        bool
 }
+
+func (m *mockEmailSender) HasBackend() bool { return !m.noBackend }
 
 func (m *mockEmailSender) SendPasswordReset(_ context.Context, toEmail, toName, resetLink string) error {
 	m.lastEmail = toEmail
@@ -1472,6 +1534,33 @@ func TestForgotPassword_EmailSendFailure_StillReturns200(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestForgotPassword_NoBackend_ShortCircuitsBeforeDBWrites(t *testing.T) {
+	// When no email backend is configured the reset link can't be delivered.
+	// Skip DB writes (avoid orphan tokens), still return generic 200 to avoid
+	// enumeration. mock.ExpectationsWereMet() catches any stray DB call.
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	emailSender := &mockEmailSender{noBackend: true}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
+	body := `{"email":"alice@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ForgotPassword(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	if emailSender.lastEmail != "" {
+		t.Error("should not attempt to send email when no backend")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unexpected DB calls: %v", err)
 	}
 }
 

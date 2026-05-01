@@ -42,3 +42,8 @@ data:
   LISTMONK_ORG_INVITE_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkOrgInviteTemplateId | quote }}
   LISTMONK_RETENTION_WARNING_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkRetentionWarningTemplateId | quote }}
   EMAIL_ALLOWLIST: {{ .Values.sendrec.env.emailAllowlist | quote }}
+  EMAIL_FROM_ADDRESS: {{ .Values.sendrec.env.emailFromAddress | quote }}
+  SMTP_HOST: {{ .Values.sendrec.env.smtpHost | quote }}
+  SMTP_PORT: {{ .Values.sendrec.env.smtpPort | quote }}
+  SMTP_TLS: {{ .Values.sendrec.env.smtpTls | quote }}
+  EMAIL_USE_SENDMAIL: {{ .Values.sendrec.env.emailUseSendmail | quote }}
