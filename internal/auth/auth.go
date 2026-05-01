@@ -349,6 +349,13 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 
 	response := messageResponse{Message: "If an account with that email exists, we've sent a password reset link"}
 
+	// No email backend → reset link can't be delivered. Skip DB writes (avoid
+	// orphan tokens) and return the same generic message to avoid enumeration.
+	if h.emailSender == nil || !h.emailSender.HasBackend() {
+		httputil.WriteJSON(w, http.StatusOK, response)
+		return
+	}
+
 	var userID, userName string
 	err := h.db.QueryRow(r.Context(),
 		"SELECT id, name FROM users WHERE email = $1", req.Email,

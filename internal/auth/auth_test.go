@@ -1537,6 +1537,33 @@ func TestForgotPassword_EmailSendFailure_StillReturns200(t *testing.T) {
 	}
 }
 
+func TestForgotPassword_NoBackend_ShortCircuitsBeforeDBWrites(t *testing.T) {
+	// When no email backend is configured the reset link can't be delivered.
+	// Skip DB writes (avoid orphan tokens), still return generic 200 to avoid
+	// enumeration. mock.ExpectationsWereMet() catches any stray DB call.
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	emailSender := &mockEmailSender{noBackend: true}
+	handler.SetEmailSender(emailSender, "https://app.sendrec.eu")
+
+	body := `{"email":"alice@example.com"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	handler.ForgotPassword(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	if emailSender.lastEmail != "" {
+		t.Error("should not attempt to send email when no backend")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unexpected DB calls: %v", err)
+	}
+}
+
 // --- ResetPassword ---
 
 func TestResetPassword_Success(t *testing.T) {
