@@ -46,7 +46,10 @@ test.describe("Authentication", () => {
     await expect(passwordInputs).toHaveCount(2);
   });
 
-  test("register with new email redirects to check-email", async ({
+  // The e2e stack runs without an email backend (no Listmonk, no SMTP), so
+  // registration auto-verifies and redirects to /login instead of /check-email.
+  // The /check-email branch is exercised by Register.test.tsx unit tests.
+  test("register with new email redirects to login when no email backend", async ({
     page,
   }) => {
     const uniqueEmail = `e2e-register-${Date.now()}@test.sendrec.local`;
@@ -57,6 +60,6 @@ test.describe("Authentication", () => {
     await passwordInputs.nth(0).fill("TestPassword123!");
     await passwordInputs.nth(1).fill("TestPassword123!");
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page).toHaveURL(/\/check-email/);
+    await expect(page).toHaveURL(/\/login/);
   });
 });
