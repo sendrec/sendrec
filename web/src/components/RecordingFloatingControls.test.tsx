@@ -20,13 +20,7 @@ function createPictureInPictureWindow() {
     dispatchEvent: eventTarget.dispatchEvent.bind(eventTarget),
   } as unknown as Window;
 
-  const requestWindow = vi.fn().mockResolvedValue(pipWindow);
-  Object.defineProperty(window, "documentPictureInPicture", {
-    value: { requestWindow },
-    configurable: true,
-  });
-
-  return { pipWindow, requestWindow, close };
+  return { pipWindow, close };
 }
 
 const baseProps = {
@@ -42,18 +36,16 @@ const baseProps = {
 
 describe("RecordingFloatingControls", () => {
   afterEach(() => {
-    delete (window as unknown as { documentPictureInPicture?: unknown })
-      .documentPictureInPicture;
     vi.clearAllMocks();
   });
 
   it("renders timer, camera preview, Pause, and Stop inside the PiP window", async () => {
-    const { pipWindow, requestWindow } = createPictureInPictureWindow();
+    const { pipWindow } = createPictureInPictureWindow();
 
-    render(<RecordingFloatingControls {...baseProps} />);
+    render(<RecordingFloatingControls {...baseProps} pipWindow={pipWindow} />);
 
     await waitFor(() => {
-      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+      expect(pipWindow.document.body.querySelector("#root")).not.toBeNull();
     });
     const pipBody = within(pipWindow.document.body);
     expect(pipBody.getByText("1:15")).toBeTruthy();
@@ -70,7 +62,7 @@ describe("RecordingFloatingControls", () => {
     const { pipWindow } = createPictureInPictureWindow();
     const onStop = vi.fn();
 
-    render(<RecordingFloatingControls {...baseProps} onStop={onStop} />);
+    render(<RecordingFloatingControls {...baseProps} pipWindow={pipWindow} onStop={onStop} />);
 
     await waitFor(() => {
       expect(pipWindow.document.body.querySelector("button")).not.toBeNull();
@@ -87,7 +79,7 @@ describe("RecordingFloatingControls", () => {
     const { pipWindow } = createPictureInPictureWindow();
     const onStop = vi.fn();
 
-    render(<RecordingFloatingControls {...baseProps} onStop={onStop} />);
+    render(<RecordingFloatingControls {...baseProps} pipWindow={pipWindow} onStop={onStop} />);
 
     await waitFor(() => {
       expect(pipWindow.document.body.querySelector("#root")).not.toBeNull();
@@ -100,7 +92,7 @@ describe("RecordingFloatingControls", () => {
   it("closes the PiP window on unmount", async () => {
     const { pipWindow, close } = createPictureInPictureWindow();
 
-    const { unmount } = render(<RecordingFloatingControls {...baseProps} />);
+    const { unmount } = render(<RecordingFloatingControls {...baseProps} pipWindow={pipWindow} />);
 
     await waitFor(() => {
       expect(pipWindow.document.body.querySelector("#root")).not.toBeNull();

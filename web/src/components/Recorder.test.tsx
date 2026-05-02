@@ -225,22 +225,21 @@ describe("Recorder", () => {
     });
   });
 
-  it("opens Document Picture-in-Picture after countdown completes", async () => {
+  it("opens Document Picture-in-Picture during Start click, before countdown", async () => {
     const { requestWindow } = installDocumentPictureInPicture();
     const user = userEvent.setup();
 
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
 
-    expect(requestWindow).not.toHaveBeenCalled();
+    // PiP is opened inside startRecording (before getDisplayMedia) so it is
+    // already called by the time the countdown overlay appears.
+    expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
     expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("Click to start now")).toBeInTheDocument();
     await user.click(screen.getByTestId("countdown-overlay"));
 
-    await vi.waitFor(() => {
-      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
-    });
     expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
   });
 
@@ -964,5 +963,57 @@ describe("Recorder", () => {
   it("has no accessibility violations", async () => {
     const { container } = render(<Recorder onRecordingComplete={vi.fn()} />);
     await expectNoA11yViolations(container);
+  });
+
+  it("awaits pending webcam request before starting recording (race condition)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    // getUserMedia resolves only when we call resolveWebcam()
+    let resolveWebcam!: (stream: MockMediaStream) => void;
+    const webcamStream = new MockMediaStream();
+    const pendingWebcamPromise = new Promise<MockMediaStream>((res) => {
+      resolveWebcam = res;
+    });
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockReturnValue(
+      pendingWebcamPromise,
+    );
+
+    localStorage.setItem("recording-mode", "screen-camera");
+    localStorage.setItem("recording-audio", "false");
+
+    // Track MediaRecorder constructor calls so we can assert webcam recorder was created
+    const constructorArgs: MediaStream[] = [];
+    const OriginalMock = MockMediaRecorder;
+    class TrackingMediaRecorder extends OriginalMock {
+      constructor(stream: MediaStream) {
+        super();
+        constructorArgs.push(stream);
+      }
+    }
+    globalThis.MediaRecorder = TrackingMediaRecorder as unknown as typeof MediaRecorder;
+
+    const onComplete = vi.fn();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<Recorder onRecordingComplete={onComplete} />);
+
+    // Click Start immediately — webcam getUserMedia promise is still pending
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    // Resolve webcam after startRecording has already been called
+    await act(async () => {
+      resolveWebcam(webcamStream);
+      // Flush microtasks so the pending promise settles
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Without the fix: webcamStreamRef.current was null when startRecording checked,
+    // so only 1 MediaRecorder (screen) was created.
+    // With the fix: startRecording awaits the pending promise, so webcamStreamRef.current
+    // is set before the guard, producing 2 MediaRecorder instances.
+    expect(constructorArgs.length).toBe(2);
+
+    vi.useRealTimers();
   });
 });

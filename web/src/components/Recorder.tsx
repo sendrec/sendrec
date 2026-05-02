@@ -26,7 +26,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(() => localStorage.getItem("recording-audio") !== "false");
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [showFloatingControlsBanner, setShowFloatingControlsBanner] = useState(false);
-  const [floatingControlsUnavailable, setFloatingControlsUnavailable] = useState(false);
   const [supportsDocPiP] = useState(() => supportsDocumentPictureInPicture());
   const countdownEnabled = useRef(localStorage.getItem("recording-countdown") !== "false");
 
@@ -35,6 +34,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   const screenStreamRef = useRef<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const floatingControlsWindowRef = useRef<Window | null>(null);
 
   const webcamStreamRef = useRef<MediaStream | null>(null);
   const webcamRecorderRef = useRef<MediaRecorder | null>(null);
@@ -165,12 +165,41 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
   }, [recording]);
 
-  const handleFloatingControlsUnavailable = useCallback(() => {
-    setFloatingControlsUnavailable(true);
-  }, []);
-
-  const beginRecording = useCallback(() => {
+  const beginRecording = useCallback(async () => {
     clearInterval(recording.countdownTimerRef.current);
+
+    // Wait for any in-flight webcam permission request before checking the stream.
+    // If the user clicks Start (or the countdown elapses) while getUserMedia is
+    // still pending from mount, we must not skip webcam recorder setup.
+    if (pendingWebcamRequestRef.current) {
+      await pendingWebcamRequestRef.current;
+    }
+
+    // Set up webcam recorder now that the stream ref is guaranteed to be settled.
+    webcamBlobPromiseRef.current = null;
+    if (webcamEnabled && webcamStreamRef.current) {
+      const webcamMimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9"
+        : "video/webm";
+      const webcamRecorder = new MediaRecorder(webcamStreamRef.current, {
+        mimeType: webcamMimeType,
+      });
+      webcamRecorderRef.current = webcamRecorder;
+      webcamChunksRef.current = [];
+
+      webcamRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          webcamChunksRef.current.push(event.data);
+        }
+      };
+
+      webcamBlobPromiseRef.current = new Promise<Blob>((resolve) => {
+        webcamRecorder.onstop = () => {
+          resolve(new Blob(webcamChunksRef.current, { type: "video/webm" }));
+        };
+      });
+    }
+
     if (mediaRecorderRef.current) {
       // No timeslice — Chrome's MP4 MediaRecorder may produce empty fragments
       // with start(timeslice) on getDisplayMedia() streams. All data is buffered
@@ -187,7 +216,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       localStorage.setItem(FLOATING_CONTROLS_BANNER_KEY, "1");
       setShowFloatingControlsBanner(true);
     }
-  }, [recording, supportsDocPiP]);
+  }, [recording, supportsDocPiP, webcamEnabled]);
 
   const abortCountdown = useCallback(() => {
     recording.reset();
@@ -200,7 +229,11 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     mediaRecorderRef.current = null;
     webcamRecorderRef.current = null;
     webcamBlobPromiseRef.current = null;
+    floatingControlsWindowRef.current?.close();
+    floatingControlsWindowRef.current = null;
   }, [recording, stopAllStreams, stopCompositing]);
+
+  const pendingWebcamRequestRef = useRef<Promise<MediaStream | null> | null>(null);
 
   const requestWebcamStream = useCallback(async () => {
     try {
@@ -216,6 +249,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       setWebcamEnabled(false);
       setMediaError("Could not access your camera. Please allow camera access and try again.");
       return null;
+    } finally {
+      pendingWebcamRequestRef.current = null;
     }
   }, []);
 
@@ -225,7 +260,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   requestWebcamStreamRef.current = requestWebcamStream;
   useEffect(() => {
     if (localStorage.getItem("recording-mode") === "screen-camera") {
-      void requestWebcamStreamRef.current();
+      pendingWebcamRequestRef.current = requestWebcamStreamRef.current();
     }
   }, []);
 
@@ -245,9 +280,22 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
   async function startRecording() {
     setMediaError(null);
-    setFloatingControlsUnavailable(false);
     setShowFloatingControlsBanner(false);
     try {
+      // Open the Document PiP window synchronously inside the click handler, before
+      // getDisplayMedia consumes the transient user activation. Activation propagates
+      // through the async chain so requestWindow works here when called first.
+      if (supportsDocPiP) {
+        const dpip = window.documentPictureInPicture;
+        if (dpip) {
+          try {
+            floatingControlsWindowRef.current = await dpip.requestWindow({ width: 280, height: 220 });
+          } catch {
+            floatingControlsWindowRef.current = null;
+          }
+        }
+      }
+
       const displayMediaOptions: DisplayMediaStreamOptions & Record<string, unknown> = {
         video: true,
         audio: systemAudioEnabled,
@@ -332,33 +380,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       chunksRef.current = [];
       recording.pauseStartRef.current = 0;
       recording.totalPausedRef.current = 0;
-
-      // Set up webcam recorder if webcam is enabled (but don't start yet).
-      // Always use WebM for webcam — it's only used temporarily for server-side compositing,
-      // and WebM is more reliable for video-only MediaRecorder streams across browsers.
-      webcamBlobPromiseRef.current = null;
-      if (webcamEnabled && webcamStreamRef.current) {
-        const webcamMimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-          ? "video/webm;codecs=vp9"
-          : "video/webm";
-        const webcamRecorder = new MediaRecorder(webcamStreamRef.current, {
-          mimeType: webcamMimeType,
-        });
-        webcamRecorderRef.current = webcamRecorder;
-        webcamChunksRef.current = [];
-
-        webcamRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            webcamChunksRef.current.push(event.data);
-          }
-        };
-
-        webcamBlobPromiseRef.current = new Promise<Blob>((resolve) => {
-          webcamRecorder.onstop = () => {
-            resolve(new Blob(webcamChunksRef.current, { type: "video/webm" }));
-          };
-        });
-      }
 
       const handleDataAvailable = (event: BlobEvent) => {
         if (event.data.size > 0) {
@@ -462,7 +483,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
   const { elapsed: duration, countdown: countdownValue,
     isIdle, isCountdown, isPaused, isActive, isRecording, remaining } = recording;
-  const useFloatingControls = isRecording && supportsDocPiP && !floatingControlsUnavailable;
+  const useFloatingControls = isRecording && !!floatingControlsWindowRef.current;
 
   return (
     <div className="recorder-container">
@@ -645,6 +666,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
       {useFloatingControls && (
         <RecordingFloatingControls
+          pipWindow={floatingControlsWindowRef.current!}
           webcamStream={webcamStreamRef.current}
           webcamEnabled={webcamEnabled}
           duration={duration}
@@ -653,7 +675,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={stopRecording}
-          onUnavailable={handleFloatingControlsUnavailable}
         />
       )}
 

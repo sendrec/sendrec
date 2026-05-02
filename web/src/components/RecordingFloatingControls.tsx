@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { formatDuration } from "../utils/format";
 
 interface RecordingFloatingControlsProps {
+  pipWindow: Window;
   webcamStream: MediaStream | null;
   webcamEnabled: boolean;
   duration: number;
@@ -11,7 +12,6 @@ interface RecordingFloatingControlsProps {
   onPause: () => void;
   onResume: () => void;
   onStop: () => void;
-  onUnavailable?: () => void;
 }
 
 interface FloatingPanelProps {
@@ -26,6 +26,7 @@ interface FloatingPanelProps {
 }
 
 export function RecordingFloatingControls({
+  pipWindow,
   webcamStream,
   webcamEnabled,
   duration,
@@ -34,7 +35,6 @@ export function RecordingFloatingControls({
   onPause,
   onResume,
   onStop,
-  onUnavailable,
 }: RecordingFloatingControlsProps) {
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const onStopRef = useRef(onStop);
@@ -44,43 +44,21 @@ export function RecordingFloatingControls({
   }, [onStop]);
 
   useEffect(() => {
-    let cancelled = false;
-    let activePipWindow: Window | null = null;
-    let handlePageHide: (() => void) | null = null;
+    cloneStylesheetsInto(pipWindow.document);
 
-    async function openPictureInPictureWindow() {
-      activePipWindow = await requestPictureInPictureWindow();
-      if (!activePipWindow) {
-        onUnavailable?.();
-        return;
-      }
+    const root = pipWindow.document.createElement("div");
+    root.id = "root";
+    pipWindow.document.body.appendChild(root);
 
-      if (cancelled) {
-        activePipWindow.close();
-        return;
-      }
-
-      cloneStylesheetsInto(activePipWindow.document);
-
-      const root = activePipWindow.document.createElement("div");
-      root.id = "root";
-      activePipWindow.document.body.appendChild(root);
-
-      handlePageHide = () => onStopRef.current();
-      activePipWindow.addEventListener("pagehide", handlePageHide);
-      setPortalRoot(root);
-    }
-
-    void openPictureInPictureWindow();
+    const handlePageHide = () => onStopRef.current();
+    pipWindow.addEventListener("pagehide", handlePageHide);
+    setPortalRoot(root);
 
     return () => {
-      cancelled = true;
-      if (activePipWindow && handlePageHide) {
-        activePipWindow.removeEventListener("pagehide", handlePageHide);
-      }
-      activePipWindow?.close();
+      pipWindow.removeEventListener("pagehide", handlePageHide);
+      pipWindow.close();
     };
-  }, [onUnavailable]);
+  }, [pipWindow]);
 
   if (!portalRoot) return null;
 
@@ -97,20 +75,6 @@ export function RecordingFloatingControls({
     />,
     portalRoot,
   );
-}
-
-async function requestPictureInPictureWindow(): Promise<Window | null> {
-  const documentPictureInPicture = window.documentPictureInPicture;
-  if (!documentPictureInPicture) return null;
-
-  try {
-    return await documentPictureInPicture.requestWindow({
-      width: 280,
-      height: 220,
-    });
-  } catch {
-    return null;
-  }
 }
 
 function cloneStylesheetsInto(pipDocument: Document) {
