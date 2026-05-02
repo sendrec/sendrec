@@ -213,6 +213,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       const displayMediaOptions: DisplayMediaStreamOptions & Record<string, unknown> = {
         video: true,
         audio: systemAudioEnabled,
+        selfBrowserSurface: "exclude",
+        preferCurrentTab: false,
       };
       if (systemAudioEnabled) {
         displayMediaOptions.systemAudio = "include";

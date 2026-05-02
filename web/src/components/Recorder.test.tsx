@@ -730,6 +730,19 @@ describe("Recorder", () => {
     );
   });
 
+  it("calls getDisplayMedia with selfBrowserSurface=exclude and preferCurrentTab=false", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(navigator.mediaDevices.getDisplayMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selfBrowserSurface: "exclude",
+        preferCurrentTab: false,
+      }),
+    );
+  });
+
   it("calls onRecordingError when recording is shorter than 1 second", async () => {
     const onComplete = vi.fn();
     const onError = vi.fn();
