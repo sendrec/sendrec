@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { formatDuration } from "../utils/format";
 
 interface RecordingFloatingControlsProps {
-  pipWindow?: Window | null;
   webcamStream: MediaStream | null;
   webcamEnabled: boolean;
   duration: number;
@@ -27,7 +26,6 @@ interface FloatingPanelProps {
 }
 
 export function RecordingFloatingControls({
-  pipWindow,
   webcamStream,
   webcamEnabled,
   duration,
@@ -51,7 +49,7 @@ export function RecordingFloatingControls({
     let handlePageHide: (() => void) | null = null;
 
     async function openPictureInPictureWindow() {
-      activePipWindow = pipWindow ?? await requestPictureInPictureWindow();
+      activePipWindow = await requestPictureInPictureWindow();
       if (!activePipWindow) {
         onUnavailable?.();
         return;
@@ -66,7 +64,7 @@ export function RecordingFloatingControls({
 
       const root = activePipWindow.document.createElement("div");
       root.id = "root";
-      activePipWindow.document.body.replaceChildren(root);
+      activePipWindow.document.body.appendChild(root);
 
       handlePageHide = () => onStopRef.current();
       activePipWindow.addEventListener("pagehide", handlePageHide);
@@ -82,7 +80,7 @@ export function RecordingFloatingControls({
       }
       activePipWindow?.close();
     };
-  }, [onUnavailable, pipWindow]);
+  }, [onUnavailable]);
 
   if (!portalRoot) return null;
 

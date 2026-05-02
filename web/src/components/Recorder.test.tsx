@@ -225,7 +225,7 @@ describe("Recorder", () => {
     });
   });
 
-  it("opens Document Picture-in-Picture from the countdown click", async () => {
+  it("opens Document Picture-in-Picture after countdown completes", async () => {
     const { requestWindow } = installDocumentPictureInPicture();
     const user = userEvent.setup();
 
@@ -234,8 +234,8 @@ describe("Recorder", () => {
 
     expect(requestWindow).not.toHaveBeenCalled();
     expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
-    expect(screen.getByText("Ready")).toBeInTheDocument();
-    expect(screen.getByText("Click to open floating controls")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Click to start now")).toBeInTheDocument();
     await user.click(screen.getByTestId("countdown-overlay"));
 
     await vi.waitFor(() => {
@@ -244,7 +244,7 @@ describe("Recorder", () => {
     expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
   });
 
-  it("keeps the Doc PiP countdown waiting for a click instead of auto-starting without activation", async () => {
+  it("auto-starts recording after countdown when Document Picture-in-Picture is supported", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const { requestWindow } = installDocumentPictureInPicture();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -256,8 +256,9 @@ describe("Recorder", () => {
       vi.advanceTimersByTime(4000);
     });
 
-    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
-    expect(requestWindow).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    });
     expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
     vi.useRealTimers();
   });
