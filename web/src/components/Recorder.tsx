@@ -108,6 +108,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     maxDurationSeconds,
     () => beginRecordingRef.current(),
     () => stopRecordingRef.current(),
+    !supportsDocPiP,
   );
 
   const stopRecording = useCallback(() => {
@@ -165,8 +166,24 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
   }, [recording]);
 
+  const openFloatingControlsWindow = useCallback(async () => {
+    if (!supportsDocPiP) return null;
+    const dpip = window.documentPictureInPicture;
+    if (!dpip) return null;
+    try {
+      const pipWindow = await dpip.requestWindow({ width: 280, height: 220 });
+      floatingControlsWindowRef.current = pipWindow;
+      return pipWindow;
+    } catch {
+      floatingControlsWindowRef.current = null;
+      return null;
+    }
+  }, [supportsDocPiP]);
+
   const beginRecording = useCallback(async () => {
     clearInterval(recording.countdownTimerRef.current);
+
+    await openFloatingControlsWindow();
 
     // Wait for any in-flight webcam permission request before checking the stream.
     // If the user clicks Start (or the countdown elapses) while getUserMedia is
@@ -216,7 +233,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       localStorage.setItem(FLOATING_CONTROLS_BANNER_KEY, "1");
       setShowFloatingControlsBanner(true);
     }
-  }, [recording, supportsDocPiP, webcamEnabled]);
+  }, [openFloatingControlsWindow, recording, supportsDocPiP, webcamEnabled]);
 
   const abortCountdown = useCallback(() => {
     recording.reset();
@@ -281,21 +298,9 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   async function startRecording() {
     setMediaError(null);
     setShowFloatingControlsBanner(false);
+    floatingControlsWindowRef.current?.close();
+    floatingControlsWindowRef.current = null;
     try {
-      // Open the Document PiP window synchronously inside the click handler, before
-      // getDisplayMedia consumes the transient user activation. Activation propagates
-      // through the async chain so requestWindow works here when called first.
-      if (supportsDocPiP) {
-        const dpip = window.documentPictureInPicture;
-        if (dpip) {
-          try {
-            floatingControlsWindowRef.current = await dpip.requestWindow({ width: 280, height: 220 });
-          } catch {
-            floatingControlsWindowRef.current = null;
-          }
-        }
-      }
-
       const displayMediaOptions: DisplayMediaStreamOptions & Record<string, unknown> = {
         video: true,
         audio: systemAudioEnabled,
@@ -450,7 +455,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         }
       });
 
-      if (countdownEnabled.current) {
+      if (countdownEnabled.current || supportsDocPiP) {
         recording.setCountdown(3);
         recording.setState("countdown");
       } else {
@@ -484,6 +489,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   const { elapsed: duration, countdown: countdownValue,
     isIdle, isCountdown, isPaused, isActive, isRecording, remaining } = recording;
   const useFloatingControls = isRecording && !!floatingControlsWindowRef.current;
+  const countdownLabel = supportsDocPiP ? "Ready" : countdownValue;
+  const countdownHint = supportsDocPiP ? "Click to start recording" : "Click to start now";
 
   return (
     <div className="recorder-container">
@@ -558,8 +565,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
             data-testid="countdown-overlay"
             onClick={beginRecording}
           >
-            <div className="countdown-number">{countdownValue}</div>
-            <div className="countdown-hint">Click to start now</div>
+            <div className="countdown-number">{countdownLabel}</div>
+            <div className="countdown-hint">{countdownHint}</div>
           </div>
         )}
       </div>

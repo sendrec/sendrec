@@ -225,25 +225,27 @@ describe("Recorder", () => {
     });
   });
 
-  it("opens Document Picture-in-Picture during Start click, before countdown", async () => {
+  it("opens Document Picture-in-Picture from the countdown click", async () => {
     const { requestWindow } = installDocumentPictureInPicture();
     const user = userEvent.setup();
 
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
 
-    // PiP is opened inside startRecording (before getDisplayMedia) so it is
-    // already called by the time the countdown overlay appears.
-    expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    expect(requestWindow).not.toHaveBeenCalled();
     expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("Click to start now")).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Click to start recording")).toBeInTheDocument();
+
     await user.click(screen.getByTestId("countdown-overlay"));
 
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    });
     expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
   });
 
-  it("auto-starts recording after countdown when Document Picture-in-Picture is supported", async () => {
+  it("keeps Document Picture-in-Picture countdown waiting for the click gesture", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const { requestWindow } = installDocumentPictureInPicture();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -255,10 +257,8 @@ describe("Recorder", () => {
       vi.advanceTimersByTime(4000);
     });
 
-    await vi.waitFor(() => {
-      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
-    });
-    expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+    expect(requestWindow).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 
@@ -587,6 +587,20 @@ describe("Recorder", () => {
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByText("Screen recording was blocked or failed. Please allow screen capture and try again.")).toBeInTheDocument();
+  });
+
+  it("does not open Document Picture-in-Picture when screen capture fails", async () => {
+    const { requestWindow } = installDocumentPictureInPicture();
+    (navigator.mediaDevices.getDisplayMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("User cancelled"),
+    );
+
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(requestWindow).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 
   it("dismisses media error when dismiss button is clicked", async () => {

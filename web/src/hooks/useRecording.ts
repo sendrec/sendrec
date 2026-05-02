@@ -32,6 +32,7 @@ export function useRecording(
   maxDurationSeconds: number,
   onCountdownComplete: () => void,
   onMaxDurationReached: () => void,
+  autoCountdown = true,
 ): UseRecordingResult {
   const [state, setStateRaw] = useState<RecordingState>("idle");
   const [elapsed, setElapsed] = useState(0);
@@ -77,7 +78,7 @@ export function useRecording(
   }, [stopTimer]);
 
   useEffect(() => {
-    if (state !== "countdown") return;
+    if (state !== "countdown" || !autoCountdown) return;
     countdownTimerRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -88,7 +89,7 @@ export function useRecording(
       });
     }, 1000);
     return () => clearInterval(countdownTimerRef.current);
-  }, [state]);
+  }, [autoCountdown, state]);
 
   useEffect(() => {
     if (

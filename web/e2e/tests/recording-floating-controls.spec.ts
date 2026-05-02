@@ -45,6 +45,15 @@ test.describe("Recording floating controls", () => {
         ),
       )
       .toBe(true);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            window.documentPictureInPicture?.window?.document.body
+              .textContent ?? "",
+        ),
+      )
+      .toMatch(/0:0[1-9]/);
 
     await page.evaluate(() => {
       const pipDocument = window.documentPictureInPicture?.window?.document;
