@@ -694,6 +694,41 @@ describe("Recorder", () => {
     expect(videos.length).toBe(1);
   });
 
+  it("requests camera stream when saved screen-camera mode starts recording", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    localStorage.setItem("recording-mode", "screen-camera");
+    localStorage.setItem("recording-audio", "false");
+    const webcamStream = new MockMediaStream();
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue(webcamStream);
+    const onComplete = vi.fn();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<Recorder onRecordingComplete={onComplete} />);
+    expect(screen.getByText("Camera On")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+      video: { width: 320, height: 240, facingMode: "user" },
+      audio: false,
+    });
+
+    await act(() => {
+      vi.advanceTimersByTime(1500);
+    });
+    await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+    await vi.waitFor(() => {
+      expect(onComplete).toHaveBeenCalledWith(
+        expect.any(Blob),
+        expect.any(Number),
+        expect.any(Blob),
+      );
+    });
+    vi.useRealTimers();
+  });
+
   it("sets up webcam recorder when webcam is enabled before recording starts", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     // Return a proper mock stream from getUserMedia

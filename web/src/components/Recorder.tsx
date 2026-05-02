@@ -239,6 +239,23 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     webcamBlobPromiseRef.current = null;
   }, [clearFloatingControlsWindow, recording, stopAllStreams, stopCompositing]);
 
+  const requestWebcamStream = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 240, facingMode: "user" },
+        audio: false,
+      });
+      webcamStreamRef.current = stream;
+      setWebcamEnabled(true);
+      return stream;
+    } catch (err) {
+      console.error("Webcam access failed", err);
+      setWebcamEnabled(false);
+      setMediaError("Could not access your camera. Please allow camera access and try again.");
+      return null;
+    }
+  }, []);
+
   // Keep stable callback refs up to date
   stopRecordingRef.current = stopRecording;
   beginRecordingRef.current = beginRecording;
@@ -250,17 +267,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       setWebcamEnabled(false);
       return;
     }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 320, height: 240, facingMode: "user" },
-        audio: false,
-      });
-      webcamStreamRef.current = stream;
-      setWebcamEnabled(true);
-    } catch (err) {
-      console.error("Webcam access failed", err);
-      setMediaError("Could not access your camera. Please allow camera access and try again.");
-    }
+    await requestWebcamStream();
   }
 
   async function startRecording() {
@@ -269,6 +276,11 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     setShowFloatingControlsBanner(false);
     clearFloatingControlsWindow();
     try {
+      if (webcamEnabled && !webcamStreamRef.current) {
+        const stream = await requestWebcamStream();
+        if (!stream) return;
+      }
+
       const displayMediaOptions: DisplayMediaStreamOptions & Record<string, unknown> = {
         video: true,
         audio: systemAudioEnabled,
