@@ -88,9 +88,35 @@ class MockMediaRecorder {
   });
 }
 
+function createPictureInPictureWindow() {
+  const pipDocument = document.implementation.createHTMLDocument("pip");
+  const eventTarget = new EventTarget();
+  const close = vi.fn();
+  return {
+    document: pipDocument,
+    close,
+    addEventListener: eventTarget.addEventListener.bind(eventTarget),
+    removeEventListener: eventTarget.removeEventListener.bind(eventTarget),
+    dispatchEvent: eventTarget.dispatchEvent.bind(eventTarget),
+  } as unknown as Window;
+}
+
+function installDocumentPictureInPicture(
+  requestWindow = vi.fn().mockResolvedValue(createPictureInPictureWindow()),
+) {
+  Object.defineProperty(window, "documentPictureInPicture", {
+    value: { requestWindow },
+    configurable: true,
+  });
+  return { requestWindow };
+}
+
 beforeEach(() => {
   mockDrawMode = false;
   vi.clearAllMocks();
+  localStorage.clear();
+  delete (window as unknown as { documentPictureInPicture?: unknown })
+    .documentPictureInPicture;
 
   Object.defineProperty(globalThis.navigator, "mediaDevices", {
     value: {
@@ -183,6 +209,131 @@ describe("Recorder", () => {
     expect(
       screen.getByRole("button", { name: "Stop recording" }),
     ).toBeInTheDocument();
+  });
+
+  it("hides the main recording header when Document Picture-in-Picture is supported", async () => {
+    const { requestWindow } = installDocumentPictureInPicture();
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    });
+  });
+
+  it("opens Document Picture-in-Picture from the countdown click", async () => {
+    const { requestWindow } = installDocumentPictureInPicture();
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(requestWindow).not.toHaveBeenCalled();
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Click to open floating controls")).toBeInTheDocument();
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    });
+    expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
+  });
+
+  it("keeps the Doc PiP countdown waiting for a click instead of auto-starting without activation", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { requestWindow } = installDocumentPictureInPicture();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+    expect(requestWindow).not.toHaveBeenCalled();
+    expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it("keeps the main recording header and shows the Tier-2 banner without Document Picture-in-Picture", async () => {
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(document.querySelector(".recording-header")).toBeInTheDocument();
+    expect(
+      screen.getByText("For controls that float over your recording, use Chrome."),
+    ).toBeInTheDocument();
+    expect(localStorage.getItem("sendrec.floating-banner-shown")).toBe("1");
+  });
+
+  it("shows the Tier-2 banner only once per browser", async () => {
+    localStorage.setItem("sendrec.floating-banner-shown", "1");
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(document.querySelector(".recording-header")).toBeInTheDocument();
+    expect(
+      screen.queryByText("For controls that float over your recording, use Chrome."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("falls back to the main recording header when Document Picture-in-Picture cannot open", async () => {
+    installDocumentPictureInPicture(
+      vi.fn().mockRejectedValue(new Error("PiP blocked")),
+    );
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    await vi.waitFor(() => {
+      expect(document.querySelector(".recording-header")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText("For controls that float over your recording, use Chrome."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not persist the Tier-2 banner when countdown aborts before recording starts", async () => {
+    let endedCallback: (() => void) | undefined;
+    const trackWithEndedCapture = {
+      getSettings: () => ({ width: 1920, height: 1080 }),
+      addEventListener: vi.fn().mockImplementation((event: string, handler: () => void) => {
+        if (event === "ended") {
+          endedCallback = handler;
+        }
+      }),
+      stop: vi.fn(),
+    };
+    mockScreenStream.getVideoTracks.mockReturnValue([trackWithEndedCapture]);
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(endedCallback).toBeDefined();
+    act(() => {
+      endedCallback!();
+    });
+
+    expect(localStorage.getItem("sendrec.floating-banner-shown")).toBeNull();
+    expect(
+      screen.queryByText("For controls that float over your recording, use Chrome."),
+    ).not.toBeInTheDocument();
   });
 
   it("calls toggleDrawMode when Draw button is clicked", async () => {

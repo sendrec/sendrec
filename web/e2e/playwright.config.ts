@@ -21,7 +21,14 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         launchOptions: {
-          args: ["--disable-web-security"],
+          args: [
+            "--disable-web-security",
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+            "--auto-select-desktop-capture-source=Entire screen",
+            "--enable-usermedia-screen-capturing",
+            "--allow-http-screen-capture",
+          ],
         },
       },
     },
