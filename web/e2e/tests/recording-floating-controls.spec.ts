@@ -36,7 +36,15 @@ test.describe("Recording floating controls", () => {
       .toContain("Stop");
 
     await expect(page.locator(".recording-header")).toHaveCount(0);
-    await page.waitForTimeout(1500);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.documentPictureInPicture?.window?.document.querySelector(
+            ".recording-dot--active",
+          ) !== null,
+        ),
+      )
+      .toBe(true);
 
     await page.evaluate(() => {
       const pipDocument = window.documentPictureInPicture?.window?.document;
