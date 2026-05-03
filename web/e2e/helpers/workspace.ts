@@ -77,7 +77,6 @@ export async function switchToPersonal(page: Page): Promise<void> {
 
 export async function navigateToOrgSettings(page: Page, orgId: string): Promise<void> {
   await page.goto("/");
-  await page.getByLabel("Switch workspace").waitFor({ timeout: 10000 });
   await page.evaluate((id) => localStorage.setItem("sendrec-org-id", id), orgId);
   await page.goto(`/organizations/${orgId}/settings`);
 }

@@ -62,7 +62,6 @@ export async function loginAsSecondUser(page: Page): Promise<void> {
     if (response.ok()) {
       const body = await response.json();
       accessTokenStore.set(page, body.accessToken);
-      await waitForAuthenticatedShell(page);
       return;
     }
     if (response.status() === 429) {
@@ -82,7 +81,6 @@ export async function loginViaAPI(page: Page): Promise<void> {
     if (response.ok()) {
       const body = await response.json();
       accessTokenStore.set(page, body.accessToken);
-      await waitForAuthenticatedShell(page);
       return;
     }
     if (response.status() === 429) {
@@ -95,11 +93,6 @@ export async function loginViaAPI(page: Page): Promise<void> {
 }
 
 const accessTokenStore = new WeakMap<Page, string>();
-
-async function waitForAuthenticatedShell(page: Page): Promise<void> {
-  await page.goto("/");
-  await page.getByLabel("Switch workspace").waitFor({ timeout: 10000 });
-}
 
 export function getAccessToken(page: Page): string {
   const token = accessTokenStore.get(page);

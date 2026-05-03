@@ -1841,18 +1841,6 @@ textarea.form-input {
   justify-content: center;
 }
 
-.recording-tier2-banner {
-  max-width: 480px;
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  text-align: center;
-}
-
 .btn-pause {
   background: transparent;
   color: var(--color-text);
@@ -1933,49 +1921,6 @@ textarea.form-input {
 
 .btn-stop:active {
   transform: scale(0.97);
-}
-
-.recording-floating-panel {
-  box-sizing: border-box;
-  min-height: 100vh;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: stretch;
-  justify-content: center;
-  background: var(--color-bg, #ffffff);
-  color: var(--color-text, #111827);
-  font-family: inherit;
-}
-
-.recording-floating-panel__video {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: 8px;
-  border: 2px solid var(--color-accent);
-  object-fit: cover;
-  background: var(--color-bg-tertiary, #f3f4f6);
-}
-
-.recording-floating-panel__timer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--color-error);
-}
-
-.recording-floating-panel__actions {
-  display: flex;
-  gap: 8px;
-}
-
-.recording-floating-panel__actions > button {
-  flex: 1;
-  padding-inline: 12px;
 }
 
 /* Record page — Share state */
