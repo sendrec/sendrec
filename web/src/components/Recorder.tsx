@@ -4,6 +4,14 @@ import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
 import { useRecording, MIN_RECORDING_SECONDS, MIN_RECORDING_BYTES } from "../hooks/useRecording";
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
+import { RecordingHeader } from "./RecordingHeader";
+import { RecordingFloatingControls } from "./RecordingFloatingControls";
+import { supportsDocumentPictureInPicture } from "../utils/browserCapabilities";
+import { useDocumentPictureInPictureWindow } from "../hooks/useDocumentPictureInPictureWindow";
+
+const FLOATING_CONTROLS_BANNER_KEY = "sendrec.floating-banner-shown";
+const FLOATING_CONTROLS_BANNER_MESSAGE =
+  "For controls that float over your recording, use Chrome.";
 
 interface RecorderProps {
   onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void;
@@ -18,6 +26,14 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   const [previewExpanded, setPreviewExpanded] = useState(false);
   const [systemAudioEnabled, setSystemAudioEnabled] = useState(() => localStorage.getItem("recording-audio") !== "false");
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [showFloatingControlsBanner, setShowFloatingControlsBanner] = useState(false);
+  const [supportsDocPiP] = useState(() => supportsDocumentPictureInPicture());
+  const {
+    pipWindow: floatingControlsWindow,
+    open: openFloatingControlsWindow,
+    close: closeFloatingControlsWindow,
+    waitForOpen: waitForFloatingControlsWindow,
+  } = useDocumentPictureInPictureWindow(supportsDocPiP);
   const countdownEnabled = useRef(localStorage.getItem("recording-countdown") !== "false");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -116,6 +132,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       webcamRecorderRef.current.stop();
     }
     recording.stopTimer();
+    setShowFloatingControlsBanner(false);
     stopCompositing();
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
@@ -154,8 +171,43 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
   }, [recording]);
 
-  const beginRecording = useCallback(() => {
+  const beginRecording = useCallback(async () => {
     clearInterval(recording.countdownTimerRef.current);
+
+    await waitForFloatingControlsWindow();
+
+    // Wait for any in-flight webcam permission request before checking the stream.
+    // If the user clicks Start (or the countdown elapses) while getUserMedia is
+    // still pending from mount, we must not skip webcam recorder setup.
+    if (pendingWebcamRequestRef.current) {
+      await pendingWebcamRequestRef.current;
+    }
+
+    // Set up webcam recorder now that the stream ref is guaranteed to be settled.
+    webcamBlobPromiseRef.current = null;
+    if (webcamEnabled && webcamStreamRef.current) {
+      const webcamMimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9"
+        : "video/webm";
+      const webcamRecorder = new MediaRecorder(webcamStreamRef.current, {
+        mimeType: webcamMimeType,
+      });
+      webcamRecorderRef.current = webcamRecorder;
+      webcamChunksRef.current = [];
+
+      webcamRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          webcamChunksRef.current.push(event.data);
+        }
+      };
+
+      webcamBlobPromiseRef.current = new Promise<Blob>((resolve) => {
+        webcamRecorder.onstop = () => {
+          resolve(new Blob(webcamChunksRef.current, { type: "video/webm" }));
+        };
+      });
+    }
+
     if (mediaRecorderRef.current) {
       // No timeslice — Chrome's MP4 MediaRecorder may produce empty fragments
       // with start(timeslice) on getDisplayMedia() streams. All data is buffered
@@ -168,10 +220,15 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     recording.startTimeRef.current = Date.now();
     recording.setState("recording");
     recording.startTimer();
-  }, [recording]);
+    if (!supportsDocPiP && localStorage.getItem(FLOATING_CONTROLS_BANNER_KEY) !== "1") {
+      localStorage.setItem(FLOATING_CONTROLS_BANNER_KEY, "1");
+      setShowFloatingControlsBanner(true);
+    }
+  }, [recording, supportsDocPiP, waitForFloatingControlsWindow, webcamEnabled]);
 
   const abortCountdown = useCallback(() => {
     recording.reset();
+    setShowFloatingControlsBanner(false);
     stopCompositing();
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
@@ -180,7 +237,39 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     mediaRecorderRef.current = null;
     webcamRecorderRef.current = null;
     webcamBlobPromiseRef.current = null;
-  }, [recording, stopAllStreams, stopCompositing]);
+    closeFloatingControlsWindow();
+  }, [closeFloatingControlsWindow, recording, stopAllStreams, stopCompositing]);
+
+  const pendingWebcamRequestRef = useRef<Promise<MediaStream | null> | null>(null);
+
+  const requestWebcamStream = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 240, facingMode: "user" },
+        audio: false,
+      });
+      webcamStreamRef.current = stream;
+      setWebcamEnabled(true);
+      return stream;
+    } catch (err) {
+      console.error("Webcam access failed", err);
+      setWebcamEnabled(false);
+      setMediaError("Could not access your camera. Please allow camera access and try again.");
+      return null;
+    } finally {
+      pendingWebcamRequestRef.current = null;
+    }
+  }, []);
+
+  // Restore saved camera preference immediately on mount so the stream is ready
+  // before the user hits Start (avoids a permission prompt mid-recording).
+  const requestWebcamStreamRef = useRef(requestWebcamStream);
+  requestWebcamStreamRef.current = requestWebcamStream;
+  useEffect(() => {
+    if (localStorage.getItem("recording-mode") === "screen-camera") {
+      pendingWebcamRequestRef.current = requestWebcamStreamRef.current();
+    }
+  }, []);
 
   // Keep stable callback refs up to date
   stopRecordingRef.current = stopRecording;
@@ -193,25 +282,20 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       setWebcamEnabled(false);
       return;
     }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 320, height: 240, facingMode: "user" },
-        audio: false,
-      });
-      webcamStreamRef.current = stream;
-      setWebcamEnabled(true);
-    } catch (err) {
-      console.error("Webcam access failed", err);
-      setMediaError("Could not access your camera. Please allow camera access and try again.");
-    }
+    await requestWebcamStream();
   }
 
   async function startRecording() {
     setMediaError(null);
+    setShowFloatingControlsBanner(false);
+    closeFloatingControlsWindow();
     try {
+      openFloatingControlsWindow();
       const displayMediaOptions: DisplayMediaStreamOptions & Record<string, unknown> = {
         video: true,
         audio: systemAudioEnabled,
+        selfBrowserSurface: "exclude",
+        preferCurrentTab: false,
       };
       if (systemAudioEnabled) {
         displayMediaOptions.systemAudio = "include";
@@ -292,33 +376,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       recording.pauseStartRef.current = 0;
       recording.totalPausedRef.current = 0;
 
-      // Set up webcam recorder if webcam is enabled (but don't start yet).
-      // Always use WebM for webcam — it's only used temporarily for server-side compositing,
-      // and WebM is more reliable for video-only MediaRecorder streams across browsers.
-      webcamBlobPromiseRef.current = null;
-      if (webcamEnabled && webcamStreamRef.current) {
-        const webcamMimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-          ? "video/webm;codecs=vp9"
-          : "video/webm";
-        const webcamRecorder = new MediaRecorder(webcamStreamRef.current, {
-          mimeType: webcamMimeType,
-        });
-        webcamRecorderRef.current = webcamRecorder;
-        webcamChunksRef.current = [];
-
-        webcamRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            webcamChunksRef.current.push(event.data);
-          }
-        };
-
-        webcamBlobPromiseRef.current = new Promise<Blob>((resolve) => {
-          webcamRecorder.onstop = () => {
-            resolve(new Blob(webcamChunksRef.current, { type: "video/webm" }));
-          };
-        });
-      }
-
       const handleDataAvailable = (event: BlobEvent) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
@@ -388,7 +445,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         }
       });
 
-      if (countdownEnabled.current) {
+      if (countdownEnabled.current || supportsDocPiP) {
         recording.setCountdown(3);
         recording.setState("countdown");
       } else {
@@ -397,6 +454,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     } catch (err) {
       console.error("Screen capture failed", err);
       setMediaError("Screen recording was blocked or failed. Please allow screen capture and try again.");
+      closeFloatingControlsWindow();
       stopAllStreams();
     }
   }
@@ -409,8 +467,9 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       stopTimerRef.current();
       stopCompositing();
       stopAllStreams();
+      closeFloatingControlsWindow();
     };
-  }, [stopAllStreams, stopCompositing]);
+  }, [closeFloatingControlsWindow, stopAllStreams, stopCompositing]);
 
   useEffect(() => {
     if (previewExpanded) {
@@ -421,6 +480,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
   const { elapsed: duration, countdown: countdownValue,
     isIdle, isCountdown, isPaused, isActive, isRecording, remaining } = recording;
+  const useFloatingControls = isRecording && floatingControlsWindow !== null;
 
   return (
     <div className="recorder-container">
@@ -576,104 +636,43 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         </>
       )}
 
-      {/* Recording controls — always above preview */}
-      {isRecording && (
-        <div className="recording-header" role="status" aria-live="polite">
-          <div className={`recording-indicator ${isPaused ? "recording-indicator--paused" : "recording-indicator--active"}`}>
-            <div className={`recording-dot ${isPaused ? "recording-dot--paused" : "recording-dot--active"}`} />
-            {formatDuration(duration)}
-            {isPaused && <span className="recording-remaining">(Paused)</span>}
-            {!isPaused && remaining !== null && (
-              <span className="recording-remaining">({formatDuration(remaining)} remaining)</span>
-            )}
-          </div>
-
-          <button
-            onClick={toggleDrawMode}
-            aria-label={drawMode ? "Disable drawing" : "Enable drawing"}
-            data-testid="draw-toggle"
-            className={`btn-draw${drawMode ? " btn-draw--active" : ""}`}
-          >
-            Draw
-          </button>
-
-          {drawMode && (
-            <input
-              type="color"
-              value={drawColor}
-              onChange={(e) => setDrawColor(e.target.value)}
-              aria-label="Drawing color"
-              data-testid="color-picker"
-              style={{
-                width: 36,
-                height: 36,
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                padding: 2,
-                background: "transparent",
-                cursor: "pointer",
-              }}
-            />
-          )}
-
-          {drawMode && (
-            <button
-              onClick={clearCanvas}
-              aria-label="Clear drawing"
-              data-testid="clear-drawing"
-              className="btn-pause"
-            >
-              Clear
-            </button>
-          )}
-
-          {drawMode && (
-            <div style={{ display: "flex", gap: 4, alignItems: "center" }} data-testid="thickness-selector">
-              {[2, 4, 8].map((w) => (
-                <button
-                  key={w}
-                  onClick={() => setLineWidth(w)}
-                  aria-label={`Line width ${w}`}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "50%",
-                    border: lineWidth === w ? "2px solid var(--color-accent)" : "1px solid var(--color-border)",
-                    background: "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: w + 2,
-                      height: w + 2,
-                      borderRadius: "50%",
-                      background: "var(--color-text)",
-                    }}
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-
-          {isPaused ? (
-            <button onClick={resumeRecording} aria-label="Resume recording" className="btn-resume">
-              Resume
-            </button>
-          ) : (
-            <button onClick={pauseRecording} aria-label="Pause recording" className="btn-pause">
-              Pause
-            </button>
-          )}
-
-          <button onClick={stopRecording} aria-label="Stop recording" className="btn-stop">
-            Stop Recording
-          </button>
+      {showFloatingControlsBanner && isActive && !supportsDocPiP && (
+        <div className="recording-tier2-banner" role="status" aria-live="polite">
+          {FLOATING_CONTROLS_BANNER_MESSAGE}
         </div>
+      )}
+
+      {/* Recording controls — always above preview */}
+      {isRecording && !useFloatingControls && (
+        <RecordingHeader
+          duration={duration}
+          isPaused={isPaused}
+          remaining={remaining}
+          drawMode={drawMode}
+          drawColor={drawColor}
+          lineWidth={lineWidth}
+          onPause={pauseRecording}
+          onResume={resumeRecording}
+          onStop={stopRecording}
+          onToggleDraw={toggleDrawMode}
+          onClearCanvas={clearCanvas}
+          onSetDrawColor={setDrawColor}
+          onSetLineWidth={setLineWidth}
+        />
+      )}
+
+      {useFloatingControls && (
+        <RecordingFloatingControls
+          pipWindow={floatingControlsWindow}
+          webcamStream={webcamStreamRef.current}
+          webcamEnabled={webcamEnabled}
+          duration={duration}
+          isPaused={isPaused}
+          remaining={remaining}
+          onPause={pauseRecording}
+          onResume={resumeRecording}
+          onStop={stopRecording}
+        />
       )}
 
       {webcamEnabled && (

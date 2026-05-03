@@ -88,9 +88,39 @@ class MockMediaRecorder {
   });
 }
 
+function createPictureInPictureWindow() {
+  const pipDocument = document.implementation.createHTMLDocument("pip");
+  const eventTarget = new EventTarget();
+  const close = vi.fn();
+  return {
+    document: pipDocument,
+    close,
+    addEventListener: eventTarget.addEventListener.bind(eventTarget),
+    removeEventListener: eventTarget.removeEventListener.bind(eventTarget),
+    dispatchEvent: eventTarget.dispatchEvent.bind(eventTarget),
+  } as unknown as Window;
+}
+
+function installDocumentPictureInPicture(requestWindow?: ReturnType<typeof vi.fn>) {
+  const pipWindow = createPictureInPictureWindow();
+  const resolvedRequestWindow = requestWindow ?? vi.fn().mockResolvedValue(pipWindow);
+  Object.defineProperty(window, "documentPictureInPicture", {
+    value: { requestWindow: resolvedRequestWindow },
+    configurable: true,
+  });
+  return {
+    requestWindow: resolvedRequestWindow,
+    pipWindow,
+    close: pipWindow.close as unknown as ReturnType<typeof vi.fn>,
+  };
+}
+
 beforeEach(() => {
   mockDrawMode = false;
   vi.clearAllMocks();
+  localStorage.clear();
+  delete (window as unknown as { documentPictureInPicture?: unknown })
+    .documentPictureInPicture;
 
   Object.defineProperty(globalThis.navigator, "mediaDevices", {
     value: {
@@ -183,6 +213,145 @@ describe("Recorder", () => {
     expect(
       screen.getByRole("button", { name: "Stop recording" }),
     ).toBeInTheDocument();
+  });
+
+  it("hides the main recording header when Document Picture-in-Picture is supported", async () => {
+    const { requestWindow } = installDocumentPictureInPicture();
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    });
+  });
+
+  it("opens Document Picture-in-Picture from the Start click", async () => {
+    const { requestWindow } = installDocumentPictureInPicture();
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    });
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Click to start now")).toBeInTheDocument();
+  });
+
+  it("auto-starts recording after countdown when Document Picture-in-Picture is supported", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { requestWindow } = installDocumentPictureInPicture();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+      expect(screen.queryByTestId("countdown-overlay")).not.toBeInTheDocument();
+      expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
+    });
+    vi.useRealTimers();
+  });
+
+  it("closes Document Picture-in-Picture when unmounting during countdown", async () => {
+    const { requestWindow, close } = installDocumentPictureInPicture();
+    const user = userEvent.setup();
+
+    const { unmount } = render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    });
+
+    unmount();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the main recording header and shows the Tier-2 banner without Document Picture-in-Picture", async () => {
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(document.querySelector(".recording-header")).toBeInTheDocument();
+    expect(
+      screen.getByText("For controls that float over your recording, use Chrome."),
+    ).toBeInTheDocument();
+    expect(localStorage.getItem("sendrec.floating-banner-shown")).toBe("1");
+  });
+
+  it("shows the Tier-2 banner only once per browser", async () => {
+    localStorage.setItem("sendrec.floating-banner-shown", "1");
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(document.querySelector(".recording-header")).toBeInTheDocument();
+    expect(
+      screen.queryByText("For controls that float over your recording, use Chrome."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("falls back to the main recording header when Document Picture-in-Picture cannot open", async () => {
+    installDocumentPictureInPicture(
+      vi.fn().mockRejectedValue(new Error("PiP blocked")),
+    );
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    await vi.waitFor(() => {
+      expect(document.querySelector(".recording-header")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText("For controls that float over your recording, use Chrome."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not persist the Tier-2 banner when countdown aborts before recording starts", async () => {
+    let endedCallback: (() => void) | undefined;
+    const trackWithEndedCapture = {
+      getSettings: () => ({ width: 1920, height: 1080 }),
+      addEventListener: vi.fn().mockImplementation((event: string, handler: () => void) => {
+        if (event === "ended") {
+          endedCallback = handler;
+        }
+      }),
+      stop: vi.fn(),
+    };
+    mockScreenStream.getVideoTracks.mockReturnValue([trackWithEndedCapture]);
+    const user = userEvent.setup();
+
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(endedCallback).toBeDefined();
+    act(() => {
+      endedCallback!();
+    });
+
+    expect(localStorage.getItem("sendrec.floating-banner-shown")).toBeNull();
+    expect(
+      screen.queryByText("For controls that float over your recording, use Chrome."),
+    ).not.toBeInTheDocument();
   });
 
   it("calls toggleDrawMode when Draw button is clicked", async () => {
@@ -438,6 +607,21 @@ describe("Recorder", () => {
     expect(screen.getByText("Screen recording was blocked or failed. Please allow screen capture and try again.")).toBeInTheDocument();
   });
 
+  it("closes Document Picture-in-Picture when screen capture fails", async () => {
+    const { requestWindow, close } = installDocumentPictureInPicture();
+    (navigator.mediaDevices.getDisplayMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("User cancelled"),
+    );
+
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
+
   it("dismisses media error when dismiss button is clicked", async () => {
     (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error("Permission denied"),
@@ -541,6 +725,41 @@ describe("Recorder", () => {
     // Webcam preview video should appear (the pip-preview class video)
     const videos = document.querySelectorAll("video.pip-preview");
     expect(videos.length).toBe(1);
+  });
+
+  it("requests camera stream when saved screen-camera mode starts recording", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    localStorage.setItem("recording-mode", "screen-camera");
+    localStorage.setItem("recording-audio", "false");
+    const webcamStream = new MockMediaStream();
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue(webcamStream);
+    const onComplete = vi.fn();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<Recorder onRecordingComplete={onComplete} />);
+    expect(screen.getByText("Camera On")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+      video: { width: 320, height: 240, facingMode: "user" },
+      audio: false,
+    });
+
+    await act(() => {
+      vi.advanceTimersByTime(1500);
+    });
+    await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+    await vi.waitFor(() => {
+      expect(onComplete).toHaveBeenCalledWith(
+        expect.any(Blob),
+        expect.any(Number),
+        expect.any(Blob),
+      );
+    });
+    vi.useRealTimers();
   });
 
   it("sets up webcam recorder when webcam is enabled before recording starts", async () => {
@@ -730,6 +949,19 @@ describe("Recorder", () => {
     );
   });
 
+  it("calls getDisplayMedia with selfBrowserSurface=exclude and preferCurrentTab=false", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(navigator.mediaDevices.getDisplayMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selfBrowserSurface: "exclude",
+        preferCurrentTab: false,
+      }),
+    );
+  });
+
   it("calls onRecordingError when recording is shorter than 1 second", async () => {
     const onComplete = vi.fn();
     const onError = vi.fn();
@@ -764,5 +996,57 @@ describe("Recorder", () => {
   it("has no accessibility violations", async () => {
     const { container } = render(<Recorder onRecordingComplete={vi.fn()} />);
     await expectNoA11yViolations(container);
+  });
+
+  it("awaits pending webcam request before starting recording (race condition)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    // getUserMedia resolves only when we call resolveWebcam()
+    let resolveWebcam!: (stream: MockMediaStream) => void;
+    const webcamStream = new MockMediaStream();
+    const pendingWebcamPromise = new Promise<MockMediaStream>((res) => {
+      resolveWebcam = res;
+    });
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockReturnValue(
+      pendingWebcamPromise,
+    );
+
+    localStorage.setItem("recording-mode", "screen-camera");
+    localStorage.setItem("recording-audio", "false");
+
+    // Track MediaRecorder constructor calls so we can assert webcam recorder was created
+    const constructorArgs: MediaStream[] = [];
+    const OriginalMock = MockMediaRecorder;
+    class TrackingMediaRecorder extends OriginalMock {
+      constructor(stream: MediaStream) {
+        super();
+        constructorArgs.push(stream);
+      }
+    }
+    globalThis.MediaRecorder = TrackingMediaRecorder as unknown as typeof MediaRecorder;
+
+    const onComplete = vi.fn();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<Recorder onRecordingComplete={onComplete} />);
+
+    // Click Start immediately — webcam getUserMedia promise is still pending
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    // Resolve webcam after startRecording has already been called
+    await act(async () => {
+      resolveWebcam(webcamStream);
+      // Flush microtasks so the pending promise settles
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Without the fix: webcamStreamRef.current was null when startRecording checked,
+    // so only 1 MediaRecorder (screen) was created.
+    // With the fix: startRecording awaits the pending promise, so webcamStreamRef.current
+    // is set before the guard, producing 2 MediaRecorder instances.
+    expect(constructorArgs.length).toBe(2);
+
+    vi.useRealTimers();
   });
 });
