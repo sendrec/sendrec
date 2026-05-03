@@ -75,9 +75,14 @@ export async function switchToPersonal(page: Page): Promise<void> {
   await expect(page.getByLabel("Switch workspace")).toContainText("Personal");
 }
 
-export async function navigateToOrgSettings(page: Page, orgId: string): Promise<void> {
-  await page.goto("/");
-  await page.evaluate((id) => localStorage.setItem("sendrec-org-id", id), orgId);
+export async function navigateToOrgSettings(
+  page: Page,
+  orgId: string
+): Promise<void> {
+  await page.addInitScript(
+    (id) => localStorage.setItem("sendrec-org-id", id),
+    orgId
+  );
   await page.goto(`/organizations/${orgId}/settings`);
 }
 

@@ -11,7 +11,6 @@ test.describe.serial("Workspace CRUD", () => {
   });
 
   test("create workspace shows in org switcher", async ({ page }) => {
-    await page.goto("/");
     const ws = await createWorkspace(page, workspaceName);
     workspaceId = ws.id;
 
