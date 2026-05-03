@@ -23,7 +23,6 @@ test.describe("Recording floating controls", () => {
     );
 
     await page.getByRole("button", { name: "Start recording" }).click();
-    await page.getByTestId("countdown-overlay").click();
 
     await expect
       .poll(() =>

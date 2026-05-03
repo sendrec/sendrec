@@ -101,14 +101,18 @@ function createPictureInPictureWindow() {
   } as unknown as Window;
 }
 
-function installDocumentPictureInPicture(
-  requestWindow = vi.fn().mockResolvedValue(createPictureInPictureWindow()),
-) {
+function installDocumentPictureInPicture(requestWindow?: ReturnType<typeof vi.fn>) {
+  const pipWindow = createPictureInPictureWindow();
+  const resolvedRequestWindow = requestWindow ?? vi.fn().mockResolvedValue(pipWindow);
   Object.defineProperty(window, "documentPictureInPicture", {
-    value: { requestWindow },
+    value: { requestWindow: resolvedRequestWindow },
     configurable: true,
   });
-  return { requestWindow };
+  return {
+    requestWindow: resolvedRequestWindow,
+    pipWindow,
+    close: pipWindow.close as unknown as ReturnType<typeof vi.fn>,
+  };
 }
 
 beforeEach(() => {
@@ -225,27 +229,22 @@ describe("Recorder", () => {
     });
   });
 
-  it("opens Document Picture-in-Picture from the countdown click", async () => {
+  it("opens Document Picture-in-Picture from the Start click", async () => {
     const { requestWindow } = installDocumentPictureInPicture();
     const user = userEvent.setup();
 
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
 
-    expect(requestWindow).not.toHaveBeenCalled();
-    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
-    expect(screen.getByText("Ready")).toBeInTheDocument();
-    expect(screen.getByText("Click to start recording")).toBeInTheDocument();
-
-    await user.click(screen.getByTestId("countdown-overlay"));
-
     await vi.waitFor(() => {
       expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
     });
-    expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Click to start now")).toBeInTheDocument();
   });
 
-  it("keeps Document Picture-in-Picture countdown waiting for the click gesture", async () => {
+  it("auto-starts recording after countdown when Document Picture-in-Picture is supported", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const { requestWindow } = installDocumentPictureInPicture();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -257,9 +256,28 @@ describe("Recorder", () => {
       vi.advanceTimersByTime(4000);
     });
 
-    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
-    expect(requestWindow).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+      expect(screen.queryByTestId("countdown-overlay")).not.toBeInTheDocument();
+      expect(document.querySelector(".recording-header")).not.toBeInTheDocument();
+    });
     vi.useRealTimers();
+  });
+
+  it("closes Document Picture-in-Picture when unmounting during countdown", async () => {
+    const { requestWindow, close } = installDocumentPictureInPicture();
+    const user = userEvent.setup();
+
+    const { unmount } = render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    await vi.waitFor(() => {
+      expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    });
+
+    unmount();
+
+    expect(close).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the main recording header and shows the Tier-2 banner without Document Picture-in-Picture", async () => {
@@ -589,8 +607,8 @@ describe("Recorder", () => {
     expect(screen.getByText("Screen recording was blocked or failed. Please allow screen capture and try again.")).toBeInTheDocument();
   });
 
-  it("does not open Document Picture-in-Picture when screen capture fails", async () => {
-    const { requestWindow } = installDocumentPictureInPicture();
+  it("closes Document Picture-in-Picture when screen capture fails", async () => {
+    const { requestWindow, close } = installDocumentPictureInPicture();
     (navigator.mediaDevices.getDisplayMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error("User cancelled"),
     );
@@ -599,7 +617,8 @@ describe("Recorder", () => {
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
 
-    expect(requestWindow).not.toHaveBeenCalled();
+    expect(requestWindow).toHaveBeenCalledWith({ width: 280, height: 220 });
+    expect(close).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 

@@ -7,6 +7,7 @@ import { formatDuration } from "../utils/format";
 import { RecordingHeader } from "./RecordingHeader";
 import { RecordingFloatingControls } from "./RecordingFloatingControls";
 import { supportsDocumentPictureInPicture } from "../utils/browserCapabilities";
+import { useDocumentPictureInPictureWindow } from "../hooks/useDocumentPictureInPictureWindow";
 
 const FLOATING_CONTROLS_BANNER_KEY = "sendrec.floating-banner-shown";
 const FLOATING_CONTROLS_BANNER_MESSAGE =
@@ -27,6 +28,12 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [showFloatingControlsBanner, setShowFloatingControlsBanner] = useState(false);
   const [supportsDocPiP] = useState(() => supportsDocumentPictureInPicture());
+  const {
+    pipWindow: floatingControlsWindow,
+    open: openFloatingControlsWindow,
+    close: closeFloatingControlsWindow,
+    waitForOpen: waitForFloatingControlsWindow,
+  } = useDocumentPictureInPictureWindow(supportsDocPiP);
   const countdownEnabled = useRef(localStorage.getItem("recording-countdown") !== "false");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -34,7 +41,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   const screenStreamRef = useRef<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const floatingControlsWindowRef = useRef<Window | null>(null);
 
   const webcamStreamRef = useRef<MediaStream | null>(null);
   const webcamRecorderRef = useRef<MediaRecorder | null>(null);
@@ -108,7 +114,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     maxDurationSeconds,
     () => beginRecordingRef.current(),
     () => stopRecordingRef.current(),
-    !supportsDocPiP,
   );
 
   const stopRecording = useCallback(() => {
@@ -166,24 +171,10 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
   }, [recording]);
 
-  const openFloatingControlsWindow = useCallback(async () => {
-    if (!supportsDocPiP) return null;
-    const dpip = window.documentPictureInPicture;
-    if (!dpip) return null;
-    try {
-      const pipWindow = await dpip.requestWindow({ width: 280, height: 220 });
-      floatingControlsWindowRef.current = pipWindow;
-      return pipWindow;
-    } catch {
-      floatingControlsWindowRef.current = null;
-      return null;
-    }
-  }, [supportsDocPiP]);
-
   const beginRecording = useCallback(async () => {
     clearInterval(recording.countdownTimerRef.current);
 
-    await openFloatingControlsWindow();
+    await waitForFloatingControlsWindow();
 
     // Wait for any in-flight webcam permission request before checking the stream.
     // If the user clicks Start (or the countdown elapses) while getUserMedia is
@@ -233,7 +224,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       localStorage.setItem(FLOATING_CONTROLS_BANNER_KEY, "1");
       setShowFloatingControlsBanner(true);
     }
-  }, [openFloatingControlsWindow, recording, supportsDocPiP, webcamEnabled]);
+  }, [recording, supportsDocPiP, waitForFloatingControlsWindow, webcamEnabled]);
 
   const abortCountdown = useCallback(() => {
     recording.reset();
@@ -246,9 +237,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     mediaRecorderRef.current = null;
     webcamRecorderRef.current = null;
     webcamBlobPromiseRef.current = null;
-    floatingControlsWindowRef.current?.close();
-    floatingControlsWindowRef.current = null;
-  }, [recording, stopAllStreams, stopCompositing]);
+    closeFloatingControlsWindow();
+  }, [closeFloatingControlsWindow, recording, stopAllStreams, stopCompositing]);
 
   const pendingWebcamRequestRef = useRef<Promise<MediaStream | null> | null>(null);
 
@@ -298,9 +288,9 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
   async function startRecording() {
     setMediaError(null);
     setShowFloatingControlsBanner(false);
-    floatingControlsWindowRef.current?.close();
-    floatingControlsWindowRef.current = null;
+    closeFloatingControlsWindow();
     try {
+      openFloatingControlsWindow();
       const displayMediaOptions: DisplayMediaStreamOptions & Record<string, unknown> = {
         video: true,
         audio: systemAudioEnabled,
@@ -464,6 +454,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     } catch (err) {
       console.error("Screen capture failed", err);
       setMediaError("Screen recording was blocked or failed. Please allow screen capture and try again.");
+      closeFloatingControlsWindow();
       stopAllStreams();
     }
   }
@@ -476,8 +467,9 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       stopTimerRef.current();
       stopCompositing();
       stopAllStreams();
+      closeFloatingControlsWindow();
     };
-  }, [stopAllStreams, stopCompositing]);
+  }, [closeFloatingControlsWindow, stopAllStreams, stopCompositing]);
 
   useEffect(() => {
     if (previewExpanded) {
@@ -488,9 +480,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
   const { elapsed: duration, countdown: countdownValue,
     isIdle, isCountdown, isPaused, isActive, isRecording, remaining } = recording;
-  const useFloatingControls = isRecording && !!floatingControlsWindowRef.current;
-  const countdownLabel = supportsDocPiP ? "Ready" : countdownValue;
-  const countdownHint = supportsDocPiP ? "Click to start recording" : "Click to start now";
+  const useFloatingControls = isRecording && floatingControlsWindow !== null;
 
   return (
     <div className="recorder-container">
@@ -565,8 +555,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
             data-testid="countdown-overlay"
             onClick={beginRecording}
           >
-            <div className="countdown-number">{countdownLabel}</div>
-            <div className="countdown-hint">{countdownHint}</div>
+            <div className="countdown-number">{countdownValue}</div>
+            <div className="countdown-hint">Click to start now</div>
           </div>
         )}
       </div>
@@ -673,7 +663,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
       {useFloatingControls && (
         <RecordingFloatingControls
-          pipWindow={floatingControlsWindowRef.current!}
+          pipWindow={floatingControlsWindow}
           webcamStream={webcamStreamRef.current}
           webcamEnabled={webcamEnabled}
           duration={duration}

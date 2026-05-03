@@ -79,9 +79,11 @@ export function RecordingFloatingControls({
 
 function cloneStylesheetsInto(pipDocument: Document) {
   document
-    .querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
-    .forEach((link) => {
-      pipDocument.head.appendChild(link.cloneNode(true));
+    .querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
+      'link[rel="stylesheet"], style',
+    )
+    .forEach((styleNode) => {
+      pipDocument.head.appendChild(styleNode.cloneNode(true));
     });
 }
 

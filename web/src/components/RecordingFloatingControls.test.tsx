@@ -101,4 +101,29 @@ describe("RecordingFloatingControls", () => {
 
     expect(close).toHaveBeenCalledTimes(1);
   });
+
+  it("clones linked and inline styles into the PiP window", async () => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "/assets/app.css";
+    document.head.appendChild(link);
+    const style = document.createElement("style");
+    style.textContent = ".recording-floating-panel { color: red; }";
+    document.head.appendChild(style);
+    const { pipWindow } = createPictureInPictureWindow();
+
+    render(<RecordingFloatingControls {...baseProps} pipWindow={pipWindow} />);
+
+    await waitFor(() => {
+      expect(pipWindow.document.body.querySelector("#root")).not.toBeNull();
+    });
+
+    expect(pipWindow.document.head.querySelector('link[rel="stylesheet"]')).not.toBeNull();
+    expect(pipWindow.document.head.querySelector("style")?.textContent).toContain(
+      ".recording-floating-panel",
+    );
+
+    link.remove();
+    style.remove();
+  });
 });
