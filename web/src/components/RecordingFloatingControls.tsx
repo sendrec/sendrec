@@ -56,7 +56,6 @@ export function RecordingFloatingControls({
 
     return () => {
       pipWindow.removeEventListener("pagehide", handlePageHide);
-      pipWindow.close();
     };
   }, [pipWindow]);
 

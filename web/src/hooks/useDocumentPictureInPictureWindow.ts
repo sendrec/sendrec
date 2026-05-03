@@ -38,6 +38,11 @@ export function useDocumentPictureInPictureWindow(supported: boolean) {
           setPipWindow(null);
         }
         return null;
+      })
+      .finally(() => {
+        if (pendingWindowRef.current === pendingWindow) {
+          pendingWindowRef.current = null;
+        }
       });
     pendingWindowRef.current = pendingWindow;
     return pendingWindow;

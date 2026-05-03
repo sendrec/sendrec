@@ -89,17 +89,21 @@ describe("RecordingFloatingControls", () => {
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 
-  it("closes the PiP window on unmount", async () => {
-    const { pipWindow, close } = createPictureInPictureWindow();
+  it("removes the pagehide listener on unmount", async () => {
+    const { pipWindow } = createPictureInPictureWindow();
+    const onStop = vi.fn();
 
-    const { unmount } = render(<RecordingFloatingControls {...baseProps} pipWindow={pipWindow} />);
+    const { unmount } = render(
+      <RecordingFloatingControls {...baseProps} pipWindow={pipWindow} onStop={onStop} />,
+    );
 
     await waitFor(() => {
       expect(pipWindow.document.body.querySelector("#root")).not.toBeNull();
     });
     unmount();
+    pipWindow.dispatchEvent(new Event("pagehide"));
 
-    expect(close).toHaveBeenCalledTimes(1);
+    expect(onStop).not.toHaveBeenCalled();
   });
 
   it("clones linked and inline styles into the PiP window", async () => {
