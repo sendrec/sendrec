@@ -16,6 +16,7 @@ services:
       - MAX_UPLOAD_BYTES=524288000
       - AWS_REQUEST_CHECKSUM_CALCULATION=when_required
       - AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+      - PLAN_BADGE_ENABLED=true
     depends_on:
       postgres:
         condition: service_healthy
