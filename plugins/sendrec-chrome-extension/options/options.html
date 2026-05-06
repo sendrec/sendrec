@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>SendRec Extension Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1><span class="title-send">Send</span><span class="title-rec">Rec</span> Extension Settings</h1>
+      <div class="header-actions">
+        <button id="btn-theme" class="btn-icon" title="Toggle theme">
+          <svg id="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg id="icon-sun" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+        <button id="btn-exit" class="btn-icon" title="Close settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <form id="settings-form">
+      <div class="field">
+        <label for="server-url">Server URL</label>
+        <input type="url" id="server-url" value="https://app.sendrec.eu" placeholder="https://app.sendrec.eu" required>
+        <small>Use <code>https://app.sendrec.eu</code> for the hosted version, or your self-hosted URL.</small>
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="you@example.com" required>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Your account password" required>
+        <small>Your credentials are used to obtain a session token and are not stored.</small>
+      </div>
+
+      <div id="login-status" class="field hidden" style="text-align:center;">
+        <small id="login-status-text"></small>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn btn-save">Sign In & Save</button>
+        <button type="button" id="btn-logout" class="btn btn-test hidden">Sign Out</button>
+      </div>
+
+      <div id="message" class="message hidden"></div>
+    </form>
+
+    <div class="section-divider"></div>
+
+    <div class="media-section">
+      <h2>Media Permissions</h2>
+      <span class="media-desc">Grant access to your microphone and webcam.</span>
+      <div style="text-align:center;"><button type="button" id="btn-media-permissions" class="btn btn-save">Request Mic & Webcam Access</button></div>
+    </div>
+  </div>
+  <script src="../shared/theme.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

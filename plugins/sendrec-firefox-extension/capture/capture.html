@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a1628;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+    }
+    .container {
+      padding: 32px;
+    }
+    h2 {
+      margin-bottom: 12px;
+      font-size: 18px;
+    }
+    p {
+      color: #94a3b8;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .btn {
+      background: #00b67a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 32px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #00a06a; }
+    .btn:active { background: #008f5e; }
+    .status {
+      margin-top: 16px;
+      color: #f87171;
+      font-size: 13px;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Select Screen to Record</h2>
+    <p>Click the button below and choose what to share.</p>
+    <button id="btn-capture" class="btn">Start Screen Recording</button>
+    <div id="status" class="status"></div>
+  </div>
+  <script src="capture.js"></script>
+</body>
+</html>

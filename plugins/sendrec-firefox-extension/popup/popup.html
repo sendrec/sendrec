@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 class="title" id="logo-link" style="cursor:pointer;" title="Open SendRec"><span class="title-send">Send</span><span class="title-rec">Rec</span></h1>
+      <div class="header-actions">
+        <button id="btn-theme" class="btn-icon" title="Toggle theme">
+          <svg id="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg id="icon-sun" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+        <button id="btn-settings" class="btn-icon" title="Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="not-configured" class="message hidden">
+      <p>Please sign in with your SendRec account in <a href="#" id="open-options">Settings</a>.</p>
+    </div>
+
+    <div id="recorder-controls">
+      <div class="status-bar">
+        <span id="status-indicator" class="indicator idle"></span>
+        <span id="status-text">Ready</span>
+        <span id="timer" class="timer">00:00</span>
+      </div>
+
+      <div class="source-select">
+        <label>Workspace</label>
+        <select id="workspace-select">
+          <option value="">Personal</option>
+        </select>
+      </div>
+
+      <div class="audio-options">
+        <button id="webcam" class="btn-toggle btn-toggle--active">Camera On</button>
+        <button id="mic-audio" class="btn-toggle btn-toggle--active">Microphone On</button>
+      </div>
+
+      <div class="controls">
+        <button id="btn-start" class="btn btn-start">
+          <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="currentColor"/></svg>
+          Start
+        </button>
+        <button id="btn-pause" class="btn btn-pause hidden" disabled>
+          <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="3" width="4" height="10" fill="currentColor"/><rect x="9" y="3" width="4" height="10" fill="currentColor"/></svg>
+          Pause
+        </button>
+        <button id="btn-stop" class="btn btn-stop hidden" disabled>
+          <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1" fill="currentColor"/></svg>
+          Stop
+        </button>
+      </div>
+
+      <div id="upload-status" class="upload-status hidden">
+        <div class="progress-bar">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+        <p id="upload-text">Uploading...</p>
+      </div>
+
+      <div id="result" class="result hidden">
+        <p>Recording uploaded!</p>
+        <a id="share-link" href="#" target="_blank">Open in SendRec</a>
+        <button id="btn-copy-link" class="btn btn-small">Copy Link</button>
+      </div>
+    </div>
+  </div>
+  <script src="../shared/theme.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -233,6 +233,26 @@ Video recordings happen entirely in the browser using `getDisplayMedia` + `Media
 
 After upload, the server generates a thumbnail with ffmpeg and enqueues the video for transcription with [whisper.cpp](https://github.com/ggerganov/whisper.cpp). WebM recordings are automatically transcoded to MP4 for universal playback. Uploaded MP4s are normalized with iOS-safe encoding flags when needed. Transcripts are stored as VTT subtitles and a clickable segment panel on the watch page. Transcription is optional — if the whisper model is not available, it is silently skipped.
 
+## Browser Extensions
+
+SendRec ships with browser extensions for Chrome and Firefox, available in the [plugins/](plugins/) directory.
+
+### Chrome Extension
+
+Record your screen, tab, or webcam directly from Chrome and upload to any SendRec instance. Supports webcam overlay, microphone/system audio capture, pause/resume, and instant share links.
+
+Install in developer mode: `chrome://extensions/` → Enable Developer mode → Load unpacked → select `plugins/sendrec-chrome-extension`.
+
+See [plugins/sendrec-chrome-extension/README.md](plugins/sendrec-chrome-extension/README.md) for full setup and usage.
+
+### Firefox Extension
+
+Record your screen or tab from Firefox with webcam overlay, audio capture, pause/resume, and direct upload to any SendRec instance.
+
+Install temporarily: `about:debugging` → This Firefox → Load Temporary Add-on → select `plugins/sendrec-firefox-extension/manifest.json`.
+
+For permanent installation on Firefox Developer Edition / ESR / Nightly, see [plugins/sendrec-firefox-extension/README.md](plugins/sendrec-firefox-extension/README.md).
+
 ## Self-Hosting
 
 SendRec can run either on a single server with Docker Compose or on Kubernetes with the included Helm chart. See the **[Self-Hosting Guide](SELF-HOSTING.md)** for full setup instructions, including:
