@@ -125,7 +125,7 @@ describe("Register", () => {
   it("shows error on failed registration", async () => {
     mockHealthResponse(true);
     const user = userEvent.setup();
-    mockApiFetch.mockRejectedValueOnce(new Error("could not create account"));
+    mockApiFetch.mockRejectedValueOnce(new Error("An account with this email already exists"));
     renderRegister();
 
     await user.type(await screen.findByLabelText("Name"), "Alice");
@@ -134,7 +134,7 @@ describe("Register", () => {
     await user.type(screen.getByLabelText("Confirm password"), "password123");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(screen.getByText("could not create account")).toBeInTheDocument();
+    expect(screen.getByText("An account with this email already exists")).toBeInTheDocument();
   });
 
   it("redirects to login when registration is disabled", async () => {
