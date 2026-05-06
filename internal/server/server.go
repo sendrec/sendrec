@@ -60,6 +60,7 @@ type Config struct {
 	CreemBusinessProductID   string
 	CreemOrgBusinessProductID string
 	RegistrationEnabled     bool
+	PlanBadgeEnabled        bool
 	GeoIPDBPath             string
 	GoogleClientID          string
 	GoogleClientSecret      string
@@ -85,6 +86,7 @@ type Server struct {
 	webFS               fs.FS
 	enableDocs          bool
 	registrationEnabled bool
+	planBadgeEnabled    bool
 	analyticsScript     string
 }
 
@@ -98,7 +100,7 @@ func New(cfg Config) *Server {
 		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
 	}))
 
-	s := &Server{router: r, version: cfg.Version, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, analyticsScript: cfg.AnalyticsScript}
+	s := &Server{router: r, version: cfg.Version, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -530,7 +532,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_, _ = fmt.Fprintf(w, `{"status":"ok","version":%q,"registrationEnabled":%t}`, s.version, s.registrationEnabled)
+	_, _ = fmt.Fprintf(w, `{"status":"ok","version":%q,"registrationEnabled":%t,"planBadgeEnabled":%t}`, s.version, s.registrationEnabled, s.planBadgeEnabled)
 }
 
 func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {

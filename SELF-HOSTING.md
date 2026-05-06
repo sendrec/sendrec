@@ -260,6 +260,7 @@ Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy sh
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `REGISTRATION_ENABLED` | Allow new user signups. Set to `false` to disable the registration form and API endpoint | `true` |
+| `PLAN_BADGE_ENABLED` | Show the plan badge ("Free"/"Pro"/"Business") next to the SendRec logo. Off by default for self-hosters; set to `true` to surface upgrade tiers | `false` |
 
 ### Analytics (optional)
 

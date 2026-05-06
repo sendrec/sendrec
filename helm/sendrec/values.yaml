@@ -48,6 +48,7 @@ sendrec:
     apiDocsEnabled: "true"
     brandingEnabled: "true"
     registrationEnabled: "false"
+    planBadgeEnabled: "false"
 
     # Transcription
     transcriptionEnabled: "false"

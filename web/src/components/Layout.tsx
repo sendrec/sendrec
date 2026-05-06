@@ -17,6 +17,7 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [plan, setPlan] = useState<string | null>(null);
+  const [planBadgeEnabled, setPlanBadgeEnabled] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
   const { orgs, selectedOrg, selectedOrgId, switchOrg, createOrg } = useOrganization();
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
@@ -35,6 +36,12 @@ export function Layout({ children }: LayoutProps) {
     apiFetch<BillingResponse>("/api/settings/billing")
       .then((res) => { if (res?.plan) setPlan(res.plan); else setPlan("free"); })
       .catch(() => setPlan("free"));
+    fetch("/api/health")
+      .then((res) => res.json())
+      .then((data: { planBadgeEnabled?: boolean }) => {
+        setPlanBadgeEnabled(data.planBadgeEnabled === true);
+      })
+      .catch(() => setPlanBadgeEnabled(false));
   }, []);
 
   function isActive(path: string): boolean {
@@ -130,7 +137,7 @@ export function Layout({ children }: LayoutProps) {
         <Link to="/" className="nav-logo" onClick={handleNavClick}>
           <img src="/images/logo.png" alt="" width="48" height="48" />
           <span className="logo-send">Send</span><span className="logo-rec">Rec</span>
-          {plan && (
+          {plan && planBadgeEnabled && (
             <span className={`plan-badge${plan !== "free" ? " plan-badge--pro" : ""}`}>
               {plan === "business" ? "Business" : plan === "pro" ? "Pro" : "Free"}
             </span>

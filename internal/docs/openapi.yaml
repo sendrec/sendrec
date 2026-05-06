@@ -833,6 +833,9 @@ components:
         registrationEnabled:
           type: boolean
           description: Whether new user registration is allowed
+        planBadgeEnabled:
+          type: boolean
+          description: Whether the plan badge ("Free"/"Pro"/"Business") is shown next to the logo
         error:
           type: string
 

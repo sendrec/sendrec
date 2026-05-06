@@ -21,6 +21,7 @@ data:
   API_DOCS_ENABLED: {{ .Values.sendrec.env.apiDocsEnabled | quote }}
   BRANDING_ENABLED: {{ .Values.sendrec.env.brandingEnabled | quote }}
   REGISTRATION_ENABLED: {{ .Values.sendrec.env.registrationEnabled | quote }}
+  PLAN_BADGE_ENABLED: {{ .Values.sendrec.env.planBadgeEnabled | quote }}
   TRANSCRIPTION_ENABLED: {{ .Values.sendrec.env.transcriptionEnabled | quote }}
   WHISPER_MODEL_PATH: {{ .Values.sendrec.env.whisperModelPath | quote }}
   AI_ENABLED: {{ .Values.sendrec.env.aiEnabled | quote }}
