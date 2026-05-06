@@ -62,7 +62,14 @@ describe("Layout", () => {
       refreshOrgs: mockRefreshOrgs,
       loading: false,
     });
-    globalThis.fetch = vi.fn().mockResolvedValue({});
+    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === "string" && url.includes("/api/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ planBadgeEnabled: true }), { status: 200 })
+        );
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
   });
 
   it("renders navigation links", () => {
@@ -208,6 +215,36 @@ describe("Layout", () => {
     await waitFor(() => {
       expect(screen.getByText("Free")).toBeInTheDocument();
     });
+    expect(screen.queryByText("Pro")).not.toBeInTheDocument();
+  });
+
+  it("hides plan badge when planBadgeEnabled is false", async () => {
+    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === "string" && url.includes("/api/health")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ planBadgeEnabled: false }), { status: 200 })
+        );
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    });
+    mockApiFetch.mockResolvedValueOnce({ plan: "free" });
+    renderLayout();
+
+    // Wait for billing to settle, then assert badge absent.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByText("Free")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pro")).not.toBeInTheDocument();
+    expect(screen.queryByText("Business")).not.toBeInTheDocument();
+  });
+
+  it("hides plan badge when health endpoint omits planBadgeEnabled", async () => {
+    globalThis.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response("{}", { status: 200 }))
+    );
+    mockApiFetch.mockResolvedValueOnce({ plan: "pro" });
+    renderLayout();
+
+    await new Promise((r) => setTimeout(r, 0));
     expect(screen.queryByText("Pro")).not.toBeInTheDocument();
   });
 
