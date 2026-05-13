@@ -32,7 +32,7 @@ sendrec:
 
     # Storage (S3-compatible)
     s3Endpoint: "" # e.g. https://s3.amazonaws.com or https://<your-minio-endpoint>
-    s3PublicEndpoint: "" # e.g. https://cdn.yourdomain.com, used for generating public URLs to videos
+    s3PublicEndpoint: "" # e.g. https://s3.amazonaws.com, used for generating public URLs to videos
     s3Bucket: "" # e.g. your-bucket-name
     s3Region: "" # e.g. us-east-1
     awsRequestChecksumCalculation: "when_required"
