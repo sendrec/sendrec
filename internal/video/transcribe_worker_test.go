@@ -7,6 +7,18 @@ import (
 	"github.com/pashagolub/pgxmock/v4"
 )
 
+type stubTranscriber struct {
+	available bool
+	segments  []TranscriptSegment
+	err       error
+}
+
+func (s stubTranscriber) Name() string      { return "stub" }
+func (s stubTranscriber) Available() bool   { return s.available }
+func (s stubTranscriber) Transcribe(ctx context.Context, audioPath, language string) ([]TranscriptSegment, error) {
+	return s.segments, s.err
+}
+
 func TestEnqueueTranscription(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -42,7 +54,7 @@ func TestProcessNextTranscription_NoJobs(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token", "language"}))
 
 	storage := &mockStorage{}
-	processNextTranscription(context.Background(), mock, storage, false)
+	processNextTranscription(context.Background(), mock, storage, stubTranscriber{available: true}, false)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
@@ -65,7 +77,7 @@ func TestProcessNextTranscription_ResetsStuckJobs(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token", "language"}))
 
 	storage := &mockStorage{}
-	processNextTranscription(context.Background(), mock, storage, false)
+	processNextTranscription(context.Background(), mock, storage, stubTranscriber{available: true}, false)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)

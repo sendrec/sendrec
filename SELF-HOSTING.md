@@ -280,8 +280,18 @@ API keys for machine-to-machine access (used by the Nextcloud integration for vi
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `TRANSCRIPTION_ENABLED` | Enable automatic video transcription | `true` |
-| `WHISPER_MODEL_PATH` | Path to the whisper.cpp model file | `/models/ggml-small.bin` |
+| `TRANSCRIPTION_ENABLED` | Enable automatic video transcription | `false` |
+| `TRANSCRIPTION_PROVIDER` | `local`, `openai`, or `deepgram` | `local` |
+| `WHISPER_MODEL_PATH` | Path to the whisper.cpp model file (only for `local`) | `/models/ggml-small.bin` |
+| `TRANSCRIPTION_API_URL` | Base URL for OpenAI-compatible providers (omit for `https://api.openai.com`) | — |
+| `TRANSCRIPTION_API_KEY` | API key for cloud providers | — |
+| `TRANSCRIPTION_MODEL` | Model name; defaults `whisper-1` (openai), `nova-3` (deepgram) | — |
+| `TRANSCRIPTION_TIMEOUT_SECONDS` | HTTP timeout for cloud calls (seconds) | `300` |
+
+**Provider notes:**
+- `local` — runs `whisper-cli` on the app container; CPU-bound. Best for full privacy or offline deployments.
+- `openai` — POSTs audio to any OpenAI-compatible `/v1/audio/transcriptions` endpoint. Works with OpenAI Whisper, Groq Whisper, Scaleway Speech-to-Text, self-hosted Faster-Whisper, etc.
+- `deepgram` — POSTs audio to `https://api.deepgram.com/v1/listen`. US-hosted.
 
 ### AI Summaries (optional)
 

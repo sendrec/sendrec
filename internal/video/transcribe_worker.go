@@ -19,7 +19,7 @@ func EnqueueTranscription(ctx context.Context, db database.DBTX, videoID string)
 	return err
 }
 
-func processNextTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, aiEnabled bool) {
+func processNextTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, transcriber Transcriber, aiEnabled bool) {
 	// Reset stuck jobs (processing for more than 10 minutes)
 	if _, err := db.Exec(ctx,
 		`UPDATE videos SET transcript_status = 'pending', transcript_started_at = NULL, updated_at = now()
@@ -50,12 +50,12 @@ func processNextTranscription(ctx context.Context, db database.DBTX, storage Obj
 	}
 
 	slog.Info("transcribe-worker: claimed video", "video_id", videoID)
-	processTranscription(ctx, db, storage, videoID, fileKey, userID, shareToken, language, aiEnabled)
+	processTranscription(ctx, db, storage, transcriber, videoID, fileKey, userID, shareToken, language, aiEnabled)
 }
 
-func StartTranscriptionWorker(ctx context.Context, db database.DBTX, storage ObjectStorage, interval time.Duration, aiEnabled bool) {
+func StartTranscriptionWorker(ctx context.Context, db database.DBTX, storage ObjectStorage, transcriber Transcriber, interval time.Duration, aiEnabled bool) {
 	go func() {
-		slog.Info("transcribe-worker: started")
+		slog.Info("transcribe-worker: started", "provider", transcriber.Name())
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
@@ -64,7 +64,7 @@ func StartTranscriptionWorker(ctx context.Context, db database.DBTX, storage Obj
 				slog.Info("transcribe-worker: shutting down")
 				return
 			case <-ticker.C:
-				processNextTranscription(ctx, db, storage, aiEnabled)
+				processNextTranscription(ctx, db, storage, transcriber, aiEnabled)
 			}
 		}
 	}()
