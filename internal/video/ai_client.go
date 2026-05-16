@@ -46,7 +46,7 @@ const summarySystemPrompt = `You are a video content analyzer. Given a timestamp
 - "summary": A 2-3 sentence overview of what the video covers.
 - "chapters": An array of objects with "title" (string, 3-6 words) and "start" (number, seconds from transcript timestamps) marking major topic changes. Include 2-8 chapters depending on video length. The first chapter should start at 0.
 
-Write the summary and chapter titles in the same language as the transcript.
+First, identify the dominant language of the transcript. Then write the summary and every chapter title in that exact same language — do not translate, do not mix languages.
 Return ONLY valid JSON, no markdown formatting.`
 
 type chatMessage struct {
@@ -67,11 +67,16 @@ type chatResponse struct {
 	Choices []chatChoice `json:"choices"`
 }
 
-func (c *AIClient) GenerateSummary(ctx context.Context, transcript string) (*SummaryResult, error) {
+func (c *AIClient) GenerateSummary(ctx context.Context, transcript, language string) (*SummaryResult, error) {
+	prompt := summarySystemPrompt
+	if language != "" {
+		prompt += fmt.Sprintf("\nThe transcript language is %s. Write the summary and chapter titles in %s.", language, language)
+	}
+
 	reqBody := chatRequest{
 		Model: c.model,
 		Messages: []chatMessage{
-			{Role: "system", Content: summarySystemPrompt},
+			{Role: "system", Content: prompt},
 			{Role: "user", Content: transcript},
 		},
 	}
@@ -133,13 +138,18 @@ func parseSummaryJSON(content string) (*SummaryResult, error) {
 	return &result, nil
 }
 
-const titleSystemPrompt = `Given this video transcript, generate a concise title (3-8 words) that captures the main topic. Return ONLY the title text, no quotes, no explanation. Write in the same language as the transcript.`
+const titleSystemPrompt = `Given this video transcript, generate a concise title (3-8 words) that captures the main topic. Return ONLY the title text, no quotes, no explanation. First identify the dominant language of the transcript, then write the title in that exact same language.`
 
-func (c *AIClient) GenerateTitle(ctx context.Context, transcript string) (string, error) {
+func (c *AIClient) GenerateTitle(ctx context.Context, transcript, language string) (string, error) {
+	prompt := titleSystemPrompt
+	if language != "" {
+		prompt += fmt.Sprintf("\nThe transcript language is %s. Write the title in %s.", language, language)
+	}
+
 	reqBody := chatRequest{
 		Model: c.model,
 		Messages: []chatMessage{
-			{Role: "system", Content: titleSystemPrompt},
+			{Role: "system", Content: prompt},
 			{Role: "user", Content: transcript},
 		},
 	}
@@ -203,7 +213,7 @@ Guidelines:
 - Group related content under clear headings
 - Include timestamps as references where helpful (e.g., "at 2:30")
 - End with a conclusions section listing 3-5 main points
-- Write EVERYTHING in the same language as the transcript, including ALL headings, section titles, and bullet points — do not use any English words if the transcript is not in English
+- First identify the dominant language of the transcript. Write EVERYTHING in that exact same language, including ALL headings, section titles, and bullet points — do not translate, do not mix languages, do not default to English
 - Return ONLY markdown, no explanations or meta-commentary`
 
 func (c *AIClient) GenerateDocument(ctx context.Context, transcript, language string) (string, error) {

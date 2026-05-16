@@ -10,7 +10,15 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/languages"
 )
+
+func resolveLanguageName(code string) string {
+	if code == "" || code == "auto" {
+		return ""
+	}
+	return languages.LanguageName(code)
+}
 
 const maxTranscriptChars = 30000
 
@@ -40,6 +48,7 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 
 	var videoID string
 	var transcriptJSON []byte
+	var language string
 	err := db.QueryRow(ctx,
 		`UPDATE videos SET summary_status = 'processing', summary_started_at = now(), updated_at = now()
 		 WHERE id = (
@@ -48,8 +57,9 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 		     ORDER BY updated_at ASC LIMIT 1
 		     FOR UPDATE SKIP LOCKED
 		 )
-		 RETURNING id, transcript_json`,
-	).Scan(&videoID, &transcriptJSON)
+		 RETURNING id, transcript_json,
+		     COALESCE(transcription_language, (SELECT transcription_language FROM users WHERE id = videos.user_id), 'auto')`,
+	).Scan(&videoID, &transcriptJSON, &language)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			slog.Error("summary-worker: failed to claim job", "error", err)
@@ -71,7 +81,7 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 	}
 
 	transcript := formatTranscriptForLLM(segments)
-	result, err := ai.GenerateSummary(ctx, transcript)
+	result, err := ai.GenerateSummary(ctx, transcript, resolveLanguageName(language))
 	if err != nil {
 		slog.Error("summary-worker: AI generation failed", "video_id", videoID, "error", err)
 		markSummaryStatus(ctx, db, videoID, "failed")
@@ -101,7 +111,7 @@ func processNextSummary(ctx context.Context, db database.DBTX, ai *AIClient) {
 			if len(titleTranscript) > 2000 {
 				titleTranscript = titleTranscript[:2000]
 			}
-			if suggestedTitle, err := ai.GenerateTitle(ctx, titleTranscript); err == nil && suggestedTitle != "" {
+			if suggestedTitle, err := ai.GenerateTitle(ctx, titleTranscript, resolveLanguageName(language)); err == nil && suggestedTitle != "" {
 				_, _ = db.Exec(ctx, `UPDATE videos SET suggested_title = $1, updated_at = now() WHERE id = $2`, suggestedTitle, videoID)
 			}
 		}
@@ -121,16 +131,18 @@ func markSummaryStatus(ctx context.Context, db database.DBTX, videoID, status st
 func processNextTitleSuggestion(ctx context.Context, db database.DBTX, ai *AIClient) {
 	var videoID string
 	var transcriptJSON []byte
-	var currentTitle string
+	var currentTitle, language string
 	err := db.QueryRow(ctx,
-		`SELECT id, transcript_json, title FROM videos
+		`SELECT id, transcript_json, title,
+		     COALESCE(transcription_language, (SELECT transcription_language FROM users WHERE id = videos.user_id), 'auto')
+		 FROM videos
 		 WHERE summary_status = 'ready'
 		   AND suggested_title IS NULL
 		   AND transcript_json IS NOT NULL
 		   AND status != 'deleted'
 		   AND (title LIKE 'Recording %' OR title = 'Untitled Recording' OR title = 'Untitled Video')
 		 ORDER BY updated_at ASC LIMIT 1`,
-	).Scan(&videoID, &transcriptJSON, &currentTitle)
+	).Scan(&videoID, &transcriptJSON, &currentTitle, &language)
 	if err != nil {
 		return
 	}
@@ -149,7 +161,7 @@ func processNextTitleSuggestion(ctx context.Context, db database.DBTX, ai *AICli
 		titleTranscript = titleTranscript[:2000]
 	}
 
-	suggestedTitle, err := ai.GenerateTitle(ctx, titleTranscript)
+	suggestedTitle, err := ai.GenerateTitle(ctx, titleTranscript, resolveLanguageName(language))
 	if err != nil {
 		slog.Error("title-suggestion: AI generation failed", "video_id", videoID, "error", err)
 		return

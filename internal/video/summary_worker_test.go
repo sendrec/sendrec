@@ -64,8 +64,8 @@ func TestProcessNextSummary_SkipsTrivialTranscript(t *testing.T) {
 
 	mock.ExpectQuery(`UPDATE videos SET summary_status = 'processing'`).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "transcript_json"}).
-				AddRow("vid-1", transcriptJSON),
+			pgxmock.NewRows([]string{"id", "transcript_json", "language"}).
+				AddRow("vid-1", transcriptJSON, "auto"),
 		)
 
 	mock.ExpectExec(`UPDATE videos SET summary_status =`).
@@ -122,8 +122,8 @@ func TestProcessNextSummary_ClaimsAndProcesses(t *testing.T) {
 	// Claim next pending job
 	mock.ExpectQuery(`UPDATE videos SET summary_status = 'processing'`).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "transcript_json"}).
-				AddRow("vid-1", transcriptJSON),
+			pgxmock.NewRows([]string{"id", "transcript_json", "language"}).
+				AddRow("vid-1", transcriptJSON, "auto"),
 		)
 
 	// Save summary result
@@ -190,8 +190,8 @@ func TestProcessNextSummary_SkipsTitleForCustomTitle(t *testing.T) {
 	// Claim next pending job
 	mock.ExpectQuery(`UPDATE videos SET summary_status = 'processing'`).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "transcript_json"}).
-				AddRow("vid-1", transcriptJSON),
+			pgxmock.NewRows([]string{"id", "transcript_json", "language"}).
+				AddRow("vid-1", transcriptJSON, "auto"),
 		)
 
 	// Save summary result
@@ -231,7 +231,7 @@ func TestProcessNextSummary_NoPendingJobs(t *testing.T) {
 
 	// Claim query returns no rows
 	mock.ExpectQuery(`UPDATE videos SET summary_status = 'processing'`).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "transcript_json"}))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "transcript_json", "language"}))
 
 	processNextSummary(context.Background(), mock, nil)
 
@@ -268,8 +268,8 @@ func TestProcessNextSummary_AIFailure(t *testing.T) {
 	// Claim next pending job
 	mock.ExpectQuery(`UPDATE videos SET summary_status = 'processing'`).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "transcript_json"}).
-				AddRow("vid-1", transcriptJSON),
+			pgxmock.NewRows([]string{"id", "transcript_json", "language"}).
+				AddRow("vid-1", transcriptJSON, "auto"),
 		)
 
 	// Mark as failed
