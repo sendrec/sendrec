@@ -433,7 +433,7 @@ func TestGenerateSummary_WithLanguage(t *testing.T) {
 	}
 }
 
-func TestGenerateSummary_AutoLanguageOmitsHint(t *testing.T) {
+func TestGenerateSummary_EmptyLanguageOmitsHint(t *testing.T) {
 	var receivedPrompt string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -452,13 +452,30 @@ func TestGenerateSummary_AutoLanguageOmitsHint(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "key", "model", 0)
-	_, err := client.GenerateSummary(context.Background(), "transcript", "auto")
+	_, err := client.GenerateSummary(context.Background(), "transcript", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if strings.Contains(receivedPrompt, "The transcript language is") {
-		t.Errorf("auto language should not add explicit language hint, got: %s", receivedPrompt)
+		t.Errorf("empty language should not add explicit language hint, got: %s", receivedPrompt)
+	}
+}
+
+func TestResolveLanguageName(t *testing.T) {
+	tests := []struct {
+		code, want string
+	}{
+		{"", ""},
+		{"auto", ""},
+		{"en", "English"},
+		{"ro", "Romanian"},
+	}
+	for _, tc := range tests {
+		got := resolveLanguageName(tc.code)
+		if got != tc.want {
+			t.Errorf("resolveLanguageName(%q) = %q, want %q", tc.code, got, tc.want)
+		}
 	}
 }
 

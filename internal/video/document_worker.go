@@ -9,7 +9,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/database"
-	"github.com/sendrec/sendrec/internal/languages"
 )
 
 func processNextDocument(ctx context.Context, db database.DBTX, ai *AIClient) {
@@ -23,7 +22,7 @@ func processNextDocument(ctx context.Context, db database.DBTX, ai *AIClient) {
 
 	var videoID string
 	var transcriptJSON []byte
-	var language *string
+	var language string
 	err := db.QueryRow(ctx,
 		`UPDATE videos SET document_status = 'processing', document_started_at = now(), updated_at = now()
 		 WHERE id = (
@@ -32,7 +31,8 @@ func processNextDocument(ctx context.Context, db database.DBTX, ai *AIClient) {
 		     ORDER BY updated_at ASC LIMIT 1
 		     FOR UPDATE SKIP LOCKED
 		 )
-		 RETURNING id, transcript_json, transcription_language`,
+		 RETURNING id, transcript_json,
+		     COALESCE(transcription_language, (SELECT transcription_language FROM users WHERE id = videos.user_id), 'auto')`,
 	).Scan(&videoID, &transcriptJSON, &language)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -56,12 +56,7 @@ func processNextDocument(ctx context.Context, db database.DBTX, ai *AIClient) {
 
 	transcript := formatTranscriptForLLM(segments)
 
-	var langName string
-	if language != nil && *language != "" && *language != "auto" {
-		langName = languages.LanguageName(*language)
-	}
-
-	document, err := ai.GenerateDocument(ctx, transcript, langName)
+	document, err := ai.GenerateDocument(ctx, transcript, resolveLanguageName(language))
 	if err != nil {
 		slog.Error("document-worker: AI generation failed", "video_id", videoID, "error", err)
 		markDocumentStatus(ctx, db, videoID, "failed")

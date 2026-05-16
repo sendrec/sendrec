@@ -69,7 +69,7 @@ type chatResponse struct {
 
 func (c *AIClient) GenerateSummary(ctx context.Context, transcript, language string) (*SummaryResult, error) {
 	prompt := summarySystemPrompt
-	if language != "" && language != "auto" {
+	if language != "" {
 		prompt += fmt.Sprintf("\nThe transcript language is %s. Write the summary and chapter titles in %s.", language, language)
 	}
 
@@ -142,7 +142,7 @@ const titleSystemPrompt = `Given this video transcript, generate a concise title
 
 func (c *AIClient) GenerateTitle(ctx context.Context, transcript, language string) (string, error) {
 	prompt := titleSystemPrompt
-	if language != "" && language != "auto" {
+	if language != "" {
 		prompt += fmt.Sprintf("\nThe transcript language is %s. Write the title in %s.", language, language)
 	}
 
@@ -213,7 +213,7 @@ Guidelines:
 - Group related content under clear headings
 - Include timestamps as references where helpful (e.g., "at 2:30")
 - End with a conclusions section listing 3-5 main points
-- Write EVERYTHING in the same language as the transcript, including ALL headings, section titles, and bullet points — do not use any English words if the transcript is not in English
+- First identify the dominant language of the transcript. Write EVERYTHING in that exact same language, including ALL headings, section titles, and bullet points — do not translate, do not mix languages, do not default to English
 - Return ONLY markdown, no explanations or meta-commentary`
 
 func (c *AIClient) GenerateDocument(ctx context.Context, transcript, language string) (string, error) {
