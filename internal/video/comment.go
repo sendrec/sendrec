@@ -110,7 +110,7 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 	shareToken := chi.URLParam(r, "shareToken")
 
 	var videoID, ownerID, commentMode string
-	var shareExpiresAt time.Time
+	var shareExpiresAt *time.Time
 	var sharePassword *string
 
 	err := h.db.QueryRow(r.Context(),
@@ -123,7 +123,7 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if time.Now().After(shareExpiresAt) {
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return
 	}
@@ -290,7 +290,7 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) lookupWatchVideo(w http.ResponseWriter, r *http.Request) (videoID, ownerID, commentMode string, ok bool) {
 	shareToken := chi.URLParam(r, "shareToken")
 
-	var shareExpiresAt time.Time
+	var shareExpiresAt *time.Time
 	var sharePassword *string
 
 	err := h.db.QueryRow(r.Context(),
@@ -303,7 +303,7 @@ func (h *Handler) lookupWatchVideo(w http.ResponseWriter, r *http.Request) (vide
 		return "", "", "", false
 	}
 
-	if time.Now().After(shareExpiresAt) {
+	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
 		return "", "", "", false
 	}
