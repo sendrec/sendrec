@@ -19,7 +19,7 @@ SendRec is an open-source alternative to Loom that you self-host on your own inf
 | EU data residency | Yes | No | No | No |
 | Team workspaces | Yes | Yes | No | Limited |
 | SSO / SAML | Yes | Enterprise | No | Enterprise |
-| AI transcription | Yes (local) | $20/user | Paid | No |
+| AI transcription | Yes (local or cloud) | $20/user | Paid | No |
 | Per-viewer analytics | Yes | Yes | No | No |
 | Free commercial use | Yes | N/A | No | N/A |
 | Pricing | €0–12/month | $15–20/user | $12/month | $9–11/user |
@@ -58,7 +58,7 @@ Per-video analytics with view counts, completion funnel (25/50/75/100%), and CTA
 
 - **Screen & camera recording** — works on Chrome, Safari, and Firefox; prefers MP4 with WebM fallback; 3-2-1 countdown, pause/resume, webcam overlay, drawing annotations, mobile front/back camera
 - **Video upload** — drag-and-drop up to 10 files at once, MP4/WebM/MOV, per-file progress
-- **Automatic transcription** — whisper.cpp, closed captions on watch and embed pages, full-text search
+- **Automatic transcription** — whisper.cpp (local) or OpenAI-compatible / Deepgram cloud providers, closed captions on watch and embed pages, full-text search
 - **Transcript editing** — trim by clicking transcript segments, filler word removal with preview, AI-generated title suggestions
 - **Sharing** — expiring or permanent links, password protection, per-video download toggle, custom thumbnails
 - **Comments & reactions** — timestamped comments, emoji reactions, configurable modes
@@ -217,7 +217,7 @@ make test
 - **Backend:** Go (single binary, chi router)
 - **Database:** PostgreSQL 18
 - **Storage:** S3-compatible object storage (Garage for dev and self-hosting)
-- **Transcription:** [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (optional, runs server-side)
+- **Transcription:** [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (local default), or any OpenAI-compatible Whisper API (OpenAI, Groq, Scaleway, etc.), or Deepgram
 - **Deployment:** Docker Compose
 
 ## Architecture
@@ -231,7 +231,7 @@ Single Go binary that:
 
 Video recordings happen entirely in the browser using `getDisplayMedia` + `MediaRecorder`. The recorder prefers MP4 (native in Chrome 130+ and Safari) with automatic fallback to WebM for Firefox and older browsers. Users can also upload existing video files (MP4, WebM, MOV) via drag-and-drop. Files upload directly to S3 via presigned URLs — the server never touches video bytes.
 
-After upload, the server generates a thumbnail with ffmpeg and enqueues the video for transcription with [whisper.cpp](https://github.com/ggerganov/whisper.cpp). WebM recordings are automatically transcoded to MP4 for universal playback. Uploaded MP4s are normalized with iOS-safe encoding flags when needed. Transcripts are stored as VTT subtitles and a clickable segment panel on the watch page. Transcription is optional — if the whisper model is not available, it is silently skipped.
+After upload, the server generates a thumbnail with ffmpeg and enqueues the video for transcription. The transcription provider is selectable via `TRANSCRIPTION_PROVIDER`: local [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (default), any OpenAI-compatible Whisper API, or Deepgram. WebM recordings are automatically transcoded to MP4 for universal playback. Uploaded MP4s are normalized with iOS-safe encoding flags when needed. Transcripts are stored as VTT subtitles and a clickable segment panel on the watch page. Transcription is optional — if `TRANSCRIPTION_ENABLED=false`, it is silently skipped.
 
 ## Self-Hosting
 
@@ -241,7 +241,7 @@ SendRec can run either on a single server with Docker Compose or on Kubernetes w
 - Helm and Kubernetes configuration
 - Environment variables reference
 - Reverse proxy setup (Caddy example)
-- Enabling transcription with whisper.cpp
+- Enabling transcription (whisper.cpp local, OpenAI-compatible, or Deepgram)
 - Removing usage limits
 - Updating and backups
 
