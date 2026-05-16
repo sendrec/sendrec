@@ -11,6 +11,9 @@ import (
 )
 
 func EnqueueTranscription(ctx context.Context, db database.DBTX, videoID string) error {
+	if !isTranscriptionEnabled() {
+		return nil
+	}
 	_, err := db.Exec(ctx,
 		`UPDATE videos SET transcript_status = 'pending', updated_at = now()
 		 WHERE id = $1 AND status != 'deleted'`,

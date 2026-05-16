@@ -20,6 +20,7 @@ func (s stubTranscriber) Transcribe(ctx context.Context, audioPath, language str
 }
 
 func TestEnqueueTranscription(t *testing.T) {
+	t.Setenv("TRANSCRIPTION_ENABLED", "true")
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -30,6 +31,23 @@ func TestEnqueueTranscription(t *testing.T) {
 		WithArgs("video-123").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
+	if err := EnqueueTranscription(context.Background(), mock, "video-123"); err != nil {
+		t.Errorf("EnqueueTranscription failed: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestEnqueueTranscription_DisabledIsNoOp(t *testing.T) {
+	t.Setenv("TRANSCRIPTION_ENABLED", "false")
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	// No DB expectations - call should short-circuit before touching DB.
 	if err := EnqueueTranscription(context.Background(), mock, "video-123"); err != nil {
 		t.Errorf("EnqueueTranscription failed: %v", err)
 	}
