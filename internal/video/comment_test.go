@@ -165,6 +165,85 @@ func commentVideoRows() *pgxmock.Rows {
 	return pgxmock.NewRows([]string{"id", "user_id", "comment_mode", "share_expires_at", "share_password"})
 }
 
+func TestPostWatchComment_NullShareExpiresAt_DoesNotReturn404(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	videoID := "video-123"
+	ownerID := "owner-user-1"
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", (*time.Time)(nil), (*string)(nil)))
+
+	mock.ExpectQuery(`INSERT INTO video_comments`).
+		WithArgs(videoID, (*string)(nil), "Someone", "", "Great video!", false, (*float64)(nil)).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).AddRow("comment-1", time.Now()))
+
+	body, _ := json.Marshal(postCommentRequest{AuthorName: "Someone", Body: "Great video!"})
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/comments", handler.PostWatchComment)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/"+shareToken+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestListWatchComments_NullShareExpiresAt_DoesNotReturn404(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+
+	shareToken := "abc123defghi"
+	videoID := "video-123"
+	ownerID := "owner-user-1"
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", (*time.Time)(nil), (*string)(nil)))
+
+	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds`).
+		WithArgs(videoID).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "user_id", "author_name", "body", "is_private", "created_at", "video_timestamp_seconds"}))
+
+	r := chi.NewRouter()
+	r.Get("/api/watch/{shareToken}/comments", handler.ListWatchComments)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/watch/"+shareToken+"/comments", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
 func TestPostWatchComment_AnonymousMode_Success(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -184,7 +263,7 @@ func TestPostWatchComment_AnonymousMode_Success(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`INSERT INTO video_comments`).
 		WithArgs(videoID, (*string)(nil), "Someone", "", "Great video!", false, (*float64)(nil)).
@@ -249,7 +328,7 @@ func TestPostWatchComment_DisabledMode_Returns403(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "disabled", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "disabled", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{Body: "Hello"})
 
@@ -285,7 +364,7 @@ func TestPostWatchComment_NameRequired_MissingName_Returns400(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_required", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_required", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{Body: "Hello"})
 
@@ -317,7 +396,7 @@ func TestPostWatchComment_NameEmailRequired_MissingEmail_Returns400(t *testing.T
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_email_required", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_email_required", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{AuthorName: "Alex", Body: "Hello"})
 
@@ -350,7 +429,7 @@ func TestPostWatchComment_NameRequired_ReactionAllowsAnonymous(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, "owner-1", "name_required", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, "owner-1", "name_required", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`INSERT INTO video_comments`).
 		WithArgs(videoID, (*string)(nil), "", "", "👍", false, (*float64)(nil)).
@@ -387,7 +466,7 @@ func TestPostWatchComment_NameEmailRequired_ReactionAllowsAnonymous(t *testing.T
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, "owner-1", "name_email_required", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, "owner-1", "name_email_required", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`INSERT INTO video_comments`).
 		WithArgs(videoID, (*string)(nil), "", "", "🎉", false, (*float64)(nil)).
@@ -423,7 +502,7 @@ func TestPostWatchComment_NameRequired_NonQuickReactionEmojiStillRequiresName(t 
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_required", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_required", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{Body: "🔥"})
 
@@ -459,7 +538,7 @@ func TestPostWatchComment_QuickReaction_DoesNotSendCommentNotification(t *testin
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`INSERT INTO video_comments`).
 		WithArgs(videoID, (*string)(nil), "", "", "🎉", false, (*float64)(nil)).
@@ -505,7 +584,7 @@ func TestPostWatchComment_NotificationModeViewsOnly_DoesNotSendCommentNotificati
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`INSERT INTO video_comments`).
 		WithArgs(videoID, (*string)(nil), "Someone", "", "Great video!", false, (*float64)(nil)).
@@ -561,7 +640,7 @@ func TestPostWatchComment_NotificationModeCommentsOnly_SendsCommentNotification(
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`INSERT INTO video_comments`).
 		WithArgs(videoID, (*string)(nil), "Someone", "", "Great video!", false, (*float64)(nil)).
@@ -617,7 +696,7 @@ func TestPostWatchComment_EmptyBody_Returns400(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{Body: ""})
 
@@ -649,7 +728,7 @@ func TestPostWatchComment_NameTooLong_Returns400(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_required", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_required", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{
 		AuthorName: strings.Repeat("a", 201),
@@ -693,7 +772,7 @@ func TestPostWatchComment_EmailTooLong_Returns400(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_email_required", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "name_email_required", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{
 		AuthorName:  "Alex",
@@ -738,7 +817,7 @@ func TestPostWatchComment_PrivateWithoutJWT_Returns401(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{Body: "Private note", IsPrivate: true})
 
@@ -770,7 +849,7 @@ func TestPostWatchComment_ExpiredVideo_Returns410(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{Body: "Hello"})
 
@@ -833,7 +912,7 @@ func TestPostWatchComment_BodyTooLong_Returns400(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", &expiresAt, (*string)(nil)))
 
 	longBody := make([]byte, 5001)
 	for i := range longBody {
@@ -874,7 +953,7 @@ func TestPostWatchComment_WithValidTimestamp_Success(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`INSERT INTO video_comments`).
 		WithArgs(videoID, (*string)(nil), "Someone", "", "Great at 83.5s!", false, &timestamp).
@@ -930,7 +1009,7 @@ func TestPostWatchComment_NegativeTimestamp_Returns400(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", &expiresAt, (*string)(nil)))
 
 	body, _ := json.Marshal(postCommentRequest{
 		Body:           "Bad timestamp",
@@ -976,7 +1055,7 @@ func TestPostWatchComment_NilTimestamp_Success(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`INSERT INTO video_comments`).
 		WithArgs(videoID, (*string)(nil), "", "", "No timestamp here", false, (*float64)(nil)).
@@ -1030,7 +1109,7 @@ func TestListWatchComments_IncludesTimestamp(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 AND c\.is_private = false ORDER BY c\.created_at ASC`).
 		WithArgs(videoID).
@@ -1098,7 +1177,7 @@ func TestListWatchComments_PublicOnly(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 AND c\.is_private = false ORDER BY c\.created_at ASC`).
 		WithArgs(videoID).
@@ -1151,7 +1230,7 @@ func TestListWatchComments_DisabledMode_ReturnsEmptyArray(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "disabled", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "disabled", &expiresAt, (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/comments", handler.ListWatchComments)
@@ -1194,7 +1273,7 @@ func TestListWatchComments_WithJWT_NonOwner_ExcludesPrivate(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 AND c\.is_private = false ORDER BY c\.created_at ASC`).
 		WithArgs(videoID).
@@ -1240,7 +1319,7 @@ func TestListWatchComments_WithJWT_Owner_IncludesPrivate(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", &expiresAt, (*string)(nil)))
 
 	mock.ExpectQuery(`SELECT c\.id, c\.user_id, c\.author_name, c\.body, c\.is_private, c\.created_at, c\.video_timestamp_seconds FROM video_comments c WHERE c\.video_id = \$1 ORDER BY c\.created_at ASC`).
 		WithArgs(videoID).
@@ -1286,7 +1365,7 @@ func TestListWatchComments_ExpiredVideo_Returns410(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1 AND v\.status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", expiresAt, (*string)(nil)))
+		WillReturnRows(commentVideoRows().AddRow("video-123", "owner-1", "anonymous", &expiresAt, (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/comments", handler.ListWatchComments)
