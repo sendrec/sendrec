@@ -28,14 +28,19 @@ spec:
       {{- if or .Values.sendrec.deployment.extraInitContainers (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") }}
       initContainers:
         {{- if eq (toString .Values.sendrec.env.transcriptionEnabled) "true" }}
-        - name: download-whisper-model
+        - name: download-transcription-model
           image: {{ .Values.sendrec.transcription.initImage }}
           command:
             - sh
             - -c
             - |
-              curl -L -o {{ .Values.sendrec.transcription.modelPath }} \
-                {{ .Values.sendrec.transcription.modelUrl }}
+              if [ -f {{ .Values.sendrec.transcription.modelPath }} ]; then
+                echo "Transcription model already present at {{ .Values.sendrec.transcription.modelPath }}, skipping download."
+              else
+                curl -L -o {{ .Values.sendrec.transcription.modelPath }} \
+                  {{ .Values.sendrec.transcription.modelUrl }}
+                echo "Transcription model downloaded to {{ .Values.sendrec.transcription.modelPath }}."
+              fi
           volumeMounts:
             - name: whisper-models
               mountPath: /models
