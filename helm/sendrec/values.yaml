@@ -52,6 +52,10 @@ sendrec:
 
     # Transcription
     transcriptionEnabled: "false"
+    transcriptionProvider: "local"  # local | openai | deepgram
+    transcriptionApiUrl: ""         # OpenAI-compatible base URL (e.g. https://api.openai.com, https://api.groq.com/openai)
+    transcriptionModel: ""          # Provider-specific model override (e.g. whisper-large-v3, nova-3)
+    transcriptionTimeoutSeconds: "" # HTTP timeout for cloud calls (default 300)
     whisperModelPath: "/models/ggml-small.bin"
 
     # AI
@@ -100,6 +104,7 @@ sendrec:
     githubSsoClientId: ""      # GitHub SSO OAuth client ID, use /api/auth/sso/github/callback as the redirect URI path
     githubSsoClientSecret: ""  # GitHub SSO OAuth client secret
     aiApiKey: ""               # API key for the configured AI provider
+    transcriptionApiKey: ""    # API key for cloud transcription provider (openai/deepgram)
     listmonkUsername: ""       # Listmonk API username
     listmonkPassword: ""       # Listmonk API password
     smtpUsername: ""           # SMTP auth username (omit for unauthenticated relays)

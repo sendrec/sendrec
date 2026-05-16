@@ -195,12 +195,14 @@ func main() {
 	defer cleanupCancel()
 	video.StartCleanupLoop(cleanupCtx, db.Pool, store, 10*time.Minute)
 
-	transcriber, err := video.NewTranscriberFromEnv()
-	if err != nil {
-		slog.Error("transcriber configuration invalid", "error", err)
-		os.Exit(1)
+	if getEnv("TRANSCRIPTION_ENABLED", "false") == "true" {
+		transcriber, err := video.NewTranscriberFromEnv()
+		if err != nil {
+			slog.Error("transcriber configuration invalid", "error", err)
+			os.Exit(1)
+		}
+		video.StartTranscriptionWorker(cleanupCtx, db.Pool, store, transcriber, 5*time.Second, aiEnabled)
 	}
-	video.StartTranscriptionWorker(cleanupCtx, db.Pool, store, transcriber, 5*time.Second, aiEnabled)
 	video.StartSummaryWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
 	video.StartDocumentWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
 	video.StartDigestWorker(cleanupCtx, db.Pool, emailClient, baseURL)

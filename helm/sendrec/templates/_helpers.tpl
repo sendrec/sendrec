@@ -1,3 +1,12 @@
+{{/* True when transcription is enabled AND the provider is local-whisper (needs model volume + init download). */}}
+{{- define "sendrec.needsLocalWhisper" -}}
+{{- if eq (toString .Values.sendrec.env.transcriptionEnabled) "true" -}}
+{{- if or (not .Values.sendrec.env.transcriptionProvider) (eq (toString .Values.sendrec.env.transcriptionProvider) "local") -}}
+true
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "sendrec.validateRequired" -}}
 {{- $_ := required "sendrec.env.baseUrl is required (maps to BASE_URL)" .Values.sendrec.env.baseUrl -}}
 {{- $_ := required "sendrec.env.s3Endpoint is required (maps to S3_ENDPOINT)" .Values.sendrec.env.s3Endpoint -}}

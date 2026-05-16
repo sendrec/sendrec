@@ -23,6 +23,10 @@ data:
   REGISTRATION_ENABLED: {{ .Values.sendrec.env.registrationEnabled | quote }}
   PLAN_BADGE_ENABLED: {{ .Values.sendrec.env.planBadgeEnabled | quote }}
   TRANSCRIPTION_ENABLED: {{ .Values.sendrec.env.transcriptionEnabled | quote }}
+  TRANSCRIPTION_PROVIDER: {{ .Values.sendrec.env.transcriptionProvider | default "local" | quote }}
+  TRANSCRIPTION_API_URL: {{ .Values.sendrec.env.transcriptionApiUrl | default "" | quote }}
+  TRANSCRIPTION_MODEL: {{ .Values.sendrec.env.transcriptionModel | default "" | quote }}
+  TRANSCRIPTION_TIMEOUT_SECONDS: {{ .Values.sendrec.env.transcriptionTimeoutSeconds | default "" | quote }}
   WHISPER_MODEL_PATH: {{ .Values.sendrec.env.whisperModelPath | quote }}
   AI_ENABLED: {{ .Values.sendrec.env.aiEnabled | quote }}
   AI_BASE_URL: {{ .Values.sendrec.env.aiBaseUrl | quote }}

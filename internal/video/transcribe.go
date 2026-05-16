@@ -74,10 +74,14 @@ func formatVTTTimestamp(seconds float64) string {
 	if seconds < 0 {
 		seconds = 0
 	}
-	h := int(seconds) / 3600
-	m := (int(seconds) % 3600) / 60
-	s := seconds - float64(h*3600+m*60)
-	return fmt.Sprintf("%02d:%02d:%06.3f", h, m, s)
+	totalMillis := int64(seconds*1000 + 0.5)
+	h := totalMillis / 3_600_000
+	rem := totalMillis % 3_600_000
+	m := rem / 60_000
+	rem %= 60_000
+	s := rem / 1000
+	ms := rem % 1000
+	return fmt.Sprintf("%02d:%02d:%02d.%03d", h, m, s, ms)
 }
 
 func segmentsToVTT(segments []TranscriptSegment) string {
