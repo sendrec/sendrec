@@ -29,11 +29,13 @@ const deepgramSampleResponse = `{
 
 func TestDeepgram_Transcribe(t *testing.T) {
 	var receivedAuth, receivedQuery, receivedContentType string
+	var receivedContentLength int64
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedAuth = r.Header.Get("Authorization")
 		receivedQuery = r.URL.RawQuery
 		receivedContentType = r.Header.Get("Content-Type")
+		receivedContentLength = r.ContentLength
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, deepgramSampleResponse)
 	}))
@@ -57,6 +59,9 @@ func TestDeepgram_Transcribe(t *testing.T) {
 	}
 	if receivedContentType != "audio/wav" {
 		t.Errorf("Content-Type = %q, want audio/wav", receivedContentType)
+	}
+	if receivedContentLength != int64(len("audio bytes")) {
+		t.Errorf("Content-Length = %d, want %d (Deepgram rejects unset length)", receivedContentLength, len("audio bytes"))
 	}
 	if !strings.Contains(receivedQuery, "model=nova-3") {
 		t.Errorf("query missing model: %s", receivedQuery)

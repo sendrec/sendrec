@@ -3,6 +3,7 @@ package video
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -47,13 +48,13 @@ func NewTranscriberFromEnv() (Transcriber, error) {
 }
 
 func parseTimeoutEnv(name string) time.Duration {
-	v := os.Getenv(name)
+	v := strings.TrimSpace(os.Getenv(name))
 	if v == "" {
 		return 0
 	}
-	d, err := time.ParseDuration(v + "s")
-	if err != nil {
+	secs, err := strconv.Atoi(v)
+	if err != nil || secs <= 0 {
 		return 0
 	}
-	return d
+	return time.Duration(secs) * time.Second
 }

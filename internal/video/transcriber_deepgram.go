@@ -62,6 +62,11 @@ func (d *deepgram) Transcribe(ctx context.Context, audioPath, language string) (
 	}
 	defer func() { _ = f.Close() }()
 
+	stat, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat audio: %w", err)
+	}
+
 	params := url.Values{}
 	params.Set("model", d.model)
 	params.Set("smart_format", "true")
@@ -78,6 +83,7 @@ func (d *deepgram) Transcribe(ctx context.Context, audioPath, language string) (
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
+	req.ContentLength = stat.Size()
 	req.Header.Set("Authorization", "Token "+d.apiKey)
 	req.Header.Set("Content-Type", "audio/wav")
 
