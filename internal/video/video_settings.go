@@ -272,7 +272,7 @@ func (h *Handler) Extend(w http.ResponseWriter, r *http.Request) {
 
 	_, updateArgs := orgVideoFilter(r.Context(), videoID, nil, "AND status != 'deleted'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET share_expires_at = now() + INTERVAL '7 days', updated_at = now()
+		`UPDATE videos SET share_expires_at = share_expires_at + INTERVAL '7 days', updated_at = now()
 		 WHERE `+where, updateArgs...,
 	)
 	if err != nil {

@@ -2648,7 +2648,7 @@ paths:
     post:
       tags: [Videos]
       summary: Extend share link expiry
-      description: Resets the share expiry to now plus 7 days. Rate limited to 2 requests per second with a burst of 10.
+      description: Adds 7 days to the current share expiry. Returns 400 if the link has no expiry set. Rate limited to 2 requests per second with a burst of 10.
       operationId: extendShareLink
       security:
         - bearerAuth: []
@@ -2661,6 +2661,12 @@ paths:
       responses:
         "204":
           description: Share link extended
+        "400":
+          description: Link does not expire
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Unauthorized
           content:
