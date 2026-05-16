@@ -52,6 +52,7 @@ func TestEnqueueJob_AllTypesNoPanic(t *testing.T) {
 }
 
 func TestEnqueueJob_TranscribeType(t *testing.T) {
+	t.Setenv("TRANSCRIPTION_ENABLED", "true")
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)

@@ -6509,6 +6509,7 @@ func TestList_IncludesSuggestedTitle(t *testing.T) {
 // --- Retranscribe Tests ---
 
 func TestRetranscribe_WithLanguage(t *testing.T) {
+	t.Setenv("TRANSCRIPTION_ENABLED", "true")
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -6547,6 +6548,7 @@ func TestRetranscribe_WithLanguage(t *testing.T) {
 }
 
 func TestRetranscribe_NoBody(t *testing.T) {
+	t.Setenv("TRANSCRIPTION_ENABLED", "true")
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)

@@ -7,7 +7,20 @@ import (
 	"github.com/pashagolub/pgxmock/v4"
 )
 
+type stubTranscriber struct {
+	available bool
+	segments  []TranscriptSegment
+	err       error
+}
+
+func (s stubTranscriber) Name() string      { return "stub" }
+func (s stubTranscriber) Available() bool   { return s.available }
+func (s stubTranscriber) Transcribe(ctx context.Context, audioPath, language string) ([]TranscriptSegment, error) {
+	return s.segments, s.err
+}
+
 func TestEnqueueTranscription(t *testing.T) {
+	t.Setenv("TRANSCRIPTION_ENABLED", "true")
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -18,6 +31,23 @@ func TestEnqueueTranscription(t *testing.T) {
 		WithArgs("video-123").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
+	if err := EnqueueTranscription(context.Background(), mock, "video-123"); err != nil {
+		t.Errorf("EnqueueTranscription failed: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestEnqueueTranscription_DisabledIsNoOp(t *testing.T) {
+	t.Setenv("TRANSCRIPTION_ENABLED", "false")
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	// No DB expectations - call should short-circuit before touching DB.
 	if err := EnqueueTranscription(context.Background(), mock, "video-123"); err != nil {
 		t.Errorf("EnqueueTranscription failed: %v", err)
 	}
@@ -42,7 +72,7 @@ func TestProcessNextTranscription_NoJobs(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token", "language"}))
 
 	storage := &mockStorage{}
-	processNextTranscription(context.Background(), mock, storage, false)
+	processNextTranscription(context.Background(), mock, storage, stubTranscriber{available: true}, false)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
@@ -65,7 +95,7 @@ func TestProcessNextTranscription_ResetsStuckJobs(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id", "file_key", "user_id", "share_token", "language"}))
 
 	storage := &mockStorage{}
-	processNextTranscription(context.Background(), mock, storage, false)
+	processNextTranscription(context.Background(), mock, storage, stubTranscriber{available: true}, false)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)

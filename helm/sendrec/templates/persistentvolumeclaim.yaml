@@ -1,4 +1,4 @@
-{{- if and (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") (eq .Values.sendrec.transcription.type "volume") }}
+{{- if and (include "sendrec.needsLocalWhisper" .) (eq .Values.sendrec.transcription.type "volume") }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

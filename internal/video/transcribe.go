@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/sendrec/sendrec/internal/database"
@@ -24,24 +23,15 @@ func transcriptFileKey(userID, shareToken string) string {
 	return fmt.Sprintf("recordings/%s/%s.vtt", userID, shareToken)
 }
 
-func whisperModelPath() string {
-	if p := os.Getenv("WHISPER_MODEL_PATH"); p != "" {
-		return p
-	}
-	return "/models/ggml-small.bin"
+func isTranscriptionEnabled() bool {
+	return os.Getenv("TRANSCRIPTION_ENABLED") == "true"
 }
 
-func isTranscriptionAvailable() bool {
-	if os.Getenv("TRANSCRIPTION_ENABLED") != "true" {
+func isTranscriptionAvailable(t Transcriber) bool {
+	if !isTranscriptionEnabled() {
 		return false
 	}
-	if _, err := exec.LookPath("whisper-cli"); err != nil {
-		return false
-	}
-	if _, err := os.Stat(whisperModelPath()); err != nil {
-		return false
-	}
-	return true
+	return t != nil && t.Available()
 }
 
 var errNoAudio = fmt.Errorf("video has no audio stream")
@@ -80,96 +70,36 @@ func extractAudio(inputPath, outputPath string) error {
 	return nil
 }
 
-func runWhisper(audioPath, outputPrefix, language string) error {
-	cmd := exec.Command("whisper-cli",
-		"-m", whisperModelPath(),
-		"-f", audioPath,
-		"--output-vtt",
-		"--output-json",
-		"-of", outputPrefix,
-		"-t", "2",
-		"-l", language,
-	)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("whisper: %w: %s", err, string(output))
+func formatVTTTimestamp(seconds float64) string {
+	if seconds < 0 {
+		seconds = 0
 	}
-	return nil
+	totalMillis := int64(seconds*1000 + 0.5)
+	h := totalMillis / 3_600_000
+	rem := totalMillis % 3_600_000
+	m := rem / 60_000
+	rem %= 60_000
+	s := rem / 1000
+	ms := rem % 1000
+	return fmt.Sprintf("%02d:%02d:%02d.%03d", h, m, s, ms)
 }
 
-func parseTimestampToSeconds(ts string) float64 {
-	if ts == "" {
-		return 0.0
+func segmentsToVTT(segments []TranscriptSegment) string {
+	var b strings.Builder
+	b.WriteString("WEBVTT\n\n")
+	for _, seg := range segments {
+		b.WriteString(formatVTTTimestamp(seg.Start))
+		b.WriteString(" --> ")
+		b.WriteString(formatVTTTimestamp(seg.End))
+		b.WriteString("\n")
+		b.WriteString(seg.Text)
+		b.WriteString("\n\n")
 	}
-
-	normalized := strings.Replace(ts, ",", ".", 1)
-
-	parts := strings.Split(normalized, ":")
-	if len(parts) != 3 {
-		return 0.0
-	}
-
-	hours, err := strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return 0.0
-	}
-
-	minutes, err := strconv.ParseFloat(parts[1], 64)
-	if err != nil {
-		return 0.0
-	}
-
-	seconds, err := strconv.ParseFloat(parts[2], 64)
-	if err != nil {
-		return 0.0
-	}
-
-	return hours*3600 + minutes*60 + seconds
+	return b.String()
 }
 
-type whisperJSON struct {
-	Transcription []whisperSegment `json:"transcription"`
-}
-
-type whisperSegment struct {
-	Timestamps whisperTimestamps `json:"timestamps"`
-	Text       string            `json:"text"`
-}
-
-type whisperTimestamps struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-}
-
-func parseWhisperJSON(jsonPath string) ([]TranscriptSegment, error) {
-	data, err := os.ReadFile(jsonPath)
-	if err != nil {
-		return nil, fmt.Errorf("read whisper JSON: %w", err)
-	}
-
-	var result whisperJSON
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("parse whisper JSON: %w", err)
-	}
-
-	segments := make([]TranscriptSegment, 0)
-	for _, seg := range result.Transcription {
-		text := strings.TrimSpace(seg.Text)
-		if text == "" {
-			continue
-		}
-		segments = append(segments, TranscriptSegment{
-			Start: parseTimestampToSeconds(seg.Timestamps.From),
-			End:   parseTimestampToSeconds(seg.Timestamps.To),
-			Text:  text,
-		})
-	}
-
-	return segments, nil
-}
-
-func processTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, userID, shareToken, language string, aiEnabled bool) {
-	if !isTranscriptionAvailable() {
+func processTranscription(ctx context.Context, db database.DBTX, storage ObjectStorage, transcriber Transcriber, videoID, fileKey, userID, shareToken, language string, aiEnabled bool) {
+	if !isTranscriptionAvailable(transcriber) {
 		slog.Warn("transcribe: transcription not available, marking as failed", "video_id", videoID)
 		if _, err := db.Exec(ctx,
 			`UPDATE videos SET transcript_status = 'failed', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
@@ -180,7 +110,7 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 		return
 	}
 
-	slog.Info("transcribe: starting", "video_id", videoID, "language", language)
+	slog.Info("transcribe: starting", "video_id", videoID, "language", language, "provider", transcriber.Name())
 
 	setFailed := func() {
 		if _, err := db.Exec(ctx,
@@ -233,37 +163,40 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 		return
 	}
 
-	tmpOutput, err := os.CreateTemp("", "sendrec-transcribe-out-*")
+	segments, err := transcriber.Transcribe(ctx, tmpAudioPath, language)
 	if err != nil {
-		slog.Error("transcribe: failed to create temp output file", "error", err)
-		setFailed()
-		return
-	}
-	tmpOutputPrefix := tmpOutput.Name()
-	_ = tmpOutput.Close()
-	_ = os.Remove(tmpOutputPrefix)
-	defer func() {
-		_ = os.Remove(tmpOutputPrefix + ".vtt")
-		_ = os.Remove(tmpOutputPrefix + ".json")
-		_ = os.Remove(tmpOutputPrefix)
-	}()
-
-	if err := runWhisper(tmpAudioPath, tmpOutputPrefix, language); err != nil {
-		slog.Error("transcribe: whisper failed", "video_id", videoID, "error", err)
-		setFailed()
-		return
-	}
-
-	segments, err := parseWhisperJSON(tmpOutputPrefix + ".json")
-	if err != nil {
-		slog.Error("transcribe: failed to parse whisper output", "video_id", videoID, "error", err)
+		if errors.Is(err, ErrNoAudio) {
+			slog.Info("transcribe: provider reported no speech", "video_id", videoID)
+			if _, dbErr := db.Exec(ctx,
+				`UPDATE videos SET transcript_status = 'no_audio', transcript_started_at = NULL, updated_at = now() WHERE id = $1`,
+				videoID,
+			); dbErr != nil {
+				slog.Error("transcribe: failed to set no_audio status", "video_id", videoID, "error", dbErr)
+			}
+			return
+		}
+		slog.Error("transcribe: provider failed", "video_id", videoID, "provider", transcriber.Name(), "error", err)
 		setFailed()
 		return
 	}
 
 	transcriptKey := transcriptFileKey(userID, shareToken)
-	vttPath := tmpOutputPrefix + ".vtt"
-	if err := storage.UploadFile(ctx, transcriptKey, vttPath, "text/vtt"); err != nil {
+	tmpVTT, err := os.CreateTemp("", "sendrec-transcribe-*.vtt")
+	if err != nil {
+		slog.Error("transcribe: failed to create temp vtt file", "error", err)
+		setFailed()
+		return
+	}
+	tmpVTTPath := tmpVTT.Name()
+	defer func() { _ = os.Remove(tmpVTTPath) }()
+	if _, err := tmpVTT.WriteString(segmentsToVTT(segments)); err != nil {
+		_ = tmpVTT.Close()
+		slog.Error("transcribe: failed to write VTT", "video_id", videoID, "error", err)
+		setFailed()
+		return
+	}
+	_ = tmpVTT.Close()
+	if err := storage.UploadFile(ctx, transcriptKey, tmpVTTPath, "text/vtt"); err != nil {
 		slog.Error("transcribe: failed to upload VTT", "video_id", videoID, "error", err)
 		setFailed()
 		return

@@ -25,9 +25,9 @@ spec:
         checksum/secret: {{- if .Values.sendrec.existingSecret }} "external-secret" {{- else }} {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }} {{- end }}
         checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
-      {{- if or .Values.sendrec.deployment.extraInitContainers (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") }}
+      {{- if or .Values.sendrec.deployment.extraInitContainers (include "sendrec.needsLocalWhisper" .) }}
       initContainers:
-        {{- if eq (toString .Values.sendrec.env.transcriptionEnabled) "true" }}
+        {{- if include "sendrec.needsLocalWhisper" . }}
         - name: download-transcription-model
           image: {{ .Values.sendrec.transcription.initImage }}
           command:
@@ -70,9 +70,9 @@ spec:
             {{- toYaml .Values.sendrec.livenessProbe | nindent 12 }}
           readinessProbe:
             {{- toYaml .Values.sendrec.readinessProbe | nindent 12 }}
-          {{- if or .Values.sendrec.deployment.extraVolumeMounts (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") }}
+          {{- if or .Values.sendrec.deployment.extraVolumeMounts (include "sendrec.needsLocalWhisper" .) }}
           volumeMounts:
-            {{- if eq (toString .Values.sendrec.env.transcriptionEnabled) "true" }}
+            {{- if include "sendrec.needsLocalWhisper" . }}
             - name: whisper-models
               mountPath: /models
             {{- end }}
@@ -80,9 +80,9 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
-      {{- if or .Values.sendrec.deployment.extraVolumes (eq (toString .Values.sendrec.env.transcriptionEnabled) "true") }}
+      {{- if or .Values.sendrec.deployment.extraVolumes (include "sendrec.needsLocalWhisper" .) }}
       volumes:
-        {{- if eq (toString .Values.sendrec.env.transcriptionEnabled) "true" }}
+        {{- if include "sendrec.needsLocalWhisper" . }}
         - name: whisper-models
           {{- if eq .Values.sendrec.transcription.type "volume" }}
           persistentVolumeClaim:
