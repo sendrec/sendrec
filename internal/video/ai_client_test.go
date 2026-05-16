@@ -37,7 +37,7 @@ func TestAIClient_GenerateSummary(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "test-api-key", "gpt-4", 0)
-	result, err := client.GenerateSummary(context.Background(), "00:00 Hello world 00:45 Testing patterns")
+	result, err := client.GenerateSummary(context.Background(), "00:00 Hello world 00:45 Testing patterns", "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -87,7 +87,7 @@ func TestAIClient_GenerateSummary_MarkdownFence(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "key", "model", 0)
-	result, err := client.GenerateSummary(context.Background(), "transcript")
+	result, err := client.GenerateSummary(context.Background(), "transcript", "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -119,7 +119,7 @@ func TestAIClient_GenerateSummary_InvalidJSON(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "key", "model", 0)
-	_, err := client.GenerateSummary(context.Background(), "transcript")
+	_, err := client.GenerateSummary(context.Background(), "transcript", "")
 
 	if err == nil {
 		t.Fatal("expected error for invalid JSON, got nil")
@@ -137,7 +137,7 @@ func TestAIClient_GenerateSummary_EmptyChoices(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "key", "model", 0)
-	_, err := client.GenerateSummary(context.Background(), "transcript")
+	_, err := client.GenerateSummary(context.Background(), "transcript", "")
 
 	if err == nil {
 		t.Fatal("expected error for empty choices, got nil")
@@ -157,7 +157,7 @@ func TestAIClient_GenerateSummary_HTTPError(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "bad-key", "model", 0)
-	_, err := client.GenerateSummary(context.Background(), "transcript")
+	_, err := client.GenerateSummary(context.Background(), "transcript", "")
 
 	if err == nil {
 		t.Fatal("expected error for 401 response, got nil")
@@ -215,7 +215,7 @@ func TestGenerateTitle(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "test-key", "gpt-4", 0)
-	title, err := client.GenerateTitle(context.Background(), "[00:00] Hello world\n[00:45] Testing patterns")
+	title, err := client.GenerateTitle(context.Background(), "[00:00] Hello world\n[00:45] Testing patterns", "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -255,7 +255,7 @@ func TestGenerateTitleTrimsQuotes(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "key", "model", 0)
-	title, err := client.GenerateTitle(context.Background(), "transcript")
+	title, err := client.GenerateTitle(context.Background(), "transcript", "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -284,7 +284,7 @@ func TestGenerateTitleTruncates(t *testing.T) {
 	defer server.Close()
 
 	client := NewAIClient(server.URL, "key", "model", 0)
-	title, err := client.GenerateTitle(context.Background(), "transcript")
+	title, err := client.GenerateTitle(context.Background(), "transcript", "")
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -395,6 +395,93 @@ func TestGenerateDocument_WithLanguage(t *testing.T) {
 
 	client := NewAIClient(server.URL, "key", "model", 0)
 	_, err := client.GenerateDocument(context.Background(), "transcript", "Romanian")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(receivedPrompt, "Romanian") {
+		t.Errorf("system prompt should contain language name, got: %s", receivedPrompt)
+	}
+}
+
+func TestGenerateSummary_WithLanguage(t *testing.T) {
+	var receivedPrompt string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req chatRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		receivedPrompt = req.Messages[0].Content
+
+		resp := chatResponse{
+			Choices: []chatChoice{
+				{Message: chatMessage{Role: "assistant", Content: `{"summary":"x","chapters":[]}`}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewAIClient(server.URL, "key", "model", 0)
+	_, err := client.GenerateSummary(context.Background(), "transcript", "Romanian")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(receivedPrompt, "Romanian") {
+		t.Errorf("system prompt should contain language name, got: %s", receivedPrompt)
+	}
+}
+
+func TestGenerateSummary_AutoLanguageOmitsHint(t *testing.T) {
+	var receivedPrompt string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req chatRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		receivedPrompt = req.Messages[0].Content
+
+		resp := chatResponse{
+			Choices: []chatChoice{
+				{Message: chatMessage{Role: "assistant", Content: `{"summary":"x","chapters":[]}`}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewAIClient(server.URL, "key", "model", 0)
+	_, err := client.GenerateSummary(context.Background(), "transcript", "auto")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(receivedPrompt, "The transcript language is") {
+		t.Errorf("auto language should not add explicit language hint, got: %s", receivedPrompt)
+	}
+}
+
+func TestGenerateTitle_WithLanguage(t *testing.T) {
+	var receivedPrompt string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req chatRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		receivedPrompt = req.Messages[0].Content
+
+		resp := chatResponse{
+			Choices: []chatChoice{
+				{Message: chatMessage{Role: "assistant", Content: "Titlu"}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := NewAIClient(server.URL, "key", "model", 0)
+	_, err := client.GenerateTitle(context.Background(), "transcript", "Romanian")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
