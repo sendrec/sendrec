@@ -2,7 +2,7 @@
 FROM node:24-alpine AS frontend
 WORKDIR /app/web
 COPY web/package.json web/pnpm-lock.yaml* web/.npmrc* ./
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN corepack enable && pnpm install --frozen-lockfile --config.strict-dep-builds=false
 COPY web/ .
 RUN pnpm build
 
