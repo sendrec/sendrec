@@ -6,9 +6,20 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
+
+// TestMain blanks PATH for the whole package so no test can ever invoke the
+// real sendmail(8) binary on a dev machine. Tests that need the sendmail
+// fallback path simulate availability via the unexported sendmailAvailable
+// flag; the actual exec.LookPath inside sendViaSendmail then fails and the
+// fallback returns nil gracefully.
+func TestMain(m *testing.M) {
+	_ = os.Setenv("PATH", "")
+	os.Exit(m.Run())
+}
 
 func TestSendPasswordReset_Success(t *testing.T) {
 	var receivedBody txRequest
@@ -61,8 +72,6 @@ func TestSendPasswordReset_Success(t *testing.T) {
 }
 
 func TestSendPasswordReset_ServerError_FallsBackToSendmail(t *testing.T) {
-	t.Setenv("PATH", "") // prevent real sendmail from being invoked
-
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/subscribers" {
 			w.WriteHeader(http.StatusOK)
@@ -1149,9 +1158,9 @@ func TestSendmail_FallbackWhenNoListmonk(t *testing.T) {
 		SendmailEnabled: true,
 	})
 
-	// Without Listmonk, sendmail fallback is attempted.
-	// If sendmail is not available, it gracefully returns nil.
-	// If sendmail IS available (macOS), it sends the email.
+	// Without Listmonk, sendmail fallback is attempted; PATH is blanked in
+	// TestMain so the exec.LookPath inside sendViaSendmail fails and the
+	// fallback returns nil gracefully.
 	err := client.SendPasswordReset(context.Background(),
 		"alice@example.com", "Alice", "https://example.com/reset")
 	if err != nil {
