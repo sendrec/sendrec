@@ -19,14 +19,6 @@ sendrec:
     extraVolumes: []         # pod-level volumes
     extraVolumeMounts: []    # mounts on the main sendrec container
 
-  # Transcription model configuration, activation is controlled by env.transcriptionEnabled
-  transcription:
-    type: emptyDir           # volume type: emptyDir or volume (persistent volume)
-    size: 1Gi                # max size for the model volume (for emptyDir) or PVC storage request (for volume)
-    initImage: alpine/curl:8.17.0  # image for the model download init container
-    modelUrl: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
-    modelPath: /models/ggml-small.bin
-
   env:
     baseUrl: "https://sendrec.yourdomain.com"
 
@@ -114,6 +106,14 @@ sendrec:
 
   # Use an existing Kubernetes Secret name instead of creating upper secret
   existingSecret: ""
+
+# Transcription model configuration, activation is controlled by env.transcriptionEnabled + env.transcriptionProvider=local
+  transcription:
+    type: emptyDir           # volume type: emptyDir or volume (persistent volume)
+    size: 1Gi                # max size for the model volume (for emptyDir) or PVC storage request (for volume)
+    initImage: alpine/curl:8.17.0  # image for the model download init container
+    modelUrl: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+    modelPath: /models/ggml-small.bin
 
   port: 8080
 
