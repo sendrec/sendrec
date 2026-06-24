@@ -1,6 +1,6 @@
 module github.com/sendrec/sendrec
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.1
@@ -10,7 +10,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/crewjam/saml v0.5.1
 	github.com/go-chi/chi/v5 v5.2.5
-	github.com/go-jose/go-jose/v4 v4.1.3
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jackc/pgx/v5 v5.8.0
