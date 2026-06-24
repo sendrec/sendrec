@@ -138,6 +138,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         }
         video {
             width: 100%;
+            height: 100%;
+            object-fit: contain;
             display: block;
             background: #000;
         }

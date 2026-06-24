@@ -93,6 +93,31 @@ const playerCSS = `
             transition: opacity 0.3s;
         }
         .player-controls.hidden { opacity: 0; pointer-events: none; }
+        .caption-overlay {
+            position: absolute;
+            left: 0;
+            right: 0;
+            /* Must stay >= the .player-controls bar height (~60px) so captions clear it. */
+            bottom: 64px;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+            padding: 0 5%;
+            text-align: center;
+            transition: bottom 0.3s;
+        }
+        .caption-overlay.controls-hidden { bottom: 24px; }
+        .caption-overlay:empty { display: none; }
+        .caption-overlay span {
+            background: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: clamp(14px, 2.5vw, 22px);
+            line-height: 1.35;
+            white-space: pre-line;
+        }
         .ctrl-btn {
             background: none;
             border: none;
@@ -357,6 +382,7 @@ const playerControlsHTML = `
                 </div>
                 <div class="player-spinner" id="player-spinner"></div>
                 <div class="player-error" id="player-error"><div class="player-error-icon">&#9888;</div>Video failed to load</div>
+                <div class="caption-overlay" id="caption-overlay" aria-live="polite"></div>
                 <div class="player-controls" id="player-controls">
                     <button class="ctrl-btn" id="play-btn" aria-label="Play">&#9654;</button>
                     <span class="time-display" id="time-current">0:00</span>
@@ -700,14 +726,66 @@ const playerJS = `
         updatePlayBtn();
         updateMuteBtn();
 
-        // iOS Safari: fall back to native controls.
-        // Custom controls have touch/playback issues on iOS; native controls work reliably.
+        // Captions: render cues into a custom overlay instead of native <track> display.
+        // Native cues anchor to the bottom of the video content box, which on a letterboxed
+        // (e.g. 4:3) source lands behind the controls bar and gets clipped. Owning the render
+        // lets us position captions above the controls, consistently across Chrome/Firefox.
         var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var captionOverlay = document.getElementById('caption-overlay');
+        var subTrack = null;
+        function escapeHtml(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        function renderCues() {
+            if (!subTrack || !captionOverlay) return;
+            var html = '', cues = subTrack.activeCues;
+            for (var j = 0; cues && j < cues.length; j++) {
+                html += '<span>' + escapeHtml(cues[j].text) + '</span>';
+            }
+            captionOverlay.innerHTML = html;
+        }
+        function bindCaptions() {
+            if (subTrack) { subTrack.removeEventListener('cuechange', renderCues); subTrack = null; }
+            if (captionOverlay) captionOverlay.innerHTML = '';
+            for (var i = 0; i < player.textTracks.length; i++) {
+                var t = player.textTracks[i];
+                if (t.kind === 'subtitles' || t.kind === 'captions') { subTrack = t; break; }
+            }
+            if (subTrack) {
+                subTrack.mode = 'hidden';
+                subTrack.addEventListener('cuechange', renderCues);
+                renderCues();
+            }
+        }
+        bindCaptions();
+
+        // Keep captions clear of the controls bar: drop them when the bar auto-hides.
+        function syncCaptionOffset() {
+            if (!captionOverlay) return;
+            captionOverlay.classList.toggle('controls-hidden', controls.classList.contains('hidden'));
+        }
+        if (typeof MutationObserver !== 'undefined') {
+            new MutationObserver(syncCaptionOffset).observe(controls, { attributes: true, attributeFilter: ['class'] });
+        }
+
+        // Picture-in-Picture strips page CSS, so let the browser draw native cues there.
+        player.addEventListener('enterpictureinpicture', function() {
+            if (subTrack) subTrack.mode = 'showing';
+            if (captionOverlay) captionOverlay.innerHTML = '';
+        });
+        player.addEventListener('leavepictureinpicture', function() {
+            if (subTrack && !isIOS) { subTrack.mode = 'hidden'; renderCues(); }
+        });
+
+        // iOS Safari: fall back to native controls.
+        // Custom controls have touch/playback issues on iOS; native controls work reliably.
         if (isIOS) {
             player.setAttribute('controls', '');
             controls.style.display = 'none';
             overlay.style.display = 'none';
+            if (subTrack) subTrack.mode = 'showing';
+            if (captionOverlay) captionOverlay.style.display = 'none';
         }
 `
 
@@ -845,6 +923,7 @@ const playlistJS = `
 
             player.src = v.videoUrl;
             player.load();
+            bindCaptions();
             player.play().catch(function() {});
             listItems.forEach(function(li) {
                 li.classList.toggle('active', parseInt(li.getAttribute('data-index'), 10) === index);

@@ -146,6 +146,8 @@ func TestEmbedPage_Success_RendersVideoPlayer(t *testing.T) {
 		"video source":  `src="https://s3.example.com/video.webm"`,
 		"watch link":    `/watch/` + shareToken,
 		"watch on text": "Watch on",
+		"caption overlay": `id="caption-overlay"`,
+		"caption render":  "function bindCaptions()",
 	}
 	for name, want := range checks {
 		if !strings.Contains(body, want) {

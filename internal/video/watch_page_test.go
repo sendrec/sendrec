@@ -189,6 +189,12 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 		"spinner":         "player-spinner",
 		"error overlay":   "player-error",
 		"seek tooltip":    "seek-time-tooltip",
+		"caption overlay": `id="caption-overlay"`,
+		"caption css":     ".caption-overlay",
+		"caption render":  "function bindCaptions()",
+		"cue listener":    "'cuechange'",
+		"hidden track":    "subTrack.mode = 'hidden'",
+		"object-fit":      "object-fit: contain",
 	}
 	for name, want := range checks {
 		if !strings.Contains(body, want) {
