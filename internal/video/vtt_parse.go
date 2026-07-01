@@ -19,7 +19,6 @@ var (
 // identifiers, HTML entities, and voice/span tags.
 func parseVTT(raw []byte) ([]TranscriptSegment, error) {
 	text := string(raw)
-	// Remove UTF-8 BOM if present
 	const bom = "\xef\xbb\xbf"
 	text = strings.TrimPrefix(text, bom)
 	text = strings.ReplaceAll(text, "\r\n", "\n")
@@ -41,7 +40,6 @@ func parseVTT(raw []byte) ([]TranscriptSegment, error) {
 		if len(lines) == 0 {
 			continue
 		}
-		// Skip the header block and NOTE/STYLE/REGION blocks.
 		first := strings.TrimSpace(lines[0])
 		if strings.HasPrefix(first, "WEBVTT") || strings.HasPrefix(first, "NOTE") ||
 			strings.HasPrefix(first, "STYLE") || strings.HasPrefix(first, "REGION") {
@@ -66,8 +64,11 @@ func parseVTT(raw []byte) ([]TranscriptSegment, error) {
 		}
 		speaker, cleaned := extractSpeaker(payload)
 		speaker = sanitizeSpeaker(speaker)
-		cleaned = vttSpanTagRe.ReplaceAllString(cleaned, "")
+		// Unescape entities before stripping tags so entity-encoded markup
+		// (e.g. &lt;v X&gt;) is stripped rather than resurrected into live VTT
+		// markup in the re-rendered output.
 		cleaned = html.UnescapeString(cleaned)
+		cleaned = vttSpanTagRe.ReplaceAllString(cleaned, "")
 		cleaned = strings.TrimSpace(cleaned)
 		if cleaned == "" {
 			continue
@@ -112,15 +113,22 @@ func parseVTTTimestamp(s string) (float64, bool) {
 	}
 	hms := strings.Split(s[:dot], ":")
 	var h, m, sec int
+	var errH, errM, errS error
 	switch len(hms) {
 	case 3:
-		h, _ = strconv.Atoi(hms[0])
-		m, _ = strconv.Atoi(hms[1])
-		sec, _ = strconv.Atoi(hms[2])
+		h, errH = strconv.Atoi(hms[0])
+		m, errM = strconv.Atoi(hms[1])
+		sec, errS = strconv.Atoi(hms[2])
 	case 2:
-		m, _ = strconv.Atoi(hms[0])
-		sec, _ = strconv.Atoi(hms[1])
+		m, errM = strconv.Atoi(hms[0])
+		sec, errS = strconv.Atoi(hms[1])
 	default:
+		return 0, false
+	}
+	// Reject non-numeric components (silent Atoi zeroing would keep a cue at
+	// the wrong time), but tolerate out-of-range numeric values that real
+	// exporters occasionally emit rather than dropping the cue.
+	if errH != nil || errM != nil || errS != nil || h < 0 || m < 0 || sec < 0 {
 		return 0, false
 	}
 	return float64(h)*3600 + float64(m)*60 + float64(sec) + float64(ms)/1000, true
@@ -165,19 +173,25 @@ func extractSpeaker(text string) (speaker, cleaned string) {
 
 // mergeSegments joins consecutive cues from the same speaker when the gap
 // between them is at most maxMergeGapSeconds, extending the end time and
-// concatenating text with a single space.
+// concatenating text with a single space. Text pieces are accumulated per
+// merged group and joined once to keep this linear in total text size.
 func mergeSegments(in []TranscriptSegment) []TranscriptSegment {
 	const maxMergeGapSeconds = 2.0
 	var out []TranscriptSegment
+	var parts [][]string
 	for _, s := range in {
 		if n := len(out); n > 0 && out[n-1].Speaker == s.Speaker && s.Start-out[n-1].End <= maxMergeGapSeconds {
 			if s.End > out[n-1].End {
 				out[n-1].End = s.End
 			}
-			out[n-1].Text += " " + s.Text
+			parts[n-1] = append(parts[n-1], s.Text)
 			continue
 		}
 		out = append(out, s)
+		parts = append(parts, []string{s.Text})
+	}
+	for i := range out {
+		out[i].Text = strings.Join(parts[i], " ")
 	}
 	return out
 }

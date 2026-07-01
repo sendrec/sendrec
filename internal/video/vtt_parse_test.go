@@ -15,13 +15,52 @@ func TestParseVTTTimestamp(t *testing.T) {
 		{"01:02:03.250", 3723.25, true},
 		{"02:03.100", 123.1, true}, // no hours
 		{"garbage", 0, false},
-		{"00:00:01", 0, false}, // missing millis
+		{"00:00:01", 0, false},   // missing millis
+		{"xx:30:45.250", 0, false},   // non-numeric hour must be rejected, not silently 0
+		{"00:3x:00.500", 0, false},   // non-numeric minute rejected
+		{"00:75:00.000", 4500, true}, // out-of-range but numeric: tolerated, not silently zeroed
 	}
 	for _, c := range cases {
 		got, ok := parseVTTTimestamp(c.in)
 		if ok != c.ok || (ok && got != c.want) {
 			t.Errorf("parseVTTTimestamp(%q) = %v,%v want %v,%v", c.in, got, ok, c.want, c.ok)
 		}
+	}
+}
+
+func TestParseVTT_EntityEncodedMarkupDoesNotResurrectTags(t *testing.T) {
+	// Cue text with entity-encoded markup must not become live VTT markup in
+	// the re-rendered output (caption/markup injection guard).
+	raw := "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n" +
+		"User: &lt;v Attacker&gt;spoiler&lt;/v&gt;\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(segs[0].Text, "<v") || strings.Contains(segs[0].Text, "<") {
+		t.Errorf("entity-encoded tag survived into Text: %q", segs[0].Text)
+	}
+	if strings.Contains(segmentsToVTT(segs), "<v Attacker>") {
+		t.Errorf("injected voice tag reached rendered VTT:\n%s", segmentsToVTT(segs))
+	}
+}
+
+func TestMergeSegments_LargeSameSpeakerIsLinear(t *testing.T) {
+	// Guards against O(n^2) text concatenation: a big single-speaker run must
+	// merge without pathological slowdown and preserve joined text.
+	const n = 40000
+	in := make([]TranscriptSegment, n)
+	for i := range in {
+		in[i] = TranscriptSegment{
+			Start: float64(i), End: float64(i) + 0.1, Text: "word", Speaker: "A",
+		}
+	}
+	out := mergeSegments(in)
+	if len(out) != 1 {
+		t.Fatalf("want 1 merged segment, got %d", len(out))
+	}
+	if want := n*len("word") + (n - 1); len(out[0].Text) != want {
+		t.Errorf("merged text length = %d, want %d", len(out[0].Text), want)
 	}
 }
 
