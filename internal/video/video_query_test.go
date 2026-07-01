@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -137,5 +138,43 @@ func TestGetTranscript_NullSegments(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestList_SearchBySpeaker(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+
+	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
+	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
+
+	// Title deliberately does NOT contain the search term "Alice": this row
+	// can only come back if the WHERE clause actually matches on
+	// seg->>'speaker', not on title or seg->>'text'. The query regexp also
+	// pins the speaker predicate itself so the test fails if it's removed.
+	mock.ExpectQuery(`SELECT v\.id, v\.title.*seg->>'speaker' ILIKE \$2`).
+		WithArgs(testUserID, "%Alice%", 50, 0).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "noise_reduction", "pinned", "tags_json", "playlists_json"}).
+			AddRow("video-1", "Q3 Planning", "ready", 300, "tok123", createdAt, &shareExpiresAt, int64(5), int64(3), (*string)(nil), (*string)(nil), "disabled", int64(0), "ready", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), false, false, "[]", "[]"),
+		)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/videos", handler.List)
+
+	req := authenticatedRequest(t, http.MethodGet, "/api/videos?q=Alice", nil)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
 	}
 }

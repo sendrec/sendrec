@@ -269,8 +269,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		args = append(args, "%"+escaped+"%")
 		baseQuery += fmt.Sprintf(` AND (v.title ILIKE $%d OR EXISTS (
 			SELECT 1 FROM jsonb_array_elements(v.transcript_json) seg
-			WHERE seg->>'text' ILIKE $%d
-		))`, paramIdx, paramIdx)
+			WHERE seg->>'text' ILIKE $%d OR seg->>'speaker' ILIKE $%d
+		))`, paramIdx, paramIdx, paramIdx)
 		paramIdx++
 	}
 

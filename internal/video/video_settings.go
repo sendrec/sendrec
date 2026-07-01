@@ -1,8 +1,12 @@
 package video
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -368,4 +372,93 @@ func (h *Handler) DismissTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+const MaxTranscriptUploadBytes = 5 << 20 // 5 MB
+
+func (h *Handler) UploadTranscript(w http.ResponseWriter, r *http.Request) {
+	videoID := chi.URLParam(r, "id")
+
+	where, args := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
+	var userID, shareToken string
+	if err := h.db.QueryRow(r.Context(),
+		`SELECT user_id, share_token FROM videos WHERE `+where, args...,
+	).Scan(&userID, &shareToken); err != nil {
+		httputil.WriteError(w, http.StatusNotFound, "video not found")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, MaxTranscriptUploadBytes+1024)
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			httputil.WriteError(w, http.StatusRequestEntityTooLarge, "transcript file too large")
+			return
+		}
+		httputil.WriteError(w, http.StatusBadRequest, "missing transcript file")
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	raw, err := io.ReadAll(io.LimitReader(file, MaxTranscriptUploadBytes+1))
+	if err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "could not read file")
+		return
+	}
+	if len(raw) > MaxTranscriptUploadBytes {
+		httputil.WriteError(w, http.StatusRequestEntityTooLarge, "transcript file too large")
+		return
+	}
+
+	segments, err := parseVTT(raw)
+	if err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid WebVTT file")
+		return
+	}
+	segments = mergeSegments(segments)
+
+	transcriptKey := transcriptFileKey(userID, shareToken)
+	if err := h.uploadTranscriptVTT(r.Context(), transcriptKey, segmentsToVTT(segments)); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not store transcript")
+		return
+	}
+
+	segmentsJSON, err := json.Marshal(segments)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not encode transcript")
+		return
+	}
+
+	updWhere, updArgs := orgVideoFilter(r.Context(), videoID,
+		[]any{transcriptKey, string(segmentsJSON)}, "")
+	if _, err := h.db.Exec(r.Context(),
+		`UPDATE videos SET transcript_key = $1, transcript_json = $2, transcript_status = 'ready', transcript_started_at = NULL, updated_at = now() WHERE `+updWhere,
+		updArgs...,
+	); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "could not update transcript")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, map[string]any{"segments": segments})
+}
+
+// uploadTranscriptVTT writes the VTT to a temp file and uploads it, mirroring
+// how processTranscription and trim store artifacts (ObjectStorage exposes
+// only UploadFile, not a bytes upload).
+func (h *Handler) uploadTranscriptVTT(ctx context.Context, key, vtt string) error {
+	tmp, err := os.CreateTemp("", "sendrec-upload-vtt-*.vtt")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+	if _, err := tmp.WriteString(vtt); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return h.storage.UploadFile(ctx, key, tmpPath, "text/vtt")
 }

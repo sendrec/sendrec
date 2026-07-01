@@ -1,0 +1,267 @@
+package video
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestParseVTTTimestamp(t *testing.T) {
+	cases := []struct {
+		in   string
+		want float64
+		ok   bool
+	}{
+		{"00:00:01.500", 1.5, true},
+		{"01:02:03.250", 3723.25, true},
+		{"02:03.100", 123.1, true}, // no hours
+		{"garbage", 0, false},
+		{"00:00:01", 0, false},   // missing millis
+		{"xx:30:45.250", 0, false},   // non-numeric hour must be rejected, not silently 0
+		{"00:3x:00.500", 0, false},   // non-numeric minute rejected
+		{"00:75:00.000", 4500, true}, // out-of-range but numeric: tolerated, not silently zeroed
+	}
+	for _, c := range cases {
+		got, ok := parseVTTTimestamp(c.in)
+		if ok != c.ok || (ok && got != c.want) {
+			t.Errorf("parseVTTTimestamp(%q) = %v,%v want %v,%v", c.in, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+func TestParseVTT_EntityEncodedMarkupDoesNotResurrectTags(t *testing.T) {
+	// Cue text with entity-encoded markup must not become live VTT markup in
+	// the re-rendered output (caption/markup injection guard).
+	raw := "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n" +
+		"User: &lt;v Attacker&gt;spoiler&lt;/v&gt;\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(segs[0].Text, "<v") || strings.Contains(segs[0].Text, "<") {
+		t.Errorf("entity-encoded tag survived into Text: %q", segs[0].Text)
+	}
+	if strings.Contains(segmentsToVTT(segs), "<v Attacker>") {
+		t.Errorf("injected voice tag reached rendered VTT:\n%s", segmentsToVTT(segs))
+	}
+}
+
+func TestMergeSegments_LargeSameSpeakerIsLinear(t *testing.T) {
+	// Guards against O(n^2) text concatenation: a big single-speaker run must
+	// merge without pathological slowdown and preserve joined text.
+	const n = 40000
+	in := make([]TranscriptSegment, n)
+	for i := range in {
+		in[i] = TranscriptSegment{
+			Start: float64(i), End: float64(i) + 0.1, Text: "word", Speaker: "A",
+		}
+	}
+	out := mergeSegments(in)
+	if len(out) != 1 {
+		t.Fatalf("want 1 merged segment, got %d", len(out))
+	}
+	if want := n*len("word") + (n - 1); len(out[0].Text) != want {
+		t.Errorf("merged text length = %d, want %d", len(out[0].Text), want)
+	}
+}
+
+func TestExtractSpeaker(t *testing.T) {
+	cases := []struct {
+		in, speaker, cleaned string
+	}{
+		{"<v Alice>Hello", "Alice", "Hello"},
+		{"<v Martha Helena>Sí</v>", "Martha Helena", "Sí"},
+		{"Bob: hi there", "Bob", "hi there"},
+		{"Dr. Smith: point: two", "Dr. Smith", "point: two"}, // split first ": " only
+		{"no speaker at all", "", "no speaker at all"},
+		{"10:30 Meeting: hello", "", "10:30 Meeting: hello"}, // timestamp-shaped prefix, not a speaker
+	}
+	for _, c := range cases {
+		sp, cl := extractSpeaker(c.in)
+		if sp != c.speaker || cl != c.cleaned {
+			t.Errorf("extractSpeaker(%q) = %q,%q want %q,%q", c.in, sp, cl, c.speaker, c.cleaned)
+		}
+	}
+}
+
+func TestParseVTT_Teams(t *testing.T) {
+	raw := "\xef\xbb\xbfWEBVTT\r\n\r\n" +
+		"96c14169-de06-4080-b9fe-f573f75eb719/91-0\r\n" +
+		"00:00:04.409 --> 00:00:09.359\r\n" +
+		"<v Alice>Q3 numbers &amp; targets</v>\r\n\r\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 1 {
+		t.Fatalf("want 1 segment, got %d", len(segs))
+	}
+	s := segs[0]
+	if s.Speaker != "Alice" || s.Text != "Q3 numbers & targets" || s.Start != 4.409 {
+		t.Errorf("got %+v", s)
+	}
+}
+
+func TestParseVTT_Zoom(t *testing.T) {
+	raw := "WEBVTT\n\n" +
+		"1\n00:00:00.050 --> 00:00:01.790\nSrijani Ghosh: Hi!\n\n" +
+		"2\n00:00:02.070 --> 00:00:04.050\nConor Healy: Get this party started.\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 2 || segs[0].Speaker != "Srijani Ghosh" || segs[0].Text != "Hi!" {
+		t.Fatalf("got %+v", segs)
+	}
+}
+
+func TestParseVTT_SanitizesSpeakerAngleBrackets(t *testing.T) {
+	raw := "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<v A<b>c>hi\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 1 {
+		t.Fatalf("want 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if strings.ContainsAny(segs[0].Speaker, "<>") {
+		t.Errorf("speaker retained angle brackets: %q", segs[0].Speaker)
+	}
+
+	vtt := segmentsToVTT(segs)
+	if strings.Count(vtt, "<v ") != 1 {
+		t.Errorf("expected exactly one <v tag in output, got: %q", vtt)
+	}
+	// The voice tag itself must be well-formed: exactly one '<' and one '>'
+	// delimiting it, with no stray angle brackets from the speaker leaking in.
+	start := strings.Index(vtt, "<v ")
+	end := strings.Index(vtt[start:], ">")
+	if end < 0 {
+		t.Fatalf("no closing '>' found for voice tag in: %q", vtt)
+	}
+	tag := vtt[start : start+end+1]
+	if strings.Count(tag, "<") != 1 || strings.Count(tag, ">") != 1 {
+		t.Errorf("malformed voice tag: %q", tag)
+	}
+}
+
+func TestParseVTT_SanitizesEntityBearingSpeaker(t *testing.T) {
+	raw := "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<v Q3 &amp; R&amp;D>hi\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 1 {
+		t.Fatalf("want 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Speaker != "Q3 & R&D" {
+		t.Errorf("expected unescaped speaker %q, got %q", "Q3 & R&D", segs[0].Speaker)
+	}
+}
+
+func TestParseVTT_IllegalButParseableTimingNotMisclassifiedAsIdentifier(t *testing.T) {
+	// Minutes >= 60 is spec-illegal but parseTimingLine/parseVTTTimestamp
+	// accept it. The identifier-skip and the actual parse must agree on a
+	// single timing detector, or this cue is silently dropped.
+	raw := "WEBVTT\n\n00:75:00.000 --> 00:76:00.000\nHello\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 1 {
+		t.Fatalf("want 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Text != "Hello" {
+		t.Errorf("got %+v", segs[0])
+	}
+}
+
+func TestParseVTT_NoSpeaker(t *testing.T) {
+	raw := "WEBVTT\n\n00:01:08.000 --> 00:01:09.000\nThis doesn't.\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil || len(segs) != 1 || segs[0].Speaker != "" || segs[0].Text != "This doesn't." {
+		t.Fatalf("got %+v err %v", segs, err)
+	}
+}
+
+func TestParseVTT_MultiLineCue(t *testing.T) {
+	raw := "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\n<v Al>line one\nline two\n\n"
+	segs, _ := parseVTT([]byte(raw))
+	if len(segs) != 1 || segs[0].Text != "line one\nline two" {
+		t.Fatalf("got %+v", segs)
+	}
+}
+
+func TestParseVTT_SkipsNoteAndStyle(t *testing.T) {
+	raw := "WEBVTT\n\nNOTE this is a comment\n\nSTYLE\n::cue { color: white }\n\n" +
+		"00:00:00.000 --> 00:00:01.000\nHello\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil || len(segs) != 1 || segs[0].Text != "Hello" {
+		t.Fatalf("got %+v err %v", segs, err)
+	}
+}
+
+func TestParseVTT_SkipsTagOnlyPayload(t *testing.T) {
+	raw := "WEBVTT\n\n" +
+		"00:00:00.000 --> 00:00:01.000\n<c></c>\n\n" +
+		"00:00:01.000 --> 00:00:02.000\nHello\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 1 || segs[0].Text != "Hello" {
+		t.Fatalf("want 1 segment with text %q, got %+v", "Hello", segs)
+	}
+}
+
+func TestParseVTT_Errors(t *testing.T) {
+	if _, err := parseVTT([]byte("not a vtt file")); err == nil {
+		t.Error("want error for missing signature")
+	}
+	if _, err := parseVTT([]byte("WEBVTT\n\n")); err == nil {
+		t.Error("want error for zero cues")
+	}
+}
+
+func TestMergeSegments(t *testing.T) {
+	in := []TranscriptSegment{
+		{Start: 0, End: 1, Text: "Um", Speaker: "A"},
+		{Start: 1.5, End: 2, Text: "yeah", Speaker: "A"},   // gap 0.5s, same speaker -> merge
+		{Start: 2, End: 3, Text: "ok", Speaker: "B"},       // diff speaker -> new
+		{Start: 10, End: 11, Text: "later", Speaker: "B"},  // gap 7s -> new
+	}
+	got := mergeSegments(in)
+	if len(got) != 3 {
+		t.Fatalf("want 3 merged, got %d: %+v", len(got), got)
+	}
+	if got[0].Text != "Um yeah" || got[0].End != 2 {
+		t.Errorf("first merge wrong: %+v", got[0])
+	}
+}
+
+func TestMergeSegments_EmptySpeakerMerges(t *testing.T) {
+	in := []TranscriptSegment{
+		{Start: 0, End: 1, Text: "a"},
+		{Start: 1, End: 2, Text: "b"},
+	}
+	got := mergeSegments(in)
+	if len(got) != 1 || got[0].Text != "a b" {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestMergeSegments_OverlappingCueDoesNotShrinkEnd(t *testing.T) {
+	in := []TranscriptSegment{
+		{Start: 0, End: 5, Text: "long one", Speaker: "A"},
+		{Start: 1, End: 2, Text: "crosstalk", Speaker: "A"}, // overlaps, ends before prior End -> must not shrink
+	}
+	got := mergeSegments(in)
+	if len(got) != 1 {
+		t.Fatalf("want 1 merged, got %d: %+v", len(got), got)
+	}
+	if got[0].End != 5 {
+		t.Errorf("merged End regressed: got %+v", got[0])
+	}
+	if got[0].Text != "long one crosstalk" {
+		t.Errorf("merged Text wrong: %+v", got[0])
+	}
+}

@@ -737,11 +737,24 @@ const playerJS = `
         function escapeHtml(s) {
             return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
+        function cueParts(raw) {
+            // VTTCue.text is the raw payload including voice/span markup; pull
+            // the speaker out of a leading <v Name> tag and strip remaining tags.
+            var speaker = '', text = raw;
+            var v = /^<v\s+([^>]*)>/.exec(text);
+            if (v) { speaker = v[1]; text = text.slice(v[0].length); }
+            text = text.replace(/<\/?[^>]*>/g, '');
+            return { speaker: speaker, text: text };
+        }
         function renderCues() {
             if (!subTrack || !captionOverlay) return;
             var html = '', cues = subTrack.activeCues;
             for (var j = 0; cues && j < cues.length; j++) {
-                html += '<span>' + escapeHtml(cues[j].text) + '</span>';
+                var p = cueParts(cues[j].text);
+                var inner = p.speaker
+                    ? '<b>' + escapeHtml(p.speaker) + ':</b> ' + escapeHtml(p.text)
+                    : escapeHtml(p.text);
+                html += '<span>' + inner + '</span>';
             }
             captionOverlay.innerHTML = html;
         }

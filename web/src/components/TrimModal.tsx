@@ -2,12 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { formatDuration } from "../utils/format";
-
-interface TranscriptSegment {
-  start: number;
-  end: number;
-  text: string;
-}
+import type { TranscriptSegment } from "../types/transcript";
 
 interface TrimModalProps {
   videoId: string;

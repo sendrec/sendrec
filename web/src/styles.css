@@ -3517,6 +3517,12 @@ textarea.form-input {
   color: var(--color-text);
 }
 
+.transcript-segment-speaker {
+  font-weight: 600;
+  margin-right: 6px;
+  color: var(--color-text);
+}
+
 /* Comments section */
 .comment-item {
   display: flex;

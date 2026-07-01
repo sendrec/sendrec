@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,6 +37,9 @@ type mockStorage struct {
 	headErr                error
 	downloadToFileErr      error
 	uploadFileErr          error
+	uploadFileCallCount    int
+	uploadFileKeys         []string
+	uploadFileContentTypes []string
 }
 
 func (m *mockStorage) GenerateUploadURL(_ context.Context, key string, _ string, _ int64, _ time.Duration) (string, error) {
@@ -81,7 +85,10 @@ func (m *mockStorage) DownloadToFile(_ context.Context, _ string, _ string) erro
 	return m.downloadToFileErr
 }
 
-func (m *mockStorage) UploadFile(_ context.Context, _ string, _ string, _ string) error {
+func (m *mockStorage) UploadFile(_ context.Context, key string, _ string, contentType string) error {
+	m.uploadFileCallCount++
+	m.uploadFileKeys = append(m.uploadFileKeys, key)
+	m.uploadFileContentTypes = append(m.uploadFileContentTypes, contentType)
 	return m.uploadFileErr
 }
 
@@ -107,6 +114,33 @@ func authenticatedRequest(t *testing.T, method, target string, body []byte) *htt
 
 func newAuthMiddleware() func(http.Handler) http.Handler {
 	return auth.NewHandler(nil, testJWTSecret, false).Middleware
+}
+
+// authenticatedMultipartRequest builds an authenticated POST with a single
+// "file" form field, mirroring authenticatedRequest for multipart uploads.
+func authenticatedMultipartRequest(t *testing.T, target, fieldName, fileName string, content []byte) *http.Request {
+	t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile(fieldName, fileName)
+	if err != nil {
+		t.Fatalf("failed to create form file: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("failed to write form file content: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("failed to close multipart writer: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, target, &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	token, err := auth.GenerateAccessToken(testJWTSecret, testUserID)
+	if err != nil {
+		t.Fatalf("failed to generate access token: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	return req
 }
 
 func parseErrorResponse(t *testing.T, body []byte) string {
@@ -6825,6 +6859,247 @@ func TestLimits_ViewerExcludedFromMemberCount(t *testing.T) {
 	}
 	if resp.MaxOrgMembers != 3 {
 		t.Errorf("expected maxOrgMembers 3 (free plan limit), got %d", resp.MaxOrgMembers)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// --- UploadTranscript Tests ---
+
+func TestUploadTranscript_NotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-999"
+
+	// Mock SELECT returns no rows
+	mock.ExpectQuery(`SELECT user_id, share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/transcript", handler.UploadTranscript)
+
+	rec := httptest.NewRecorder()
+	req := authenticatedRequest(t, http.MethodPost, "/api/videos/"+videoID+"/transcript", nil)
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestUploadTranscript_HappyPath(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-123"
+	shareToken := "tok"
+
+	mock.ExpectQuery(`SELECT user_id, share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "share_token"}).AddRow(testUserID, shareToken))
+
+	segmentsJSON, err := json.Marshal([]TranscriptSegment{{Start: 0, End: 1, Text: "hi", Speaker: "Alice"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mock.ExpectExec(`UPDATE videos SET transcript_key = \$1, transcript_json = \$2, transcript_status = 'ready', transcript_started_at = NULL, updated_at = now\(\) WHERE id = \$3 AND user_id = \$4 AND organization_id IS NULL`).
+		WithArgs("recordings/"+testUserID+"/"+shareToken+".vtt", string(segmentsJSON), videoID, testUserID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	vtt := "WEBVTT\n\n1\n00:00:00.000 --> 00:00:01.000\nAlice: hi\n\n"
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/transcript", handler.UploadTranscript)
+
+	rec := httptest.NewRecorder()
+	req := authenticatedMultipartRequest(t, "/api/videos/"+videoID+"/transcript", "file", "transcript.vtt", []byte(vtt))
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Segments []TranscriptSegment `json:"segments"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(resp.Segments) != 1 {
+		t.Fatalf("expected 1 segment, got %d", len(resp.Segments))
+	}
+	if resp.Segments[0].Speaker != "Alice" {
+		t.Errorf("expected speaker %q, got %q", "Alice", resp.Segments[0].Speaker)
+	}
+	if resp.Segments[0].Text != "hi" {
+		t.Errorf("expected text %q, got %q", "hi", resp.Segments[0].Text)
+	}
+
+	if storage.uploadFileCallCount != 1 {
+		t.Errorf("expected storage.UploadFile called once, got %d", storage.uploadFileCallCount)
+	}
+	if len(storage.uploadFileKeys) == 1 && storage.uploadFileKeys[0] != "recordings/"+testUserID+"/"+shareToken+".vtt" {
+		t.Errorf("unexpected upload key: %s", storage.uploadFileKeys[0])
+	}
+	if len(storage.uploadFileContentTypes) == 1 && storage.uploadFileContentTypes[0] != "text/vtt" {
+		t.Errorf("unexpected content type: %s", storage.uploadFileContentTypes[0])
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestUploadTranscript_RejectsNonVTT(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-124"
+	shareToken := "tok2"
+
+	mock.ExpectQuery(`SELECT user_id, share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "share_token"}).AddRow(testUserID, shareToken))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/transcript", handler.UploadTranscript)
+
+	rec := httptest.NewRecorder()
+	req := authenticatedMultipartRequest(t, "/api/videos/"+videoID+"/transcript", "file", "transcript.txt", []byte("not a vtt"))
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	if storage.uploadFileCallCount != 0 {
+		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadFileCallCount)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestUploadTranscript_RejectsOversized(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-125"
+	shareToken := "tok3"
+
+	mock.ExpectQuery(`SELECT user_id, share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "share_token"}).AddRow(testUserID, shareToken))
+
+	// Syntactically-plausible VTT, padded past the size limit with more cues:
+	// the rejection must be attributable to SIZE, not to invalid-VTT.
+	var vtt strings.Builder
+	vtt.WriteString("WEBVTT\n\n")
+	for vtt.Len() <= MaxTranscriptUploadBytes {
+		vtt.WriteString("00:00:00.000 --> 00:00:01.000\nHello\n\n")
+	}
+	oversized := []byte(vtt.String())
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/transcript", handler.UploadTranscript)
+
+	rec := httptest.NewRecorder()
+	req := authenticatedMultipartRequest(t, "/api/videos/"+videoID+"/transcript", "file", "transcript.vtt", oversized)
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "transcript file too large") {
+		t.Fatalf("expected size-specific error message, got: %s", rec.Body.String())
+	}
+
+	if storage.uploadFileCallCount != 0 {
+		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadFileCallCount)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestUploadTranscript_RejectsOversized_OverRouteCeiling(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-126"
+	shareToken := "tok4"
+
+	mock.ExpectQuery(`SELECT user_id, share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "share_token"}).AddRow(testUserID, shareToken))
+
+	// A body large enough to exceed the handler's own MaxBytesReader ceiling
+	// (MaxTranscriptUploadBytes+1024), not just the post-read size check.
+	// FormFile itself must fail in this case; the handler must still report
+	// the size-specific error, not "missing transcript file".
+	var vtt strings.Builder
+	vtt.WriteString("WEBVTT\n\n")
+	for vtt.Len() <= MaxTranscriptUploadBytes+4096 {
+		vtt.WriteString("00:00:00.000 --> 00:00:01.000\nHello\n\n")
+	}
+	oversized := []byte(vtt.String())
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/transcript", handler.UploadTranscript)
+
+	rec := httptest.NewRecorder()
+	req := authenticatedMultipartRequest(t, "/api/videos/"+videoID+"/transcript", "file", "transcript.vtt", oversized)
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "transcript file too large") {
+		t.Fatalf("expected size-specific error message, got: %s", rec.Body.String())
+	}
+
+	if storage.uploadFileCallCount != 0 {
+		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadFileCallCount)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

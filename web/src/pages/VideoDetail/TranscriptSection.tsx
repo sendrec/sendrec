@@ -1,18 +1,13 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { apiFetch } from "../../api/client";
 import { useToast } from "../../hooks/useToast";
 import { Toast } from "../../components/Toast";
 import { DocumentModal } from "../../components/DocumentModal";
 import { TRANSCRIPTION_LANGUAGES } from "../../constants/languages";
 import type { Video } from "../../types/video";
+import type { TranscriptSegment } from "../../types/transcript";
 import { LimitsResponse } from "../../types/limits";
 import { formatDuration } from "../../utils/format";
-
-interface TranscriptSegment {
-  start: number;
-  end: number;
-  text: string;
-}
 
 interface TranscriptSectionProps {
   video: Video;
@@ -23,6 +18,7 @@ interface TranscriptSectionProps {
   onRetranscribeLanguageChange: (language: string) => void;
   onVideoUpdate: (updater: (prev: Video | null) => Video | null) => void;
   onTranscriptClear: () => void;
+  onTranscriptSegmentsUpdate: (segments: TranscriptSegment[]) => void;
 }
 
 export function TranscriptSection({
@@ -34,10 +30,15 @@ export function TranscriptSection({
   onRetranscribeLanguageChange,
   onVideoUpdate,
   onTranscriptClear,
+  onTranscriptSegmentsUpdate,
 }: TranscriptSectionProps) {
   const toast = useToast();
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [documentContent, setDocumentContent] = useState<string | null>(null);
+  const [uploadingTranscript, setUploadingTranscript] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const currentVideoId = useRef(video.id);
+  currentVideoId.current = video.id;
 
   async function retranscribe() {
     const body =
@@ -53,6 +54,46 @@ export function TranscriptSection({
     );
     onTranscriptClear();
     toast.show("Transcription queued");
+  }
+
+  async function uploadTranscript(file: File) {
+    const uploadVideoId = video.id;
+    const formData = new FormData();
+    formData.append("file", file);
+    setUploadingTranscript(true);
+    try {
+      const data = await apiFetch<{ segments: TranscriptSegment[] }>(
+        `/api/videos/${uploadVideoId}/transcript`,
+        { method: "POST", body: formData },
+      );
+      // The user may have navigated to another video while the upload was in
+      // flight; only apply the result if this is still the shown video.
+      // The user may have navigated to another video while the upload was in
+      // flight; only apply the result if this is still the shown video.
+      if (currentVideoId.current !== uploadVideoId) return;
+      onVideoUpdate((prev) =>
+        prev ? { ...prev, transcriptStatus: "ready" } : prev,
+      );
+      onTranscriptSegmentsUpdate(data?.segments ?? []);
+      toast.show("Transcript uploaded");
+    } catch (err) {
+      if (currentVideoId.current !== uploadVideoId) return;
+      toast.show(
+        err instanceof Error ? err.message : "Failed to upload transcript",
+      );
+    } finally {
+      if (currentVideoId.current === uploadVideoId) {
+        setUploadingTranscript(false);
+      }
+    }
+  }
+
+  function handleUploadInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) {
+      void uploadTranscript(file);
+    }
   }
 
   async function summarize() {
@@ -128,6 +169,25 @@ export function TranscriptSection({
                         ? "Redo transcript"
                         : "Retry transcript"}
                   </button>
+                  <button
+                    onClick={() => uploadInputRef.current?.click()}
+                    disabled={uploadingTranscript}
+                    className="detail-btn"
+                    style={{
+                      opacity: uploadingTranscript ? 0.5 : undefined,
+                    }}
+                  >
+                    {uploadingTranscript ? "Uploading..." : "Upload transcript"}
+                  </button>
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept=".vtt,text/vtt"
+                    data-testid="transcript-upload-input"
+                    onChange={handleUploadInputChange}
+                    disabled={uploadingTranscript}
+                    style={{ display: "none" }}
+                  />
                 </>
               )}
           </div>
@@ -141,7 +201,14 @@ export function TranscriptSection({
                   <span className="transcript-segment-time">
                     {formatDuration(seg.start)}
                   </span>
-                  <span className="transcript-segment-text">{seg.text}</span>
+                  <span className="transcript-segment-text">
+                    {seg.speaker && (
+                      <span className="transcript-segment-speaker">
+                        {seg.speaker}
+                      </span>
+                    )}
+                    {seg.text}
+                  </span>
                 </div>
               ))}
             </div>

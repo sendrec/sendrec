@@ -14,9 +14,10 @@ import (
 )
 
 type TranscriptSegment struct {
-	Start float64 `json:"start"`
-	End   float64 `json:"end"`
-	Text  string  `json:"text"`
+	Start   float64 `json:"start"`
+	End     float64 `json:"end"`
+	Text    string  `json:"text"`
+	Speaker string  `json:"speaker,omitempty"`
 }
 
 func transcriptFileKey(userID, shareToken string) string {
@@ -92,6 +93,11 @@ func segmentsToVTT(segments []TranscriptSegment) string {
 		b.WriteString(" --> ")
 		b.WriteString(formatVTTTimestamp(seg.End))
 		b.WriteString("\n")
+		if seg.Speaker != "" {
+			b.WriteString("<v ")
+			b.WriteString(seg.Speaker)
+			b.WriteString(">")
+		}
 		b.WriteString(seg.Text)
 		b.WriteString("\n\n")
 	}
