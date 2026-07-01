@@ -399,7 +399,6 @@ func (s *Server) routes() {
 				r.Get("/{id}/analytics", s.videoHandler.Analytics)
 				r.Get("/{id}/analytics/export", s.videoHandler.AnalyticsExport)
 				r.Get("/{id}/branding", s.videoHandler.GetVideoBranding)
-				r.Get("/{id}/transcript", s.videoHandler.GetTranscript)
 
 				// Write routes (viewer blocked)
 				r.Group(func(r chi.Router) {
@@ -441,16 +440,22 @@ func (s *Server) routes() {
 			})
 		})
 
-		// Separate route group: transcript uploads need a larger body-size cap
-		// than the rest of /api/videos, so it can't share that group's
-		// maxBodySize(64KB) middleware.
+		// Separate mounted subrouter: GET and POST /api/videos/{id}/transcript
+		// live together here so neither is shadowed by the other (a Route()
+		// subtree mounted at a path that collides with a sibling route
+		// registered inside the /api/videos group wins the routing decision
+		// for ALL methods at that path, 405-ing the sibling). Mounting both
+		// verbs in one subrouter also lets the POST route use a larger
+		// body-size cap without the /api/videos group's 64KB maxBodySize
+		// double-wrapping it (chi's With() adds middleware on top of,
+		// not instead of, the enclosing group's middleware).
 		s.router.Route("/api/videos/{id}/transcript", func(r chi.Router) {
 			r.Use(videoLimiter.Middleware)
-			r.Use(maxBodySize(video.MaxTranscriptUploadBytes + 1024))
 			r.Use(s.authHandler.Middleware)
 			r.Use(organization.Middleware(s.db))
-			r.Use(organization.RequireWriter)
-			r.Post("/", s.videoHandler.UploadTranscript)
+			r.Get("/", s.videoHandler.GetTranscript)
+			r.With(maxBodySize(video.MaxTranscriptUploadBytes+1024), organization.RequireWriter).
+				Post("/", s.videoHandler.UploadTranscript)
 		})
 
 		s.router.Route("/api/analytics", func(r chi.Router) {

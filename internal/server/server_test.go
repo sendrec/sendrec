@@ -14,6 +14,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/server"
@@ -358,6 +359,65 @@ func TestVideoListRouteRequiresAuth(t *testing.T) {
 	}
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401 for unauthenticated video list, got %d", rec.Code)
+	}
+}
+
+func TestTranscriptRoutesDoNotShadow(t *testing.T) {
+	srv, mock := newServerWithDB(t)
+
+	token, err := auth.GenerateAccessToken("test-secret", "user-1")
+	if err != nil {
+		t.Fatalf("failed to generate access token: %v", err)
+	}
+
+	// GET must reach GetTranscript, not be shadowed by a separate Route
+	// subtree registered for POST under the same path.
+	mock.ExpectQuery(`SELECT transcript_status, transcript_json FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status != 'deleted'`).
+		WithArgs("video-1", "user-1").
+		WillReturnError(pgx.ErrNoRows)
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/videos/video-1/transcript", nil)
+	getReq.Header.Set("Authorization", "Bearer "+token)
+	getRec := httptest.NewRecorder()
+	srv.ServeHTTP(getRec, getReq)
+
+	if getRec.Code == http.StatusMethodNotAllowed {
+		t.Fatalf("GET /api/videos/{id}/transcript returned 405: shadowed by the POST-only route subtree")
+	}
+	if getRec.Code == http.StatusNotFound && strings.Contains(getRec.Body.String(), "404 page not found") {
+		t.Fatalf("GET /api/videos/{id}/transcript did not route to a handler at all: %d %s", getRec.Code, getRec.Body.String())
+	}
+
+	// POST must still reach UploadTranscript.
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile("file", "transcript.vtt")
+	if err != nil {
+		t.Fatalf("failed to create form file: %v", err)
+	}
+	if _, err := part.Write([]byte("not a vtt")); err != nil {
+		t.Fatalf("failed to write form file content: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("failed to close multipart writer: %v", err)
+	}
+
+	mock.ExpectQuery(`SELECT user_id, share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs("video-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "share_token"}).AddRow("user-1", "tok"))
+
+	postReq := httptest.NewRequest(http.MethodPost, "/api/videos/video-1/transcript", &buf)
+	postReq.Header.Set("Content-Type", mw.FormDataContentType())
+	postReq.Header.Set("Authorization", "Bearer "+token)
+	postRec := httptest.NewRecorder()
+	srv.ServeHTTP(postRec, postReq)
+
+	if postRec.Code != http.StatusBadRequest || !strings.Contains(postRec.Body.String(), "invalid WebVTT file") {
+		t.Fatalf("expected POST to reach UploadTranscript (400 invalid WebVTT file), got %d %s", postRec.Code, postRec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
 }
 
