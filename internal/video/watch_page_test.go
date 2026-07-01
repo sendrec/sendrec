@@ -195,6 +195,7 @@ func TestWatchPage_Success_RendersVideoPlayer(t *testing.T) {
 		"cue listener":    "'cuechange'",
 		"hidden track":    "subTrack.mode = 'hidden'",
 		"object-fit":      "object-fit: contain",
+		"cue tag strip":   "function cueParts(",
 	}
 	for name, want := range checks {
 		if !strings.Contains(body, want) {
