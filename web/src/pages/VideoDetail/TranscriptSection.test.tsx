@@ -28,7 +28,10 @@ function createVttFile(name = "captions.vtt"): File {
   return new File([content], name, { type: "text/vtt" });
 }
 
-function renderSection(overrides: Partial<Video> = {}) {
+function renderSection(
+  overrides: Partial<Video> = {},
+  isViewer = false
+) {
   return render(
     <TranscriptSection
       video={makeVideo(overrides)}
@@ -36,7 +39,7 @@ function renderSection(overrides: Partial<Video> = {}) {
         transcriptionEnabled: true,
         aiEnabled: true,
       } as any}
-      isViewer={false}
+      isViewer={isViewer}
       transcriptSegments={[]}
       retranscribeLanguage="auto"
       onRetranscribeLanguageChange={() => {}}
@@ -99,5 +102,52 @@ describe("TranscriptSection upload", () => {
     await waitFor(() => {
       expect(screen.getByText(/invalid WebVTT file/)).toBeInTheDocument();
     });
+  });
+
+  it("disables the upload button and shows uploading state during the in-flight POST", async () => {
+    const user = userEvent.setup();
+    let resolveUpload!: (value: {
+      segments: { start: number; end: number; text: string }[];
+    }) => void;
+    mockApiFetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveUpload = resolve;
+      })
+    );
+
+    renderSection();
+
+    const file = createVttFile();
+    const input = screen.getByTestId("transcript-upload-input");
+    await user.upload(input, file);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /uploading/i })
+      ).toBeDisabled();
+    });
+    expect(input).toBeDisabled();
+
+    resolveUpload({ segments: [] });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /upload transcript/i })
+      ).not.toBeDisabled();
+    });
+  });
+
+  it("hides the upload transcript button for viewers", () => {
+    renderSection({}, true);
+    expect(
+      screen.queryByRole("button", { name: /upload transcript/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the upload transcript button while transcription is processing", () => {
+    renderSection({ transcriptStatus: "processing" });
+    expect(
+      screen.queryByRole("button", { name: /upload transcript/i })
+    ).not.toBeInTheDocument();
   });
 });

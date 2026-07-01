@@ -93,6 +93,26 @@ describe("apiFetch", () => {
     expect(headers.get("Content-Type")).toBe("application/json");
   });
 
+  it("does not set Content-Type header when body is FormData", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+    });
+
+    const formData = new FormData();
+    formData.append("file", new Blob(["content"]), "file.vtt");
+
+    await apiFetch("/api/test", {
+      method: "POST",
+      body: formData,
+    });
+
+    const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const headers = call[1].headers as Headers;
+    expect(headers.get("Content-Type")).toBeNull();
+  });
+
   it("sets Authorization header when access token exists", async () => {
     setAccessToken("test-token");
 

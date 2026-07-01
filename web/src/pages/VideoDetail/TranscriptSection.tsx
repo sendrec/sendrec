@@ -40,6 +40,7 @@ export function TranscriptSection({
   const toast = useToast();
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [documentContent, setDocumentContent] = useState<string | null>(null);
+  const [uploadingTranscript, setUploadingTranscript] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   async function retranscribe() {
@@ -61,6 +62,7 @@ export function TranscriptSection({
   async function uploadTranscript(file: File) {
     const formData = new FormData();
     formData.append("file", file);
+    setUploadingTranscript(true);
     try {
       const data = await apiFetch<{ segments: TranscriptSegment[] }>(
         `/api/videos/${video.id}/transcript`,
@@ -75,6 +77,8 @@ export function TranscriptSection({
       toast.show(
         err instanceof Error ? err.message : "Failed to upload transcript",
       );
+    } finally {
+      setUploadingTranscript(false);
     }
   }
 
@@ -161,9 +165,13 @@ export function TranscriptSection({
                   </button>
                   <button
                     onClick={() => uploadInputRef.current?.click()}
+                    disabled={uploadingTranscript}
                     className="detail-btn"
+                    style={{
+                      opacity: uploadingTranscript ? 0.5 : undefined,
+                    }}
                   >
-                    Upload transcript
+                    {uploadingTranscript ? "Uploading..." : "Upload transcript"}
                   </button>
                   <input
                     ref={uploadInputRef}
@@ -171,6 +179,7 @@ export function TranscriptSection({
                     accept=".vtt,text/vtt"
                     data-testid="transcript-upload-input"
                     onChange={handleUploadInputChange}
+                    disabled={uploadingTranscript}
                     style={{ display: "none" }}
                   />
                 </>
