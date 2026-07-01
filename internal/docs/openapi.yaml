@@ -734,6 +734,9 @@ components:
           format: double
         text:
           type: string
+        speaker:
+          type: string
+          description: Speaker name, if present in the source transcript
 
     AnalyticsSummary:
       type: object
