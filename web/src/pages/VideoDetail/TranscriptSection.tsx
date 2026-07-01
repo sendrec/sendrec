@@ -5,14 +5,9 @@ import { Toast } from "../../components/Toast";
 import { DocumentModal } from "../../components/DocumentModal";
 import { TRANSCRIPTION_LANGUAGES } from "../../constants/languages";
 import type { Video } from "../../types/video";
+import type { TranscriptSegment } from "../../types/transcript";
 import { LimitsResponse } from "../../types/limits";
 import { formatDuration } from "../../utils/format";
-
-interface TranscriptSegment {
-  start: number;
-  end: number;
-  text: string;
-}
 
 interface TranscriptSectionProps {
   video: Video;
@@ -206,7 +201,14 @@ export function TranscriptSection({
                   <span className="transcript-segment-time">
                     {formatDuration(seg.start)}
                   </span>
-                  <span className="transcript-segment-text">{seg.text}</span>
+                  <span className="transcript-segment-text">
+                    {seg.speaker && (
+                      <span className="transcript-segment-speaker">
+                        {seg.speaker}
+                      </span>
+                    )}
+                    {seg.text}
+                  </span>
                 </div>
               ))}
             </div>

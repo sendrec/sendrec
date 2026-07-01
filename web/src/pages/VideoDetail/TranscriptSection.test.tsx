@@ -62,6 +62,28 @@ describe("TranscriptSection upload", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders the speaker name alongside the segment text", () => {
+    render(
+      <TranscriptSection
+        video={makeVideo({ transcriptStatus: "ready" })}
+        limits={{ transcriptionEnabled: true, aiEnabled: true } as any}
+        isViewer={false}
+        transcriptSegments={[
+          { start: 0, end: 2, text: "Hello everyone", speaker: "Alice Johnson" },
+          { start: 2, end: 4, text: "No speaker here" },
+        ]}
+        retranscribeLanguage="auto"
+        onRetranscribeLanguageChange={() => {}}
+        onVideoUpdate={() => {}}
+        onTranscriptClear={() => {}}
+        onTranscriptSegmentsUpdate={() => {}}
+      />
+    );
+    expect(screen.getByText("Alice Johnson")).toBeInTheDocument();
+    expect(screen.getByText("Hello everyone")).toBeInTheDocument();
+    expect(screen.getByText("No speaker here")).toBeInTheDocument();
+  });
+
   it("uploads a selected .vtt file via multipart POST", async () => {
     const user = userEvent.setup();
     mockApiFetch.mockResolvedValueOnce({

@@ -10,6 +10,7 @@ import { SilenceRemovalModal } from "../../components/SilenceRemovalModal";
 import { Toast } from "../../components/Toast";
 import { ConfirmDialog, ConfirmDialogState } from "../../components/ConfirmDialog";
 import type { Video, Folder, Tag } from "../../types/video";
+import type { TranscriptSegment } from "../../types/transcript";
 import { LimitsResponse } from "../../types/limits";
 import { formatDuration, formatDate, expiryLabel } from "../../utils/format";
 import { copyToClipboard } from "../../utils/clipboard";
@@ -21,12 +22,6 @@ interface PlaylistInfo {
   id: string;
   title: string;
   videoCount: number;
-}
-
-interface TranscriptSegment {
-  start: number;
-  end: number;
-  text: string;
 }
 
 interface TranscriptResponse {
