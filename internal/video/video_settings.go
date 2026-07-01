@@ -3,6 +3,7 @@ package video
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -390,6 +391,11 @@ func (h *Handler) UploadTranscript(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, MaxTranscriptUploadBytes+1024)
 	file, _, err := r.FormFile("file")
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			httputil.WriteError(w, http.StatusRequestEntityTooLarge, "transcript file too large")
+			return
+		}
 		httputil.WriteError(w, http.StatusBadRequest, "missing transcript file")
 		return
 	}
@@ -401,7 +407,7 @@ func (h *Handler) UploadTranscript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(raw) > MaxTranscriptUploadBytes {
-		httputil.WriteError(w, http.StatusBadRequest, "transcript file too large")
+		httputil.WriteError(w, http.StatusRequestEntityTooLarge, "transcript file too large")
 		return
 	}
 

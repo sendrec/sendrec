@@ -7023,10 +7023,14 @@ func TestUploadTranscript_RejectsOversized(t *testing.T) {
 		WithArgs(videoID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"user_id", "share_token"}).AddRow(testUserID, shareToken))
 
-	oversized := make([]byte, MaxTranscriptUploadBytes+1)
-	for i := range oversized {
-		oversized[i] = 'a'
+	// Syntactically-plausible VTT, padded past the size limit with more cues:
+	// the rejection must be attributable to SIZE, not to invalid-VTT.
+	var vtt strings.Builder
+	vtt.WriteString("WEBVTT\n\n")
+	for vtt.Len() <= MaxTranscriptUploadBytes {
+		vtt.WriteString("00:00:00.000 --> 00:00:01.000\nHello\n\n")
 	}
+	oversized := []byte(vtt.String())
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Post("/api/videos/{id}/transcript", handler.UploadTranscript)
@@ -7036,8 +7040,62 @@ func TestUploadTranscript_RejectsOversized(t *testing.T) {
 
 	r.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "transcript file too large") {
+		t.Fatalf("expected size-specific error message, got: %s", rec.Body.String())
+	}
+
+	if storage.uploadFileCallCount != 0 {
+		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadFileCallCount)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestUploadTranscript_RejectsOversized_OverRouteCeiling(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-126"
+	shareToken := "tok4"
+
+	mock.ExpectQuery(`SELECT user_id, share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "share_token"}).AddRow(testUserID, shareToken))
+
+	// A body large enough to exceed the handler's own MaxBytesReader ceiling
+	// (MaxTranscriptUploadBytes+1024), not just the post-read size check.
+	// FormFile itself must fail in this case; the handler must still report
+	// the size-specific error, not "missing transcript file".
+	var vtt strings.Builder
+	vtt.WriteString("WEBVTT\n\n")
+	for vtt.Len() <= MaxTranscriptUploadBytes+4096 {
+		vtt.WriteString("00:00:00.000 --> 00:00:01.000\nHello\n\n")
+	}
+	oversized := []byte(vtt.String())
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/transcript", handler.UploadTranscript)
+
+	rec := httptest.NewRecorder()
+	req := authenticatedMultipartRequest(t, "/api/videos/"+videoID+"/transcript", "file", "transcript.vtt", oversized)
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "transcript file too large") {
+		t.Fatalf("expected size-specific error message, got: %s", rec.Body.String())
 	}
 
 	if storage.uploadFileCallCount != 0 {
