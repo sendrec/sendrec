@@ -13,7 +13,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/mssola/useragent v1.0.0
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/pashagolub/pgxmock/v4 v4.9.0
