@@ -414,7 +414,6 @@ func (s *Server) routes() {
 					r.Post("/{id}/extend", s.videoHandler.Extend)
 					r.Post("/{id}/trim", s.videoHandler.Trim)
 					r.Post("/{id}/retranscribe", s.videoHandler.Retranscribe)
-					r.Post("/{id}/transcript", s.videoHandler.UploadTranscript)
 					r.Put("/{id}/password", s.videoHandler.SetPassword)
 					r.Put("/{id}/comment-mode", s.videoHandler.SetCommentMode)
 					r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
@@ -440,6 +439,18 @@ func (s *Server) routes() {
 					}
 				})
 			})
+		})
+
+		// Separate route group: transcript uploads need a larger body-size cap
+		// than the rest of /api/videos, so it can't share that group's
+		// maxBodySize(64KB) middleware.
+		s.router.Route("/api/videos/{id}/transcript", func(r chi.Router) {
+			r.Use(videoLimiter.Middleware)
+			r.Use(maxBodySize(video.MaxTranscriptUploadBytes + 1024))
+			r.Use(s.authHandler.Middleware)
+			r.Use(organization.Middleware(s.db))
+			r.Use(organization.RequireWriter)
+			r.Post("/", s.videoHandler.UploadTranscript)
 		})
 
 		s.router.Route("/api/analytics", func(r chi.Router) {

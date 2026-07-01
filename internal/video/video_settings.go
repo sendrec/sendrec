@@ -373,7 +373,7 @@ func (h *Handler) DismissTitle(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-const maxTranscriptUploadBytes = 5 << 20 // 5 MB
+const MaxTranscriptUploadBytes = 5 << 20 // 5 MB
 
 func (h *Handler) UploadTranscript(w http.ResponseWriter, r *http.Request) {
 	videoID := chi.URLParam(r, "id")
@@ -387,7 +387,7 @@ func (h *Handler) UploadTranscript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxTranscriptUploadBytes+1024)
+	r.Body = http.MaxBytesReader(w, r.Body, MaxTranscriptUploadBytes+1024)
 	file, _, err := r.FormFile("file")
 	if err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "missing transcript file")
@@ -395,12 +395,12 @@ func (h *Handler) UploadTranscript(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = file.Close() }()
 
-	raw, err := io.ReadAll(io.LimitReader(file, maxTranscriptUploadBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(file, MaxTranscriptUploadBytes+1))
 	if err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "could not read file")
 		return
 	}
-	if len(raw) > maxTranscriptUploadBytes {
+	if len(raw) > MaxTranscriptUploadBytes {
 		httputil.WriteError(w, http.StatusBadRequest, "transcript file too large")
 		return
 	}

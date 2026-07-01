@@ -1,10 +1,12 @@
 package server_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pashagolub/pgxmock/v4"
+	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/server"
 )
 
@@ -355,6 +358,58 @@ func TestVideoListRouteRequiresAuth(t *testing.T) {
 	}
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401 for unauthenticated video list, got %d", rec.Code)
+	}
+}
+
+func TestUploadTranscriptRouteAcceptsBodyOverGenericLimit(t *testing.T) {
+	srv, mock := newServerWithDB(t)
+
+	// The /api/videos group caps bodies at 64KB for every other route, but
+	// transcript uploads are allowed up to 5MB. A body comfortably over 64KB
+	// (well under 5MB) must reach the handler, not fail at the transport
+	// layer with "request body too large".
+	body := strings.Repeat("a", 200*1024)
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile("file", "transcript.vtt")
+	if err != nil {
+		t.Fatalf("failed to create form file: %v", err)
+	}
+	if _, err := part.Write([]byte(body)); err != nil {
+		t.Fatalf("failed to write form file content: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("failed to close multipart writer: %v", err)
+	}
+
+	token, err := auth.GenerateAccessToken("test-secret", "user-1")
+	if err != nil {
+		t.Fatalf("failed to generate access token: %v", err)
+	}
+
+	mock.ExpectQuery(`SELECT user_id, share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs("video-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"user_id", "share_token"}).AddRow("user-1", "tok"))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/videos/video-1/transcript", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if strings.Contains(rec.Body.String(), "request body too large") {
+		t.Fatalf("body was rejected by the generic 64KB limit instead of reaching the handler: %d %s", rec.Code, rec.Body.String())
+	}
+	// Body isn't valid WebVTT, so the handler should get past the size
+	// check and reject it with 400 "invalid WebVTT file", not fail earlier
+	// at the transport layer with a body-too-large error.
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "invalid WebVTT file") {
+		t.Fatalf("expected 400 invalid WebVTT file (proving the body was fully read), got %d %s", rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("expected handler to reach ownership query, proving body was not truncated: %v", err)
 	}
 }
 
