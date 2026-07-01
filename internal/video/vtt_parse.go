@@ -146,3 +146,20 @@ func extractSpeaker(text string) (speaker, cleaned string) {
 	}
 	return "", text
 }
+
+// mergeSegments joins consecutive cues from the same speaker when the gap
+// between them is at most maxMergeGapSeconds, extending the end time and
+// concatenating text with a single space.
+func mergeSegments(in []TranscriptSegment) []TranscriptSegment {
+	const maxMergeGapSeconds = 2.0
+	var out []TranscriptSegment
+	for _, s := range in {
+		if n := len(out); n > 0 && out[n-1].Speaker == s.Speaker && s.Start-out[n-1].End <= maxMergeGapSeconds {
+			out[n-1].End = s.End
+			out[n-1].Text += " " + s.Text
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}

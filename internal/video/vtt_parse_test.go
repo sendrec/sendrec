@@ -104,3 +104,30 @@ func TestParseVTT_Errors(t *testing.T) {
 		t.Error("want error for zero cues")
 	}
 }
+
+func TestMergeSegments(t *testing.T) {
+	in := []TranscriptSegment{
+		{Start: 0, End: 1, Text: "Um", Speaker: "A"},
+		{Start: 1.5, End: 2, Text: "yeah", Speaker: "A"},   // gap 0.5s, same speaker -> merge
+		{Start: 2, End: 3, Text: "ok", Speaker: "B"},       // diff speaker -> new
+		{Start: 10, End: 11, Text: "later", Speaker: "B"},  // gap 7s -> new
+	}
+	got := mergeSegments(in)
+	if len(got) != 3 {
+		t.Fatalf("want 3 merged, got %d: %+v", len(got), got)
+	}
+	if got[0].Text != "Um yeah" || got[0].End != 2 {
+		t.Errorf("first merge wrong: %+v", got[0])
+	}
+}
+
+func TestMergeSegments_EmptySpeakerMerges(t *testing.T) {
+	in := []TranscriptSegment{
+		{Start: 0, End: 1, Text: "a"},
+		{Start: 1, End: 2, Text: "b"},
+	}
+	got := mergeSegments(in)
+	if len(got) != 1 || got[0].Text != "a b" {
+		t.Fatalf("got %+v", got)
+	}
+}
