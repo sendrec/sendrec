@@ -67,8 +67,12 @@ func parseVTT(raw []byte) ([]TranscriptSegment, error) {
 		speaker, cleaned := extractSpeaker(payload)
 		cleaned = vttSpanTagRe.ReplaceAllString(cleaned, "")
 		cleaned = html.UnescapeString(cleaned)
+		cleaned = strings.TrimSpace(cleaned)
+		if cleaned == "" {
+			continue
+		}
 		segments = append(segments, TranscriptSegment{
-			Start: start, End: end, Text: strings.TrimSpace(cleaned), Speaker: speaker,
+			Start: start, End: end, Text: cleaned, Speaker: speaker,
 		})
 	}
 

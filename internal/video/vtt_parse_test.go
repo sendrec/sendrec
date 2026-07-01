@@ -96,6 +96,19 @@ func TestParseVTT_SkipsNoteAndStyle(t *testing.T) {
 	}
 }
 
+func TestParseVTT_SkipsTagOnlyPayload(t *testing.T) {
+	raw := "WEBVTT\n\n" +
+		"00:00:00.000 --> 00:00:01.000\n<c></c>\n\n" +
+		"00:00:01.000 --> 00:00:02.000\nHello\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 1 || segs[0].Text != "Hello" {
+		t.Fatalf("want 1 segment with text %q, got %+v", "Hello", segs)
+	}
+}
+
 func TestParseVTT_Errors(t *testing.T) {
 	if _, err := parseVTT([]byte("not a vtt file")); err == nil {
 		t.Error("want error for missing signature")
