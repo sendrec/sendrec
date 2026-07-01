@@ -2798,6 +2798,70 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/videos/{id}/transcript:
+    post:
+      tags: [Videos]
+      summary: Upload a VTT transcript
+      description: Upload a pre-made WebVTT transcript (Teams/Zoom) to replace the existing one. Rate limited to 2 requests per second with a burst of 10.
+      operationId: uploadTranscript
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: WebVTT file (max 5 MB)
+              required:
+                - file
+      responses:
+        "200":
+          description: Transcript uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  segments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TranscriptSegment"
+        "400":
+          description: Invalid file or request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Video not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/videos/{id}/password:
     put:
       tags: [Videos]
