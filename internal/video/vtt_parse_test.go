@@ -144,3 +144,20 @@ func TestMergeSegments_EmptySpeakerMerges(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestMergeSegments_OverlappingCueDoesNotShrinkEnd(t *testing.T) {
+	in := []TranscriptSegment{
+		{Start: 0, End: 5, Text: "long one", Speaker: "A"},
+		{Start: 1, End: 2, Text: "crosstalk", Speaker: "A"}, // overlaps, ends before prior End -> must not shrink
+	}
+	got := mergeSegments(in)
+	if len(got) != 1 {
+		t.Fatalf("want 1 merged, got %d: %+v", len(got), got)
+	}
+	if got[0].End != 5 {
+		t.Errorf("merged End regressed: got %+v", got[0])
+	}
+	if got[0].Text != "long one crosstalk" {
+		t.Errorf("merged Text wrong: %+v", got[0])
+	}
+}

@@ -159,7 +159,9 @@ func mergeSegments(in []TranscriptSegment) []TranscriptSegment {
 	var out []TranscriptSegment
 	for _, s := range in {
 		if n := len(out); n > 0 && out[n-1].Speaker == s.Speaker && s.Start-out[n-1].End <= maxMergeGapSeconds {
-			out[n-1].End = s.End
+			if s.End > out[n-1].End {
+				out[n-1].End = s.End
+			}
 			out[n-1].Text += " " + s.Text
 			continue
 		}
