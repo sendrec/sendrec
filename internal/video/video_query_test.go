@@ -153,10 +153,14 @@ func TestList_SearchBySpeaker(t *testing.T) {
 	createdAt := time.Date(2026, 2, 5, 10, 30, 0, 0, time.UTC)
 	shareExpiresAt := createdAt.Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT v.id, v.title`).
+	// Title deliberately does NOT contain the search term "Alice": this row
+	// can only come back if the WHERE clause actually matches on
+	// seg->>'speaker', not on title or seg->>'text'. The query regexp also
+	// pins the speaker predicate itself so the test fails if it's removed.
+	mock.ExpectQuery(`SELECT v\.id, v\.title.*seg->>'speaker' ILIKE \$2`).
 		WithArgs(testUserID, "%Alice%", 50, 0).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "title", "status", "duration", "share_token", "created_at", "share_expires_at", "view_count", "unique_view_count", "thumbnail_key", "share_password", "comment_mode", "comment_count", "transcript_status", "view_notification", "download_enabled", "cta_text", "cta_url", "email_gate_enabled", "summary_status", "document_status", "suggested_title", "folder_id", "transcription_language", "noise_reduction", "pinned", "tags_json", "playlists_json"}).
-			AddRow("video-1", "Interview with Alice", "ready", 300, "tok123", createdAt, &shareExpiresAt, int64(5), int64(3), (*string)(nil), (*string)(nil), "disabled", int64(0), "ready", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), false, false, "[]", "[]"),
+			AddRow("video-1", "Q3 Planning", "ready", 300, "tok123", createdAt, &shareExpiresAt, int64(5), int64(3), (*string)(nil), (*string)(nil), "disabled", int64(0), "ready", (*string)(nil), true, (*string)(nil), (*string)(nil), false, "none", "none", (*string)(nil), (*string)(nil), (*string)(nil), false, false, "[]", "[]"),
 		)
 
 	r := chi.NewRouter()
