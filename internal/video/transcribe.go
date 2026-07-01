@@ -93,6 +93,11 @@ func segmentsToVTT(segments []TranscriptSegment) string {
 		b.WriteString(" --> ")
 		b.WriteString(formatVTTTimestamp(seg.End))
 		b.WriteString("\n")
+		if seg.Speaker != "" {
+			b.WriteString("<v ")
+			b.WriteString(seg.Speaker)
+			b.WriteString(">")
+		}
 		b.WriteString(seg.Text)
 		b.WriteString("\n\n")
 	}

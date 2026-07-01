@@ -35,3 +35,16 @@ func TestSegmentsToVTT(t *testing.T) {
 		t.Errorf("segmentsToVTT mismatch:\ngot:  %q\nwant: %q", got, want)
 	}
 }
+
+func TestSegmentsToVTT_WithSpeaker(t *testing.T) {
+	got := segmentsToVTT([]TranscriptSegment{
+		{Start: 0, End: 1.5, Text: "Hello world", Speaker: "Alice"},
+		{Start: 1.5, End: 3, Text: "No speaker here"},
+	})
+	want := "WEBVTT\n\n" +
+		"00:00:00.000 --> 00:00:01.500\n<v Alice>Hello world\n\n" +
+		"00:00:01.500 --> 00:00:03.000\nNo speaker here\n\n"
+	if got != want {
+		t.Errorf("got:\n%q\nwant:\n%q", got, want)
+	}
+}
