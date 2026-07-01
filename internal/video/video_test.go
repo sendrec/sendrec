@@ -6831,3 +6831,38 @@ func TestLimits_ViewerExcludedFromMemberCount(t *testing.T) {
 		t.Errorf("unmet pgxmock expectations: %v", err)
 	}
 }
+
+// --- UploadTranscript Tests ---
+
+func TestUploadTranscript_NotFound(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	videoID := "video-999"
+
+	// Mock SELECT returns no rows
+	mock.ExpectQuery(`SELECT user_id, share_token FROM videos WHERE id = \$1 AND user_id = \$2 AND organization_id IS NULL AND status = 'ready'`).
+		WithArgs(videoID, testUserID).
+		WillReturnError(pgx.ErrNoRows)
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/videos/{id}/transcript", handler.UploadTranscript)
+
+	rec := httptest.NewRecorder()
+	req := authenticatedRequest(t, http.MethodPost, "/api/videos/"+videoID+"/transcript", nil)
+
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}

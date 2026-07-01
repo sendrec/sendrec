@@ -69,6 +69,7 @@ func TestSpecContainsAllEndpoints(t *testing.T) {
 		"/api/videos/{id}/download",
 		"/api/videos/{id}/trim",
 		"/api/videos/{id}/retranscribe",
+		"/api/videos/{id}/transcript",
 		"/api/videos/{id}/password",
 		"/api/videos/{id}/comment-mode",
 		"/api/videos/{id}/comments",

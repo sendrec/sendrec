@@ -414,6 +414,7 @@ func (s *Server) routes() {
 					r.Post("/{id}/extend", s.videoHandler.Extend)
 					r.Post("/{id}/trim", s.videoHandler.Trim)
 					r.Post("/{id}/retranscribe", s.videoHandler.Retranscribe)
+					r.Post("/{id}/transcript", s.videoHandler.UploadTranscript)
 					r.Put("/{id}/password", s.videoHandler.SetPassword)
 					r.Put("/{id}/comment-mode", s.videoHandler.SetCommentMode)
 					r.Delete("/{id}/comments/{commentId}", s.videoHandler.DeleteComment)
