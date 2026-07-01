@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { apiFetch } from "../../api/client";
 import { useToast } from "../../hooks/useToast";
 import { Toast } from "../../components/Toast";
@@ -23,6 +23,7 @@ interface TranscriptSectionProps {
   onRetranscribeLanguageChange: (language: string) => void;
   onVideoUpdate: (updater: (prev: Video | null) => Video | null) => void;
   onTranscriptClear: () => void;
+  onTranscriptSegmentsUpdate: (segments: TranscriptSegment[]) => void;
 }
 
 export function TranscriptSection({
@@ -34,10 +35,12 @@ export function TranscriptSection({
   onRetranscribeLanguageChange,
   onVideoUpdate,
   onTranscriptClear,
+  onTranscriptSegmentsUpdate,
 }: TranscriptSectionProps) {
   const toast = useToast();
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [documentContent, setDocumentContent] = useState<string | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   async function retranscribe() {
     const body =
@@ -53,6 +56,34 @@ export function TranscriptSection({
     );
     onTranscriptClear();
     toast.show("Transcription queued");
+  }
+
+  async function uploadTranscript(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const data = await apiFetch<{ segments: TranscriptSegment[] }>(
+        `/api/videos/${video.id}/transcript`,
+        { method: "POST", body: formData },
+      );
+      onVideoUpdate((prev) =>
+        prev ? { ...prev, transcriptStatus: "ready" } : prev,
+      );
+      onTranscriptSegmentsUpdate(data?.segments ?? []);
+      toast.show("Transcript uploaded");
+    } catch (err) {
+      toast.show(
+        err instanceof Error ? err.message : "Failed to upload transcript",
+      );
+    }
+  }
+
+  function handleUploadInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) {
+      void uploadTranscript(file);
+    }
   }
 
   async function summarize() {
@@ -128,6 +159,20 @@ export function TranscriptSection({
                         ? "Redo transcript"
                         : "Retry transcript"}
                   </button>
+                  <button
+                    onClick={() => uploadInputRef.current?.click()}
+                    className="detail-btn"
+                  >
+                    Upload transcript
+                  </button>
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept=".vtt,text/vtt"
+                    data-testid="transcript-upload-input"
+                    onChange={handleUploadInputChange}
+                    style={{ display: "none" }}
+                  />
                 </>
               )}
           </div>

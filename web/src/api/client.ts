@@ -43,7 +43,7 @@ async function apiFetch<T>(
   options: RequestInit = {}
 ): Promise<T | undefined> {
   const headers = new Headers(options.headers);
-  if (options.body) {
+  if (options.body && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 

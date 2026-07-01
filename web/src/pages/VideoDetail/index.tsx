@@ -789,6 +789,7 @@ export function VideoDetail() {
         onRetranscribeLanguageChange={setRetranscribeLanguage}
         onVideoUpdate={setVideo}
         onTranscriptClear={() => setTranscriptSegments([])}
+        onTranscriptSegmentsUpdate={setTranscriptSegments}
       />
 
       {/* Editing */}
