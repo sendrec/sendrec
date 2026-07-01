@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	vttTimingRe  = regexp.MustCompile(`^\s*(\d{2,}:)?([0-5]\d):([0-5]\d)\.(\d{3})\s*-->\s*(\d{2,}:)?([0-5]\d):([0-5]\d)\.(\d{3})`)
-	vttVoiceRe   = regexp.MustCompile(`^<v\s+([^>]+)>`)
-	vttSpanTagRe = regexp.MustCompile(`</?[a-zA-Z][^>]*>|<\d{2,}:[0-5]\d:[0-5]\d\.\d{3}>`)
+	vttVoiceRe         = regexp.MustCompile(`^<v\s+([^>]+)>`)
+	vttSpanTagRe       = regexp.MustCompile(`</?[a-zA-Z][^>]*>|<\d{2,}:[0-5]\d:[0-5]\d\.\d{3}>`)
+	leadingTimestampRe = regexp.MustCompile(`^\d{1,2}:\d{2}`)
 )
 
 // parseVTT parses a WebVTT file from Teams, Zoom, or a generic source into
@@ -50,7 +50,7 @@ func parseVTT(raw []byte) ([]TranscriptSegment, error) {
 		// A leading non-timing line is an opaque cue identifier (Teams GUID,
 		// Zoom integer). Discard it.
 		idx := 0
-		if !vttTimingRe.MatchString(lines[idx]) {
+		if _, _, ok := parseTimingLine(lines[idx]); !ok {
 			idx++
 		}
 		if idx >= len(lines) {
@@ -65,6 +65,7 @@ func parseVTT(raw []byte) ([]TranscriptSegment, error) {
 			continue
 		}
 		speaker, cleaned := extractSpeaker(payload)
+		speaker = sanitizeSpeaker(speaker)
 		cleaned = vttSpanTagRe.ReplaceAllString(cleaned, "")
 		cleaned = html.UnescapeString(cleaned)
 		cleaned = strings.TrimSpace(cleaned)
@@ -125,6 +126,17 @@ func parseVTTTimestamp(s string) (float64, bool) {
 	return float64(h)*3600 + float64(m)*60 + float64(sec) + float64(ms)/1000, true
 }
 
+// speakerSanitizer strips characters that would corrupt a re-emitted <v
+// SPEAKER> voice tag; a real display name never contains them.
+var speakerSanitizer = strings.NewReplacer("<", "", ">", "", "\n", "", "\r", "")
+
+// sanitizeSpeaker unescapes HTML entities in a speaker name (mirroring cue
+// text) and strips angle brackets/newlines so the name can't break out of
+// the <v SPEAKER> voice tag it's re-emitted into by segmentsToVTT.
+func sanitizeSpeaker(speaker string) string {
+	return speakerSanitizer.Replace(html.UnescapeString(speaker))
+}
+
 // extractSpeaker pulls a speaker name from a cue payload via a <v Name> voice
 // tag or a leading "Name: " prefix (Zoom), splitting on the first ": " only.
 func extractSpeaker(text string) (speaker, cleaned string) {
@@ -144,7 +156,7 @@ func extractSpeaker(text string) (speaker, cleaned string) {
 	}
 	if i := strings.Index(firstLine, ": "); i > 0 {
 		name := strings.TrimSpace(firstLine[:i])
-		if name != "" && !strings.ContainsAny(name, "<>") {
+		if name != "" && !strings.ContainsAny(name, "<>") && !leadingTimestampRe.MatchString(name) {
 			return name, strings.TrimSpace(firstLine[i+2:]) + rest
 		}
 	}

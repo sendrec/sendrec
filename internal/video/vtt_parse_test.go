@@ -1,6 +1,9 @@
 package video
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseVTTTimestamp(t *testing.T) {
 	cases := []struct {
@@ -31,6 +34,7 @@ func TestExtractSpeaker(t *testing.T) {
 		{"Bob: hi there", "Bob", "hi there"},
 		{"Dr. Smith: point: two", "Dr. Smith", "point: two"}, // split first ": " only
 		{"no speaker at all", "", "no speaker at all"},
+		{"10:30 Meeting: hello", "", "10:30 Meeting: hello"}, // timestamp-shaped prefix, not a speaker
 	}
 	for _, c := range cases {
 		sp, cl := extractSpeaker(c.in)
@@ -68,6 +72,67 @@ func TestParseVTT_Zoom(t *testing.T) {
 	}
 	if len(segs) != 2 || segs[0].Speaker != "Srijani Ghosh" || segs[0].Text != "Hi!" {
 		t.Fatalf("got %+v", segs)
+	}
+}
+
+func TestParseVTT_SanitizesSpeakerAngleBrackets(t *testing.T) {
+	raw := "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<v A<b>c>hi\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 1 {
+		t.Fatalf("want 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if strings.ContainsAny(segs[0].Speaker, "<>") {
+		t.Errorf("speaker retained angle brackets: %q", segs[0].Speaker)
+	}
+
+	vtt := segmentsToVTT(segs)
+	if strings.Count(vtt, "<v ") != 1 {
+		t.Errorf("expected exactly one <v tag in output, got: %q", vtt)
+	}
+	// The voice tag itself must be well-formed: exactly one '<' and one '>'
+	// delimiting it, with no stray angle brackets from the speaker leaking in.
+	start := strings.Index(vtt, "<v ")
+	end := strings.Index(vtt[start:], ">")
+	if end < 0 {
+		t.Fatalf("no closing '>' found for voice tag in: %q", vtt)
+	}
+	tag := vtt[start : start+end+1]
+	if strings.Count(tag, "<") != 1 || strings.Count(tag, ">") != 1 {
+		t.Errorf("malformed voice tag: %q", tag)
+	}
+}
+
+func TestParseVTT_SanitizesEntityBearingSpeaker(t *testing.T) {
+	raw := "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n<v Q3 &amp; R&amp;D>hi\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 1 {
+		t.Fatalf("want 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Speaker != "Q3 & R&D" {
+		t.Errorf("expected unescaped speaker %q, got %q", "Q3 & R&D", segs[0].Speaker)
+	}
+}
+
+func TestParseVTT_IllegalButParseableTimingNotMisclassifiedAsIdentifier(t *testing.T) {
+	// Minutes >= 60 is spec-illegal but parseTimingLine/parseVTTTimestamp
+	// accept it. The identifier-skip and the actual parse must agree on a
+	// single timing detector, or this cue is silently dropped.
+	raw := "WEBVTT\n\n00:75:00.000 --> 00:76:00.000\nHello\n\n"
+	segs, err := parseVTT([]byte(raw))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(segs) != 1 {
+		t.Fatalf("want 1 segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Text != "Hello" {
+		t.Errorf("got %+v", segs[0])
 	}
 }
 
