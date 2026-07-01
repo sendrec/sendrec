@@ -42,6 +42,8 @@ export function TranscriptSection({
   const [documentContent, setDocumentContent] = useState<string | null>(null);
   const [uploadingTranscript, setUploadingTranscript] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const currentVideoId = useRef(video.id);
+  currentVideoId.current = video.id;
 
   async function retranscribe() {
     const body =
@@ -60,25 +62,34 @@ export function TranscriptSection({
   }
 
   async function uploadTranscript(file: File) {
+    const uploadVideoId = video.id;
     const formData = new FormData();
     formData.append("file", file);
     setUploadingTranscript(true);
     try {
       const data = await apiFetch<{ segments: TranscriptSegment[] }>(
-        `/api/videos/${video.id}/transcript`,
+        `/api/videos/${uploadVideoId}/transcript`,
         { method: "POST", body: formData },
       );
+      // The user may have navigated to another video while the upload was in
+      // flight; only apply the result if this is still the shown video.
+      // The user may have navigated to another video while the upload was in
+      // flight; only apply the result if this is still the shown video.
+      if (currentVideoId.current !== uploadVideoId) return;
       onVideoUpdate((prev) =>
         prev ? { ...prev, transcriptStatus: "ready" } : prev,
       );
       onTranscriptSegmentsUpdate(data?.segments ?? []);
       toast.show("Transcript uploaded");
     } catch (err) {
+      if (currentVideoId.current !== uploadVideoId) return;
       toast.show(
         err instanceof Error ? err.message : "Failed to upload transcript",
       );
     } finally {
-      setUploadingTranscript(false);
+      if (currentVideoId.current === uploadVideoId) {
+        setUploadingTranscript(false);
+      }
     }
   }
 

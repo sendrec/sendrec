@@ -137,6 +137,54 @@ describe("TranscriptSection upload", () => {
     });
   });
 
+  it("ignores an in-flight upload result after navigating to another video", async () => {
+    const user = userEvent.setup();
+    let resolveUpload!: (value: {
+      segments: { start: number; end: number; text: string }[];
+    }) => void;
+    mockApiFetch.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveUpload = resolve;
+      })
+    );
+
+    const onTranscriptSegmentsUpdate = vi.fn();
+    const props = {
+      limits: { transcriptionEnabled: true, aiEnabled: true } as any,
+      isViewer: false,
+      transcriptSegments: [],
+      retranscribeLanguage: "auto",
+      onRetranscribeLanguageChange: () => {},
+      onVideoUpdate: () => {},
+      onTranscriptClear: () => {},
+      onTranscriptSegmentsUpdate,
+    };
+
+    const { rerender } = render(
+      <TranscriptSection video={makeVideo({ id: "video-1" })} {...props} />
+    );
+
+    await user.upload(
+      screen.getByTestId("transcript-upload-input"),
+      createVttFile()
+    );
+
+    // User navigates to a different video while the upload is still pending.
+    rerender(
+      <TranscriptSection video={makeVideo({ id: "video-2" })} {...props} />
+    );
+
+    resolveUpload({ segments: [{ start: 0, end: 1, text: "stale" }] });
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        "/api/videos/video-1/transcript",
+        expect.anything()
+      );
+    });
+    expect(onTranscriptSegmentsUpdate).not.toHaveBeenCalled();
+  });
+
   it("hides the upload transcript button for viewers", () => {
     renderSection({}, true);
     expect(
