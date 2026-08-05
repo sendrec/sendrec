@@ -111,6 +111,21 @@ jobs:
       - name: Build Go binary
         run: go build -o bin/sendrec ./cmd/sendrec
 
+  # The jobs above build the app the way a developer does: the Go toolchain
+  # comes from go.mod, pnpm from pnpm/action-setup. The image pins its own
+  # versions instead, so a Dockerfile that disagrees with go.mod or a lockfile
+  # the image build rejects both passed CI and only failed at release time.
+  # Building the image here closes that gap.
+  docker-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t sendrec:ci .
+
   e2e:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: test
