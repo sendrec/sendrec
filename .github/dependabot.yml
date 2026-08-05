@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Grouped so an aws-sdk-go-v2 bump arrives as one PR, not a dozen.
+  # govulncheck in CI is the gate on whether it is safe to merge.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
