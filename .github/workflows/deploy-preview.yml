@@ -58,10 +58,24 @@ jobs:
           # service-token headers or it is redirected to an HTML login page.
           CF_HDR=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
 
-          # Check if app already exists. -fsS makes curl fail loudly (non-empty
-          # stderr, no silent empty body that would crash the json parser).
-          EXISTING=$(curl -fsS "$COOLIFY_API_URL/applications" \
-            -H "Authorization: Bearer $COOLIFY_API_TOKEN" "${CF_HDR[@]}" | \
+          # --fail-with-body keeps -f's non-zero exit but still prints the
+          # response, so a Coolify error reaches the log instead of being
+          # swallowed. Bodies are captured before parsing rather than piped
+          # straight into python, which would feed the error json to the parser
+          # and surface a traceback instead of Coolify's message.
+          api() {
+            local body
+            if ! body=$(curl --fail-with-body -sS "$@" \
+              -H "Authorization: Bearer $COOLIFY_API_TOKEN" "${CF_HDR[@]}"); then
+              echo "Coolify API call failed: $*" >&2
+              echo "$body" >&2
+              return 1
+            fi
+            echo "$body"
+          }
+
+          # Check if app already exists.
+          EXISTING=$(api "$COOLIFY_API_URL/applications" | \
             python3 -c "
           import json, sys
           apps = json.load(sys.stdin)
@@ -76,16 +90,14 @@ jobs:
             echo "Found existing app: $EXISTING"
 
             # Update branch
-            curl -fsS -X PATCH "$COOLIFY_API_URL/applications/$EXISTING" \
-              -H "Authorization: Bearer $COOLIFY_API_TOKEN" "${CF_HDR[@]}" \
+            api -X PATCH "$COOLIFY_API_URL/applications/$EXISTING" \
               -H "Content-Type: application/json" \
               -d "{\"git_branch\": \"${{ github.head_ref }}\"}"
           else
             echo "Creating new preview app: $APP_NAME"
 
             # Create app
-            UUID=$(curl -fsS -X POST "$COOLIFY_API_URL/applications/private-github-app" \
-              -H "Authorization: Bearer $COOLIFY_API_TOKEN" "${CF_HDR[@]}" \
+            UUID=$(api -X POST "$COOLIFY_API_URL/applications/private-github-app" \
               -H "Content-Type: application/json" \
               -d "{
                 \"project_uuid\": \"$COOLIFY_PROJECT_UUID\",
@@ -106,8 +118,7 @@ jobs:
             echo "Created app: $UUID"
 
             # Configure dockerfile location and model volume
-            curl -fsS -X PATCH "$COOLIFY_API_URL/applications/$UUID" \
-              -H "Authorization: Bearer $COOLIFY_API_TOKEN" "${CF_HDR[@]}" \
+            api -X PATCH "$COOLIFY_API_URL/applications/$UUID" \
               -H "Content-Type: application/json" \
               -d '{"dockerfile_location": "/Dockerfile", "custom_docker_run_options": "-v /opt/sendrec/models:/models:ro"}'
 
@@ -149,7 +160,7 @@ jobs:
 
       - name: Deploy preview via Coolify
         run: |
-          curl -fsS -X GET "${{ secrets.COOLIFY_API_URL }}/deploy?uuid=${{ steps.app.outputs.uuid }}&force=true" \
+          curl --fail-with-body -sS -X GET "${{ secrets.COOLIFY_API_URL }}/deploy?uuid=${{ steps.app.outputs.uuid }}&force=true" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
             -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
             -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}"
@@ -205,8 +216,18 @@ jobs:
 
           CF_HDR=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
 
-          UUID=$(curl -fsS "$COOLIFY_API_URL/applications" \
-            -H "Authorization: Bearer $COOLIFY_API_TOKEN" "${CF_HDR[@]}" | \
+          api() {
+            local body
+            if ! body=$(curl --fail-with-body -sS "$@" \
+              -H "Authorization: Bearer $COOLIFY_API_TOKEN" "${CF_HDR[@]}"); then
+              echo "Coolify API call failed: $*" >&2
+              echo "$body" >&2
+              return 1
+            fi
+            echo "$body"
+          }
+
+          UUID=$(api "$COOLIFY_API_URL/applications" | \
             python3 -c "
           import json, sys
           apps = json.load(sys.stdin)
@@ -218,8 +239,7 @@ jobs:
 
           if [ -n "$UUID" ]; then
             echo "Deleting preview app: $UUID ($APP_NAME)"
-            curl -fsS -X DELETE "$COOLIFY_API_URL/applications/$UUID" \
-              -H "Authorization: Bearer $COOLIFY_API_TOKEN" "${CF_HDR[@]}"
+            api -X DELETE "$COOLIFY_API_URL/applications/$UUID"
           else
             echo "No preview app found for $APP_NAME"
           fi
