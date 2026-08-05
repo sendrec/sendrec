@@ -75,7 +75,8 @@ type ffprobeResult struct {
 	} `json:"streams"`
 }
 
-func probeVideoProperties(inputPath string) (videoProperties, error) {
+// See transcodeToMP4 for why this is a var.
+var probeVideoProperties = func(inputPath string) (videoProperties, error) {
 	cmd := exec.Command("ffprobe",
 		"-v", "error",
 		"-select_streams", "v:0",
@@ -125,7 +126,8 @@ func buildNormalizeArgs(inputPath, outputPath, audioFilter string) []string {
 	return args
 }
 
-func transcodeToIOSCompatible(inputPath, outputPath, audioFilter string) error {
+// See transcodeToMP4 for why this is a var.
+var transcodeToIOSCompatible = func(inputPath, outputPath, audioFilter string) error {
 	args := buildNormalizeArgs(inputPath, outputPath, audioFilter)
 	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
@@ -212,6 +214,7 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 
 	if err := storage.UploadFile(ctx, fileKey, tmpOutputPath, "video/mp4"); err != nil {
 		slog.Error("normalize: failed to upload", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 
@@ -220,6 +223,7 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 		videoID, newFileSize,
 	); err != nil {
 		slog.Error("normalize: failed to update db", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 
