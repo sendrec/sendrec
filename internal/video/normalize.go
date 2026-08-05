@@ -138,12 +138,18 @@ func transcodeToIOSCompatible(inputPath, outputPath, audioFilter string) error {
 func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, audioFilter string) {
 	// Check if video is already normalized (another normalize may have completed)
 	var normalized bool
-	if err := db.QueryRow(ctx, "SELECT ios_normalized FROM videos WHERE id = $1", videoID).Scan(&normalized); err != nil {
+	var attempts int
+	if err := db.QueryRow(ctx, "SELECT ios_normalized, transcode_attempts FROM videos WHERE id = $1", videoID).Scan(&normalized, &attempts); err != nil {
 		slog.Error("normalize: failed to check status", "video_id", videoID, "error", err)
 		return
 	}
 	if normalized {
 		slog.Info("normalize: skipped, already normalized", "video_id", videoID)
+		return
+	}
+	// The worker query filters on this too, but job enqueues reach us directly.
+	if attempts >= maxTranscodeAttempts {
+		slog.Warn("normalize: skipped, attempt budget exhausted", "video_id", videoID, "attempts", attempts)
 		return
 	}
 

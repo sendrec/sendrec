@@ -110,12 +110,18 @@ func clearTranscodeFailure(ctx context.Context, db database.DBTX, videoID string
 func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, audioFilter string) {
 	// Check if video is still WebM (another transcode may have already completed)
 	var contentType string
-	if err := db.QueryRow(ctx, "SELECT content_type FROM videos WHERE id = $1", videoID).Scan(&contentType); err != nil {
+	var attempts int
+	if err := db.QueryRow(ctx, "SELECT content_type, transcode_attempts FROM videos WHERE id = $1", videoID).Scan(&contentType, &attempts); err != nil {
 		slog.Error("transcode: failed to check content type", "video_id", videoID, "error", err)
 		return
 	}
 	if contentType != "video/webm" {
 		slog.Info("transcode: skipped, already transcoded", "video_id", videoID, "content_type", contentType)
+		return
+	}
+	// The worker query filters on this too, but job enqueues reach us directly.
+	if attempts >= maxTranscodeAttempts {
+		slog.Warn("transcode: skipped, attempt budget exhausted", "video_id", videoID, "attempts", attempts)
 		return
 	}
 

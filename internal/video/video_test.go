@@ -36,6 +36,7 @@ type mockStorage struct {
 	headType               string
 	headErr                error
 	downloadToFileErr      error
+	downloadToFileCount    int
 	uploadFileErr          error
 	uploadFileCallCount    int
 	uploadFileKeys         []string
@@ -82,6 +83,7 @@ func (m *mockStorage) HeadObject(_ context.Context, _ string) (int64, string, er
 }
 
 func (m *mockStorage) DownloadToFile(_ context.Context, _ string, _ string) error {
+	m.downloadToFileCount++
 	return m.downloadToFileErr
 }
 

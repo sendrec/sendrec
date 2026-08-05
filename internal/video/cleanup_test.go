@@ -136,3 +136,58 @@ func TestPurgeOrphanedFiles_DeletesTranscriptFile(t *testing.T) {
 		t.Errorf("expected 2 delete calls (video + transcript), got %d", storage.deleteCallCount)
 	}
 }
+
+func TestAbandonStaleUploads_RetiresOldUploads(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectExec(`UPDATE videos SET status = 'deleted'`).
+		WithArgs(staleUploadAgeHours).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 4))
+
+	AbandonStaleUploads(context.Background(), mock)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAbandonStaleUploads_NoStaleRows(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectExec(`UPDATE videos SET status = 'deleted'`).
+		WithArgs(staleUploadAgeHours).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+
+	AbandonStaleUploads(context.Background(), mock)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestAbandonStaleUploads_HandlesDBError(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectExec(`UPDATE videos SET status = 'deleted'`).
+		WithArgs(staleUploadAgeHours).
+		WillReturnError(errors.New("connection refused"))
+
+	// Should not panic, and must not stop the surrounding cleanup tick.
+	AbandonStaleUploads(context.Background(), mock)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
