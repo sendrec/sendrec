@@ -30,7 +30,9 @@ func buildTranscodeArgs(inputPath, outputPath, audioFilter string) []string {
 	return args
 }
 
-func transcodeToMP4(inputPath, outputPath, audioFilter string) error {
+// Package-level var so tests can reach the steps after ffmpeg without needing
+// an ffmpeg binary or a real video fixture.
+var transcodeToMP4 = func(inputPath, outputPath, audioFilter string) error {
 	args := buildTranscodeArgs(inputPath, outputPath, audioFilter)
 	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
@@ -170,6 +172,7 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 
 	if err := storage.UploadFile(ctx, newFileKey, tmpOutputPath, "video/mp4"); err != nil {
 		slog.Error("transcode: failed to upload", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 
@@ -178,6 +181,7 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 		videoID, newFileKey, newFileSize,
 	); err != nil {
 		slog.Error("transcode: failed to update db", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 

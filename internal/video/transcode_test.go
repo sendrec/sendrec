@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -355,5 +356,106 @@ func TestNormalizeVideoAsync_StopsWhenBudgetExhausted(t *testing.T) {
 	}
 	if s.downloadToFileCount != 0 {
 		t.Errorf("expected no download, got %d", s.downloadToFileCount)
+	}
+}
+
+// stubFFmpeg replaces the ffmpeg call with one that just writes the output
+// file, so a test can reach the upload and db-update steps that follow.
+func stubFFmpeg(t *testing.T, target *func(string, string, string) error) {
+	t.Helper()
+	original := *target
+	*target = func(_, outputPath, _ string) error {
+		return os.WriteFile(outputPath, []byte("fake mp4"), 0o600)
+	}
+	t.Cleanup(func() { *target = original })
+}
+
+// An upload failure leaves the video exactly as the worker query found it, so
+// without an attempt bump the worker re-downloads and re-runs ffmpeg forever.
+func TestTranscodeWebMAsync_UploadFailureConsumesBudget(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	stubFFmpeg(t, &transcodeToMP4)
+	s := &mockStorage{uploadFileErr: fmt.Errorf("s3 unavailable")}
+
+	mock.ExpectQuery(`SELECT content_type, transcode_attempts FROM videos`).
+		WithArgs("video-1").
+		WillReturnRows(pgxmock.NewRows([]string{"content_type", "transcode_attempts"}).
+			AddRow("video/webm", 0))
+	mock.ExpectQuery(`UPDATE videos`).
+		WithArgs("video-1", "s3 unavailable", false, maxTranscodeAttempts).
+		WillReturnRows(pgxmock.NewRows([]string{"transcode_attempts"}).AddRow(1))
+
+	TranscodeWebMAsync(context.Background(), mock, s, "video-1", "recordings/user/video.webm", "")
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// The transcoded object is already uploaded by this point, so an unbounded
+// retry also leaves a duplicate .mp4 behind on every pass.
+func TestTranscodeWebMAsync_DBUpdateFailureConsumesBudget(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	stubFFmpeg(t, &transcodeToMP4)
+	s := &mockStorage{}
+
+	mock.ExpectQuery(`SELECT content_type, transcode_attempts FROM videos`).
+		WithArgs("video-1").
+		WillReturnRows(pgxmock.NewRows([]string{"content_type", "transcode_attempts"}).
+			AddRow("video/webm", 0))
+	mock.ExpectExec(`UPDATE videos SET file_key`).
+		WithArgs("video-1", pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnError(errors.New("deadlock detected"))
+	mock.ExpectQuery(`UPDATE videos`).
+		WithArgs("video-1", "deadlock detected", false, maxTranscodeAttempts).
+		WillReturnRows(pgxmock.NewRows([]string{"transcode_attempts"}).AddRow(1))
+
+	TranscodeWebMAsync(context.Background(), mock, s, "video-1", "recordings/user/video.webm", "")
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestNormalizeVideoAsync_UploadFailureConsumesBudget(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	stubFFmpeg(t, &transcodeToIOSCompatible)
+	// Report a non-h264 codec so needsNormalization() is true and the re-encode
+	// path runs instead of the early "already compatible" exit.
+	originalProbe := probeVideoProperties
+	probeVideoProperties = func(string) (videoProperties, error) {
+		return videoProperties{CodecName: "vp9", Width: 1280, Height: 720}, nil
+	}
+	t.Cleanup(func() { probeVideoProperties = originalProbe })
+
+	s := &mockStorage{uploadFileErr: fmt.Errorf("s3 unavailable")}
+
+	mock.ExpectQuery(`SELECT ios_normalized, transcode_attempts FROM videos`).
+		WithArgs("video-1").
+		WillReturnRows(pgxmock.NewRows([]string{"ios_normalized", "transcode_attempts"}).
+			AddRow(false, 0))
+	mock.ExpectQuery(`UPDATE videos`).
+		WithArgs("video-1", "s3 unavailable", false, maxTranscodeAttempts).
+		WillReturnRows(pgxmock.NewRows([]string{"transcode_attempts"}).AddRow(1))
+
+	NormalizeVideoAsync(context.Background(), mock, s, "video-1", "recordings/user/video.mp4", "")
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
 	}
 }
