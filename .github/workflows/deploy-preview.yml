@@ -160,7 +160,9 @@ jobs:
 
       - name: Deploy preview via Coolify
         run: |
-          curl --fail-with-body -sS -X GET "${{ secrets.COOLIFY_API_URL }}/deploy?uuid=${{ steps.app.outputs.uuid }}&force=true" \
+          # Coolify 4.2.0 moved /deploy to POST; GET now returns 405. uuid and
+          # force still come from the query string ($request->input reads both).
+          curl --fail-with-body -sS -X POST "${{ secrets.COOLIFY_API_URL }}/deploy?uuid=${{ steps.app.outputs.uuid }}&force=true" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
             -H "CF-Access-Client-Id: ${{ secrets.CF_ACCESS_CLIENT_ID }}" \
             -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}"
