@@ -168,7 +168,7 @@ jobs:
             -H "CF-Access-Client-Secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}"
 
       - name: Comment PR with preview URL
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
@@ -247,7 +247,7 @@ jobs:
           fi
 
       - name: Comment PR cleanup
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.issues.createComment({
