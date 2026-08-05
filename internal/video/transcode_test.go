@@ -1,4 +1,4 @@
-﻿package video
+package video
 
 import (
 	"context"
@@ -184,6 +184,29 @@ func TestRecordTranscodeFailure_TruncatesLongMessage(t *testing.T) {
 	}
 }
 
+func TestRecordTranscodeFailure_TruncationKeepsValidUTF8(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	// ffmpeg quotes the input filename, so the log can carry multi-byte runes.
+	// 2000 is not a multiple of 3, so the cut lands inside a rune; Postgres
+	// rejects invalid UTF-8 and the attempt counter would never advance.
+	long := strings.Repeat("日", 2000)
+
+	mock.ExpectQuery(`UPDATE videos`).
+		WithArgs("video-1", strings.Repeat("日", 666), false, maxTranscodeAttempts).
+		WillReturnRows(pgxmock.NewRows([]string{"transcode_attempts"}).AddRow(1))
+
+	recordTranscodeFailure(context.Background(), mock, "video-1", fmt.Errorf("%s", long))
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
 func TestRecordTranscodeFailure_HandlesDBError(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -195,7 +218,7 @@ func TestRecordTranscodeFailure_HandlesDBError(t *testing.T) {
 		WithArgs("video-1", "boom", false, maxTranscodeAttempts).
 		WillReturnError(errors.New("connection refused"))
 
-	// Should not panic вЂ” the caller has already given up on this attempt.
+	// Should not panic — the caller has already given up on this attempt.
 	recordTranscodeFailure(context.Background(), mock, "video-1", fmt.Errorf("boom"))
 
 	if err := mock.ExpectationsWereMet(); err != nil {

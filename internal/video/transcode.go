@@ -73,7 +73,9 @@ func recordTranscodeFailure(ctx context.Context, db database.DBTX, videoID strin
 
 	msg := cause.Error()
 	if len(msg) > 2000 {
-		msg = msg[:2000]
+		// Byte-slicing can split a rune; Postgres rejects invalid UTF-8, which
+		// would fail this UPDATE and leave the attempt counter untouched.
+		msg = strings.ToValidUTF8(msg[:2000], "")
 	}
 
 	var attempts int
