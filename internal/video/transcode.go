@@ -73,12 +73,15 @@ func isPermanentFFmpegError(err error) bool {
 func recordTranscodeFailure(ctx context.Context, db database.DBTX, videoID string, cause error) {
 	permanent := isPermanentFFmpegError(cause)
 
+	// The cause carries raw ffmpeg output, so it can hold arbitrary bytes, and
+	// truncation can split a rune. Postgres rejects both invalid UTF-8 and NUL
+	// in a text column; either would fail this UPDATE and leave the attempt
+	// counter untouched, which is the loop this whole mechanism exists to stop.
 	msg := cause.Error()
 	if len(msg) > 2000 {
-		// Byte-slicing can split a rune; Postgres rejects invalid UTF-8, which
-		// would fail this UPDATE and leave the attempt counter untouched.
-		msg = strings.ToValidUTF8(msg[:2000], "")
+		msg = msg[:2000]
 	}
+	msg = strings.ReplaceAll(strings.ToValidUTF8(msg, ""), "\x00", "")
 
 	var attempts int
 	err := db.QueryRow(ctx,

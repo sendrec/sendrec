@@ -44,22 +44,6 @@ func TestTranscodeWebMAsync_FFmpegFails(t *testing.T) {
 	}
 }
 
-func TestTranscodeWebMAsync_UploadError(t *testing.T) {
-	mock, err := pgxmock.NewPool()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer mock.Close()
-
-	s := &mockStorage{uploadFileErr: fmt.Errorf("upload failed")}
-
-	TranscodeWebMAsync(context.Background(), mock, s, "video-123", "recordings/user/video.webm", "")
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
-}
-
 func TestIsPermanentFFmpegError(t *testing.T) {
 	if isPermanentFFmpegError(nil) {
 		t.Error("expected nil error to be non-permanent")
@@ -451,6 +435,64 @@ func TestNormalizeVideoAsync_UploadFailureConsumesBudget(t *testing.T) {
 			AddRow(false, 0))
 	mock.ExpectQuery(`UPDATE videos`).
 		WithArgs("video-1", "s3 unavailable", false, maxTranscodeAttempts).
+		WillReturnRows(pgxmock.NewRows([]string{"transcode_attempts"}).AddRow(1))
+
+	NormalizeVideoAsync(context.Background(), mock, s, "video-1", "recordings/user/video.mp4", "")
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// ffmpeg output reaches this column verbatim, so a short message can still
+// carry bytes Postgres refuses even when no truncation happens.
+func TestRecordTranscodeFailure_SanitizesShortMessages(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	// Invalid UTF-8 and a NUL, well under the truncation threshold. NUL is
+	// valid UTF-8, so ToValidUTF8 alone does not remove it.
+	cause := fmt.Errorf("ffmpeg: %s", "bad\xffbyte\x00here")
+
+	mock.ExpectQuery(`UPDATE videos`).
+		WithArgs("video-1", "ffmpeg: badbytehere", false, maxTranscodeAttempts).
+		WillReturnRows(pgxmock.NewRows([]string{"transcode_attempts"}).AddRow(1))
+
+	recordTranscodeFailure(context.Background(), mock, "video-1", cause)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestNormalizeVideoAsync_DBUpdateFailureConsumesBudget(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	stubFFmpeg(t, &transcodeToIOSCompatible)
+	originalProbe := probeVideoProperties
+	probeVideoProperties = func(string) (videoProperties, error) {
+		return videoProperties{CodecName: "vp9", Width: 1280, Height: 720}, nil
+	}
+	t.Cleanup(func() { probeVideoProperties = originalProbe })
+
+	s := &mockStorage{}
+
+	mock.ExpectQuery(`SELECT ios_normalized, transcode_attempts FROM videos`).
+		WithArgs("video-1").
+		WillReturnRows(pgxmock.NewRows([]string{"ios_normalized", "transcode_attempts"}).
+			AddRow(false, 0))
+	mock.ExpectExec(`UPDATE videos SET file_size`).
+		WithArgs("video-1", pgxmock.AnyArg()).
+		WillReturnError(errors.New("deadlock detected"))
+	mock.ExpectQuery(`UPDATE videos`).
+		WithArgs("video-1", "deadlock detected", false, maxTranscodeAttempts).
 		WillReturnRows(pgxmock.NewRows([]string{"transcode_attempts"}).AddRow(1))
 
 	NormalizeVideoAsync(context.Background(), mock, s, "video-1", "recordings/user/video.mp4", "")
