@@ -2,6 +2,7 @@
   "name": "sendrec-web",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.26.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
