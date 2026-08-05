@@ -8,7 +8,7 @@ COPY web/ .
 RUN pnpm build
 
 # Stage 2: Build Go binary
-FROM golang:1.26.4-alpine AS backend
+FROM golang:1.26.5-alpine AS backend
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
