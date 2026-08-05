@@ -160,6 +160,7 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 
 	if err := storage.DownloadToFile(ctx, fileKey, tmpInputPath); err != nil {
 		slog.Error("normalize: failed to download", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 
@@ -192,6 +193,7 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 
 	if err := transcodeToIOSCompatible(tmpInputPath, tmpOutputPath, audioFilter); err != nil {
 		slog.Error("normalize: ffmpeg failed", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 
@@ -214,6 +216,8 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 		slog.Error("normalize: failed to update db", "video_id", videoID, "error", err)
 		return
 	}
+
+	clearTranscodeFailure(ctx, db, videoID)
 
 	slog.Info("normalize: completed", "video_id", videoID, "new_size", newFileSize)
 }

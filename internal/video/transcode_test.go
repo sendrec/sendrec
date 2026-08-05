@@ -57,6 +57,21 @@ func TestTranscodeWebMAsync_UploadError(t *testing.T) {
 	}
 }
 
+func TestIsPermanentFFmpegError(t *testing.T) {
+	if isPermanentFFmpegError(nil) {
+		t.Error("expected nil error to be non-permanent")
+	}
+	// The failure seen in production: browser upload stored a webm without a
+	// readable header, so every retry produced the same result.
+	corrupt := fmt.Errorf("ffmpeg transcode: exit status 183: [matroska,webm] EBML header parsing failed\nError opening input: Invalid data found when processing input")
+	if !isPermanentFFmpegError(corrupt) {
+		t.Error("expected corrupt webm error to be permanent")
+	}
+	if isPermanentFFmpegError(fmt.Errorf("ffmpeg transcode: exit status 1: No space left on device")) {
+		t.Error("expected transient error to be non-permanent")
+	}
+}
+
 func TestBuildTranscodeArgs(t *testing.T) {
 	t.Run("without audio filter", func(t *testing.T) {
 		args := buildTranscodeArgs("input.webm", "output.mp4", "")

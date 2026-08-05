@@ -40,6 +40,73 @@ func transcodeToMP4(inputPath, outputPath, audioFilter string) error {
 	return nil
 }
 
+// maxTranscodeAttempts bounds how often a single video is fed to ffmpeg before
+// it is abandoned. Without it a corrupt upload is retried on every worker tick
+// forever.
+const maxTranscodeAttempts = 5
+
+// permanentFFmpegErrors mark inputs ffmpeg can never decode, so retrying is
+// pointless no matter how many attempts remain.
+var permanentFFmpegErrors = []string{
+	"Invalid data found when processing input",
+	"EBML header parsing failed",
+	"moov atom not found",
+}
+
+func isPermanentFFmpegError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	for _, marker := range permanentFFmpegErrors {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// recordTranscodeFailure increments the attempt counter and stores the reason.
+// Permanent failures consume the whole budget at once.
+func recordTranscodeFailure(ctx context.Context, db database.DBTX, videoID string, cause error) {
+	permanent := isPermanentFFmpegError(cause)
+
+	msg := cause.Error()
+	if len(msg) > 2000 {
+		msg = msg[:2000]
+	}
+
+	var attempts int
+	err := db.QueryRow(ctx,
+		`UPDATE videos
+		 SET transcode_attempts = CASE WHEN $3 THEN $4 ELSE transcode_attempts + 1 END,
+		     transcode_error = $2,
+		     updated_at = now()
+		 WHERE id = $1
+		 RETURNING transcode_attempts`,
+		videoID, msg, permanent, maxTranscodeAttempts,
+	).Scan(&attempts)
+	if err != nil {
+		slog.Error("transcode: failed to record failure", "video_id", videoID, "error", err)
+		return
+	}
+
+	if attempts >= maxTranscodeAttempts {
+		slog.Error("transcode: giving up", "video_id", videoID, "attempts", attempts, "permanent", permanent, "error", cause)
+		return
+	}
+	slog.Warn("transcode: will retry", "video_id", videoID, "attempts", attempts, "error", cause)
+}
+
+func clearTranscodeFailure(ctx context.Context, db database.DBTX, videoID string) {
+	if _, err := db.Exec(ctx,
+		`UPDATE videos SET transcode_attempts = 0, transcode_error = NULL WHERE id = $1`,
+		videoID,
+	); err != nil {
+		slog.Error("transcode: failed to clear failure state", "video_id", videoID, "error", err)
+	}
+}
+
 func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, audioFilter string) {
 	// Check if video is still WebM (another transcode may have already completed)
 	var contentType string
@@ -65,6 +132,7 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 
 	if err := storage.DownloadToFile(ctx, fileKey, tmpInputPath); err != nil {
 		slog.Error("transcode: failed to download", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 
@@ -79,6 +147,7 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 
 	if err := transcodeToMP4(tmpInputPath, tmpOutputPath, audioFilter); err != nil {
 		slog.Error("transcode: ffmpeg failed", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 
@@ -108,6 +177,8 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 		slog.Warn("transcode: failed to delete old webm", "video_id", videoID, "key", fileKey, "error", err)
 	}
 
+	clearTranscodeFailure(ctx, db, videoID)
+
 	slog.Info("transcode: completed", "video_id", videoID, "new_key", newFileKey, "size", newFileSize)
 }
 
@@ -116,7 +187,8 @@ func transcodeExistingWebM(ctx context.Context, db database.DBTX, storage Object
 		`SELECT id, file_key FROM videos
 		 WHERE content_type = 'video/webm' AND status = 'ready'
 		   AND created_at < now() - interval '5 minutes'
-		 ORDER BY created_at DESC LIMIT 50`)
+		   AND transcode_attempts < $1
+		 ORDER BY created_at DESC LIMIT 50`, maxTranscodeAttempts)
 	if err != nil {
 		slog.Error("transcode-worker: failed to query", "error", err)
 		return
@@ -139,7 +211,8 @@ func normalizeExistingVideos(ctx context.Context, db database.DBTX, storage Obje
 		 WHERE content_type IN ('video/mp4', 'video/quicktime')
 		   AND status = 'ready' AND ios_normalized = false
 		   AND created_at < now() - interval '5 minutes'
-		 ORDER BY created_at DESC LIMIT 50`)
+		   AND transcode_attempts < $1
+		 ORDER BY created_at DESC LIMIT 50`, maxTranscodeAttempts)
 	if err != nil {
 		slog.Error("normalize-worker: failed to query", "error", err)
 		return
