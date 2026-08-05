@@ -138,12 +138,18 @@ func transcodeToIOSCompatible(inputPath, outputPath, audioFilter string) error {
 func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, audioFilter string) {
 	// Check if video is already normalized (another normalize may have completed)
 	var normalized bool
-	if err := db.QueryRow(ctx, "SELECT ios_normalized FROM videos WHERE id = $1", videoID).Scan(&normalized); err != nil {
+	var attempts int
+	if err := db.QueryRow(ctx, "SELECT ios_normalized, transcode_attempts FROM videos WHERE id = $1", videoID).Scan(&normalized, &attempts); err != nil {
 		slog.Error("normalize: failed to check status", "video_id", videoID, "error", err)
 		return
 	}
 	if normalized {
 		slog.Info("normalize: skipped, already normalized", "video_id", videoID)
+		return
+	}
+	// The worker query filters on this too, but job enqueues reach us directly.
+	if attempts >= maxTranscodeAttempts {
+		slog.Warn("normalize: skipped, attempt budget exhausted", "video_id", videoID, "attempts", attempts)
 		return
 	}
 
@@ -160,6 +166,7 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 
 	if err := storage.DownloadToFile(ctx, fileKey, tmpInputPath); err != nil {
 		slog.Error("normalize: failed to download", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 
@@ -192,6 +199,7 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 
 	if err := transcodeToIOSCompatible(tmpInputPath, tmpOutputPath, audioFilter); err != nil {
 		slog.Error("normalize: ffmpeg failed", "video_id", videoID, "error", err)
+		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
 
@@ -214,6 +222,8 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 		slog.Error("normalize: failed to update db", "video_id", videoID, "error", err)
 		return
 	}
+
+	clearTranscodeFailure(ctx, db, videoID)
 
 	slog.Info("normalize: completed", "video_id", videoID, "new_size", newFileSize)
 }

@@ -331,18 +331,22 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 		size, contentType, err := h.storage.HeadObject(r.Context(), fileKey)
 		if err != nil {
+			slog.Warn("finalize: could not verify upload", "video_id", videoID, "file_key", fileKey, "error", err)
 			httputil.WriteError(w, http.StatusBadRequest, "could not verify upload")
 			return
 		}
 		if size <= 0 || (h.maxUploadBytes > 0 && size > h.maxUploadBytes) {
+			slog.Warn("finalize: uploaded file invalid size", "video_id", videoID, "size", size, "max", h.maxUploadBytes)
 			httputil.WriteError(w, http.StatusBadRequest, "uploaded file invalid size")
 			return
 		}
 		if fileSize > 0 && size != fileSize {
+			slog.Warn("finalize: uploaded file size mismatch", "video_id", videoID, "expected", fileSize, "actual", size)
 			httputil.WriteError(w, http.StatusBadRequest, "uploaded file size mismatch")
 			return
 		}
 		if contentType != expectedContentType {
+			slog.Warn("finalize: uploaded file invalid type", "video_id", videoID, "expected", expectedContentType, "actual", contentType)
 			httputil.WriteError(w, http.StatusBadRequest, "uploaded file invalid type")
 			return
 		}
