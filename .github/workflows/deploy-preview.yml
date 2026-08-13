@@ -16,23 +16,22 @@ env:
   PREVIEW_DOMAIN: pr-${{ github.event.pull_request.number }}.app.sendrec.eu
 
 jobs:
-  skip-fork:
-    # Fork PRs run with a read-only GITHUB_TOKEN, so we cannot comment back.
-    # Surface the skip via the job summary instead; the CI status already
-    # tells contributors a maintainer must deploy the preview manually.
+  skip-untrusted:
     if: >-
       github.event.action != 'closed' &&
-      github.event.pull_request.head.repo.full_name != github.repository
+      (github.event.pull_request.head.repo.full_name != github.repository ||
+       github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - name: Note that preview is skipped
         run: |
-          echo "Preview deploy skipped: PR is from a fork. A maintainer can deploy a preview manually after review." >> "$GITHUB_STEP_SUMMARY"
+          echo "Preview deploy skipped: this PR cannot access staging secrets. A maintainer can deploy it manually after review." >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     if: >-
       github.event.action != 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.author_association != 'NONE' &&
       github.event.pull_request.author_association != 'FIRST_TIMER' &&
       github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
@@ -201,6 +200,7 @@ jobs:
     if: >-
       github.event.action == 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.author_association != 'NONE' &&
       github.event.pull_request.author_association != 'FIRST_TIMER' &&
       github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
