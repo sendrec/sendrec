@@ -20,5 +20,5 @@ maintainers:
 - name: mark24slides
 - name: alexneamtu 
 
-version: "1.2.3"
-appVersion: "1.90.0"
+version: "1.2.4"
+appVersion: "1.90.1"
