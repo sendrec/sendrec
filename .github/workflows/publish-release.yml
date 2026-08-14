@@ -64,3 +64,21 @@ jobs:
               --title "$TAG_NAME" \
               --generate-notes
           fi
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy production via Coolify
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_SENDREC_APP_UUID: ${{ secrets.COOLIFY_SENDREC_APP_UUID }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          curl --fail-with-body -sS -X POST "$COOLIFY_API_URL/deploy?uuid=$COOLIFY_SENDREC_APP_UUID&force=true" \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"
