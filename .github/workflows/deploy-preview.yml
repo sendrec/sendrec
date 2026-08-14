@@ -16,23 +16,22 @@ env:
   PREVIEW_DOMAIN: pr-${{ github.event.pull_request.number }}.app.sendrec.eu
 
 jobs:
-  skip-fork:
-    # Fork PRs run with a read-only GITHUB_TOKEN, so we cannot comment back.
-    # Surface the skip via the job summary instead; the CI status already
-    # tells contributors a maintainer must deploy the preview manually.
+  skip-untrusted:
     if: >-
       github.event.action != 'closed' &&
-      github.event.pull_request.head.repo.full_name != github.repository
+      (github.event.pull_request.head.repo.full_name != github.repository ||
+       github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - name: Note that preview is skipped
         run: |
-          echo "Preview deploy skipped: PR is from a fork. A maintainer can deploy a preview manually after review." >> "$GITHUB_STEP_SUMMARY"
+          echo "Preview deploy skipped: this PR cannot access staging secrets. A maintainer can deploy it manually after review." >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     if: >-
       github.event.action != 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.author_association != 'NONE' &&
       github.event.pull_request.author_association != 'FIRST_TIMER' &&
       github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
@@ -51,8 +50,10 @@ jobs:
           COOLIFY_SENDREC_STAGING_UUID: ${{ secrets.COOLIFY_SENDREC_STAGING_UUID }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          PR_HEAD_REF: ${{ github.head_ref }}
         run: |
           APP_NAME="sendrec-pr-${{ env.PR_NUMBER }}"
+          BRANCH_JSON=$(python3 -c 'import json, os; print(json.dumps(os.environ["PR_HEAD_REF"]))')
 
           # Cloudflare Access fronts the Coolify API; every call must carry the
           # service-token headers or it is redirected to an HTML login page.
@@ -92,7 +93,7 @@ jobs:
             # Update branch
             api -X PATCH "$COOLIFY_API_URL/applications/$EXISTING" \
               -H "Content-Type: application/json" \
-              -d "{\"git_branch\": \"${{ github.head_ref }}\"}"
+              -d "{\"git_branch\": $BRANCH_JSON}"
           else
             echo "Creating new preview app: $APP_NAME"
 
@@ -107,7 +108,7 @@ jobs:
                 \"build_pack\": \"dockerfile\",
                 \"github_app_uuid\": \"$COOLIFY_GITHUB_APP_UUID\",
                 \"git_repository\": \"sendrec/sendrec\",
-                \"git_branch\": \"${{ github.head_ref }}\",
+                \"git_branch\": $BRANCH_JSON,
                 \"name\": \"$APP_NAME\",
                 \"description\": \"PR #${{ env.PR_NUMBER }} preview\",
                 \"domains\": \"https://${{ env.PREVIEW_DOMAIN }}\",
@@ -201,6 +202,7 @@ jobs:
     if: >-
       github.event.action == 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.author_association != 'NONE' &&
       github.event.pull_request.author_association != 'FIRST_TIMER' &&
       github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
