@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/smtp"
+	"net/url"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -138,6 +139,14 @@ type subscriberRequest struct {
 	Status string `json:"status"`
 }
 
+type subscriberListResponse struct {
+	Data struct {
+		Results []struct {
+			Email string `json:"email"`
+		} `json:"results"`
+	} `json:"data"`
+}
+
 // ParseAllowlist parses a comma-separated string of email addresses and
 // @domain entries into a slice suitable for Config.Allowlist.
 func ParseAllowlist(s string) []string {
@@ -185,12 +194,35 @@ func (c *Client) resolveRecipient(email string) string {
 }
 
 func (c *Client) ensureSubscriber(ctx context.Context, email, name string) {
-	body := subscriberRequest{Email: c.resolveRecipient(email), Name: name, Status: "enabled"}
+	email = c.resolveRecipient(email)
+	query := url.Values{"search": {email}, "per_page": {"100"}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.config.BaseURL+"/api/subscribers?"+query.Encode(), nil)
+	if err == nil {
+		req.SetBasicAuth(c.config.Username, c.config.Password)
+		resp, requestErr := c.http.Do(req)
+		if requestErr == nil {
+			var result subscriberListResponse
+			var decodeErr error
+			if resp.StatusCode == http.StatusOK {
+				decodeErr = json.NewDecoder(resp.Body).Decode(&result)
+			}
+			_ = resp.Body.Close()
+			if resp.StatusCode == http.StatusOK && decodeErr == nil {
+				for _, subscriber := range result.Data.Results {
+					if strings.EqualFold(subscriber.Email, email) {
+						return
+					}
+				}
+			}
+		}
+	}
+
+	body := subscriberRequest{Email: email, Name: name, Status: "enabled"}
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+"/api/subscribers", bytes.NewReader(jsonBody))
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+"/api/subscribers", bytes.NewReader(jsonBody))
 	if err != nil {
 		return
 	}
