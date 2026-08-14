@@ -21,12 +21,31 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func handleExistingSubscriber(t *testing.T, w http.ResponseWriter, r *http.Request) bool {
+	t.Helper()
+	if r.URL.Path != "/api/subscribers" {
+		return false
+	}
+	if r.Method != http.MethodGet {
+		t.Errorf("unexpected subscriber method: %s", r.Method)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return true
+	}
+	response := map[string]any{
+		"data": map[string]any{
+			"results": []map[string]string{{"email": r.URL.Query().Get("search")}},
+		},
+	}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		t.Errorf("encode subscriber response: %v", err)
+	}
+	return true
+}
+
 func TestSendPasswordReset_Success(t *testing.T) {
 	var receivedBody txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"data":{"id":1}}`))
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		if r.URL.Path != "/api/tx" {
@@ -73,8 +92,7 @@ func TestSendPasswordReset_Success(t *testing.T) {
 
 func TestSendPasswordReset_ServerError_FallsBackToSendmail(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		w.WriteHeader(http.StatusInternalServerError)
@@ -101,8 +119,7 @@ func TestSendCommentNotification_UsesCommentTemplateID(t *testing.T) {
 	var received txRequest
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -138,8 +155,7 @@ func TestSendCommentNotification_UsesCommentTemplateID(t *testing.T) {
 func TestSendCommentNotification_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -172,8 +188,7 @@ func TestSendPasswordReset_StillUsesTemplateID(t *testing.T) {
 	var received txRequest
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -209,8 +224,7 @@ func TestSendPasswordReset_StillUsesTemplateID(t *testing.T) {
 func TestSendViewNotification_Success(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -254,8 +268,7 @@ func TestSendViewNotification_Success(t *testing.T) {
 func TestSendViewNotification_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -287,8 +300,7 @@ func TestSendViewNotification_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 func TestSendDigestNotification_Success(t *testing.T) {
 	var receivedRaw json.RawMessage
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -541,8 +553,7 @@ func TestAllowlist_CaseInsensitive(t *testing.T) {
 func TestSendConfirmation_BypassesAllowlist(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -585,8 +596,7 @@ func TestSendConfirmation_BypassesAllowlist(t *testing.T) {
 func TestSendConfirmation_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -618,8 +628,7 @@ func TestSendConfirmation_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 func TestSendWelcome_Success(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -666,8 +675,7 @@ func TestSendWelcome_Success(t *testing.T) {
 func TestSendWelcome_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -702,8 +710,7 @@ func TestSendWelcome_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 func TestSendWelcome_BypassesAllowlist(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -739,8 +746,7 @@ func TestSendWelcome_BypassesAllowlist(t *testing.T) {
 func TestSendOnboardingDay2_Success(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -784,8 +790,7 @@ func TestSendOnboardingDay2_Success(t *testing.T) {
 func TestSendOnboardingDay2_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -817,8 +822,7 @@ func TestSendOnboardingDay2_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 func TestSendOnboardingDay2_BypassesAllowlist(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -854,8 +858,7 @@ func TestSendOnboardingDay2_BypassesAllowlist(t *testing.T) {
 func TestSendOnboardingDay7_Success(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -899,8 +902,7 @@ func TestSendOnboardingDay7_Success(t *testing.T) {
 func TestSendOnboardingDay7_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -932,8 +934,7 @@ func TestSendOnboardingDay7_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 func TestSendOnboardingDay7_BypassesAllowlist(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -966,11 +967,90 @@ func TestSendOnboardingDay7_BypassesAllowlist(t *testing.T) {
 	}
 }
 
+func TestSendRetentionWarning_ReusesExistingListmonkSubscriber(t *testing.T) {
+	var lookupRequests, createRequests, txRequests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/subscribers":
+			if r.Method == http.MethodGet {
+				lookupRequests++
+				if got := r.URL.Query().Get("search"); got != "alice@example.com" {
+					t.Errorf("unexpected subscriber search: %q", got)
+				}
+				_, _ = w.Write([]byte(`{"data":{"results":[{"email":"alice@example.com"}]}}`))
+				return
+			}
+			createRequests++
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/api/tx":
+			txRequests++
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	client := New(Config{
+		BaseURL:                    srv.URL,
+		RetentionWarningTemplateID: 15,
+	})
+
+	err := client.SendRetentionWarning(context.Background(),
+		"alice@example.com", []RetentionVideoSummary{{Title: "Video"}}, "2026-04-01")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if lookupRequests != 1 {
+		t.Errorf("expected one subscriber lookup, got %d", lookupRequests)
+	}
+	if createRequests != 0 {
+		t.Errorf("expected no subscriber creation request, got %d", createRequests)
+	}
+	if txRequests != 1 {
+		t.Errorf("expected one transactional send, got %d", txRequests)
+	}
+}
+
+func TestSendPasswordReset_CreatesMissingListmonkSubscriber(t *testing.T) {
+	var created subscriberRequest
+	var txRequests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/subscribers" && r.Method == http.MethodGet:
+			_, _ = w.Write([]byte(`{"data":{"results":[]}}`))
+		case r.URL.Path == "/api/subscribers" && r.Method == http.MethodPost:
+			if err := json.NewDecoder(r.Body).Decode(&created); err != nil {
+				t.Fatalf("decode subscriber: %v", err)
+			}
+			w.WriteHeader(http.StatusOK)
+		case r.URL.Path == "/api/tx":
+			txRequests++
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	client := New(Config{BaseURL: srv.URL, TemplateID: 5})
+	err := client.SendPasswordReset(context.Background(),
+		"alice@example.com", "Alice", "https://example.com/reset")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if created.Email != "alice@example.com" || created.Name != "Alice" || created.Status != "enabled" {
+		t.Errorf("unexpected subscriber: %+v", created)
+	}
+	if txRequests != 1 {
+		t.Errorf("expected one transactional send, got %d", txRequests)
+	}
+}
+
 func TestSendRetentionWarning_Success(t *testing.T) {
 	var receivedRaw json.RawMessage
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -1031,8 +1111,7 @@ func TestSendRetentionWarning_Success(t *testing.T) {
 func TestSendRetentionWarning_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, _ := io.ReadAll(r.Body)
@@ -1064,8 +1143,7 @@ func TestSendRetentionWarning_FallbackBodyWhenTemplateIDZero(t *testing.T) {
 func TestSendRetentionWarning_BypassesAllowlist(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -1127,8 +1205,7 @@ func TestParseAllowlist(t *testing.T) {
 
 func TestSendmail_FallbackOnListmonkError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		w.WriteHeader(http.StatusForbidden)
@@ -1220,8 +1297,7 @@ func TestSendmail_AllEmailTypesWork(t *testing.T) {
 func TestDeveloperEmail_BypassesAllowlist(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -1260,8 +1336,7 @@ func TestDeveloperEmail_BypassesAllowlist(t *testing.T) {
 func TestDeveloperEmail_RedirectsAllEmails(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -1297,8 +1372,7 @@ func TestDeveloperEmail_RedirectsAllEmails(t *testing.T) {
 func TestDeveloperEmail_NotSetSendsToOriginal(t *testing.T) {
 	var received txRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/subscribers" {
-			w.WriteHeader(http.StatusOK)
+		if handleExistingSubscriber(t, w, r) {
 			return
 		}
 		body, err := io.ReadAll(r.Body)
