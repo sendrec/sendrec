@@ -1,3 +1,12 @@
+# ⚠️  LOCAL DEVELOPMENT ONLY — the secrets below are committed to a public repo
+# and are therefore public knowledge. Anything running with this file has an
+# admin token every reader of the repo already knows.
+#
+# Do NOT use this file as a self-hosting template. Production deployments
+# generate real secrets in docker-entrypoint.sh / garage-init; the dev and e2e
+# compose files publish these ports on 127.0.0.1 only, so the admin API is not
+# reachable from the network.
+
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
 db_engine = "sqlite"

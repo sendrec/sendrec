@@ -2078,8 +2078,8 @@ func TestWatch_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id", "email_gate_enabled"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil), false),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -2186,8 +2186,8 @@ func TestWatch_StorageError(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id", "email_gate_enabled"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil), false),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -2237,8 +2237,8 @@ func TestWatch_ExpiredLink(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id", "email_gate_enabled"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil), false),
 		)
 
 	r := chi.NewRouter()
@@ -2546,8 +2546,8 @@ func TestWatch_RecordsView(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id", "email_gate_enabled"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil), false),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -2595,8 +2595,8 @@ func TestWatch_IncludesThumbnailURL(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, &thumbKey, (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id", "email_gate_enabled"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, &thumbKey, (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil), false),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -3394,27 +3394,39 @@ func TestViewerHash_Returns16Characters(t *testing.T) {
 
 // --- clientIP Tests ---
 
-func TestClientIP_UsesXForwardedFor(t *testing.T) {
+// SR-01: clientIP feeds viewerHash. Honoring a client-supplied X-Forwarded-For
+// let anyone mint unlimited distinct "unique viewers", so the header counts only
+// when a trusted proxy is configured — and then only its own last entry.
+func TestClientIP_UsesLastForwardedEntryBehindTrustedProxy(t *testing.T) {
+	previous := httputil.TrustProxyHeaders
+	httputil.TrustProxyHeaders = true
+	t.Cleanup(func() { httputil.TrustProxyHeaders = previous })
+
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("X-Forwarded-For", "203.0.113.50, 70.41.3.18")
-	if ip := clientIP(req); ip != "203.0.113.50" {
-		t.Errorf("expected %q, got %q", "203.0.113.50", ip)
+	if ip := clientIP(req); ip != "70.41.3.18" {
+		t.Errorf("expected %q, got %q", "70.41.3.18", ip)
 	}
 }
 
-func TestClientIP_FallsBackToRemoteAddr(t *testing.T) {
+func TestClientIP_IgnoresForwardedForWithoutTrustedProxy(t *testing.T) {
+	previous := httputil.TrustProxyHeaders
+	httputil.TrustProxyHeaders = false
+	t.Cleanup(func() { httputil.TrustProxyHeaders = previous })
+
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.RemoteAddr = "192.168.1.100:54321"
-	if ip := clientIP(req); ip != "192.168.1.100:54321" {
-		t.Errorf("expected %q, got %q", "192.168.1.100:54321", ip)
+	req.Header.Set("X-Forwarded-For", "203.0.113.50")
+	if ip := clientIP(req); ip != "192.168.1.100" {
+		t.Errorf("spoofed header must be ignored, expected %q, got %q", "192.168.1.100", ip)
 	}
 }
 
-func TestClientIP_SingleXForwardedFor(t *testing.T) {
+func TestClientIP_StripsPortFromRemoteAddr(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("X-Forwarded-For", "203.0.113.50")
-	if ip := clientIP(req); ip != "203.0.113.50" {
-		t.Errorf("expected %q, got %q", "203.0.113.50", ip)
+	req.RemoteAddr = "192.168.1.100:54321"
+	if ip := clientIP(req); ip != "192.168.1.100" {
+		t.Errorf("expected %q, got %q", "192.168.1.100", ip)
 	}
 }
 
@@ -3988,10 +4000,10 @@ func TestWatchDownload_Success(t *testing.T) {
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled, email_gate_enabled FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password", "content_type", "download_enabled"}).
-			AddRow("Demo Recording", "recordings/user-1/abc.webm", &shareExpiresAt, (*string)(nil), "video/webm", true))
+		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password", "content_type", "download_enabled", "email_gate_enabled"}).
+			AddRow("Demo Recording", "recordings/user-1/abc.webm", &shareExpiresAt, (*string)(nil), "video/webm", true, false))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/download", handler.WatchDownload)
@@ -4031,7 +4043,7 @@ func TestWatchDownload_VideoNotFound(t *testing.T) {
 
 	shareToken := "nonexistent12"
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled, email_gate_enabled FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
 		WillReturnError(pgx.ErrNoRows)
 
@@ -4069,10 +4081,10 @@ func TestWatchDownload_Expired(t *testing.T) {
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(-1 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled, email_gate_enabled FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password", "content_type", "download_enabled"}).
-			AddRow("Demo Recording", "recordings/user-1/abc.webm", &shareExpiresAt, (*string)(nil), "video/webm", true))
+		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password", "content_type", "download_enabled", "email_gate_enabled"}).
+			AddRow("Demo Recording", "recordings/user-1/abc.webm", &shareExpiresAt, (*string)(nil), "video/webm", true, false))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/download", handler.WatchDownload)
@@ -4171,10 +4183,10 @@ func TestWatchDownload_Disabled(t *testing.T) {
 	shareToken := "abc123defghi"
 	shareExpiresAt := time.Now().Add(7 * 24 * time.Hour)
 
-	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
+	mock.ExpectQuery(`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled, email_gate_enabled FROM videos WHERE share_token = \$1 AND status IN \('ready', 'processing'\)`).
 		WithArgs(shareToken).
-		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password", "content_type", "download_enabled"}).
-			AddRow("Demo Recording", "recordings/user-1/abc.webm", &shareExpiresAt, (*string)(nil), "video/webm", false))
+		WillReturnRows(pgxmock.NewRows([]string{"title", "file_key", "share_expires_at", "share_password", "content_type", "download_enabled", "email_gate_enabled"}).
+			AddRow("Demo Recording", "recordings/user-1/abc.webm", &shareExpiresAt, (*string)(nil), "video/webm", false, false))
 
 	r := chi.NewRouter()
 	r.Get("/api/watch/{shareToken}/download", handler.WatchDownload)
@@ -4409,8 +4421,8 @@ func TestWatch_IncludesTranscriptWhenReady(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), &transcriptKey, &transcriptJSON, "ready", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id", "email_gate_enabled"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), &transcriptKey, &transcriptJSON, "ready", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil), false),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -4475,8 +4487,8 @@ func TestWatch_OmitsTranscriptWhenNone(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id", "email_gate_enabled"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil), false),
 		)
 
 	mock.ExpectExec(`INSERT INTO video_views`).
@@ -4535,8 +4547,8 @@ func TestWatch_TranscriptPoll_SkipsViewRecording(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.file_key, u.name, v.created_at, v.share_expires_at`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id"}).
-				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "processing", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil)),
+			pgxmock.NewRows([]string{"id", "title", "duration", "file_key", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "transcript_key", "transcript_json", "transcript_status", "user_id", "email", "view_notification", "content_type", "ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface", "ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css", "ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface", "ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css", "vb_company_name", "vb_logo_key", "vb_color_background", "vb_color_surface", "vb_color_text", "vb_color_accent", "vb_footer_text", "cta_text", "cta_url", "summary", "chapters", "summary_status", "document", "document_status", "organization_id", "email_gate_enabled"}).
+				AddRow(videoID, "Demo Recording", 180, "recordings/user-1/abc.webm", "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "processing", "owner-user-id", "owner@example.com", (*string)(nil), "video/webm", (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), "none", (*string)(nil), "none", (*string)(nil), false),
 		)
 
 	// No INSERT INTO video_views expected — poll should skip view recording
@@ -5850,8 +5862,8 @@ func TestOEmbed_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.duration, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "duration", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Demo Recording", 180, "Alex Neamtu", createdAt, &shareExpiresAt, stringPtr("thumbnails/user-1/abc.jpg")),
+			pgxmock.NewRows([]string{"title", "duration", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "email_gate_enabled"}).
+				AddRow("Demo Recording", 180, "Alex Neamtu", createdAt, &shareExpiresAt, stringPtr("thumbnails/user-1/abc.jpg"), (*string)(nil), false),
 		)
 
 	r := chi.NewRouter()
@@ -5966,8 +5978,8 @@ func TestOEmbed_ExpiredLink(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.duration, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "duration", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("Demo Recording", 180, "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "duration", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "email_gate_enabled"}).
+				AddRow("Demo Recording", 180, "Alex Neamtu", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), false),
 		)
 
 	r := chi.NewRouter()
@@ -6008,8 +6020,8 @@ func TestOEmbed_NoThumbnail(t *testing.T) {
 	mock.ExpectQuery(`SELECT v.title, v.duration, u.name, v.created_at, v.share_expires_at, v.thumbnail_key`).
 		WithArgs(shareToken).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"title", "duration", "name", "created_at", "share_expires_at", "thumbnail_key"}).
-				AddRow("No Thumb Video", 60, "Jane Doe", createdAt, &shareExpiresAt, (*string)(nil)),
+			pgxmock.NewRows([]string{"title", "duration", "name", "created_at", "share_expires_at", "thumbnail_key", "share_password", "email_gate_enabled"}).
+				AddRow("No Thumb Video", 60, "Jane Doe", createdAt, &shareExpiresAt, (*string)(nil), (*string)(nil), false),
 		)
 
 	r := chi.NewRouter()

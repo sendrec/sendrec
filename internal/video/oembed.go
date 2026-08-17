@@ -31,14 +31,16 @@ func (h *Handler) OEmbed(w http.ResponseWriter, r *http.Request) {
 	var createdAt time.Time
 	var shareExpiresAt *time.Time
 	var thumbnailKey *string
+	var sharePassword *string
+	var emailGateEnabled bool
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.title, v.duration, u.name, v.created_at, v.share_expires_at, v.thumbnail_key
+		`SELECT v.title, v.duration, u.name, v.created_at, v.share_expires_at, v.thumbnail_key, v.share_password, v.email_gate_enabled
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
-	).Scan(&title, &duration, &authorName, &createdAt, &shareExpiresAt, &thumbnailKey)
+	).Scan(&title, &duration, &authorName, &createdAt, &shareExpiresAt, &thumbnailKey, &sharePassword, &emailGateEnabled)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -46,6 +48,12 @@ func (h *Handler) OEmbed(w http.ResponseWriter, r *http.Request) {
 
 	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		httputil.WriteError(w, http.StatusGone, "link expired")
+		return
+	}
+
+	// Title, author and thumbnail are content too — unfurling a protected link
+	// must not reveal them (SR-08).
+	if !h.enforceWatchAccess(w, r, shareToken, sharePassword, emailGateEnabled) {
 		return
 	}
 

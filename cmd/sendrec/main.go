@@ -17,6 +17,7 @@ import (
 
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/email"
+	"github.com/sendrec/sendrec/internal/httputil"
 	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/server"
 	slackpkg "github.com/sendrec/sendrec/internal/slack"
@@ -42,6 +43,15 @@ func main() {
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET is required")
 	}
+
+	// Only believe X-Forwarded-For when a reverse proxy actually sets it —
+	// otherwise any client can forge it and mint a fresh rate-limit bucket
+	// per request. Set TRUSTED_PROXY=true when running behind Caddy/Traefik.
+	httputil.TrustProxyHeaders = getEnv("TRUSTED_PROXY", "false") == "true"
+
+	// User-configured webhooks may not reach loopback or private ranges unless
+	// a developer explicitly opts in to point one at their own machine.
+	webhookpkg.AllowPrivateTargets = getEnv("WEBHOOK_ALLOW_PRIVATE_TARGETS", "false") == "true"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -118,6 +128,11 @@ func main() {
 
 	creemAPIKey := os.Getenv("CREEM_API_KEY")
 	creemWebhookSecret := os.Getenv("CREEM_WEBHOOK_SECRET")
+	// Billing enabled without a webhook secret leaves /api/webhooks/creem
+	// forgeable, so refuse to start rather than serve entitlements to anyone.
+	if creemAPIKey != "" && creemWebhookSecret == "" {
+		log.Fatal("CREEM_WEBHOOK_SECRET is required when CREEM_API_KEY is set")
+	}
 	creemProProductID := os.Getenv("CREEM_PRO_PRODUCT_ID")
 	creemOrgProProductID := os.Getenv("CREEM_ORG_PRO_PRODUCT_ID")
 	creemBusinessProductID := os.Getenv("CREEM_BUSINESS_PRODUCT_ID")

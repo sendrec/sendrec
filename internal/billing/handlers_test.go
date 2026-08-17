@@ -581,3 +581,39 @@ func TestOrgWebhookActivated_UpdatesPlan(t *testing.T) {
 		t.Errorf("unmet mock expectations: %v", err)
 	}
 }
+
+// SR-07: an operator who sets CREEM_API_KEY but leaves CREEM_WEBHOOK_SECRET
+// empty made every forged payload verifiable via HMAC-SHA256(body, ""), which
+// was enough to flip a victim's plan. With no secret configured, no signature
+// may ever verify.
+func TestVerifySignatureRejectsEverythingWhenSecretIsEmpty(t *testing.T) {
+	handlers := &Handlers{webhookSecret: ""}
+	body := []byte(`{"eventType":"subscription.active"}`)
+
+	mac := hmac.New(sha256.New, []byte(""))
+	mac.Write(body)
+	forged := hex.EncodeToString(mac.Sum(nil))
+
+	if handlers.verifySignature(body, forged) {
+		t.Error("signature computed with the empty key must not verify")
+	}
+	if handlers.verifySignature(body, "") {
+		t.Error("empty signature must not verify against an empty secret")
+	}
+}
+
+func TestVerifySignatureAcceptsCorrectSignatureWhenSecretIsSet(t *testing.T) {
+	handlers := &Handlers{webhookSecret: "webhook-secret"}
+	body := []byte(`{"eventType":"subscription.active"}`)
+
+	mac := hmac.New(sha256.New, []byte("webhook-secret"))
+	mac.Write(body)
+	valid := hex.EncodeToString(mac.Sum(nil))
+
+	if !handlers.verifySignature(body, valid) {
+		t.Error("correctly signed body must verify")
+	}
+	if handlers.verifySignature(body, "deadbeef") {
+		t.Error("wrong signature must not verify")
+	}
+}

@@ -1,6 +1,9 @@
 package validate
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestTitle(t *testing.T) {
 	tests := []struct {
@@ -297,5 +300,27 @@ func TestFieldLimits(t *testing.T) {
 	}
 	if len(fl) < 13 {
 		t.Errorf("FieldLimits() returned %d entries, expected at least 13", len(fl))
+	}
+}
+
+// SR-10: user names had no length check at all, so a 60 KB name was stored and
+// rendered as the creator on every watch page.
+func TestName(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"empty", "", ""},
+		{"normal", "Alex Neamtu", ""},
+		{"at limit", strings.Repeat("a", MaxNameLength), ""},
+		{"over limit", strings.Repeat("a", MaxNameLength+1), "name must be 100 characters or fewer"},
+		{"far over limit", strings.Repeat("a", 60000), "name must be 100 characters or fewer"},
+	}
+
+	for _, tt := range tests {
+		if got := Name(tt.input); got != tt.want {
+			t.Errorf("Name(%s) = %q, want %q", tt.name, got, tt.want)
+		}
 	}
 }

@@ -2000,10 +2000,20 @@ var emailGatePageTemplate = template.Must(template.New("emailgate").Parse(`<!DOC
 </body>
 </html>`))
 
+// injectScriptNonce adds the per-request CSP nonce to the operator-configured
+// analytics snippet. The snippet is emitted as trusted HTML, so accept only the
+// shape this rewrite actually handles — one leading <script> tag — and drop
+// anything else rather than emit markup the nonce does not cover (SR-14).
 func injectScriptNonce(scriptTag, nonce string) template.HTML {
 	if scriptTag == "" {
 		return ""
 	}
+
+	if !strings.HasPrefix(scriptTag, "<script") || strings.Count(scriptTag, "<script") != 1 {
+		slog.Warn("watch-page: ignoring ANALYTICS_SCRIPT, expected exactly one leading <script> tag")
+		return ""
+	}
+
 	injected := strings.Replace(scriptTag, "<script", "<script nonce=\""+nonce+"\"", 1)
 	return template.HTML(injected)
 }
@@ -2270,13 +2280,15 @@ func (h *Handler) WatchThumbnail(w http.ResponseWriter, r *http.Request) {
 
 	var thumbnailKey *string
 	var shareExpiresAt *time.Time
+	var sharePassword *string
+	var emailGateEnabled bool
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT v.thumbnail_key, v.share_expires_at
+		`SELECT v.thumbnail_key, v.share_expires_at, v.share_password, v.email_gate_enabled
 		 FROM videos v
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
-	).Scan(&thumbnailKey, &shareExpiresAt)
+	).Scan(&thumbnailKey, &shareExpiresAt, &sharePassword, &emailGateEnabled)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -2284,6 +2296,12 @@ func (h *Handler) WatchThumbnail(w http.ResponseWriter, r *http.Request) {
 
 	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		http.NotFound(w, r)
+		return
+	}
+
+	// The thumbnail of a screen recording is itself sensitive, so it may not
+	// outrun the password/email gate protecting the video (SR-08).
+	if !h.enforceWatchAccess(w, r, shareToken, sharePassword, emailGateEnabled) {
 		return
 	}
 

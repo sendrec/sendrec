@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/mail"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -100,6 +101,20 @@ func generateSecureToken() (raw string, hash string, err error) {
 	return raw, hash, nil
 }
 
+// timingEqualizerHash is a real bcrypt hash of a value no one can log in with.
+// Comparing against it on the unknown-email path costs the same as comparing a
+// genuine one, so login latency no longer reveals whether an account exists.
+// Computed once, on first use, at the same cost as stored password hashes.
+var timingEqualizerHash = sync.OnceValue(func() []byte {
+	hash, err := bcrypt.GenerateFromPassword([]byte("sendrec/login-timing-equalizer"), bcrypt.DefaultCost)
+	if err != nil {
+		// Fall back to a non-matching value; a malformed hash still costs a
+		// comparison, and login correctness does not depend on this.
+		return []byte("$2a$10$invalid")
+	}
+	return hash
+})
+
 func hashToken(raw string) string {
 	h := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(h[:])
@@ -124,6 +139,11 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := mail.ParseAddress(req.Email); err != nil {
 		httputil.WriteError(w, http.StatusBadRequest, "invalid email address")
+		return
+	}
+
+	if msg := validate.Name(req.Name); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -218,6 +238,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		"SELECT id, password, email_verified FROM users WHERE email = $1", req.Email,
 	).Scan(&userID, &hashedPassword, &emailVerified)
 	if err != nil {
+		// Returning here without hashing made an unknown address answer ~60ms
+		// faster than a wrong password, which enumerates accounts regardless of
+		// the identical response body (SR-09). Pay the same bcrypt cost.
+		_ = bcrypt.CompareHashAndPassword(timingEqualizerHash(), []byte(req.Password))
 		httputil.WriteError(w, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
@@ -459,6 +483,15 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		userID,
 	); err != nil {
 		slog.Error("reset-password: failed to revoke refresh tokens", "error", err)
+	}
+
+	// A reset is account recovery: assume the credentials were compromised and
+	// cut off API keys too, which otherwise never expire (SR-05).
+	if _, err := h.db.Exec(r.Context(),
+		"DELETE FROM api_keys WHERE user_id = $1",
+		userID,
+	); err != nil {
+		slog.Error("reset-password: failed to revoke API keys", "error", err)
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, messageResponse{Message: "Password updated successfully"})
@@ -723,9 +756,24 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to update password")
 			return
 		}
+
+		// Changing the password is what a user does after suspecting theft, so
+		// it must invalidate stolen sessions here too — not just on the reset
+		// flow (SR-04). The caller re-authenticates with their new password.
+		if _, err := h.db.Exec(r.Context(),
+			"UPDATE refresh_tokens SET revoked = true, revoked_at = now() WHERE user_id = $1 AND revoked = false",
+			userID,
+		); err != nil {
+			slog.Error("update-user: failed to revoke refresh tokens", "error", err)
+		}
 	}
 
 	if hasNameChange {
+		if msg := validate.Name(req.Name); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
+			return
+		}
+
 		if _, err := h.db.Exec(r.Context(),
 			"UPDATE users SET name = $1, updated_at = now() WHERE id = $2",
 			req.Name, userID,

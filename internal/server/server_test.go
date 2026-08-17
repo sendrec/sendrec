@@ -119,7 +119,7 @@ func TestHealthEndpointReturnsOK(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","version":"","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -147,7 +147,7 @@ func TestHealthEndpointWithPingSuccess(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","version":"","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -163,7 +163,7 @@ func TestHealthEndpointWithPingFailure(t *testing.T) {
 		t.Errorf("expected status 503, got %d", rec.Code)
 	}
 
-	expected := `{"status":"unhealthy","version":"","error":"database unreachable"}`
+	expected := `{"status":"unhealthy","error":"database unreachable"}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -176,7 +176,7 @@ func TestHealthEndpointIncludesRegistrationEnabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","version":"","registrationEnabled":true,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":true,"planBadgeEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -189,7 +189,7 @@ func TestHealthEndpointRegistrationDisabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","version":"","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -202,7 +202,7 @@ func TestHealthEndpointPlanBadgeEnabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","version":"","registrationEnabled":false,"planBadgeEnabled":true}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":true}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -214,7 +214,7 @@ func TestHealthEndpointPlanBadgeDefaultDisabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","version":"","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -828,12 +828,13 @@ func TestRobotsTxtReturnsCorrectContent(t *testing.T) {
 		t.Errorf("expected Content-Type text/plain, got %q", contentType)
 	}
 
+	// SR-13: share and embed pages must not be invited into search indexes.
 	body := rec.Body.String()
-	if !strings.Contains(body, "Allow: /watch/") {
-		t.Error("expected robots.txt to allow /watch/")
+	if strings.Contains(body, "Allow: /watch/") {
+		t.Error("robots.txt must not invite crawlers to index share pages")
 	}
-	if !strings.Contains(body, "Allow: /embed/") {
-		t.Error("expected robots.txt to allow /embed/")
+	if strings.Contains(body, "Allow: /embed/") {
+		t.Error("robots.txt must not invite crawlers to index embed pages")
 	}
 	if !strings.Contains(body, "Disallow: /") {
 		t.Error("expected robots.txt to disallow /")
@@ -850,8 +851,66 @@ func TestSPADoesNotInterceptHealthEndpoint(t *testing.T) {
 		t.Errorf("expected status 200 for health endpoint with SPA, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","version":"","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected health JSON, got %q", rec.Body.String())
+	}
+}
+
+// --- SR-03: unauthenticated watch/analytics routes were registered bare ---
+//
+// GET /api/watch/{t} records a view (and can notify the owner) on every call,
+// and the three beacon POSTs parsed unbounded bodies, with no limiter on any of
+// them. Siblings like /verify and /comments were limited all along.
+
+func TestUnauthenticatedWatchAnalyticsRoutesAreRateLimited(t *testing.T) {
+	routes := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"watch", http.MethodGet, "/api/watch/sometoken123", ""},
+		{"segments", http.MethodPost, "/api/watch/sometoken123/segments", `{"segments":[1,2,3]}`},
+		{"milestone", http.MethodPost, "/api/watch/sometoken123/milestone", `{"milestone":50}`},
+		{"cta-click", http.MethodPost, "/api/watch/sometoken123/cta-click", `{}`},
+	}
+
+	for _, route := range routes {
+		t.Run(route.name, func(t *testing.T) {
+			srv, _ := newServerWithDB(t)
+
+			for i := 0; i < 60; i++ {
+				rec := executeRequestWithBody(srv, route.method, route.path, route.body)
+				if rec.Code == http.StatusTooManyRequests {
+					return
+				}
+			}
+
+			t.Errorf("expected 429 after a burst against %s %s", route.method, route.path)
+		})
+	}
+}
+
+func TestWatchAnalyticsBeaconsRejectOversizedBodies(t *testing.T) {
+	paths := []string{
+		"/api/watch/sometoken123/segments",
+		"/api/watch/sometoken123/milestone",
+		"/api/watch/sometoken123/cta-click",
+	}
+
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			srv, _ := newServerWithDB(t)
+
+			// 1 MB of JSON; the handler decodes into a slice, so an unbounded
+			// body is a memory-amplification primitive.
+			oversized := `{"segments":[` + strings.Repeat("1,", 500_000) + `1]}`
+			rec := executeRequestWithBody(srv, http.MethodPost, path, oversized)
+
+			if rec.Code == http.StatusNoContent || rec.Code == http.StatusOK {
+				t.Errorf("expected oversized body to be rejected, got %d", rec.Code)
+			}
+		})
 	}
 }

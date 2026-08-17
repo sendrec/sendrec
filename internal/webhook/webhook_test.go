@@ -52,7 +52,17 @@ func expectDeliveryLog(mock pgxmock.PgxPoolIface, eventName string, attempt int)
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 }
 
+// allowLocalDispatch lets a test dial the httptest server on loopback, which the
+// SSRF guard blocks by default (SR-06).
+func allowLocalDispatch(t *testing.T) {
+	t.Helper()
+	previous := AllowPrivateTargets
+	AllowPrivateTargets = true
+	t.Cleanup(func() { AllowPrivateTargets = previous })
+}
+
 func TestDispatchSuccess(t *testing.T) {
+	allowLocalDispatch(t)
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +117,7 @@ func TestDispatchSuccess(t *testing.T) {
 }
 
 func TestDispatchRetryOnServerError(t *testing.T) {
+	allowLocalDispatch(t)
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -154,6 +165,7 @@ func TestDispatchRetryOnServerError(t *testing.T) {
 }
 
 func TestDispatchAllRetriesFail(t *testing.T) {
+	allowLocalDispatch(t)
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -200,6 +212,7 @@ func TestDispatchAllRetriesFail(t *testing.T) {
 }
 
 func TestDispatchConnectionError(t *testing.T) {
+	allowLocalDispatch(t)
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -235,6 +248,7 @@ func TestDispatchConnectionError(t *testing.T) {
 }
 
 func TestResponseBodyTruncation(t *testing.T) {
+	allowLocalDispatch(t)
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)

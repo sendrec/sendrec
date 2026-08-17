@@ -510,17 +510,21 @@ func (s *Server) routes() {
 		watchAuthLimiter := ratelimit.NewLimiter(0.5, 5)
 		commentLimiter := ratelimit.NewLimiter(0.2, 3)
 		commentReadLimiter := ratelimit.NewLimiter(5, 20)
-		s.router.Get("/api/watch/{shareToken}", s.videoHandler.Watch)
-		s.router.Get("/api/watch/{shareToken}/download", s.videoHandler.WatchDownload)
+		// Unauthenticated watch surface: every GET records a view and can notify
+		// the owner, and the beacons write analytics rows, so they need the same
+		// throttling and body caps their siblings already had (SR-03).
+		watchLimiter := ratelimit.NewLimiter(5, 20)
+		s.router.With(watchLimiter.Middleware).Get("/api/watch/{shareToken}", s.videoHandler.Watch)
+		s.router.With(watchLimiter.Middleware).Get("/api/watch/{shareToken}/download", s.videoHandler.WatchDownload)
 		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/verify", s.videoHandler.VerifyWatchPassword)
 		s.router.With(commentReadLimiter.Middleware).Get("/api/watch/{shareToken}/comments", s.videoHandler.ListWatchComments)
 		s.router.With(commentLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/comments", s.videoHandler.PostWatchComment)
 		s.router.With(watchAuthLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/identify", s.videoHandler.IdentifyViewer)
-		s.router.Post("/api/watch/{shareToken}/cta-click", s.videoHandler.RecordCTAClick)
-		s.router.Post("/api/watch/{shareToken}/milestone", s.videoHandler.RecordMilestone)
-		s.router.Post("/api/watch/{shareToken}/segments", s.videoHandler.RecordSegments)
-		s.router.Get("/api/watch/{shareToken}/thumbnail", s.videoHandler.WatchThumbnail)
-		s.router.Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
+		s.router.With(watchLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/cta-click", s.videoHandler.RecordCTAClick)
+		s.router.With(watchLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/milestone", s.videoHandler.RecordMilestone)
+		s.router.With(watchLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/segments", s.videoHandler.RecordSegments)
+		s.router.With(watchLimiter.Middleware).Get("/api/watch/{shareToken}/thumbnail", s.videoHandler.WatchThumbnail)
+		s.router.With(watchLimiter.Middleware).Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 		s.router.Get("/embed/{shareToken}", s.videoHandler.EmbedPage)
 
@@ -542,17 +546,22 @@ func (s *Server) routes() {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	// The exact build version is only useful to someone matching the deployment
+	// against known CVEs, and nothing consumes it here (SR-15). The feature flags
+	// stay: the SPA reads them to decide what to render.
 	if s.pinger != nil {
 		if err := s.pinger.Ping(r.Context()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = fmt.Fprintf(w, `{"status":"unhealthy","version":%q,"error":"database unreachable"}`, s.version)
+			_, _ = fmt.Fprint(w, `{"status":"unhealthy","error":"database unreachable"}`)
 			return
 		}
 	}
-	_, _ = fmt.Fprintf(w, `{"status":"ok","version":%q,"registrationEnabled":%t,"planBadgeEnabled":%t}`, s.version, s.registrationEnabled, s.planBadgeEnabled)
+	_, _ = fmt.Fprintf(w, `{"status":"ok","registrationEnabled":%t,"planBadgeEnabled":%t}`, s.registrationEnabled, s.planBadgeEnabled)
 }
 
 func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte("User-agent: *\nAllow: /watch/\nAllow: /embed/\nDisallow: /\n"))
+	// Share links are unguessable but not secret once leaked; inviting crawlers
+	// to index them published the page content along with the URL (SR-13).
+	_, _ = w.Write([]byte("User-agent: *\nDisallow: /\n"))
 }

@@ -4,6 +4,7 @@ import "fmt"
 
 // Text field length limits — single source of truth for backend and frontend.
 const (
+	MaxNameLength                = 100
 	MaxTitleLength               = 500
 	MaxPlaylistTitleLength       = 200
 	MaxPlaylistDescriptionLength = 2000
@@ -27,6 +28,7 @@ func checkLen(value string, max int, field string) string {
 	return ""
 }
 
+func Name(s string) string               { return checkLen(s, MaxNameLength, "name") }
 func Title(s string) string              { return checkLen(s, MaxTitleLength, "title") }
 func PlaylistTitle(s string) string      { return checkLen(s, MaxPlaylistTitleLength, "playlist title") }
 func PlaylistDescription(s string) string {
@@ -68,6 +70,7 @@ func Password(password string) string {
 // FieldLimits returns a map of field names to max lengths for the /api/limits endpoint.
 func FieldLimits() map[string]int {
 	return map[string]int{
+		"name":                MaxNameLength,
 		"title":               MaxTitleLength,
 		"playlistTitle":       MaxPlaylistTitleLength,
 		"playlistDescription": MaxPlaylistDescriptionLength,

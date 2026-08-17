@@ -369,6 +369,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 	var summaryStatus string
 	var documentText *string
 	var documentStatus string
+	var emailGateEnabled bool
 	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
 	var obCompanyName, obLogoKey, obColorBg, obColorSurface, obColorText, obColorAccent, obFooterText, obCustomCSS *string
 	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
@@ -384,7 +385,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		        v.cta_text, v.cta_url,
 		        v.summary, v.chapters, v.summary_status,
 		        v.document, v.document_status,
-		        v.organization_id
+		        v.organization_id, v.email_gate_enabled
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id AND ub.organization_id IS NULL
@@ -400,7 +401,7 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		&ctaText, &ctaUrl,
 		&summaryText, &chaptersJSON, &summaryStatus,
 		&documentText, &documentStatus,
-		&videoOrgID)
+		&videoOrgID, &emailGateEnabled)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -411,11 +412,8 @@ func (h *Handler) Watch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if sharePassword != nil {
-		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
-			httputil.WriteError(w, http.StatusForbidden, "password required")
-			return
-		}
+	if !h.enforceWatchAccess(w, r, shareToken, sharePassword, emailGateEnabled) {
+		return
 	}
 
 	baseBranding := brandingSettingsResponse{
@@ -679,11 +677,12 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 	var sharePassword *string
 	var contentType string
 	var downloadEnabled bool
+	var emailGateEnabled bool
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
+		`SELECT title, file_key, share_expires_at, share_password, content_type, download_enabled, email_gate_enabled FROM videos WHERE share_token = $1 AND status IN ('ready', 'processing')`,
 		shareToken,
-	).Scan(&title, &fileKey, &shareExpiresAt, &sharePassword, &contentType, &downloadEnabled)
+	).Scan(&title, &fileKey, &shareExpiresAt, &sharePassword, &contentType, &downloadEnabled, &emailGateEnabled)
 	if err != nil {
 		httputil.WriteError(w, http.StatusNotFound, "video not found")
 		return
@@ -699,11 +698,8 @@ func (h *Handler) WatchDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if sharePassword != nil {
-		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
-			httputil.WriteError(w, http.StatusForbidden, "password required")
-			return
-		}
+	if !h.enforceWatchAccess(w, r, shareToken, sharePassword, emailGateEnabled) {
+		return
 	}
 
 	filename := title + extensionForContentType(contentType)

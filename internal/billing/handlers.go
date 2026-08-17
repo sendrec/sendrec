@@ -515,6 +515,12 @@ func (h *Handlers) updateSubscriptionPlan(ctx context.Context, entity billingEnt
 }
 
 func (h *Handlers) verifySignature(body []byte, signature string) bool {
+	// Without a secret every caller can compute HMAC-SHA256(body, "") and forge
+	// a valid billing event, so fail closed rather than authenticate nobody.
+	if h.webhookSecret == "" {
+		return false
+	}
+
 	mac := hmac.New(sha256.New, []byte(h.webhookSecret))
 	mac.Write(body)
 	expected := hex.EncodeToString(mac.Sum(nil))
