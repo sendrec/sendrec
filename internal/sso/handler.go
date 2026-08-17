@@ -12,12 +12,14 @@ import (
 	"net/url"
 	"sort"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 // Handler implements the HTTP endpoints for social login and SSO callbacks.
@@ -61,6 +63,20 @@ func (h *Handler) Providers(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, providersResponse{Providers: names})
 }
 
+// clampName bounds an IdP-supplied display name to the app-wide name limit
+// (SR-10). SSO must not *reject* on it — that would block login over a
+// cosmetic field — so it truncates on a UTF-8 boundary instead.
+func clampName(name string) string {
+	if len(name) <= validate.MaxNameLength {
+		return name
+	}
+	b := name[:validate.MaxNameLength]
+	for len(b) > 0 && !utf8.ValidString(b) {
+		b = b[:len(b)-1]
+	}
+	return b
+}
+
 // resolveUser maps an external identity to a local user account, creating
 // new users and identity links as needed.
 func (h *Handler) resolveUser(ctx context.Context, providerName string, info *UserInfo) (string, error) {
@@ -99,7 +115,7 @@ func (h *Handler) resolveUser(ctx context.Context, providerName string, info *Us
 	// 3. No existing user -- create one.
 	err = h.db.QueryRow(ctx,
 		"INSERT INTO users (email, password, name, email_verified) VALUES ($1, $2, $3, true) ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email RETURNING id",
-		info.Email, "", info.Name,
+		info.Email, "", clampName(info.Name),
 	).Scan(&userID)
 	if err != nil {
 		return "", fmt.Errorf("create user: %w", err)
