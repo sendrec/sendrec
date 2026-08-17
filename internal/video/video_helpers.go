@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mssola/useragent"
+	"github.com/sendrec/sendrec/internal/httputil"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
@@ -55,14 +56,10 @@ func viewerHash(ip, userAgent string) string {
 	return fmt.Sprintf("%x", h[:8])
 }
 
+// clientIP feeds viewerHash, so trusting a client-supplied X-Forwarded-For here
+// let anyone forge unlimited distinct "unique viewers" (SR-01/SR-03).
 func clientIP(r *http.Request) string {
-	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		if first, _, ok := strings.Cut(forwarded, ","); ok {
-			return strings.TrimSpace(first)
-		}
-		return strings.TrimSpace(forwarded)
-	}
-	return r.RemoteAddr
+	return httputil.ClientIP(r)
 }
 
 func categorizeReferrer(referer string) string {

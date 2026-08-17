@@ -14,6 +14,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - BASE_URL=${BASE_URL:-http://localhost:8080}
       - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-524288000}
+      - WEBHOOK_ALLOW_PRIVATE_TARGETS=${WEBHOOK_ALLOW_PRIVATE_TARGETS:-true}
       - AWS_REQUEST_CHECKSUM_CALCULATION=when_required
       - AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
     depends_on:
@@ -26,7 +27,7 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     environment:
       POSTGRES_USER: sendrec
       POSTGRES_PASSWORD: ${SENDREC_DB_PASSWORD:-sendrec}
@@ -47,8 +48,8 @@ services:
       - sendrec-storage-meta:/var/lib/garage/meta
       - sendrec-storage-data:/var/lib/garage/data
     ports:
-      - "3900:3900"
-      - "3903:3903"
+      - "127.0.0.1:3900:3900"
+      - "127.0.0.1:3903:3903"
 
   garage-init:
     build:

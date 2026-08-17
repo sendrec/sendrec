@@ -838,7 +838,17 @@ func TestPutNotificationPreferences_RejectsHttpWebhookUrl(t *testing.T) {
 	}
 }
 
+// allowLocalWebhookTargets opts a test into dialing loopback, which the SSRF
+// guard blocks by default (SR-06).
+func allowLocalWebhookTargets(t *testing.T) {
+	t.Helper()
+	previous := webhook.AllowPrivateTargets
+	webhook.AllowPrivateTargets = true
+	t.Cleanup(func() { webhook.AllowPrivateTargets = previous })
+}
+
 func TestPutNotificationPreferences_AllowsLocalhostHttp(t *testing.T) {
+	allowLocalWebhookTargets(t)
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -985,6 +995,7 @@ func TestTestWebhook_NoUrl(t *testing.T) {
 }
 
 func TestTestWebhook_Success(t *testing.T) {
+	allowLocalWebhookTargets(t)
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -1156,4 +1167,48 @@ func (m *mockSlackNotifier) SendViewNotification(_ context.Context, _, _, _, _ s
 func (m *mockSlackNotifier) SendCommentNotification(_ context.Context, _, _, _, _, _, _ string) error {
 	m.commentCalled = true
 	return nil
+}
+
+// SR-06: the old check was a prefix match on the whole URL, so any host merely
+// starting with "localhost" passed — plaintext to an attacker-controlled server.
+func TestIsValidWebhookURL_RejectsLookalikeLocalhostHosts(t *testing.T) {
+	allowLocalWebhookTargets(t)
+
+	rejected := []string{
+		"http://localhost.attacker.com/steal",
+		"http://127.0.0.1.attacker.com/steal",
+		"http://example.com/plain",
+		"ftp://example.com/x",
+		"not-a-url",
+		"",
+	}
+
+	for _, raw := range rejected {
+		if isValidWebhookURL(raw) {
+			t.Errorf("expected %q to be rejected", raw)
+		}
+	}
+}
+
+func TestIsValidWebhookURL_RejectsInternalHTTPSTargets(t *testing.T) {
+	previous := webhook.AllowPrivateTargets
+	webhook.AllowPrivateTargets = false
+	t.Cleanup(func() { webhook.AllowPrivateTargets = previous })
+
+	rejected := []string{
+		"https://127.0.0.1/admin",
+		"https://10.0.0.5/internal",
+		"https://169.254.169.254/latest/meta-data/",
+		"https://192.168.1.1/router",
+	}
+
+	for _, raw := range rejected {
+		if isValidWebhookURL(raw) {
+			t.Errorf("expected internal target %q to be rejected", raw)
+		}
+	}
+
+	if !isValidWebhookURL("https://hooks.example.com/endpoint") {
+		t.Error("expected a public https endpoint to remain valid")
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 
@@ -33,10 +34,27 @@ type Client struct {
 }
 
 // New creates a webhook client.
+//
+// The transport refuses to dial internal addresses and does not follow
+// redirects: both are ways a user-supplied URL can reach services that are not
+// on the internet (SR-06).
 func New(db database.DBTX) *Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Control:   safeDialControl,
+	}).DialContext
+
 	return &Client{
-		db:          db,
-		http:        &http.Client{Timeout: 10 * time.Second},
+		db: db,
+		http: &http.Client{
+			Timeout:   10 * time.Second,
+			Transport: transport,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 		retryDelays: []time.Duration{1 * time.Second, 4 * time.Second},
 	}
 }

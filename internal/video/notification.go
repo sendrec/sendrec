@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -87,13 +89,34 @@ func (h *Handler) GetNotificationPreferences(w http.ResponseWriter, r *http.Requ
 	})
 }
 
-func isValidWebhookURL(u string) bool {
-	if strings.HasPrefix(u, "https://") {
+// isValidWebhookURL screens a user-supplied webhook target. It is a first pass
+// only — the real guarantee is the dial-time block in the webhook client, which
+// also covers DNS names that resolve inward and redirects (SR-06).
+//
+// The previous prefix match on "http://localhost" also accepted hosts like
+// http://localhost.example.com, sending plaintext to an attacker-chosen server.
+func isValidWebhookURL(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+
+	host := parsed.Hostname()
+
+	if parsed.Scheme == "https" {
+		// Literal internal addresses are rejected here for a clear error at save
+		// time; hostnames are left to the dialer, which sees what they resolve to.
+		if ip := net.ParseIP(host); ip != nil && webhook.IsBlockedIP(ip) {
+			return false
+		}
 		return true
 	}
-	if strings.HasPrefix(u, "http://localhost") || strings.HasPrefix(u, "http://127.0.0.1") {
-		return true
+
+	// Plaintext is only for pointing at a listener on the developer's own machine.
+	if parsed.Scheme == "http" && webhook.AllowPrivateTargets {
+		return host == "localhost" || host == "127.0.0.1" || host == "::1"
 	}
+
 	return false
 }
 

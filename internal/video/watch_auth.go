@@ -36,12 +36,20 @@ func watchCookieName(shareToken string) string {
 	return "wa_" + prefix
 }
 
+// deriveCookieKey separates a cookie-signing key from the JWT secret it comes
+// from, so no single key signs two different kinds of message (SR-12). Deriving
+// here rather than at the call sites keeps the raw secret out of every HMAC.
+func deriveCookieKey(secret, purpose string) []byte {
+	sum := sha256.Sum256([]byte("sendrec/" + purpose + "/v1|" + secret))
+	return sum[:]
+}
+
 func signWatchCookie(hmacSecret, shareToken, passwordHash string) string {
 	hashPrefix := passwordHash
 	if len(hashPrefix) > 16 {
 		hashPrefix = hashPrefix[:16]
 	}
-	mac := hmac.New(sha256.New, []byte(hmacSecret))
+	mac := hmac.New(sha256.New, deriveCookieKey(hmacSecret, "watch-cookie"))
 	mac.Write([]byte(shareToken + "|" + hashPrefix))
 	return hex.EncodeToString(mac.Sum(nil))
 }
@@ -69,6 +77,28 @@ func hasValidWatchCookie(r *http.Request, hmacSecret, shareToken, passwordHash s
 		return false
 	}
 	return verifyWatchCookie(hmacSecret, shareToken, passwordHash, cookie.Value)
+}
+
+// enforceWatchAccess applies the share-password and email-gate checks that guard
+// a shared video. Every watch surface — JSON, download, thumbnail, oEmbed — must
+// route through it; enforcing only on the rendered pages left the data APIs open
+// to anyone holding the share link.
+//
+// It writes the error response and returns false when access is denied.
+func (h *Handler) enforceWatchAccess(w http.ResponseWriter, r *http.Request, shareToken string, sharePassword *string, emailGateEnabled bool) bool {
+	if sharePassword != nil && !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
+		httputil.WriteError(w, http.StatusForbidden, "password required")
+		return false
+	}
+
+	if emailGateEnabled {
+		if _, ok := hasValidEmailGateCookie(r, h.hmacSecret, shareToken); !ok {
+			httputil.WriteError(w, http.StatusForbidden, "email required")
+			return false
+		}
+	}
+
+	return true
 }
 
 type verifyPasswordRequest struct {
@@ -125,7 +155,7 @@ func emailGateCookieName(shareToken string) string {
 }
 
 func signEmailGateCookie(hmacSecret, shareToken, email string) string {
-	mac := hmac.New(sha256.New, []byte(hmacSecret))
+	mac := hmac.New(sha256.New, deriveCookieKey(hmacSecret, "email-gate-cookie"))
 	mac.Write([]byte(shareToken + "|" + email))
 	sig := hex.EncodeToString(mac.Sum(nil))
 	return email + "|" + sig

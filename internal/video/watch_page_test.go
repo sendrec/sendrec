@@ -1404,6 +1404,12 @@ func TestInjectScriptNonce(t *testing.T) {
 			`<script nonce="n123" defer src="/script.js" data-website-id="xxx"></script>`},
 		{"plausible", `<script defer data-domain="example.com" src="https://plausible.io/js/script.js"></script>`, "n456",
 			`<script nonce="n456" defer data-domain="example.com" src="https://plausible.io/js/script.js"></script>`},
+		// SR-14: the snippet is operator-supplied and injected by string surgery.
+		// Anything that is not a single well-formed <script> tag would put the
+		// nonce somewhere unintended, so it must not be emitted at all.
+		{"bare url", `https://analytics.example.com/s.js`, "n1", ""},
+		{"leading markup", `<img src=x><script src="s.js"></script>`, "n1", ""},
+		{"two script tags", `<script src="a.js"></script><script src="b.js"></script>`, "n1", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2540,8 +2546,8 @@ func TestWatchThumbnail_Redirects(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at`).
 		WithArgs("validtoken12").
-		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at"}).
-			AddRow(&thumbKey, &expiresAt))
+		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at", "share_password", "email_gate_enabled"}).
+			AddRow(&thumbKey, &expiresAt, (*string)(nil), false))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/watch/validtoken12/thumbnail", nil)
 	rec := serveWatchThumbnail(handler, req)
@@ -2595,8 +2601,8 @@ func TestWatchThumbnail_NoThumbnail(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at`).
 		WithArgs("nothumbtoken").
-		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at"}).
-			AddRow((*string)(nil), &expiresAt))
+		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at", "share_password", "email_gate_enabled"}).
+			AddRow((*string)(nil), &expiresAt, (*string)(nil), false))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/watch/nothumbtoken/thumbnail", nil)
 	rec := serveWatchThumbnail(handler, req)
@@ -2623,8 +2629,8 @@ func TestWatchThumbnail_Expired(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT v.thumbnail_key, v.share_expires_at`).
 		WithArgs("expiredtoken").
-		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at"}).
-			AddRow(&thumbKey, &expiredAt))
+		WillReturnRows(pgxmock.NewRows([]string{"thumbnail_key", "share_expires_at", "share_password", "email_gate_enabled"}).
+			AddRow(&thumbKey, &expiredAt, (*string)(nil), false))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/watch/expiredtoken/thumbnail", nil)
 	rec := serveWatchThumbnail(handler, req)

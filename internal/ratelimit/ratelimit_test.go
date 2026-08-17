@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/sendrec/sendrec/internal/httputil"
 )
 
 func TestNewLimiterAllowsFirstRequest(t *testing.T) {
@@ -220,7 +222,16 @@ func TestMiddlewareReturnsErrorBodyOn429(t *testing.T) {
 	}
 }
 
-func TestMiddlewareRespectsXForwardedForHeader(t *testing.T) {
+// trustProxy flips the deployment-wide trust flag for one test and restores it.
+func trustProxy(t *testing.T, trusted bool) {
+	t.Helper()
+	previous := httputil.TrustProxyHeaders
+	httputil.TrustProxyHeaders = trusted
+	t.Cleanup(func() { httputil.TrustProxyHeaders = previous })
+}
+
+func TestMiddlewareRespectsXForwardedForHeaderBehindTrustedProxy(t *testing.T) {
+	trustProxy(t, true)
 	limiter := NewLimiter(1, 1)
 
 	handler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -245,7 +256,8 @@ func TestMiddlewareRespectsXForwardedForHeader(t *testing.T) {
 	}
 }
 
-func TestMiddlewareXForwardedForDifferentIPsAreIndependent(t *testing.T) {
+func TestMiddlewareXForwardedForDifferentIPsAreIndependentBehindTrustedProxy(t *testing.T) {
+	trustProxy(t, true)
 	limiter := NewLimiter(1, 1)
 
 	handler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -267,6 +279,57 @@ func TestMiddlewareXForwardedForDifferentIPsAreIndependent(t *testing.T) {
 
 	if recorder.Code != http.StatusOK {
 		t.Errorf("expected 200 for different X-Forwarded-For IP, got %d", recorder.Code)
+	}
+}
+
+// SR-01: RemoteAddr carries an ephemeral port, so keying on it verbatim gave
+// every fresh TCP connection its own bucket — the limiter was bypassed by any
+// ordinary client, no header spoofing required.
+func TestMiddlewareLimitsAcrossNewConnectionsFromSameHost(t *testing.T) {
+	trustProxy(t, false)
+	limiter := NewLimiter(1, 1)
+
+	handler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	firstRequest := httptest.NewRequest(http.MethodGet, "/", nil)
+	firstRequest.RemoteAddr = "203.0.113.9:11111"
+	handler.ServeHTTP(httptest.NewRecorder(), firstRequest)
+
+	// Same host, brand-new source port — must share the bucket.
+	secondRequest := httptest.NewRequest(http.MethodGet, "/", nil)
+	secondRequest.RemoteAddr = "203.0.113.9:22222"
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, secondRequest)
+
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Errorf("expected 429 for same host on a new connection, got %d", recorder.Code)
+	}
+}
+
+// SR-01: with no trusted proxy configured, a spoofed header must not mint buckets.
+func TestMiddlewareIgnoresSpoofedXForwardedForByDefault(t *testing.T) {
+	trustProxy(t, false)
+	limiter := NewLimiter(1, 1)
+
+	handler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	firstRequest := httptest.NewRequest(http.MethodGet, "/", nil)
+	firstRequest.RemoteAddr = "203.0.113.9:11111"
+	firstRequest.Header.Set("X-Forwarded-For", "1.1.1.1")
+	handler.ServeHTTP(httptest.NewRecorder(), firstRequest)
+
+	secondRequest := httptest.NewRequest(http.MethodGet, "/", nil)
+	secondRequest.RemoteAddr = "203.0.113.9:11111"
+	secondRequest.Header.Set("X-Forwarded-For", "2.2.2.2")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, secondRequest)
+
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Errorf("expected 429 despite rotating X-Forwarded-For, got %d", recorder.Code)
 	}
 }
 
