@@ -9,6 +9,9 @@ services:
     environment:
       - DATABASE_URL=postgres://sendrec:${SENDREC_DB_PASSWORD:-sendrec}@postgres:5432/sendrec?sslmode=disable
       - S3_ENDPOINT=http://garage:3900
+      # S3_ENDPOINT is the internal Docker hostname; browsers can't reach it, so
+      # presigned upload/download URLs must be signed for a host-reachable one.
+      - S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT:-http://localhost:3900}
       - S3_REGION=${S3_REGION:-eu-central-1}
       - S3_BUCKET=recordings
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
@@ -32,6 +35,9 @@ services:
       POSTGRES_USER: sendrec
       POSTGRES_PASSWORD: ${SENDREC_DB_PASSWORD:-sendrec}
       POSTGRES_DB: sendrec
+      # postgres:18+ refuses a data volume mounted at the legacy path root;
+      # point PGDATA at a subdirectory of the mount so initdb runs cleanly.
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - sendrec-db:/var/lib/postgresql/data
     healthcheck:
