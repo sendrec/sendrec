@@ -3392,8 +3392,6 @@ func TestViewerHash_Returns16Characters(t *testing.T) {
 	}
 }
 
-// --- clientIP Tests ---
-
 // --- deleteWithRetry Tests ---
 
 func TestDeleteWithRetry_SucceedsFirstAttempt(t *testing.T) {
