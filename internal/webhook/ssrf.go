@@ -1,7 +1,6 @@
 package webhook
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"syscall"
@@ -28,13 +27,14 @@ func IsBlockedIP(ip net.IP) bool {
 		ip.IsUnspecified()
 }
 
-// blockInternalTargets rejects connections to internal addresses at dial time.
+// safeDialControl is the net.Dialer Control hook wired into the webhook client;
+// it rejects connections to internal addresses at dial time.
 //
 // Validating the configured URL is not enough: the hostname may resolve to an
 // internal address, may resolve differently on the second lookup, or the target
 // may redirect. The dialer sees the address actually being connected to on every
 // hop, so this is the one place the check cannot be routed around.
-func blockInternalTargets(_ context.Context, _, address string) error {
+func safeDialControl(_, address string, _ syscall.RawConn) error {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return fmt.Errorf("webhook: cannot parse dial address %q: %w", address, err)
@@ -50,9 +50,4 @@ func blockInternalTargets(_ context.Context, _, address string) error {
 	}
 
 	return nil
-}
-
-// safeDialControl is the net.Dialer Control hook wired into the webhook client.
-func safeDialControl(network, address string, _ syscall.RawConn) error {
-	return blockInternalTargets(context.Background(), network, address)
 }

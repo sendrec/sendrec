@@ -144,7 +144,6 @@ func main() {
 	planBadgeEnabled := getEnv("PLAN_BADGE_ENABLED", "false") == "true"
 
 	srv := server.New(server.Config{
-		Version:                   version,
 		DB:                        db.Pool,
 		Pinger:                    db,
 		Storage:                   store,

@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/sendrec/sendrec/internal/httputil"
 )
 
 type viewParams struct {
@@ -22,7 +24,7 @@ func (h *Handler) recordViewAsync(r *http.Request, p viewParams) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		ip := clientIP(r)
+		ip := httputil.ClientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
 		ref := categorizeReferrer(r.Header.Get("Referer"))
 		browser := parseBrowser(r.UserAgent())

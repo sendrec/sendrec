@@ -211,6 +211,15 @@ volumes:
 
 Put a reverse proxy (Caddy, nginx, Traefik) in front to handle TLS. The proxy should route your app domain to port 8080 and your storage domain to Garage port 3900.
 
+### Rate limiting behind a proxy (`TRUSTED_PROXY`)
+
+Per-IP rate limiting keys on the connection's source address. Behind a reverse proxy every request arrives from the *proxy's* address, so the setting matters:
+
+- **`TRUSTED_PROXY` unset or `false`, behind a proxy** — all traffic looks like it comes from the proxy IP, so every user shares a single rate-limit bucket. One busy client trips the limit for everyone — a self-inflicted denial of service.
+- **`TRUSTED_PROXY=true`** — the app believes the last `X-Forwarded-For` entry and limits per real client IP.
+
+Set `TRUSTED_PROXY=true` **only** when an edge proxy you control always sets `X-Forwarded-For` (Caddy, nginx, and Traefik do by default). If the app is exposed to the internet directly, leave it `false`: otherwise clients forge the header and evade rate limiting entirely.
+
 ## Environment variables
 
 ### Required

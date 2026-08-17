@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 type Handler struct {
@@ -101,6 +102,11 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	externalID := req.ExternalID
 	if externalID == "" {
 		externalID = email
+	}
+
+	if msg := validate.Name(name); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
 	}
 
 	userID, created, err := h.resolveUser(r.Context(), orgID, externalID, email, name)
@@ -318,6 +324,12 @@ func (h *Handler) PatchUser(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid patch operation")
 			return
 		}
+		if update.Name != nil {
+			if msg := validate.Name(*update.Name); msg != "" {
+				writeError(w, http.StatusBadRequest, msg)
+				return
+			}
+		}
 		if err := h.applyUserUpdate(r.Context(), orgID, userID, update); err != nil {
 			writeError(w, http.StatusInternalServerError, "update user failed")
 			return
@@ -369,6 +381,13 @@ func (h *Handler) ReplaceUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if update.ExternalID != nil && *update.ExternalID == "" {
 		update.ExternalID = nil
+	}
+
+	if update.Name != nil {
+		if msg := validate.Name(*update.Name); msg != "" {
+			writeError(w, http.StatusBadRequest, msg)
+			return
+		}
 	}
 
 	if err := h.applyUserUpdate(r.Context(), orgID, userID, update); err != nil {
