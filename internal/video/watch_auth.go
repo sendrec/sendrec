@@ -223,7 +223,7 @@ func (h *Handler) IdentifyViewer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := clientIP(r)
+	ip := httputil.ClientIP(r)
 	hash := viewerHash(ip, r.UserAgent())
 
 	go func() {
