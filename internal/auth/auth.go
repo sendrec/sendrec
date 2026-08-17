@@ -766,6 +766,15 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			slog.Error("update-user: failed to revoke refresh tokens", "error", err)
 		}
+
+		// Same reasoning as the reset flow: a password change is a lock-out
+		// action, so cut off never-expiring API keys too (SR-05).
+		if _, err := h.db.Exec(r.Context(),
+			"DELETE FROM api_keys WHERE user_id = $1",
+			userID,
+		); err != nil {
+			slog.Error("update-user: failed to revoke API keys", "error", err)
+		}
 	}
 
 	if hasNameChange {
