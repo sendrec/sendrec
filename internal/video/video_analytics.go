@@ -114,7 +114,7 @@ func (h *Handler) RecordCTAClick(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		ip := clientIP(r)
+		ip := httputil.ClientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
 		if _, err := h.db.Exec(ctx,
 			`INSERT INTO cta_clicks (video_id, viewer_hash) VALUES ($1, $2)`,
@@ -171,7 +171,7 @@ func (h *Handler) RecordMilestone(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		ip := clientIP(r)
+		ip := httputil.ClientIP(r)
 		hash := viewerHash(ip, r.UserAgent())
 		if _, err := h.db.Exec(ctx,
 			`INSERT INTO view_milestones (video_id, viewer_hash, milestone) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,

@@ -5,12 +5,10 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/mssola/useragent"
-	"github.com/sendrec/sendrec/internal/httputil"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
@@ -54,12 +52,6 @@ func deleteWithRetry(ctx context.Context, storage ObjectStorage, key string, max
 func viewerHash(ip, userAgent string) string {
 	h := sha256.Sum256([]byte(ip + "|" + userAgent))
 	return fmt.Sprintf("%x", h[:8])
-}
-
-// clientIP feeds viewerHash, so trusting a client-supplied X-Forwarded-For here
-// let anyone forge unlimited distinct "unique viewers" (SR-01/SR-03).
-func clientIP(r *http.Request) string {
-	return httputil.ClientIP(r)
 }
 
 func categorizeReferrer(referer string) string {

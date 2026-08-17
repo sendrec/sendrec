@@ -3394,42 +3394,6 @@ func TestViewerHash_Returns16Characters(t *testing.T) {
 
 // --- clientIP Tests ---
 
-// SR-01: clientIP feeds viewerHash. Honoring a client-supplied X-Forwarded-For
-// let anyone mint unlimited distinct "unique viewers", so the header counts only
-// when a trusted proxy is configured — and then only its own last entry.
-func TestClientIP_UsesLastForwardedEntryBehindTrustedProxy(t *testing.T) {
-	previous := httputil.TrustProxyHeaders
-	httputil.TrustProxyHeaders = true
-	t.Cleanup(func() { httputil.TrustProxyHeaders = previous })
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("X-Forwarded-For", "203.0.113.50, 70.41.3.18")
-	if ip := clientIP(req); ip != "70.41.3.18" {
-		t.Errorf("expected %q, got %q", "70.41.3.18", ip)
-	}
-}
-
-func TestClientIP_IgnoresForwardedForWithoutTrustedProxy(t *testing.T) {
-	previous := httputil.TrustProxyHeaders
-	httputil.TrustProxyHeaders = false
-	t.Cleanup(func() { httputil.TrustProxyHeaders = previous })
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.RemoteAddr = "192.168.1.100:54321"
-	req.Header.Set("X-Forwarded-For", "203.0.113.50")
-	if ip := clientIP(req); ip != "192.168.1.100" {
-		t.Errorf("spoofed header must be ignored, expected %q, got %q", "192.168.1.100", ip)
-	}
-}
-
-func TestClientIP_StripsPortFromRemoteAddr(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.RemoteAddr = "192.168.1.100:54321"
-	if ip := clientIP(req); ip != "192.168.1.100" {
-		t.Errorf("expected %q, got %q", "192.168.1.100", ip)
-	}
-}
-
 // --- deleteWithRetry Tests ---
 
 func TestDeleteWithRetry_SucceedsFirstAttempt(t *testing.T) {
