@@ -29,45 +29,45 @@ type Pinger interface {
 }
 
 type Config struct {
-	DB                      database.DBTX
-	Pinger                  Pinger
-	Storage                 video.ObjectStorage
-	WebFS                   fs.FS
-	JWTSecret               string
-	BaseURL                 string
-	MaxUploadBytes          int64
-	MaxVideosPerMonth       int
-	MaxVideoDurationSeconds int
-	MaxPlaylists            int
-	S3PublicEndpoint        string
-	EnableDocs              bool
-	BrandingEnabled         bool
-	AiEnabled               bool
-	TranscriptionEnabled    bool
-	NoiseReductionFilter    string
-	AllowedFrameAncestors   string
-	AnalyticsScript         string
-	EmailSender             auth.EmailSender
-	CommentNotifier         video.CommentNotifier
-	ViewNotifier            video.ViewNotifier
-	SlackNotifier           video.SlackNotifier
-	WebhookClient           *webhook.Client
-	CreemAPIKey              string
-	CreemWebhookSecret       string
-	CreemProProductID        string
-	CreemOrgProProductID     string
-	CreemBusinessProductID   string
+	DB                        database.DBTX
+	Pinger                    Pinger
+	Storage                   video.ObjectStorage
+	WebFS                     fs.FS
+	JWTSecret                 string
+	BaseURL                   string
+	MaxUploadBytes            int64
+	MaxVideosPerMonth         int
+	MaxVideoDurationSeconds   int
+	MaxPlaylists              int
+	S3PublicEndpoint          string
+	EnableDocs                bool
+	BrandingEnabled           bool
+	AiEnabled                 bool
+	TranscriptionEnabled      bool
+	NoiseReductionFilter      string
+	AllowedFrameAncestors     string
+	AnalyticsScript           string
+	EmailSender               auth.EmailSender
+	CommentNotifier           video.CommentNotifier
+	ViewNotifier              video.ViewNotifier
+	SlackNotifier             video.SlackNotifier
+	WebhookClient             *webhook.Client
+	CreemAPIKey               string
+	CreemWebhookSecret        string
+	CreemProProductID         string
+	CreemOrgProProductID      string
+	CreemBusinessProductID    string
 	CreemOrgBusinessProductID string
-	RegistrationEnabled     bool
-	PlanBadgeEnabled        bool
-	GeoIPDBPath             string
-	GoogleClientID          string
-	GoogleClientSecret      string
-	GoogleAllowedDomains    []string
-	MicrosoftClientID       string
-	MicrosoftClientSecret   string
-	GitHubSSOClientID       string
-	GitHubSSOClientSecret   string
+	RegistrationEnabled       bool
+	PlanBadgeEnabled          bool
+	GeoIPDBPath               string
+	GoogleClientID            string
+	GoogleClientSecret        string
+	GoogleAllowedDomains      []string
+	MicrosoftClientID         string
+	MicrosoftClientSecret     string
+	GitHubSSOClientID         string
+	GitHubSSOClientSecret     string
 }
 
 type Server struct {

@@ -88,8 +88,8 @@ func newServerWithDB(t *testing.T) (*server.Server, pgxmock.PgxPoolIface) {
 
 func testWebFS() fstest.MapFS {
 	return fstest.MapFS{
-		"index.html":    {Data: []byte("<html>app</html>")},
-		"assets/app.js": {Data: []byte("console.log('app')")},
+		"index.html":     {Data: []byte("<html>app</html>")},
+		"assets/app.js":  {Data: []byte("console.log('app')")},
 		"assets/app.css": {Data: []byte("body{}")},
 	}
 }

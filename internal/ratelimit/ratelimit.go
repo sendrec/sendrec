@@ -9,8 +9,8 @@ import (
 )
 
 type visitor struct {
-	tokens    float64
-	lastSeen  time.Time
+	tokens   float64
+	lastSeen time.Time
 }
 
 type Limiter struct {

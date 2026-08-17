@@ -28,25 +28,25 @@ func checkLen(value string, max int, field string) string {
 	return ""
 }
 
-func Name(s string) string               { return checkLen(s, MaxNameLength, "name") }
-func Title(s string) string              { return checkLen(s, MaxTitleLength, "title") }
-func PlaylistTitle(s string) string      { return checkLen(s, MaxPlaylistTitleLength, "playlist title") }
+func Name(s string) string          { return checkLen(s, MaxNameLength, "name") }
+func Title(s string) string         { return checkLen(s, MaxTitleLength, "title") }
+func PlaylistTitle(s string) string { return checkLen(s, MaxPlaylistTitleLength, "playlist title") }
 func PlaylistDescription(s string) string {
 	return checkLen(s, MaxPlaylistDescriptionLength, "playlist description")
 }
-func FolderName(s string) string    { return checkLen(s, MaxFolderNameLength, "folder name") }
-func TagName(s string) string       { return checkLen(s, MaxTagNameLength, "tag name") }
-func CommentBody(s string) string   { return checkLen(s, MaxCommentBodyLength, "comment") }
-func CompanyName(s string) string   { return checkLen(s, MaxCompanyNameLength, "company name") }
-func FooterText(s string) string    { return checkLen(s, MaxFooterTextLength, "footer text") }
-func CustomCSS(s string) string     { return checkLen(s, MaxCustomCSSLength, "custom CSS") }
+func FolderName(s string) string  { return checkLen(s, MaxFolderNameLength, "folder name") }
+func TagName(s string) string     { return checkLen(s, MaxTagNameLength, "tag name") }
+func CommentBody(s string) string { return checkLen(s, MaxCommentBodyLength, "comment") }
+func CompanyName(s string) string { return checkLen(s, MaxCompanyNameLength, "company name") }
+func FooterText(s string) string  { return checkLen(s, MaxFooterTextLength, "footer text") }
+func CustomCSS(s string) string   { return checkLen(s, MaxCustomCSSLength, "custom CSS") }
 func SlackWebhookURL(s string) string {
 	return checkLen(s, MaxSlackWebhookURLLength, "Slack webhook URL")
 }
-func WebhookURL(s string) string  { return checkLen(s, MaxWebhookURLLength, "webhook URL") }
-func APIKeyName(s string) string  { return checkLen(s, MaxAPIKeyNameLength, "API key name") }
-func OrgName(s string) string     { return checkLen(s, MaxOrgNameLength, "organization name") }
-func OrgSlug(s string) string     { return checkLen(s, MaxOrgSlugLength, "organization slug") }
+func WebhookURL(s string) string { return checkLen(s, MaxWebhookURLLength, "webhook URL") }
+func APIKeyName(s string) string { return checkLen(s, MaxAPIKeyNameLength, "API key name") }
+func OrgName(s string) string    { return checkLen(s, MaxOrgNameLength, "organization name") }
+func OrgSlug(s string) string    { return checkLen(s, MaxOrgSlugLength, "organization slug") }
 
 var validRetentionDays = map[int]bool{0: true, 30: true, 60: true, 90: true, 180: true, 365: true}
 

@@ -64,7 +64,7 @@ type trendData struct {
 
 type referrerData struct {
 	Source     string  `json:"source"`
-	Count      int64  `json:"count"`
+	Count      int64   `json:"count"`
 	Percentage float64 `json:"percentage"`
 }
 
