@@ -19,6 +19,7 @@ import (
 	"github.com/sendrec/sendrec/internal/email"
 	"github.com/sendrec/sendrec/internal/httputil"
 	"github.com/sendrec/sendrec/internal/plans"
+	"github.com/sendrec/sendrec/internal/ratelimit"
 	"github.com/sendrec/sendrec/internal/server"
 	slackpkg "github.com/sendrec/sendrec/internal/slack"
 	"github.com/sendrec/sendrec/internal/storage"
@@ -48,6 +49,10 @@ func main() {
 	// otherwise any client can forge it and mint a fresh rate-limit bucket
 	// per request. Set TRUSTED_PROXY=true when running behind Caddy/Traefik.
 	httputil.TrustProxyHeaders = getEnv("TRUSTED_PROXY", "false") == "true"
+
+	// Rate limiting is on by default; disable only in test/e2e stacks, where the
+	// whole suite hits from one IP and would otherwise throttle itself.
+	ratelimit.Enabled = getEnv("RATE_LIMIT_ENABLED", "true") == "true"
 
 	// User-configured webhooks may not reach loopback or private ranges unless
 	// a developer explicitly opts in to point one at their own machine.
