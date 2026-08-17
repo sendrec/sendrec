@@ -15,6 +15,7 @@ import (
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/integration"
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 const testJWTSecret = "test-sso-jwt-secret"
@@ -240,6 +241,53 @@ func TestCallback_NewUser_CreatesAccount(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+// maxLenArg matches any string whose byte length is at most n.
+type maxLenArg int
+
+func (m maxLenArg) Match(v interface{}) bool {
+	s, ok := v.(string)
+	return ok && len(s) <= int(m)
+}
+
+// SR-10 (SSO path): a hostile or misconfigured IdP returning a giant display
+// name must not land unbounded in the DB. SSO clamps rather than rejects (a
+// reject would block login over a cosmetic field), so the stored name stays
+// within the app-wide cap.
+func TestResolveUser_ClampsOverlongName(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	longName := strings.Repeat("x", 60000)
+
+	mock.ExpectQuery(`SELECT user_id FROM external_identities WHERE provider = \$1 AND external_id = \$2`).
+		WithArgs("github", "gh-1").
+		WillReturnError(pgx.ErrNoRows)
+	mock.ExpectQuery(`SELECT id, email_verified FROM users WHERE email = \$1`).
+		WithArgs("big@example.com").
+		WillReturnError(pgx.ErrNoRows)
+	mock.ExpectQuery(`INSERT INTO users`).
+		WithArgs("big@example.com", "", maxLenArg(validate.MaxNameLength)).
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-uuid-1"))
+	mock.ExpectExec(`INSERT INTO external_identities`).
+		WithArgs("user-uuid-1", "github", "gh-1", "big@example.com").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	userID, err := handler.resolveUser(context.Background(), "github", &UserInfo{
+		ExternalID: "gh-1",
+		Email:      "big@example.com",
+		Name:       longName,
+	})
+	if err != nil {
+		t.Fatalf("resolveUser: %v", err)
+	}
+	if userID != "user-uuid-1" {
+		t.Errorf("userID = %q, want user-uuid-1", userID)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("name was not clamped to the app-wide cap: %v", err)
 	}
 }
 

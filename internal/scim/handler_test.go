@@ -12,6 +12,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
+
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 func newTestHandler(t *testing.T) (*Handler, pgxmock.PgxPoolIface) {
@@ -146,6 +148,49 @@ func TestCreateUser_NewUser(t *testing.T) {
 	}
 	if user.UserName != "jane@example.com" {
 		t.Errorf("UserName = %q, want jane@example.com", user.UserName)
+	}
+}
+
+// SR-10 (SCIM create path): a provisioning client must not be able to store an
+// unbounded display name. Rejected at the trust boundary, before any DB write.
+func TestCreateUser_RejectsOverlongName(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	longName := strings.Repeat("a", validate.MaxNameLength+1)
+	body := `{"userName":"jane@example.com","name":{"formatted":"` + longName + `"}}`
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	req = withOrgID(req, "org-1")
+	rec := httptest.NewRecorder()
+
+	handler.CreateUser(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got status %d, want 400; body: %s", rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("overlong name must be rejected before any DB call: %v", err)
+	}
+}
+
+// SR-10 (SCIM update path): the same cap applies to Replace/PATCH updates.
+func TestReplaceUser_RejectsOverlongName(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	longName := strings.Repeat("a", validate.MaxNameLength+1)
+	body := `{"userName":"jane@example.com","name":{"formatted":"` + longName + `"},"active":true}`
+	req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(body))
+	req = withOrgID(req, "org-1")
+	rec := httptest.NewRecorder()
+
+	handler.ReplaceUser(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("got status %d, want 400; body: %s", rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("overlong name must be rejected before any DB call: %v", err)
 	}
 }
 
