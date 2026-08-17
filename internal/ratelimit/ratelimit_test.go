@@ -371,3 +371,25 @@ func TestMiddlewareDoesNotCallNextHandlerWhenRateLimited(t *testing.T) {
 		t.Errorf("expected next handler called 1 time, got %d", callCount)
 	}
 }
+
+// When rate limiting is disabled (e.g. in the e2e stack, where the whole suite
+// hits from one IP), the middleware must pass everything through — no 429s.
+func TestMiddlewarePassesEverythingWhenDisabled(t *testing.T) {
+	Enabled = false
+	t.Cleanup(func() { Enabled = true })
+
+	limiter := NewLimiter(1, 1) // burst 1: the 2nd request would normally 429
+	handler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for i := 0; i < 5; i++ {
+		request := httptest.NewRequest(http.MethodGet, "/", nil)
+		request.RemoteAddr = "192.168.1.1:1234"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, request)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("request %d: expected 200 with limiter disabled, got %d", i+1, rec.Code)
+		}
+	}
+}

@@ -14,6 +14,9 @@ services:
       - JWT_SECRET=e2e-test-secret
       - BASE_URL=http://localhost:8080
       - MAX_UPLOAD_BYTES=524288000
+      # The whole suite hits from one IP; the real limiter (SR-01) would throttle
+      # it. Off for tests only — production keeps the default (enabled).
+      - RATE_LIMIT_ENABLED=false
       - WEBHOOK_ALLOW_PRIVATE_TARGETS=${WEBHOOK_ALLOW_PRIVATE_TARGETS:-true}
       - AWS_REQUEST_CHECKSUM_CALCULATION=when_required
       - AWS_RESPONSE_CHECKSUM_VALIDATION=when_required

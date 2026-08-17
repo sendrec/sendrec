@@ -8,6 +8,12 @@ import (
 	"github.com/sendrec/sendrec/internal/httputil"
 )
 
+// Enabled gates all rate limiting. It's a deployment-wide switch set once at
+// startup (from RATE_LIMIT_ENABLED) before any request is served. Default on;
+// turned off only in test/e2e stacks, where the whole suite shares one IP and
+// would otherwise throttle itself.
+var Enabled = true
+
 type visitor struct {
 	tokens   float64
 	lastSeen time.Time
@@ -70,6 +76,10 @@ func (l *Limiter) cleanup() {
 
 func (l *Limiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !Enabled {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !l.allow(httputil.ClientIP(r)) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "10")
