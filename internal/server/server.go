@@ -29,7 +29,6 @@ type Pinger interface {
 }
 
 type Config struct {
-	Version                 string
 	DB                      database.DBTX
 	Pinger                  Pinger
 	Storage                 video.ObjectStorage
@@ -73,7 +72,6 @@ type Config struct {
 
 type Server struct {
 	router              chi.Router
-	version             string
 	pinger              Pinger
 	authHandler         *auth.Handler
 	videoHandler        *video.Handler
@@ -100,7 +98,7 @@ func New(cfg Config) *Server {
 		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
 	}))
 
-	s := &Server{router: r, version: cfg.Version, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript}
+	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
