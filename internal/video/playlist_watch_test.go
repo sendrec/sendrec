@@ -69,16 +69,16 @@ func TestPlaylistWatchPage_Success(t *testing.T) {
 
 	body := rec.Body.String()
 	checks := map[string]string{
-		"playlist title":   "My Playlist",
-		"first video":      "First Video",
-		"second video":     "Second Video",
-		"video element":    "<video",
-		"video source":     `src="https://storage.example.com/test-url"`,
-		"video list":       `class="video-list"`,
-		"player counter":   "1 of 2",
-		"nonce in style":   `nonce="test-nonce"`,
-		"nonce in script":  `<script nonce="test-nonce">`,
-		"branding":         "SendRec",
+		"playlist title":  "My Playlist",
+		"first video":     "First Video",
+		"second video":    "Second Video",
+		"video element":   "<video",
+		"video source":    `src="https://storage.example.com/test-url"`,
+		"video list":      `class="video-list"`,
+		"player counter":  "1 of 2",
+		"nonce in style":  `nonce="test-nonce"`,
+		"nonce in script": `<script nonce="test-nonce">`,
+		"branding":        "SendRec",
 	}
 	for name, want := range checks {
 		if !strings.Contains(body, want) {

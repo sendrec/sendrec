@@ -31,11 +31,11 @@ func newOIDCTestServer(t *testing.T) (*httptest.Server, *rsa.PrivateKey) {
 
 	mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		discovery := map[string]any{
-			"issuer":                 serverURL,
-			"authorization_endpoint": serverURL + "/authorize",
-			"token_endpoint":         serverURL + "/token",
-			"userinfo_endpoint":      serverURL + "/userinfo",
-			"jwks_uri":               serverURL + "/jwks",
+			"issuer":                                serverURL,
+			"authorization_endpoint":                serverURL + "/authorize",
+			"token_endpoint":                        serverURL + "/token",
+			"userinfo_endpoint":                     serverURL + "/userinfo",
+			"jwks_uri":                              serverURL + "/jwks",
 			"id_token_signing_alg_values_supported": []string{"RS256"},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -201,11 +201,11 @@ func newOIDCTestServerTrailingSlash(t *testing.T) *httptest.Server {
 	mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		// Return issuer WITH trailing slash (Auth0 behavior)
 		discovery := map[string]any{
-			"issuer":                 serverURL + "/",
-			"authorization_endpoint": serverURL + "/authorize",
-			"token_endpoint":         serverURL + "/token",
-			"userinfo_endpoint":      serverURL + "/userinfo",
-			"jwks_uri":               serverURL + "/jwks",
+			"issuer":                                serverURL + "/",
+			"authorization_endpoint":                serverURL + "/authorize",
+			"token_endpoint":                        serverURL + "/token",
+			"userinfo_endpoint":                     serverURL + "/userinfo",
+			"jwks_uri":                              serverURL + "/jwks",
 			"id_token_signing_alg_values_supported": []string{"RS256"},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -281,11 +281,11 @@ func newOIDCTestServerWithEmail(t *testing.T, opts oidcTestOpts) *httptest.Serve
 	mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"issuer":                 serverURL,
-			"authorization_endpoint": serverURL + "/authorize",
-			"token_endpoint":         serverURL + "/token",
-			"userinfo_endpoint":      serverURL + "/userinfo",
-			"jwks_uri":               serverURL + "/jwks",
+			"issuer":                                serverURL,
+			"authorization_endpoint":                serverURL + "/authorize",
+			"token_endpoint":                        serverURL + "/token",
+			"userinfo_endpoint":                     serverURL + "/userinfo",
+			"jwks_uri":                              serverURL + "/jwks",
 			"id_token_signing_alg_values_supported": []string{"RS256"},
 		})
 	})

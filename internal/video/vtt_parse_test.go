@@ -15,7 +15,7 @@ func TestParseVTTTimestamp(t *testing.T) {
 		{"01:02:03.250", 3723.25, true},
 		{"02:03.100", 123.1, true}, // no hours
 		{"garbage", 0, false},
-		{"00:00:01", 0, false},   // missing millis
+		{"00:00:01", 0, false},       // missing millis
 		{"xx:30:45.250", 0, false},   // non-numeric hour must be rejected, not silently 0
 		{"00:3x:00.500", 0, false},   // non-numeric minute rejected
 		{"00:75:00.000", 4500, true}, // out-of-range but numeric: tolerated, not silently zeroed
@@ -225,9 +225,9 @@ func TestParseVTT_Errors(t *testing.T) {
 func TestMergeSegments(t *testing.T) {
 	in := []TranscriptSegment{
 		{Start: 0, End: 1, Text: "Um", Speaker: "A"},
-		{Start: 1.5, End: 2, Text: "yeah", Speaker: "A"},   // gap 0.5s, same speaker -> merge
-		{Start: 2, End: 3, Text: "ok", Speaker: "B"},       // diff speaker -> new
-		{Start: 10, End: 11, Text: "later", Speaker: "B"},  // gap 7s -> new
+		{Start: 1.5, End: 2, Text: "yeah", Speaker: "A"},  // gap 0.5s, same speaker -> merge
+		{Start: 2, End: 3, Text: "ok", Speaker: "B"},      // diff speaker -> new
+		{Start: 10, End: 11, Text: "later", Speaker: "B"}, // gap 7s -> new
 	}
 	got := mergeSegments(in)
 	if len(got) != 3 {

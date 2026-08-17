@@ -29,9 +29,9 @@ func New(db database.DBTX) *Client {
 }
 
 type block struct {
-	Type     string  `json:"type"`
-	Text     *text   `json:"text,omitempty"`
-	Elements []text  `json:"elements,omitempty"`
+	Type     string `json:"type"`
+	Text     *text  `json:"text,omitempty"`
+	Elements []text `json:"elements,omitempty"`
 }
 
 type text struct {

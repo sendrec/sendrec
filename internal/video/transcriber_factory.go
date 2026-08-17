@@ -12,10 +12,10 @@ import (
 // environment variable. Supported providers:
 //   - "" or "local": runs whisper-cli locally (default).
 //   - "openai":      OpenAI-compatible /v1/audio/transcriptions endpoint.
-//                    Works with OpenAI, Groq, Scaleway, self-hosted Faster-Whisper, etc.
-//                    Reads TRANSCRIPTION_API_URL, TRANSCRIPTION_API_KEY, TRANSCRIPTION_MODEL.
+//     Works with OpenAI, Groq, Scaleway, self-hosted Faster-Whisper, etc.
+//     Reads TRANSCRIPTION_API_URL, TRANSCRIPTION_API_KEY, TRANSCRIPTION_MODEL.
 //   - "deepgram":    Deepgram /v1/listen.
-//                    Reads TRANSCRIPTION_API_KEY, TRANSCRIPTION_MODEL.
+//     Reads TRANSCRIPTION_API_KEY, TRANSCRIPTION_MODEL.
 func NewTranscriberFromEnv() (Transcriber, error) {
 	provider := strings.ToLower(strings.TrimSpace(os.Getenv("TRANSCRIPTION_PROVIDER")))
 	switch provider {

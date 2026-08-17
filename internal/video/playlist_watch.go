@@ -761,7 +761,6 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
 </body>
 </html>`))
 
-
 func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 	shareToken := chi.URLParam(r, "shareToken")
 	nonce := httputil.NonceFromContext(r.Context())

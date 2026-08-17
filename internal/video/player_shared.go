@@ -825,17 +825,19 @@ const safariWarningHTML = `
 
 // playlistJS contains the shared JavaScript for both the playlist watch and embed pages.
 // It expects the following variables to be declared before this code runs:
-//   videos, currentIndex, player, container, listItems, countdownTimer, autoAdvance,
-//   storageKey, aaToggle, aaTrack, nextOverlay, nextTitleEl, progressEl, nextCountdownEl,
-//   controls, overlay, playBtn, overlayBtn, seekBar, seekProgress, seekBuffered, seekThumb,
-//   timeCurrent, timeDuration, muteBtn, volumeSlider, speedBtn, speedMenu, pipBtn,
-//   fullscreenBtn, spinner, errorOverlay, seekTooltip, shortcutsBtn, shortcutsPanel, hideTimer.
+//
+//	videos, currentIndex, player, container, listItems, countdownTimer, autoAdvance,
+//	storageKey, aaToggle, aaTrack, nextOverlay, nextTitleEl, progressEl, nextCountdownEl,
+//	controls, overlay, playBtn, overlayBtn, seekBar, seekProgress, seekBuffered, seekThumb,
+//	timeCurrent, timeDuration, muteBtn, volumeSlider, speedBtn, speedMenu, pipBtn,
+//	fullscreenBtn, spinner, errorOverlay, seekTooltip, shortcutsBtn, shortcutsPanel, hideTimer.
 //
 // Each page may define hook functions before this code runs:
-//   onPlaylistVideoSwitch(index, item) — called after every video switch; use for page-specific
-//     UI updates (e.g. updating title/counter elements, loading comments).
-//   onPlaylistInit() — called once during setup; use for page-specific initialisation
-//     (e.g. sidebar collapse button wiring, loading comments for the first video).
+//
+//	onPlaylistVideoSwitch(index, item) — called after every video switch; use for page-specific
+//	  UI updates (e.g. updating title/counter elements, loading comments).
+//	onPlaylistInit() — called once during setup; use for page-specific initialisation
+//	  (e.g. sidebar collapse button wiring, loading comments for the first video).
 const playlistJS = `
         if (aaToggle) {
             aaToggle.addEventListener('click', function() {

@@ -13,8 +13,8 @@ type stubTranscriber struct {
 	err       error
 }
 
-func (s stubTranscriber) Name() string      { return "stub" }
-func (s stubTranscriber) Available() bool   { return s.available }
+func (s stubTranscriber) Name() string    { return "stub" }
+func (s stubTranscriber) Available() bool { return s.available }
 func (s stubTranscriber) Transcribe(ctx context.Context, audioPath, language string) ([]TranscriptSegment, error) {
 	return s.segments, s.err
 }
