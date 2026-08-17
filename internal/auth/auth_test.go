@@ -1997,6 +1997,47 @@ func TestUpdateUser_ChangePasswordRevokesRefreshTokens(t *testing.T) {
 	}
 }
 
+// SR-05 (settings path): the reset flow revokes API keys, but a password change
+// from settings must do the same — a stolen key otherwise survives the exact
+// action a compromised user takes to lock an attacker out.
+func TestUpdateUser_ChangePasswordRevokesAPIKeys(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	oldHash, _ := bcrypt.GenerateFromPassword([]byte("oldpass123"), bcrypt.MinCost)
+
+	mock.ExpectQuery(`SELECT password FROM users WHERE id = \$1`).
+		WithArgs("user-uuid-1").
+		WillReturnRows(pgxmock.NewRows([]string{"password"}).AddRow(string(oldHash)))
+
+	mock.ExpectExec(`UPDATE users SET password = \$1, updated_at = now\(\) WHERE id = \$2`).
+		WithArgs(pgxmock.AnyArg(), "user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+	mock.ExpectExec(`UPDATE refresh_tokens SET revoked = true`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("UPDATE", 2))
+
+	mock.ExpectExec(`DELETE FROM api_keys WHERE user_id = \$1`).
+		WithArgs("user-uuid-1").
+		WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	body := `{"currentPassword":"oldpass123","newPassword":"newpass456"}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/user", strings.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user-uuid-1"))
+	rec := httptest.NewRecorder()
+
+	handler.UpdateUser(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("API keys were not revoked on settings password change: %v", err)
+	}
+}
+
 // SR-05: API keys outlived credential recovery entirely. Resetting the password
 // after a compromise left any stolen key working indefinitely.
 func TestResetPassword_RevokesAPIKeys(t *testing.T) {
