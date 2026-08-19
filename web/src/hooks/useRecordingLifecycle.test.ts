@@ -182,4 +182,49 @@ describe("useRecordingLifecycle", () => {
     expect(perform.mock.calls.map(([command]) => command)).toEqual(["start", "stop"]);
     expect(result.current.snapshot.state).toBe("stopped");
   });
+
+  it("stops immediately when the maximum is lowered below elapsed time", () => {
+    const perform = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ maximum }) => useRecordingLifecycle({
+        maxDurationSeconds: maximum,
+        perform,
+      }),
+      { initialProps: { maximum: 10 } },
+    );
+    act(() => result.current.dispatch({ type: "request-start", countdown: false }));
+    act(() => { vi.advanceTimersByTime(3000); });
+
+    rerender({ maximum: 2 });
+
+    expect(perform.mock.calls.map(([command]) => command)).toEqual(["start", "stop"]);
+    expect(result.current.snapshot.state).toBe("stopped");
+  });
+
+  it("keeps recording when the adapter rejects pause", () => {
+    const perform = vi.fn((command: string) => command !== "pause");
+    const { result } = renderHook(() =>
+      useRecordingLifecycle({ maxDurationSeconds: 0, perform }),
+    );
+    act(() => result.current.dispatch({ type: "request-start", countdown: false }));
+
+    act(() => result.current.dispatch({ type: "pause" }));
+
+    expect(result.current.snapshot.state).toBe("recording");
+  });
+
+  it("keeps paused when the adapter rejects resume", () => {
+    let rejectResume = false;
+    const perform = vi.fn((command: string) => command !== "resume" || !rejectResume);
+    const { result } = renderHook(() =>
+      useRecordingLifecycle({ maxDurationSeconds: 0, perform }),
+    );
+    act(() => result.current.dispatch({ type: "request-start", countdown: false }));
+    act(() => result.current.dispatch({ type: "pause" }));
+    rejectResume = true;
+
+    act(() => result.current.dispatch({ type: "resume" }));
+
+    expect(result.current.snapshot.state).toBe("paused");
+  });
 });

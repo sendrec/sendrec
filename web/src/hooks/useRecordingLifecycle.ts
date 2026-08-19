@@ -23,7 +23,7 @@ export interface RecordingLifecycle {
 
 interface UseRecordingLifecycleOptions {
   maxDurationSeconds: number;
-  perform(command: RecordingCommand): void;
+  perform(command: RecordingCommand): boolean | void;
 }
 
 export function useRecordingLifecycle({
@@ -36,7 +36,6 @@ export function useRecordingLifecycle({
 
   const phaseRef = useRef<RecordingState>("idle");
   const performRef = useRef(perform);
-  const maxDurationRef = useRef(maxDurationSeconds);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef(0);
@@ -46,7 +45,6 @@ export function useRecordingLifecycle({
   const dispatchRef = useRef<(event: RecordingEvent) => void>(() => {});
 
   performRef.current = perform;
-  maxDurationRef.current = maxDurationSeconds;
 
   const clearElapsedTimer = useCallback(() => {
     if (elapsedTimerRef.current !== null) clearInterval(elapsedTimerRef.current);
@@ -70,12 +68,7 @@ export function useRecordingLifecycle({
   const startElapsedTimer = useCallback(() => {
     clearElapsedTimer();
     elapsedTimerRef.current = setInterval(() => {
-      const next = elapsedSeconds();
-      setElapsed(next);
-      const maximum = maxDurationRef.current;
-      if (maximum > 0 && next >= maximum) {
-        dispatchRef.current({ type: "stop" });
-      }
+      setElapsed(elapsedSeconds());
     }, 1000);
   }, [clearElapsedTimer, elapsedSeconds]);
 
@@ -129,7 +122,7 @@ export function useRecordingLifecycle({
 
     if (event.type === "pause") {
       if (phase !== "recording") return;
-      performRef.current("pause");
+      if (performRef.current("pause") === false) return;
       pauseStartRef.current = Date.now();
       clearElapsedTimer();
       enter("paused");
@@ -138,8 +131,8 @@ export function useRecordingLifecycle({
 
     if (event.type === "resume") {
       if (phase !== "paused") return;
+      if (performRef.current("resume") === false) return;
       totalPausedRef.current += Date.now() - pauseStartRef.current;
-      performRef.current("resume");
       startElapsedTimer();
       enter("recording");
       return;
@@ -169,6 +162,12 @@ export function useRecordingLifecycle({
   }, [beginRecording, clearCountdownTimer, clearElapsedTimer, enter, startElapsedTimer]);
 
   dispatchRef.current = dispatch;
+
+  useEffect(() => {
+    if (state === "recording" && maxDurationSeconds > 0 && elapsed >= maxDurationSeconds) {
+      dispatch({ type: "stop" });
+    }
+  }, [dispatch, elapsed, maxDurationSeconds, state]);
 
   useEffect(() => () => {
     clearElapsedTimer();

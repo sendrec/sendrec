@@ -33,11 +33,17 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
 
   const performRecordingCommand = useCallback((command: RecordingCommand) => {
     const recorder = mediaRecorderRef.current;
-    if (!recorder) return;
+    if (!recorder) return false;
 
     if (command === "start") recorder.start(1000);
-    if (command === "pause" && recorder.state === "recording") recorder.pause();
-    if (command === "resume" && recorder.state === "paused") recorder.resume();
+    if (command === "pause") {
+      if (recorder.state !== "recording") return false;
+      recorder.pause();
+    }
+    if (command === "resume") {
+      if (recorder.state !== "paused") return false;
+      recorder.resume();
+    }
     if (command === "stop" && recorder.state !== "inactive") recorder.stop();
   }, []);
 

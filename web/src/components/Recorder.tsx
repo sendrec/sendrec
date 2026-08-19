@@ -106,7 +106,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
 
     if (command === "pause") {
-      if (recorder?.state === "recording") recorder.pause();
+      if (recorder?.state !== "recording") return false;
+      recorder.pause();
       if (webcamRecorderRef.current?.state === "recording") {
         webcamRecorderRef.current.pause();
       }
@@ -114,7 +115,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
 
     if (command === "resume") {
-      if (recorder?.state === "paused") recorder.resume();
+      if (recorder?.state !== "paused") return false;
+      recorder.resume();
       if (webcamRecorderRef.current?.state === "paused") {
         webcamRecorderRef.current.resume();
       }
