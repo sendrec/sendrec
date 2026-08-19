@@ -64,11 +64,19 @@ const mockScreenStream = {
 // A chunk larger than MIN_RECORDING_BYTES (1024) so validation passes
 const LARGE_CHUNK = new Blob([new Uint8Array(2048)], { type: "video/webm" });
 
+const mediaRecorderInstances: MockMediaRecorder[] = [];
+
 class MockMediaRecorder {
   static isTypeSupported = vi.fn().mockReturnValue(true);
   state = "inactive";
   ondataavailable: ((event: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+
+  constructor() {
+    mediaRecorderInstances.push(this);
+  }
+
   start = vi.fn().mockImplementation(() => {
     this.state = "recording";
     // Simulate a data chunk being available after a microtask
@@ -90,6 +98,7 @@ class MockMediaRecorder {
 
 beforeEach(() => {
   mockDrawMode = false;
+  mediaRecorderInstances.length = 0;
   vi.clearAllMocks();
 
   Object.defineProperty(globalThis.navigator, "mediaDevices", {
@@ -613,6 +622,54 @@ describe("Recorder", () => {
     });
 
     expect(mockStopCompositing).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns to idle when screen sharing ends during countdown", async () => {
+    let endedCallback: (() => void) | undefined;
+    const stopTrack = vi.fn();
+    mockScreenStream.getVideoTracks.mockReturnValue([{
+      getSettings: () => ({ width: 1920, height: 1080 }),
+      addEventListener: vi.fn().mockImplementation((event: string, handler: () => void) => {
+        if (event === "ended") endedCallback = handler;
+      }),
+      stop: stopTrack,
+    }]);
+    mockScreenStream.getTracks.mockReturnValue([{ stop: stopTrack }]);
+
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    expect(screen.getByTestId("countdown-overlay")).toBeInTheDocument();
+
+    act(() => endedCallback!());
+
+    expect(screen.queryByTestId("countdown-overlay")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+    expect(mockStopCompositing).toHaveBeenCalled();
+    expect(stopTrack).toHaveBeenCalled();
+    expect(mediaRecorderInstances[0].stop).not.toHaveBeenCalled();
+  });
+
+  it("falls back from a runtime MP4 encoder error to WebM", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    MockMediaRecorder.isTypeSupported = vi.fn().mockReturnValue(true);
+    const onComplete = vi.fn();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<Recorder onRecordingComplete={onComplete} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    act(() => mediaRecorderInstances[0].onerror?.(new Event("error")));
+    expect(mediaRecorderInstances).toHaveLength(2);
+    expect(mediaRecorderInstances[1].start).toHaveBeenCalledTimes(1);
+
+    await act(() => vi.advanceTimersByTime(1500));
+    await user.click(screen.getByRole("button", { name: "Stop recording" }));
+    await vi.waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+
+    expect((onComplete.mock.calls[0][0] as Blob).type).toBe("video/webm");
+    vi.useRealTimers();
   });
 
   it("shows countdown after clicking start recording", async () => {
