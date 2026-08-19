@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
 import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
-import { useRecording, MIN_RECORDING_SECONDS, MIN_RECORDING_BYTES } from "../hooks/useRecording";
+import {
+  useRecordingLifecycle,
+  type RecordingCommand,
+} from "../hooks/useRecordingLifecycle";
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
+import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
 
 interface RecorderProps {
   onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void;
@@ -90,23 +94,36 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     stopWebcamStream();
   }, [stopMicStream, stopWebcamStream]);
 
-  // Stable refs for callbacks passed to useRecording to avoid stale closure issues
-  const stopRecordingRef = useRef<() => void>(() => {});
-  const beginRecordingRef = useRef<() => void>(() => {});
+  const performRecordingCommand = useCallback((command: RecordingCommand) => {
+    const recorder = mediaRecorderRef.current;
 
-  const recording = useRecording(
-    maxDurationSeconds,
-    () => beginRecordingRef.current(),
-    () => stopRecordingRef.current(),
-  );
+    if (command === "start") {
+      // No timeslice: Chrome's MP4 MediaRecorder may produce empty fragments
+      // with start(timeslice) on getDisplayMedia() streams.
+      recorder?.start();
+      webcamRecorderRef.current?.start(1000);
+      return;
+    }
 
-  const stopRecording = useCallback(() => {
+    if (command === "pause") {
+      if (recorder?.state === "recording") recorder.pause();
+      if (webcamRecorderRef.current?.state === "recording") {
+        webcamRecorderRef.current.pause();
+      }
+      return;
+    }
+
+    if (command === "resume") {
+      if (recorder?.state === "paused") recorder.resume();
+      if (webcamRecorderRef.current?.state === "paused") {
+        webcamRecorderRef.current.resume();
+      }
+      return;
+    }
+
     const hasActiveRecorder = mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive";
 
     if (hasActiveRecorder) {
-      if (mediaRecorderRef.current!.state === "paused") {
-        recording.totalPausedRef.current += Date.now() - recording.pauseStartRef.current;
-      }
       mediaRecorderRef.current!.stop();
     }
     if (webcamRecorderRef.current && webcamRecorderRef.current.state !== "inactive") {
@@ -115,7 +132,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       }
       webcamRecorderRef.current.stop();
     }
-    recording.stopTimer();
     stopCompositing();
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
@@ -127,51 +143,28 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     if (!hasActiveRecorder) {
       stopAllStreams();
     }
-    recording.setState("stopped");
-  }, [recording, stopAllStreams, stopCompositing]);
+  }, [stopAllStreams, stopCompositing]);
 
-  const pauseRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.pause();
-      if (webcamRecorderRef.current && webcamRecorderRef.current.state === "recording") {
-        webcamRecorderRef.current.pause();
-      }
-      recording.pauseStartRef.current = Date.now();
-      recording.stopTimer();
-      recording.setState("paused");
-    }
-  }, [recording]);
+  const recording = useRecordingLifecycle({
+    maxDurationSeconds,
+    perform: performRecordingCommand,
+  });
+  const { dispatch, elapsedSeconds } = recording;
 
-  const resumeRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
-      recording.totalPausedRef.current += Date.now() - recording.pauseStartRef.current;
-      mediaRecorderRef.current.resume();
-      if (webcamRecorderRef.current && webcamRecorderRef.current.state === "paused") {
-        webcamRecorderRef.current.resume();
-      }
-      recording.startTimer();
-      recording.setState("recording");
-    }
-  }, [recording]);
+  function stopRecording() {
+    dispatch({ type: "stop" });
+  }
 
-  const beginRecording = useCallback(() => {
-    clearInterval(recording.countdownTimerRef.current);
-    if (mediaRecorderRef.current) {
-      // No timeslice — Chrome's MP4 MediaRecorder may produce empty fragments
-      // with start(timeslice) on getDisplayMedia() streams. All data is buffered
-      // internally and flushed as a single blob on stop().
-      mediaRecorderRef.current.start();
-    }
-    if (webcamRecorderRef.current) {
-      webcamRecorderRef.current.start(1000);
-    }
-    recording.startTimeRef.current = Date.now();
-    recording.setState("recording");
-    recording.startTimer();
-  }, [recording]);
+  function pauseRecording() {
+    dispatch({ type: "pause" });
+  }
+
+  function resumeRecording() {
+    dispatch({ type: "resume" });
+  }
 
   const abortCountdown = useCallback(() => {
-    recording.reset();
+    dispatch({ type: "cancel-countdown" });
     stopCompositing();
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
@@ -180,11 +173,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     mediaRecorderRef.current = null;
     webcamRecorderRef.current = null;
     webcamBlobPromiseRef.current = null;
-  }, [recording, stopAllStreams, stopCompositing]);
-
-  // Keep stable callback refs up to date
-  stopRecordingRef.current = stopRecording;
-  beginRecordingRef.current = beginRecording;
+  }, [dispatch, stopAllStreams, stopCompositing]);
 
   async function toggleWebcam() {
     setMediaError(null);
@@ -289,8 +278,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
-      recording.pauseStartRef.current = 0;
-      recording.totalPausedRef.current = 0;
 
       // Set up webcam recorder if webcam is enabled (but don't start yet).
       // Always use WebM for webcam — it's only used temporarily for server-side compositing,
@@ -327,7 +314,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
       const handleStop = async () => {
         const blob = new Blob(chunksRef.current, { type: blobTypeFromMimeType(mimeTypeRef.current) });
-        const elapsed = recording.elapsedSeconds();
+        const elapsed = elapsedSeconds();
 
         let webcamBlob: Blob | undefined;
         if (webcamBlobPromiseRef.current) {
@@ -382,18 +369,16 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
       screenStream.getVideoTracks()[0].addEventListener("ended", () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          stopRecording();
+          dispatch({ type: "stop" });
         } else {
           abortCountdown();
         }
       });
 
-      if (countdownEnabled.current) {
-        recording.setCountdown(3);
-        recording.setState("countdown");
-      } else {
-        beginRecording();
-      }
+      dispatch({
+        type: "request-start",
+        countdown: countdownEnabled.current,
+      });
     } catch (err) {
       console.error("Screen capture failed", err);
       setMediaError("Screen recording was blocked or failed. Please allow screen capture and try again.");
@@ -401,12 +386,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
   }
 
-  const stopTimerRef = useRef(recording.stopTimer);
-  stopTimerRef.current = recording.stopTimer;
-
   useEffect(() => {
     return () => {
-      stopTimerRef.current();
       stopCompositing();
       stopAllStreams();
     };
@@ -419,8 +400,17 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
   }, [previewExpanded]);
 
-  const { elapsed: duration, countdown: countdownValue,
-    isIdle, isCountdown, isPaused, isActive, isRecording, remaining } = recording;
+  const {
+    state,
+    elapsed: duration,
+    countdown: countdownValue,
+    remaining,
+  } = recording.snapshot;
+  const isIdle = state === "idle";
+  const isCountdown = state === "countdown";
+  const isPaused = state === "paused";
+  const isActive = state !== "idle" && state !== "stopped";
+  const isRecording = state === "recording" || isPaused;
 
   return (
     <div className="recorder-container">
@@ -493,7 +483,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
           <div
             className="countdown-overlay"
             data-testid="countdown-overlay"
-            onClick={beginRecording}
+            onClick={() => dispatch({ type: "start-now" })}
           >
             <div className="countdown-number">{countdownValue}</div>
             <div className="countdown-hint">Click to start now</div>
