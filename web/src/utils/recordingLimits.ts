@@ -1,0 +1,2 @@
+export const MIN_RECORDING_SECONDS = 1;
+export const MIN_RECORDING_BYTES = 1024;
