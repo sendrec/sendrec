@@ -512,6 +512,26 @@ describe("Recorder", () => {
     expect(mockStopCompositing).toHaveBeenCalledTimes(1);
   });
 
+  it("resumes a paused webcam recorder before stopping it", async () => {
+    const webcamStream = new MockMediaStream();
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>)
+      .mockResolvedValue(webcamStream);
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Enable camera" }));
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+    await user.click(screen.getByRole("button", { name: "Pause recording" }));
+
+    const webcamRecorder = mediaRecorderInstances[1];
+    await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+    expect(webcamRecorder.resume).toHaveBeenCalledTimes(1);
+    expect(webcamRecorder.stop).toHaveBeenCalledTimes(1);
+    expect(webcamRecorder.resume.mock.invocationCallOrder[0])
+      .toBeLessThan(webcamRecorder.stop.mock.invocationCallOrder[0]);
+  });
+
   it("renders max duration remaining text during recording", async () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} maxDurationSeconds={120} />);

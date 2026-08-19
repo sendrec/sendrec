@@ -110,6 +110,18 @@ describe("useRecordingLifecycle", () => {
     });
   });
 
+  it("ignores unknown events during countdown", () => {
+    const perform = vi.fn();
+    const { result } = renderHook(() =>
+      useRecordingLifecycle({ maxDurationSeconds: 0, perform }),
+    );
+    act(() => result.current.dispatch({ type: "request-start", countdown: true }));
+
+    act(() => result.current.dispatch({ type: "unknown" } as never));
+
+    expect(result.current.snapshot.state).toBe("countdown");
+  });
+
   it("uses the latest adapter after rerender without restarting countdown", () => {
     const first = vi.fn();
     const second = vi.fn();
@@ -164,6 +176,40 @@ describe("useRecordingLifecycle", () => {
       act(() => result.current.dispatch({ type: "pause" }));
     }).toThrow("pause failed");
     expect(result.current.snapshot.state).toBe("recording");
+  });
+
+  it("returns to idle when the adapter rejects start", () => {
+    const perform = vi.fn((command: string) => command !== "start");
+    const { result } = renderHook(() =>
+      useRecordingLifecycle({ maxDurationSeconds: 0, perform }),
+    );
+
+    act(() => result.current.dispatch({ type: "request-start", countdown: false }));
+
+    expect(result.current.snapshot.state).toBe("idle");
+  });
+
+  it("does not double-count paused time when stop throws and is retried", () => {
+    let stopAttempts = 0;
+    const perform = vi.fn((command: string) => {
+      if (command === "stop" && stopAttempts++ === 0) throw new Error("stop failed");
+    });
+    const { result } = renderHook(() =>
+      useRecordingLifecycle({ maxDurationSeconds: 0, perform }),
+    );
+    act(() => result.current.dispatch({ type: "request-start", countdown: false }));
+    act(() => { vi.advanceTimersByTime(2000); });
+    act(() => result.current.dispatch({ type: "pause" }));
+    act(() => { vi.advanceTimersByTime(3000); });
+
+    expect(() => {
+      act(() => result.current.dispatch({ type: "stop" }));
+    }).toThrow("stop failed");
+    act(() => { vi.advanceTimersByTime(2000); });
+    act(() => result.current.dispatch({ type: "stop" }));
+
+    expect(result.current.elapsedSeconds()).toBe(2);
+    expect(result.current.snapshot.state).toBe("stopped");
   });
 
   it("uses the latest maximum duration after rerender", () => {

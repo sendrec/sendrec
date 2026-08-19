@@ -74,7 +74,12 @@ export function useRecordingLifecycle({
 
   const beginRecording = useCallback(() => {
     clearCountdownTimer();
-    performRef.current("start");
+    if (performRef.current("start") === false) {
+      countdownValueRef.current = 3;
+      setCountdown(3);
+      enter("idle");
+      return;
+    }
     startTimeRef.current = Date.now();
     countdownValueRef.current = 3;
     setCountdown(3);
@@ -140,16 +145,16 @@ export function useRecordingLifecycle({
 
     if (event.type === "stop") {
       if (phase !== "recording" && phase !== "paused") return;
+      performRef.current("stop");
       if (phase === "paused") {
         totalPausedRef.current += Date.now() - pauseStartRef.current;
       }
-      performRef.current("stop");
       clearElapsedTimer();
       enter("stopped");
       return;
     }
 
-    if (phase !== "countdown") return;
+    if (event.type !== "cancel-countdown" || phase !== "countdown") return;
     clearCountdownTimer();
     clearElapsedTimer();
     startTimeRef.current = 0;
