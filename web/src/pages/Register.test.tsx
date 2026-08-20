@@ -17,7 +17,7 @@ vi.mock("../api/client", () => ({
 }));
 
 function mockHealthResponse(registrationEnabled: boolean) {
-  vi.spyOn(global, "fetch").mockResolvedValueOnce(
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
     new Response(JSON.stringify({ registrationEnabled }), { status: 200 })
   );
 }

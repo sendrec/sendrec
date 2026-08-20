@@ -38,13 +38,13 @@ vi.mock("../api/client", () => ({
 }));
 
 function mockHealthResponse(registrationEnabled: boolean) {
-  vi.spyOn(global, "fetch").mockResolvedValueOnce(
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
     new Response(JSON.stringify({ registrationEnabled }), { status: 200 })
   );
 }
 
 function mockHealthAndProviders(registrationEnabled: boolean, providers: string[]) {
-  vi.spyOn(global, "fetch")
+  vi.spyOn(globalThis, "fetch")
     .mockResolvedValueOnce(
       new Response(JSON.stringify({ registrationEnabled }), { status: 200 })
     )
