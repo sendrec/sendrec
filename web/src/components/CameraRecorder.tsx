@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRecording, MIN_RECORDING_SECONDS, MIN_RECORDING_BYTES } from "../hooks/useRecording";
+import {
+  useRecordingLifecycle,
+  type RecordingCommand,
+} from "../hooks/useRecordingLifecycle";
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
+import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
 
 interface CameraRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
@@ -27,40 +31,26 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     }
   }, []);
 
-  // Stable refs for callbacks passed to useRecording to avoid stale closure issues
-  const stopRecordingRef = useRef<() => void>(() => {});
-  const beginRecordingRef = useRef<() => void>(() => {});
+  const performRecordingCommand = useCallback((command: RecordingCommand) => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) return false;
 
-  const recording = useRecording(
+    if (command === "start") recorder.start(1000);
+    if (command === "pause") {
+      if (recorder.state !== "recording") return false;
+      recorder.pause();
+    }
+    if (command === "resume") {
+      if (recorder.state !== "paused") return false;
+      recorder.resume();
+    }
+    if (command === "stop" && recorder.state !== "inactive") recorder.stop();
+  }, []);
+
+  const recording = useRecordingLifecycle({
     maxDurationSeconds,
-    () => beginRecordingRef.current(),
-    () => stopRecordingRef.current(),
-  );
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      if (mediaRecorderRef.current.state === "paused") {
-        recording.totalPausedRef.current += Date.now() - recording.pauseStartRef.current;
-      }
-      mediaRecorderRef.current.stop();
-    }
-    recording.stopTimer();
-    recording.setState("stopped");
-  }, [recording]);
-
-  const beginRecording = useCallback(() => {
-    clearInterval(recording.countdownTimerRef.current);
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.start(1000);
-    }
-    recording.startTimeRef.current = Date.now();
-    recording.setState("recording");
-    recording.startTimer();
-  }, [recording]);
-
-  // Keep stable callback refs up to date
-  stopRecordingRef.current = stopRecording;
-  beginRecordingRef.current = beginRecording;
+    perform: performRecordingCommand,
+  });
 
   useEffect(() => {
     async function startPreview() {
@@ -83,14 +73,8 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     startPreview();
   }, [facingMode, stopStream]);
 
-  const stopTimerRef = useRef(recording.stopTimer);
-  stopTimerRef.current = recording.stopTimer;
-
   useEffect(() => {
-    return () => {
-      stopTimerRef.current();
-      stopStream();
-    };
+    return stopStream;
   }, [stopStream]);
 
   function flipCamera() {
@@ -106,8 +90,6 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     const recorder = new MediaRecorder(streamRef.current, { mimeType });
     mediaRecorderRef.current = recorder;
     chunksRef.current = [];
-    recording.pauseStartRef.current = 0;
-    recording.totalPausedRef.current = 0;
 
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
@@ -127,34 +109,35 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
       onRecordingComplete(blob, elapsed);
     };
 
-    if (countdownEnabled.current) {
-      recording.setCountdown(3);
-      recording.setState("countdown");
-    } else {
-      beginRecording();
-    }
+    recording.dispatch({
+      type: "request-start",
+      countdown: countdownEnabled.current,
+    });
   }
 
   function pauseRecording() {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.pause();
-      recording.pauseStartRef.current = Date.now();
-      recording.stopTimer();
-      recording.setState("paused");
-    }
+    recording.dispatch({ type: "pause" });
   }
 
   function resumeRecording() {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
-      recording.totalPausedRef.current += Date.now() - recording.pauseStartRef.current;
-      mediaRecorderRef.current.resume();
-      recording.startTimer();
-      recording.setState("recording");
-    }
+    recording.dispatch({ type: "resume" });
   }
 
-  const { elapsed: duration, countdown: countdownValue,
-    isIdle, isCountdown, isPaused, isActive, isRecording, remaining } = recording;
+  function stopRecording() {
+    recording.dispatch({ type: "stop" });
+  }
+
+  const {
+    state,
+    elapsed: duration,
+    countdown: countdownValue,
+    remaining,
+  } = recording.snapshot;
+  const isIdle = state === "idle";
+  const isCountdown = state === "countdown";
+  const isPaused = state === "paused";
+  const isActive = state !== "idle" && state !== "stopped";
+  const isRecording = state === "recording" || isPaused;
 
   if (cameraError) {
     return (
@@ -212,7 +195,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
           <div
             className="countdown-overlay"
             data-testid="countdown-overlay"
-            onClick={beginRecording}
+            onClick={() => recording.dispatch({ type: "start-now" })}
           >
             <div className="countdown-number">{countdownValue}</div>
             <div className="countdown-hint">Click to start now</div>
