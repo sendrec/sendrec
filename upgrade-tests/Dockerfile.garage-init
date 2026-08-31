@@ -1,0 +1,6 @@
+FROM dxflrs/garage:v2.2.0 AS garage
+
+FROM alpine:3.22
+COPY --from=garage /garage /usr/local/bin/garage
+COPY garage-init.sh /usr/local/bin/garage-init
+ENTRYPOINT ["/usr/local/bin/garage-init"]

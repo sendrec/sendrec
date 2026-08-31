@@ -1,0 +1,31 @@
+name: Upgrade from latest compatible release
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Garage initialization helper
+        run: docker build -f upgrade-tests/Dockerfile.garage-init -t sendrec-garage-init:upgradeproof upgrade-tests
+
+      - name: Test published release to current checkout
+        uses: Sam-Hui-dot/upgradeproof@7ec473b9f4643c17615555ce757bc040aad968f4 # v0.1.0
+        with:
+          config: upgradeproof.yml
+
+      - name: Upload UpgradeProof evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upgradeproof-report
+          path: .upgradeproof/
+          include-hidden-files: true

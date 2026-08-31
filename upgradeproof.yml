@@ -1,0 +1,33 @@
+version: 2
+
+compose:
+  file: compose.upgrade.yaml
+
+paths:
+  - name: stable-to-current
+    from:
+      env:
+        SENDREC_TAG: v1.90.3@sha256:cf142fc2bb65df66fe2faf363846f7cf42107a92c0e88afc5469224368707b56
+    to:
+      env:
+        SENDREC_TAG: current
+      build:
+        services:
+          - sendrec
+        tag_env: SENDREC_TAG
+
+health:
+  type: http
+  url: http://127.0.0.1:18085/api/health
+  timeout: 120s
+  interval: 2s
+
+seed:
+  command: python3 upgrade-tests/scenario.py seed
+  timeout: 90s
+
+verify:
+  checks:
+    - name: sendrec-state-and-storage-preserved
+      command: python3 upgrade-tests/scenario.py verify
+      timeout: 90s
