@@ -1964,9 +1964,13 @@ func TestWatchPage_CtaCardIsInsidePlayerContainer(t *testing.T) {
 
 	body := rec.Body.String()
 	ctaCard := strings.Index(body, `id="cta-card"`)
-	videoTitle := strings.Index(body, `<h1 class="video-title">`)
-	if ctaCard == -1 || videoTitle == -1 || ctaCard > videoTitle {
-		t.Fatal("expected CTA card inside player container before the video title")
+	playerStart, playerEnd := -1, -1
+	if ctaCard != -1 {
+		playerStart = strings.LastIndex(body[:ctaCard], `<div class="player-container" id="player-container">`)
+		playerEnd = strings.Index(body[ctaCard:], "</div>\n        \n        </div>")
+	}
+	if ctaCard == -1 || playerStart == -1 || playerEnd == -1 {
+		t.Fatal("expected CTA card inside player container before its closing tag")
 	}
 
 	waitAndCheckExpectations(t, mock)

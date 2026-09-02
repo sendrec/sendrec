@@ -25,6 +25,7 @@ test.describe("Watch Page", () => {
   });
 
   test("shows the CTA overlay after video end even when localStorage is blocked", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
     await loginViaAPI(page);
     const file = await readFile(join(__dirname, "..", "fixtures", "test-video.webm"));
     const create = await page.request.post("/api/videos/", {
@@ -64,6 +65,18 @@ test.describe("Watch Page", () => {
 
     await page.locator("video").dispatchEvent("ended");
     await expect(page.locator("#player-container #cta-card")).toBeVisible();
+    const playerBox = await page.locator("#player-container").boundingBox();
+    const dismissBox = await page.locator("#cta-dismiss").boundingBox();
+    const ctaButtonBox = await page.locator("#cta-btn").boundingBox();
+    if (!playerBox || !dismissBox || !ctaButtonBox) {
+      throw new Error("expected CTA controls and player bounds");
+    }
+    for (const box of [dismissBox, ctaButtonBox]) {
+      expect(box.x).toBeGreaterThanOrEqual(playerBox.x);
+      expect(box.y).toBeGreaterThanOrEqual(playerBox.y);
+      expect(box.x + box.width).toBeLessThanOrEqual(playerBox.x + playerBox.width);
+      expect(box.y + box.height).toBeLessThanOrEqual(playerBox.y + playerBox.height);
+    }
     await page.locator("video").dispatchEvent("play");
     await expect(page.locator("#player-container #cta-card")).toBeHidden();
   });

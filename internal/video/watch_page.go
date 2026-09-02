@@ -764,6 +764,10 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         @media (max-width: 640px) {
             .container { padding: 1rem 0.75rem; }
             .video-title { font-size: 20px; }
+            .cta-card { padding: 0.5rem 1.75rem 0.5rem 0.5rem; }
+            .cta-title { font-size: 0.875rem; margin-bottom: 0; }
+            .cta-desc { font-size: 0.75rem; margin-bottom: 0.375rem; }
+            .cta-btn { padding: 0.5rem 1rem; font-size: 0.875rem; }
             .actions { flex-wrap: wrap; }
             .form-row { flex-direction: column; }
             .download-btn { min-height: 44px; }
