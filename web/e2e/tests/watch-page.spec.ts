@@ -60,7 +60,7 @@ test.describe("Watch Page", () => {
         get: () => ({ getItem: () => { throw new DOMException("Blocked", "SecurityError"); } }),
       });
     });
-    await page.goto(`/watch/${video.share_token}`);
+    await page.goto(`/watch/${video.shareToken}`);
 
     await page.locator("video").dispatchEvent("ended");
     await expect(page.locator("#player-container #cta-card")).toBeVisible();
