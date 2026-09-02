@@ -1924,6 +1924,58 @@ func TestWatchPage_RendersCtaCard(t *testing.T) {
 	waitAndCheckExpectations(t, mock)
 }
 
+func TestWatchPage_CtaCardIsInsidePlayerContainer(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://s3.example.com/video.webm"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	ctaText := "Book a demo"
+	ctaURL := "https://example.com/demo"
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs("test-token").
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"video-001", "Test Video", "recordings/user-001/test.webm", "Test User",
+			time.Now(), (*time.Time)(nil),
+			(*string)(nil), (*string)(nil), "disabled",
+			(*string)(nil), (*string)(nil), "none",
+			"user-001", "test@example.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, &ctaText, &ctaURL,
+			false,
+			(*string)(nil), (*string)(nil), "none",
+			0,
+			"free",
+			"ready",
+			(*string)(nil),
+		))
+	expectViewRecording(mock, "video-001")
+
+	rec := serveWatchPage(handler, watchPageRequest("test-token"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	body := rec.Body.String()
+	ctaCard := strings.Index(body, `id="cta-card"`)
+	playerStart, playerEnd := -1, -1
+	if ctaCard != -1 {
+		playerStart = strings.LastIndex(body[:ctaCard], `<div class="player-container" id="player-container">`)
+		playerEnd = strings.Index(body[ctaCard:], "</div>\n        \n        </div>")
+	}
+	if ctaCard == -1 || playerStart == -1 || playerEnd == -1 {
+		t.Fatal("expected CTA card inside player container before its closing tag")
+	}
+
+	waitAndCheckExpectations(t, mock)
+}
+
 func TestWatchPage_NoCtaWhenNotSet(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {

@@ -658,7 +658,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: var(--brand-text);
             font-size: 14px;
         }
-        .cta-card { display: none; margin: 1.5rem 0; padding: 1.5rem; background: var(--brand-surface); border: 1px solid var(--brand-accent); border-radius: 8px; text-align: center; position: relative; }
+        .cta-card { display: none; position: absolute; bottom: 48px; left: 0; right: 0; z-index: 4; padding: 1.5rem; background: var(--brand-surface); border: 1px solid var(--brand-accent); border-radius: 8px; text-align: center; }
         .cta-card.visible { display: block; }
         .cta-title { font-size: 1rem; font-weight: 600; color: var(--brand-text); margin-bottom: 0.25rem; }
         .cta-desc { font-size: 0.875rem; color: #94a3b8; margin-bottom: 0.75rem; }
@@ -764,6 +764,10 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         @media (max-width: 640px) {
             .container { padding: 1rem 0.75rem; }
             .video-title { font-size: 20px; }
+            .cta-card { padding: 0.5rem 1.75rem 0.5rem 0.5rem; }
+            .cta-title { font-size: 0.875rem; margin-bottom: 0; }
+            .cta-desc { font-size: 0.75rem; margin-bottom: 0.375rem; }
+            .cta-btn { padding: 0.5rem 1rem; font-size: 0.875rem; }
             .actions { flex-wrap: wrap; }
             .form-row { flex-direction: column; }
             .download-btn { min-height: 44px; }
@@ -808,6 +812,14 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 Your browser does not support video playback.
             </video>
 ` + playerControlsHTML + `
+        {{if and .CtaText .CtaUrl}}
+        <div class="cta-card" id="cta-card">
+            <button class="cta-dismiss" id="cta-dismiss" aria-label="Dismiss">&times;</button>
+            <p class="cta-title">Continue the conversation</p>
+            <p class="cta-desc">Interested? Click below to take the next step.</p>
+            <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" class="cta-btn" id="cta-btn">{{.CtaText}}</a>
+        </div>
+        {{end}}
         </div>
 ` + safariWarningHTML + `
         <script nonce="{{.Nonce}}">
@@ -832,14 +844,6 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             <span>{{.Date}}</span>
         </div>
         {{if .DownloadEnabled}}<div class="actions"><button class="download-btn" id="download-btn"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>Download</button></div>{{end}}
-        {{if and .CtaText .CtaUrl}}
-        <div class="cta-card" id="cta-card">
-            <button class="cta-dismiss" id="cta-dismiss" aria-label="Dismiss">&times;</button>
-            <p class="cta-title">Continue the conversation</p>
-            <p class="cta-desc">Interested? Click below to take the next step.</p>
-            <a href="{{.CtaUrl}}" target="_blank" rel="noopener noreferrer" class="cta-btn" id="cta-btn">{{.CtaText}}</a>
-        </div>
-        {{end}}
         <script nonce="{{.Nonce}}">
             {{if .DownloadEnabled}}
             document.getElementById('download-btn').addEventListener('click', function() {
@@ -1435,7 +1439,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                 });
             }
 
-            var token = localStorage.getItem('token');
+            var token = '';
+            try { token = localStorage.getItem('token') || ''; } catch(e) {}
             var failedMsg = document.getElementById('transcript-failed');
             if (token && failedMsg) failedMsg.classList.remove('hidden');
             var btn = document.getElementById('transcribe-btn');
@@ -1564,6 +1569,9 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             if (player && ctaCard) {
                 player.addEventListener('ended', function() {
                     if (!ctaDismissed) ctaCard.classList.add('visible');
+                });
+                player.addEventListener('play', function() {
+                    ctaCard.classList.remove('visible');
                 });
             }
             if (ctaBtn) {
