@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -169,6 +170,22 @@ func TestGenerateDownloadURLReturnsNonEmptyURL(t *testing.T) {
 	}
 	if url == "" {
 		t.Fatal("expected non-empty download URL")
+	}
+}
+
+func TestGenerateDownloadURLSignsOnlyHostHeader(t *testing.T) {
+	store := newTestStorage(t, storage.Config{})
+
+	presignedURL, err := store.GenerateDownloadURL(context.Background(), "videos/abc.mp4", 15*time.Minute)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	parsedURL, err := url.Parse(presignedURL)
+	if err != nil {
+		t.Fatalf("parse presigned URL: %v", err)
+	}
+	if got := parsedURL.Query().Get("X-Amz-SignedHeaders"); got != "host" {
+		t.Fatalf("expected only host signed header, got %q", got)
 	}
 }
 
