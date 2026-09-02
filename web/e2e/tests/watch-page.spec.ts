@@ -1,7 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { queryRows } from "../helpers/db";
 import { getAccessToken, loginViaAPI } from "../helpers/auth";
-import { uploadTestVideo } from "../helpers/workspace";
+import { readFile } from "fs/promises";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 test.describe("Watch Page", () => {
   test("watch page renders for a valid share token", async ({ page }) => {
@@ -22,11 +26,24 @@ test.describe("Watch Page", () => {
 
   test("shows the CTA overlay after video end even when localStorage is blocked", async ({ page }) => {
     await loginViaAPI(page);
-    await uploadTestVideo(page);
+    const file = await readFile(join(__dirname, "..", "fixtures", "test-video.webm"));
+    const create = await page.request.post("/api/videos/", {
+      data: {
+        title: "CTA overlay test",
+        duration: 1,
+        fileSize: file.length,
+        contentType: "video/webm",
+      },
+      headers: { Authorization: `Bearer ${getAccessToken(page)}` },
+    });
+    expect(create.ok()).toBe(true);
+    const video = await create.json();
 
-    const [video] = await queryRows<{ id: string; share_token: string }>(
-      "SELECT id, share_token FROM videos WHERE title = 'Untitled Video' ORDER BY created_at DESC LIMIT 1"
-    );
+    const upload = await page.request.put(video.uploadUrl, {
+      data: file,
+      headers: { "Content-Type": "video/webm" },
+    });
+    expect(upload.ok()).toBe(true);
     const ready = await page.request.patch(`/api/videos/${video.id}`, {
       data: { status: "ready" },
       headers: { Authorization: `Bearer ${getAccessToken(page)}` },
