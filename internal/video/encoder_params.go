@@ -1,77 +1,91 @@
 package video
 
-// x264MemoryParams bounds libx264's own allocations.
+// ffmpeg sizes four kinds of thread pool from the visible CPU count, and each
+// one is capped by a different flag in a different position. Every encode here
+// runs in the process that serves HTTP, so an uncapped pool means peak memory
+// tracks the node rather than the settings, and a job that outgrows the pod
+// drops every in-flight request rather than just the edit. That is #200.
 //
-// Every encode in this package runs in the process that serves HTTP, so peak
-// resident memory is an availability concern: a job that needs more than the
-// pod has takes live traffic down with it, not just the edit.
+// The pools, and the helper that caps each:
+//
+//	input decoders    inputThreads()     immediately before every -i
+//	filter graphs     globalThreads()    once, before the first -i
+//	video encoder     encoderThreads()   after the inputs, before the output
+//	libx264 internals x264MemoryParams() after the inputs, before the output
+//
+// Three review rounds landed bounds that did not bind, every one of them from
+// getting a flag's position or scope wrong rather than its value, so prefer
+// these helpers over hand-placed flags. Measured effect of the last round's two
+// gaps, varying only the CPUs the container can see:
+//
+//	                        1 CPU              4 CPUs
+//	composite, one -i cap   354 MB, 7 threads  357 MB, 12 threads
+//	composite, per-input    353 MB, 11         353 MB, 11
+//	vp9, no encoder cap     404 MB             425 MB
+//	vp9, encoder capped     425 MB             425 MB
+//
+// The vp9 encoder was the larger leak: 21 MB of node-dependence, now 0.1 MB.
+// Composite's own RSS spread was small on that fixture because the webcam input
+// is small, so the decoder thread count settling at a constant is the clearer
+// evidence there.
+const ffmpegThreadCap = "4"
+
+// globalThreads caps the simple and complex filter graphs. Both are global
+// options, so they are emitted once at the front regardless of which graph a
+// given command builds; ffmpeg accepts the unused one without complaint.
+func globalThreads() []string {
+	return []string{"-filter_threads", ffmpegThreadCap, "-filter_complex_threads", ffmpegThreadCap}
+}
+
+// inputThreads caps one input decoder. -threads is a per-file option that
+// resets between files, so it reaches only the -i that follows it: a command
+// with two inputs needs two copies. Emitting it once before the first input
+// left composite's webcam decoder scaling with the node.
+func inputThreads() []string {
+	return []string{"-threads", ffmpegThreadCap}
+}
+
+// encoderThreads caps the video encoder, for every codec. libx264 takes roughly
+// 1.5 threads per visible CPU and libvpx-vp9 takes one per CPU, so both need
+// this; an earlier version applied it only alongside the libx264 parameters and
+// left every vp9 output uncapped.
+func encoderThreads() []string {
+	return []string{"-threads", ffmpegThreadCap}
+}
+
+// x264MemoryParams bounds libx264's own allocations.
 //
 // rc-lookahead holds decoded frames for rate control, ref holds reference
 // frames, and B-frames add a reorder buffer over both. They are work as well as
 // memory, so dropping them also encodes faster — roughly 540 MB down to 340 MB,
-// and a third off the wall time, on a 1080p30 source.
+// and about a quarter off the wall time, on a 1080p30 source.
+//
+// Capping threads lower saves roughly another 60 MB for about 1.5x the wall
+// time, which is why the cap sits at 4 rather than 1.
 //
 // Figures here are approximate on purpose. They move with the ffmpeg build, the
 // input and the machine, so run hack/encoder-memory/run.sh for numbers that
-// describe your environment rather than trusting these. The ratios are the
-// finding; the megabytes are one sample.
+// describe your environment. The ratios are the finding; the megabytes are one
+// sample.
 //
 // Output grows about 11% at the same CRF on synthetic high-entropy content, so
 // real screen recordings should fare better. profile=high and level=5.1 survive
 // the raw parameters, confirmed with ffprobe.
-//
-// Thread count is capped at 4 because x264 otherwise takes roughly 1.5 threads
-// per visible CPU and each thread holds frame buffers. Uncapped, the ceiling
-// tracks the node instead of the settings. Four costs nothing here — within a
-// second of uncapped on 4 CPUs — while going lower saves about 60 MB for nearly
-// double the wall time.
 func x264MemoryParams() []string {
-	return []string{"-threads", "4", "-x264-params", "rc-lookahead=10:ref=1:bframes=0"}
+	return []string{"-x264-params", "rc-lookahead=10:ref=1:bframes=0"}
 }
 
-// appendX264Params adds the bounds only when the content type resolves to
-// libx264; libvpx-vp9 rejects -x264-params outright.
+// appendEncoderBounds adds the output-side caps. Call it after the inputs and
+// before the output URL: ffmpeg binds an option to the file that follows it, so
+// anything after the output is parsed as trailing and discarded with a warning
+// the encoder never sees.
 //
-// Call this before the output URL is appended. ffmpeg applies options to the
-// output that follows them, so options placed after the last one are parsed as
-// trailing and discarded with a warning — the encoder then runs on defaults,
-// with nothing failing to show it.
-func appendX264Params(args []string, contentType string) []string {
-	if videoCodecForContentType(contentType) != "libx264" {
-		return args
+// The libx264 parameters are codec-specific — libvpx-vp9 rejects the flag — but
+// the thread cap applies to both.
+func appendEncoderBounds(args []string, contentType string) []string {
+	args = append(args, encoderThreads()...)
+	if videoCodecForContentType(contentType) == "libx264" {
+		args = append(args, x264MemoryParams()...)
 	}
-	return append(args, x264MemoryParams()...)
-}
-
-// ffmpegPipelineThreads bounds the thread pools ffmpeg sizes from the visible
-// CPU count, and must precede the first -i.
-//
-// Capping the encoder alone leaves two other pools unbounded: the input decoder
-// and the simple and complex filter graphs each default to the available CPU
-// count independently. Same command, same x264 header, varying only how many
-// CPUs the container can see:
-//
-//	                encoder cap only   whole pipeline
-//	1 CPU              268 MB             296 MB
-//	2 CPUs             287 MB             296 MB
-//	4 CPUs             300 MB             296 MB
-//
-// The encoder-only column tracks the node. The whole-pipeline column does not,
-// which is the entire point: a bound that holds on the machine it was measured
-// on is not a bound. Measured to 4 CPUs, which is what the test machine had, so
-// the flatness is demonstrated rather than proven for larger nodes.
-//
-// The trade is visible in the first row — forcing 4 threads on a 1-CPU pod costs
-// about 28 MB over letting it size itself. A fixed ceiling everywhere is worth
-// more than the smallest possible footprint on the smallest possible node.
-//
-// Placement is what makes these work. ffmpeg binds an option to the next file,
-// so -threads must precede -i to reach the input decoder; after the input it
-// configures the encoder instead. -filter_threads and -filter_complex_threads
-// are global and set here for the same reason.
-//
-// Unlike the x264 bounds these apply to every encode, vp9 included: decoding and
-// filtering happen whatever the output codec is.
-func ffmpegPipelineThreads() []string {
-	return []string{"-threads", "4", "-filter_threads", "4", "-filter_complex_threads", "4"}
+	return args
 }

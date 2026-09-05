@@ -13,7 +13,8 @@ import (
 )
 
 func buildTranscodeArgs(inputPath, outputPath, audioFilter string) []string {
-	args := append(ffmpegPipelineThreads(),
+	args := append(globalThreads(), inputThreads()...)
+	args = append(args,
 		"-i", inputPath,
 		"-c:v", "libx264",
 		"-profile:v", "high",
@@ -23,7 +24,7 @@ func buildTranscodeArgs(inputPath, outputPath, audioFilter string) []string {
 		"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
 		"-r", "60",
 	)
-	args = append(args, x264MemoryParams()...)
+	args = appendEncoderBounds(args, "video/mp4")
 	if audioFilter != "" {
 		args = append(args, "-af", audioFilter)
 	}

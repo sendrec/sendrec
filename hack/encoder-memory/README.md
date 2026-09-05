@@ -8,8 +8,14 @@ Needs Docker. Nothing is installed on the host; ffmpeg runs from a scratch image
 ./run.sh
 ```
 
-Roughly 10 minutes on 4 cores. It builds a 1080p30 fixture, then reports peak RSS
+Roughly 10 minutes on 4 cores, plus a few more for the CPU-visibility sweep. It builds a 1080p30 fixture, then reports peak RSS
 and wall time per variant, sampling `VmHWM` from `/proc/<pid>/status` every 50ms.
+
+Covers the encoder settings, option ordering, thread count, the argument shape
+the app actually passes, both composite inputs, the vp9 output encoder, stream
+copy as a floor, and a sweep that varies how many CPUs the container can see.
+That last one is the only section that can show whether a bound is a bound: a
+figure from one machine cannot.
 
 Peak RSS is the ffmpeg process only. It is the number that matters for these
 settings, but it is not the pod's total footprint — the Go server sits alongside

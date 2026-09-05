@@ -68,6 +68,28 @@ for t in auto 1 2 4 8; do
     -c:v libx264 -preset fast -crf 23 "${targ[@]}" -x264-params "$BOUNDS" -an -y "/work/t_$t.mp4"
 done
 
+echo; echo "== stream copy: the floor, no encoder at all =="
+/work/peak.sh "stream copy" ffmpeg -nostdin -hide_banner -loglevel info -i /work/fx.mp4 -c copy -y /work/copy.mp4
+
+echo; echo "== composite: two inputs, each decoder needs its own cap =="
+ffmpeg -nostdin -loglevel error -f lavfi -i "testsrc2=size=640x480:rate=30:duration=10" \
+  -c:v libvpx-vp9 -deadline realtime -cpu-used 8 -y /work/cam.webm
+CFC="[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];[1:v]setpts=PTS-STARTPTS,scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip];[screen][pip]overlay=W-w-20:H-h-20[vout]"
+/work/peak.sh "composite, first input only" ffmpeg -nostdin -hide_banner -loglevel info \
+  -filter_threads 4 -filter_complex_threads 4 -threads 4 -i /work/fx.mp4 -i /work/cam.webm \
+  -filter_complex "$CFC" -map "[vout]" -map "0:a?" -c:v libx264 -preset fast -crf 23 -c:a aac \
+  -threads 4 -x264-params "$BOUNDS" -y /work/comp_old.mp4
+/work/peak.sh "composite, every input" ffmpeg -nostdin -hide_banner -loglevel info \
+  -filter_threads 4 -filter_complex_threads 4 -threads 4 -i /work/fx.mp4 -threads 4 -i /work/cam.webm \
+  -filter_complex "$CFC" -map "[vout]" -map "0:a?" -c:v libx264 -preset fast -crf 23 -c:a aac \
+  -threads 4 -x264-params "$BOUNDS" -y /work/comp_new.mp4
+
+echo; echo "== vp9 output: libvpx takes one thread per CPU unless capped =="
+/work/peak.sh "vp9, encoder uncapped" ffmpeg -nostdin -hide_banner -loglevel info \
+  -filter_threads 4 -filter_complex_threads 4 -threads 4 -i /work/fx.mp4 -ss 0 -to 5 -c:v libvpx-vp9 -an -y /work/v_old.webm
+/work/peak.sh "vp9, encoder capped" ffmpeg -nostdin -hide_banner -loglevel info \
+  -filter_threads 4 -filter_complex_threads 4 -threads 4 -i /work/fx.mp4 -ss 0 -to 5 -c:v libvpx-vp9 -an -threads 4 -y /work/v_new.webm
+
 echo; echo "== output size cost =="
 ls -l /work/a.mp4 /work/b.mp4 | awk '{printf "%12d  %s\n", $5, $9}'
 

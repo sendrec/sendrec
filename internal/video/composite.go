@@ -45,8 +45,10 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 		// not the original (which may be high-DPI, e.g. 3242x2626).
 		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
 			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
-		args = append(ffmpegPipelineThreads(),
-			"-i", screenPath,
+		args = append(globalThreads(), inputThreads()...)
+		args = append(args, "-i", screenPath)
+		args = append(args, inputThreads()...)
+		args = append(args,
 			"-i", webcamPath,
 			"-filter_complex", filterComplex,
 			"-map", "[vout]",
@@ -64,8 +66,10 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 		// For WebM, also scale down high-DPI screens before overlay
 		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
 			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
-		args = append(ffmpegPipelineThreads(),
-			"-i", screenPath,
+		args = append(globalThreads(), inputThreads()...)
+		args = append(args, "-i", screenPath)
+		args = append(args, inputThreads()...)
+		args = append(args,
 			"-i", webcamPath,
 			"-filter_complex", filterComplex,
 			"-map", "[vout]",
@@ -77,7 +81,7 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 
 	// The bounds have to precede the output: ffmpeg applies options to the output
 	// that follows them and discards anything after the last one.
-	args = appendX264Params(args, contentType)
+	args = appendEncoderBounds(args, contentType)
 	return append(args, "-y", outputPath)
 }
 
