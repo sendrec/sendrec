@@ -59,8 +59,6 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 			"-r", "60",
 			"-c:a", "aac",
 			"-movflags", "+faststart",
-			"-y",
-			outputPath,
 		}
 	} else {
 		// For WebM, also scale down high-DPI screens before overlay
@@ -74,12 +72,13 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 			"-map", "0:a?",
 			"-c:a", "copy",
 			"-c:v", "libvpx-vp9",
-			"-y",
-			outputPath,
 		}
 	}
 
-	return appendX264Params(args, contentType)
+	// The bounds have to precede the output: ffmpeg applies options to the output
+	// that follows them and discards anything after the last one.
+	args = appendX264Params(args, contentType)
+	return append(args, "-y", outputPath)
 }
 
 func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (string, error) {

@@ -6,11 +6,13 @@ import (
 	"testing"
 )
 
-func x264ParamsOf(t *testing.T, args []string) string {
+// flagValue reads a flag's value by key rather than position, so the tests stay
+// honest when the argument list grows.
+func flagValue(t *testing.T, args []string, flag string) string {
 	t.Helper()
-	i := slices.Index(args, "-x264-params")
+	i := slices.Index(args, flag)
 	if i == -1 || i+1 >= len(args) {
-		t.Fatalf("no -x264-params in %v", args)
+		t.Fatalf("no %s in %v", flag, args)
 	}
 	return args[i+1]
 }
@@ -19,7 +21,7 @@ func x264ParamsOf(t *testing.T, args []string) string {
 // resident memory is a availability concern, not a tuning detail. Measured on a
 // 1080p30 source: ~620 MB with the defaults, ~350 MB with these.
 func TestX264MemoryParams_BoundsTheKnownCosts(t *testing.T) {
-	got := strings.Split(x264MemoryParams()[1], ":")
+	got := strings.Split(flagValue(t, x264MemoryParams(), "-x264-params"), ":")
 
 	for _, want := range []string{"rc-lookahead=10", "ref=1", "bframes=0"} {
 		if !slices.Contains(got, want) {
@@ -28,16 +30,56 @@ func TestX264MemoryParams_BoundsTheKnownCosts(t *testing.T) {
 	}
 }
 
-// -threads 1 was measured too: another 106 MB off, but double the wall time,
-// and every one of these jobs runs under a 10 minute context.
-func TestX264MemoryParams_LeavesThreadingAlone(t *testing.T) {
-	if slices.Contains(x264MemoryParams(), "-threads") {
-		t.Error("thread count must stay at the ffmpeg default; capping it risks the 10 minute job timeout")
+// Left alone, x264 scales threads with the visible CPU count and each thread
+// holds frame buffers, so an uncapped encoder allocates more on a bigger node.
+// Without this the memory bound holds on a 4-core box and fails on a 32-core one.
+func TestX264MemoryParams_CapsThreads(t *testing.T) {
+	i := slices.Index(x264MemoryParams(), "-threads")
+	if i == -1 {
+		t.Fatal("thread count must be capped; x264 otherwise scales it with the node's CPU count")
+	}
+	if got := x264MemoryParams()[i+1]; got != "4" {
+		t.Errorf("thread cap = %q, want 4", got)
+	}
+}
+
+// ffmpeg applies options to the output that follows them, so anything after the
+// output URL is a trailing option it parses and discards with a warning nobody
+// reads. A bound that lands there is worse than no bound: the tests pass, the
+// flag is present in the command line, and the encoder runs unconstrained.
+func TestBuildersPlaceX264ParamsBeforeTheOutput(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		args   []string
+		output string
+	}{
+		{"transcode", buildTranscodeArgs("in.webm", "out.mp4", ""), "out.mp4"},
+		{"normalize", buildNormalizeArgs("in.mp4", "out.mp4", ""), "out.mp4"},
+		{"trim mp4", buildTrimArgs("in.mp4", "out.mp4", "video/mp4", 1, 5), "out.mp4"},
+		{"trim quicktime", buildTrimArgs("in.mov", "out.mov", "video/quicktime", 1, 5), "out.mov"},
+		{"composite mp4", buildCompositeArgs("s.mp4", "w.mp4", "out.mp4", "video/mp4"), "out.mp4"},
+		{"composite quicktime", buildCompositeArgs("s.mov", "w.mov", "out.mov", "video/quicktime"), "out.mov"},
+		{"remove-segments mp4", buildRemoveSegmentsArgs("in.mp4", "out.mp4", "video/mp4", []segmentRange{{Start: 1, End: 2}}, true), "out.mp4"},
+		{"remove-segments silent", buildRemoveSegmentsArgs("in.mp4", "out.mp4", "video/mp4", []segmentRange{{Start: 1, End: 2}}, false), "out.mp4"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsAt := slices.Index(tc.args, "-x264-params")
+			outputAt := slices.Index(tc.args, tc.output)
+			if paramsAt == -1 {
+				t.Fatalf("no -x264-params in %v", tc.args)
+			}
+			if outputAt == -1 {
+				t.Fatalf("output %q missing from %v", tc.output, tc.args)
+			}
+			if paramsAt > outputAt {
+				t.Errorf("-x264-params at %d comes after the output at %d; ffmpeg discards trailing options", paramsAt, outputAt)
+			}
+		})
 	}
 }
 
 func TestBuildersBoundX264Memory(t *testing.T) {
-	want := x264MemoryParams()[1]
+	want := flagValue(t, x264MemoryParams(), "-x264-params")
 
 	for _, tc := range []struct {
 		name string
@@ -50,7 +92,7 @@ func TestBuildersBoundX264Memory(t *testing.T) {
 		{"remove-segments mp4", buildRemoveSegmentsArgs("in.mp4", "out.mp4", "video/mp4", []segmentRange{{Start: 1, End: 2}}, true)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := x264ParamsOf(t, tc.args); got != want {
+			if got := flagValue(t, tc.args, "-x264-params"); got != want {
 				t.Errorf("x264 params = %q, want %q", got, want)
 			}
 		})

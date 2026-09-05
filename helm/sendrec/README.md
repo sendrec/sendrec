@@ -260,7 +260,7 @@ Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `
 | `replicas` | Pod count. The app is stateless (state lives in Postgres and S3), but transcode/transcription jobs run in-process | `1` |
 | `image.repository` / `image.tag` / `image.pullPolicy` | Container image. An empty tag resolves to `v<appVersion>` from `Chart.yaml` | `ghcr.io/sendrec/sendrec` / `""` / `Always` |
 | `deploymentStrategy` | Passed through to the Deployment | `RollingUpdate` 25%/25% |
-| `resources` | Requests/limits. See [Sizing the pod](#sizing-the-pod) | `200m` / `512Mi` requests, `2Gi` memory limit |
+| `resources` | Requests/limits. See [Sizing the pod](#sizing-the-pod) | `200m` / `512Mi` requests, no limit |
 | `livenessProbe` / `readinessProbe` | Passed through as-is; both hit `/api/health` | see `values.yaml` |
 | `deployment.extraInitContainers` | Extra init containers, appended after the model downloader | `[]` |
 | `deployment.extraContainers` | Sidecars | `[]` |
@@ -275,11 +275,15 @@ The Deployment carries `checksum/configmap` and `checksum/secret` annotations, s
 
 | | peak RSS | wall |
 | --- | --- | --- |
-| ffmpeg defaults | 523 MB | 283s |
-| the bounded encoder settings the app now passes | 338 MB | 135s |
+| ffmpeg defaults | 524 MB | 34s |
+| the bounded encoder settings the app now passes | 342 MB | 23s |
 | stream copy, no encode | 35 MB | - |
 
-The chart defaults — `512Mi` requested, `2Gi` limit — leave room for one 1080p encode plus the Go runtime. They are not enough for everything:
+Reproduce with `hack/encoder-memory/run.sh`. That figure is the ffmpeg process alone, not the pod: the Go server sits alongside it, and nothing bounds how many encodes run at once.
+
+The chart requests `512Mi` and sets no memory limit. The request is what gets the pod scheduled somewhere it can actually finish an encode; the absent limit is deliberate, because the app does not bound how many encodes run at once, so any default limit would be a hard kill threshold guessed without knowing your inputs. Set `resources.limits.memory` once you have measured your own workload.
+
+`512Mi` is not enough for everything:
 
 - **4K or high-DPI sources** scale roughly with pixel count. The app scales down to 1080p during transcode, but the decode side still holds full-resolution frames.
 - **Local transcription** runs whisper.cpp in the same pod and is both CPU and memory hungry.

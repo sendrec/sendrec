@@ -138,8 +138,11 @@ sendrec:
   # live traffic with it. Raise both numbers again for 4K sources or local
   # transcription.
   resources:
-    limits:
-      memory: 2Gi
+    # No memory limit by default. The app does not bound how many encodes run at
+    # once, so any limit picked here is a hard kill threshold guessed without
+    # knowing your input sizes or concurrency. Set one once you have measured
+    # your own workload.
+    limits: {}
     requests:
       cpu: 200m
       memory: 512Mi

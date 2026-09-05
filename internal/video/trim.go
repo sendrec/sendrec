@@ -36,8 +36,6 @@ func buildTrimArgs(inputPath, outputPath, contentType string, startSeconds, endS
 			"-r", "60",
 			"-c:a", "aac",
 			"-movflags", "+faststart",
-			"-y",
-			outputPath,
 		}
 	} else {
 		args = []string{
@@ -46,12 +44,13 @@ func buildTrimArgs(inputPath, outputPath, contentType string, startSeconds, endS
 			"-to", fmt.Sprintf("%.3f", endSeconds),
 			"-c:v", "libvpx-vp9",
 			"-c:a", "copy",
-			"-y",
-			outputPath,
 		}
 	}
 
-	return appendX264Params(args, contentType)
+	// The bounds have to precede the output: ffmpeg applies options to the output
+	// that follows them and discards anything after the last one.
+	args = appendX264Params(args, contentType)
+	return append(args, "-y", outputPath)
 }
 
 func trimVideo(inputPath, outputPath, contentType string, startSeconds, endSeconds float64) error {
