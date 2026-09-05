@@ -23,7 +23,7 @@ func buildTrimArgs(inputPath, outputPath, contentType string, startSeconds, endS
 	var args []string
 	if contentType == "video/mp4" || contentType == "video/quicktime" {
 		// iOS-safe encoding: constrain resolution, set profile/level, transcode audio to AAC
-		args = []string{
+		args = append(ffmpegPipelineThreads(),
 			"-i", inputPath,
 			"-ss", fmt.Sprintf("%.3f", startSeconds),
 			"-to", fmt.Sprintf("%.3f", endSeconds),
@@ -36,15 +36,15 @@ func buildTrimArgs(inputPath, outputPath, contentType string, startSeconds, endS
 			"-r", "60",
 			"-c:a", "aac",
 			"-movflags", "+faststart",
-		}
+		)
 	} else {
-		args = []string{
+		args = append(ffmpegPipelineThreads(),
 			"-i", inputPath,
 			"-ss", fmt.Sprintf("%.3f", startSeconds),
 			"-to", fmt.Sprintf("%.3f", endSeconds),
 			"-c:v", "libvpx-vp9",
 			"-c:a", "copy",
-		}
+		)
 	}
 
 	// The bounds have to precede the output: ffmpeg applies options to the output

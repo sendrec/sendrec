@@ -45,7 +45,7 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 		// not the original (which may be high-DPI, e.g. 3242x2626).
 		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
 			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
-		args = []string{
+		args = append(ffmpegPipelineThreads(),
 			"-i", screenPath,
 			"-i", webcamPath,
 			"-filter_complex", filterComplex,
@@ -59,12 +59,12 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 			"-r", "60",
 			"-c:a", "aac",
 			"-movflags", "+faststart",
-		}
+		)
 	} else {
 		// For WebM, also scale down high-DPI screens before overlay
 		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
 			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
-		args = []string{
+		args = append(ffmpegPipelineThreads(),
 			"-i", screenPath,
 			"-i", webcamPath,
 			"-filter_complex", filterComplex,
@@ -72,7 +72,7 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 			"-map", "0:a?",
 			"-c:a", "copy",
 			"-c:v", "libvpx-vp9",
-		}
+		)
 	}
 
 	// The bounds have to precede the output: ffmpeg applies options to the output

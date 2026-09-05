@@ -55,6 +55,12 @@ echo; echo "== option ordering: ffmpeg discards options after the output =="
 /work/peak.sh "bounds BEFORE the output" ffmpeg -nostdin -hide_banner -loglevel info -i /work/fx.mp4 \
   -c:v libx264 -preset fast -crf 23 -an -x264-params "$BOUNDS" -y /work/d.mp4
 
+echo; echo "== the argument shape the app actually passes =="
+/work/peak.sh "app shape" ffmpeg -nostdin -hide_banner -loglevel info \
+  -threads 4 -filter_threads 4 -filter_complex_threads 4 -i /work/fx.mp4 \
+  -c:v libx264 -profile:v high -level:v 5.1 -preset fast -crf 23 -vf "$VF" -r 60 \
+  -c:a aac -movflags +faststart -threads 4 -x264-params "$BOUNDS" -y /work/app.mp4
+
 echo; echo "== thread count: x264 scales threads with visible CPUs =="
 for t in auto 1 2 4 8; do
   if [ "$t" = auto ]; then targ=(); else targ=(-threads "$t"); fi
@@ -73,3 +79,28 @@ BENCH
 chmod +x "$WORK/peak.sh" "$WORK/bench.sh"
 docker build -q -t sendrec-encoder-bench "$WORK" >/dev/null
 docker run --rm -v "$WORK:/work" sendrec-encoder-bench /work/bench.sh
+
+# The bound is only a bound if it holds when the node changes size. Same command,
+# different CPU visibility: the numbers should stay flat.
+cat > "$WORK/portability.sh" <<'PORT'
+#!/bin/bash
+VF="scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2"
+BOUNDS="rc-lookahead=10:ref=1:bframes=0"
+label="$1"
+run() { # run <name> <thread-prefix...> -- <encoder-threads...>
+  /work/peak.sh "$label $1" ffmpeg -nostdin -hide_banner -loglevel info \
+    ${2:+$2} -i /work/fx.mp4 \
+    -c:v libx264 -profile:v high -level:v 5.1 -preset fast -crf 23 -vf "$VF" -r 60 \
+    -c:a aac -movflags +faststart -threads 4 -x264-params "$BOUNDS" -y /work/p.mp4
+}
+run "encoder cap only" ""
+run "whole pipeline"   "-threads 4 -filter_threads 4 -filter_complex_threads 4"
+PORT
+chmod +x "$WORK/portability.sh"
+
+echo; echo "== portability: same command, different CPU visibility =="
+for cpus in 0 0-1 0-3; do
+  n=$(( $(echo "$cpus" | tr - ' ' | awk '{print ($2==""?$1:$2)}') + 1 ))
+  docker run --rm --cpuset-cpus="$cpus" -v "$WORK:/work" \
+    sendrec-encoder-bench /work/portability.sh "cpus=$n"
+done

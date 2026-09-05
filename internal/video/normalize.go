@@ -109,7 +109,7 @@ var probeVideoProperties = func(inputPath string) (videoProperties, error) {
 }
 
 func buildNormalizeArgs(inputPath, outputPath, audioFilter string) []string {
-	args := []string{
+	args := append(ffmpegPipelineThreads(),
 		"-i", inputPath,
 		"-c:v", "libx264",
 		"-profile:v", "high",
@@ -118,7 +118,7 @@ func buildNormalizeArgs(inputPath, outputPath, audioFilter string) []string {
 		"-crf", "23",
 		"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
 		"-r", "60",
-	}
+	)
 	args = append(args, x264MemoryParams()...)
 	if audioFilter != "" {
 		args = append(args, "-af", audioFilter)

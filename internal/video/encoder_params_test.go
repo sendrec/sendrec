@@ -116,3 +116,39 @@ func TestVP9BuildersOmitX264Params(t *testing.T) {
 		})
 	}
 }
+
+// ffmpeg binds an option to the next file, so thread caps reach the input
+// decoder only when they precede -i. Placed after it they configure the encoder
+// instead and the decoder pool keeps sizing itself from the node's CPU count.
+func TestBuildersBoundThreadsBeforeTheInput(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"transcode", buildTranscodeArgs("in.webm", "out.mp4", "")},
+		{"normalize", buildNormalizeArgs("in.mp4", "out.mp4", "")},
+		{"trim mp4", buildTrimArgs("in.mp4", "out.mp4", "video/mp4", 1, 5)},
+		{"trim webm", buildTrimArgs("in.webm", "out.webm", "video/webm", 1, 5)},
+		{"composite mp4", buildCompositeArgs("s.mp4", "w.mp4", "out.mp4", "video/mp4")},
+		{"composite webm", buildCompositeArgs("s.webm", "w.webm", "out.webm", "video/webm")},
+		{"remove-segments mp4", buildRemoveSegmentsArgs("in.mp4", "out.mp4", "video/mp4", []segmentRange{{Start: 1, End: 2}}, true)},
+		{"remove-segments webm", buildRemoveSegmentsArgs("in.webm", "out.webm", "video/webm", []segmentRange{{Start: 1, End: 2}}, true)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			firstInput := slices.Index(tc.args, "-i")
+			if firstInput == -1 {
+				t.Fatalf("no input in %v", tc.args)
+			}
+			for _, flag := range []string{"-threads", "-filter_threads", "-filter_complex_threads"} {
+				at := slices.Index(tc.args, flag)
+				if at == -1 {
+					t.Errorf("%s missing; the pool then sizes itself from the node's CPU count", flag)
+					continue
+				}
+				if at > firstInput {
+					t.Errorf("%s at %d comes after the input at %d, so it never reaches the decoder", flag, at, firstInput)
+				}
+			}
+		})
+	}
+}

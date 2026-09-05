@@ -149,7 +149,7 @@ func audioCodecForContentType(ct string) string {
 func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments []segmentRange, audioPresent bool) []string {
 	betweenExpr := buildSegmentFilter(segments)
 
-	var args []string
+	args := ffmpegPipelineThreads()
 	args = append(args, "-i", inputPath)
 
 	if audioPresent {
