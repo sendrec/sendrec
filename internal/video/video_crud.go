@@ -357,7 +357,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 
 		tag, err := h.db.Exec(r.Context(),
-			`UPDATE videos SET status = $1, updated_at = now()
+			`UPDATE videos SET status = $1,
+			     processing_started_at = CASE WHEN $1 = 'processing' THEN now() ELSE NULL END,
+			     updated_at = now()
 			 WHERE id = $2 AND user_id = $3 AND status = 'uploading'`,
 			newStatus, videoID, userID,
 		)
@@ -521,7 +523,7 @@ func (h *Handler) Trim(w http.ResponseWriter, r *http.Request) {
 
 	updateWhere, updateArgs := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET status = 'processing', updated_at = now() WHERE `+updateWhere, updateArgs...,
+		`UPDATE videos SET status = 'processing', processing_started_at = now(), updated_at = now() WHERE `+updateWhere, updateArgs...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video status")

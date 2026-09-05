@@ -92,7 +92,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 
 	setReadyFallback := func() {
 		if _, err := db.Exec(ctx,
-			`UPDATE videos SET status = 'ready', webcam_key = NULL, updated_at = now() WHERE id = $1`,
+			`UPDATE videos SET status = 'ready', webcam_key = NULL, processing_started_at = NULL, updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
 			slog.Error("composite: failed to set fallback ready status", "video_id", videoID, "error", err)
@@ -196,7 +196,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	}
 
 	if _, err := db.Exec(ctx,
-		`UPDATE videos SET status = 'ready', webcam_key = NULL, updated_at = now() WHERE id = $1`,
+		`UPDATE videos SET status = 'ready', webcam_key = NULL, processing_started_at = NULL, updated_at = now() WHERE id = $1`,
 		videoID,
 	); err != nil {
 		slog.Error("composite: failed to update status", "video_id", videoID, "error", err)

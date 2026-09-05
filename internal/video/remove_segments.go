@@ -105,7 +105,7 @@ func (h *Handler) RemoveSegments(w http.ResponseWriter, r *http.Request) {
 
 	updateWhere, updateArgs := orgVideoFilter(r.Context(), videoID, nil, "AND status = 'ready'")
 	tag, err := h.db.Exec(r.Context(),
-		`UPDATE videos SET status = 'processing', updated_at = now() WHERE `+updateWhere, updateArgs...,
+		`UPDATE videos SET status = 'processing', processing_started_at = now(), updated_at = now() WHERE `+updateWhere, updateArgs...,
 	)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to update video status")
@@ -172,7 +172,7 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 
 	setReadyFallback := func() {
 		if _, err := db.Exec(ctx,
-			`UPDATE videos SET status = 'ready', updated_at = now() WHERE id = $1`,
+			`UPDATE videos SET status = 'ready', processing_started_at = NULL, updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
 			slog.Error("remove-segments: failed to set fallback ready status", "video_id", videoID, "error", err)
@@ -227,7 +227,7 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 	newDuration := int(float64(originalDuration) - removedTime)
 
 	if _, err := db.Exec(ctx,
-		`UPDATE videos SET status = 'ready', duration = $1, updated_at = now() WHERE id = $2`,
+		`UPDATE videos SET status = 'ready', duration = $1, processing_started_at = NULL, updated_at = now() WHERE id = $2`,
 		newDuration, videoID,
 	); err != nil {
 		slog.Error("remove-segments: failed to update status", "video_id", videoID, "error", err)

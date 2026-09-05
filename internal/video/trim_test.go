@@ -17,7 +17,7 @@ func TestTrimVideoAsync_DownloadError(t *testing.T) {
 
 	s := &mockStorage{downloadToFileErr: fmt.Errorf("s3 down")}
 
-	mock.ExpectExec(`UPDATE videos SET status = 'ready', updated_at = now\(\) WHERE id =`).
+	mock.ExpectExec(`UPDATE videos SET status = 'ready', processing_started_at = NULL, updated_at = now\(\) WHERE id =`).
 		WithArgs("video-123").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
@@ -39,7 +39,7 @@ func TestTrimVideoAsync_FFmpegFailsFallsBackToReady(t *testing.T) {
 
 	s := &mockStorage{}
 
-	mock.ExpectExec(`UPDATE videos SET status = 'ready', updated_at = now\(\) WHERE id =`).
+	mock.ExpectExec(`UPDATE videos SET status = 'ready', processing_started_at = NULL, updated_at = now\(\) WHERE id =`).
 		WithArgs("video-123").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
@@ -61,7 +61,7 @@ func TestTrimVideoAsync_UploadError(t *testing.T) {
 
 	s := &mockStorage{uploadFileErr: fmt.Errorf("upload failed")}
 
-	mock.ExpectExec(`UPDATE videos SET status = 'ready', updated_at = now\(\) WHERE id =`).
+	mock.ExpectExec(`UPDATE videos SET status = 'ready', processing_started_at = NULL, updated_at = now\(\) WHERE id =`).
 		WithArgs("video-123").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 

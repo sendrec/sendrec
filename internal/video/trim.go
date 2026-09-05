@@ -64,7 +64,7 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 
 	setReadyFallback := func() {
 		if _, err := db.Exec(ctx,
-			`UPDATE videos SET status = 'ready', updated_at = now() WHERE id = $1`,
+			`UPDATE videos SET status = 'ready', processing_started_at = NULL, updated_at = now() WHERE id = $1`,
 			videoID,
 		); err != nil {
 			slog.Error("trim: failed to set fallback ready status", "video_id", videoID, "error", err)
@@ -112,7 +112,7 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 
 	newDuration := int(endSeconds - startSeconds)
 	if _, err := db.Exec(ctx,
-		`UPDATE videos SET status = 'ready', duration = $1, updated_at = now() WHERE id = $2`,
+		`UPDATE videos SET status = 'ready', duration = $1, processing_started_at = NULL, updated_at = now() WHERE id = $2`,
 		newDuration, videoID,
 	); err != nil {
 		slog.Error("trim: failed to update status", "video_id", videoID, "error", err)
