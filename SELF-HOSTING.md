@@ -221,6 +221,40 @@ Per-IP rate limiting keys on the connection's source address. Behind a reverse p
 
 Set `TRUSTED_PROXY=true` **only** when an edge proxy you control always sets `X-Forwarded-For` (Caddy, nginx, and Traefik do by default). If the app is exposed to the internet directly, leave it `false`: otherwise clients forge the header and evade rate limiting entirely.
 
+## Sizing the container
+
+ffmpeg runs inside the process that serves HTTP, so an under-provisioned container does not just fail the edit — the OOM killer drops every in-flight request with it. A 1080p encode holds roughly 300 MB on top of the server itself.
+
+`MAX_CONCURRENT_ENCODES` (default `1`) caps how many encodes run at once, so extra edits queue rather than multiplying that figure. Raise it and the memory allowance together, never on its own.
+
+### Measuring your own floor
+
+Numbers from someone else's recordings are a starting point. Measure yours — a few minutes, no tooling beyond Docker:
+
+```bash
+C=sendrec   # your container name, from: docker ps
+
+# 1. Idle baseline: the Go server and nothing else.
+docker exec "$C" awk '/^anon /{printf "%.0f MB\n", $2/1048576}' /sys/fs/cgroup/memory.stat
+
+# 2. Start this sampler, then trigger the heaviest edit you expect: largest
+#    resolution, longest recording, remove-segments with many cuts.
+#    Stop it when the edit finishes; the last line printed is your figure.
+docker exec "$C" sh -c \
+  'while :; do awk "/^anon /{print \$2}" /sys/fs/cgroup/memory.stat; sleep 1; done' \
+  | awk '{ if ($1>m) { m=$1; printf "peak anon %.0f MB\n", m/1048576 } }'
+```
+
+Then set `mem_limit` (Compose) or `--memory` to **step 1 + N × (step 2 − step 1)**, plus about 20% headroom, where N is `MAX_CONCURRENT_ENCODES`. Step 2 already includes one encode, so at the default `N = 1` that is just step 2 plus headroom.
+
+**Read `anon`, not `docker stats` or `memory.current`.** Both include page cache, and this app writes multi-hundred-megabyte temp files for every edit, so cache dominates the total. Cache is reclaimable — the kernel evicts it under pressure instead of OOM-killing — so sizing from it over-provisions substantially. A production instance of this app reported 1757 MB of `memory.peak` while holding 8 MB of `anon` and 122 MB of cache.
+
+`anon` is the non-reclaimable working set, and what the OOM killer acts on. Memory-backed volumes are the exception: they are charged as `shmem` rather than `anon` and are *not* reclaimable, so add their contents by hand if you mount `/tmp` as tmpfs.
+
+Needs cgroup v2. On cgroup v1, read the `rss` line of `/sys/fs/cgroup/memory/memory.stat` the same way.
+
+Re-measure when you change resolution limits, enable transcription or noise reduction, or raise the concurrency limit — each moves the floor.
+
 ## Environment variables
 
 ### Required

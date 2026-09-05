@@ -384,5 +384,5 @@ This deletes everything the release owns, including the whisper model PVC - add 
 
 ## See also
 
-- [SELF-HOSTING.md](../../SELF-HOSTING.md) - provider notes and Docker Compose setup. It predates several of the variables above (`RATE_LIMIT_ENABLED`, `WEBHOOK_ALLOW_PRIVATE_TARGETS`, `NOISE_REDUCTION_FILTER`, `DEVELOPER_EMAIL`, the workspace Creem product IDs), so treat this page as the current reference for anything under `sendrec.env`
+- [SELF-HOSTING.md](../../SELF-HOSTING.md) - provider notes and Docker Compose setup, including the Docker equivalent of the sizing procedure above. It predates several of the variables above (`RATE_LIMIT_ENABLED`, `WEBHOOK_ALLOW_PRIVATE_TARGETS`, `NOISE_REDUCTION_FILTER`, `DEVELOPER_EMAIL`, the workspace Creem product IDs), so treat this page as the current reference for anything under `sendrec.env`
 - [Releases](https://github.com/sendrec/sendrec/releases) - changelog
