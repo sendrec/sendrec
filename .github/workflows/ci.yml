@@ -79,6 +79,13 @@ jobs:
         with:
           version: v2.9.0
 
+      # TestFFmpegHonoursTheBounds runs ffmpeg and reads back what it honoured.
+      # It is the only check that has ever caught a thread or encoder bound that
+      # was present in the command line and inert, so it has to run here rather
+      # than skip on a runner that happens to lack the binary.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Run Go tests
         run: go clean -cache && go test ./... -coverprofile=coverage.out -covermode=atomic | tee test-output.txt
 

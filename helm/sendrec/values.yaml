@@ -131,11 +131,21 @@ sendrec:
 
   port: 8080
 
+  # Sized for video work, not for an idle HTTP server. Transcode, trim,
+  # remove-segments and composite all run ffmpeg inside this pod, and a 1080p
+  # x264 encode peaks around 350 MB on its own. 128Mi was enough to serve
+  # requests and not enough to finish an edit, which OOM-killed the pod and took
+  # live traffic with it. Raise both numbers again for 4K sources or local
+  # transcription.
   resources:
+    # No memory limit by default. The app does not bound how many encodes run at
+    # once, so any limit picked here is a hard kill threshold guessed without
+    # knowing your input sizes or concurrency. Set one once you have measured
+    # your own workload.
     limits: {}
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 200m
+      memory: 512Mi
 
   livenessProbe:
     httpGet:

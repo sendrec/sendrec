@@ -260,7 +260,7 @@ Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `
 | `replicas` | Pod count. The app is stateless (state lives in Postgres and S3), but transcode/transcription jobs run in-process | `1` |
 | `image.repository` / `image.tag` / `image.pullPolicy` | Container image. An empty tag resolves to `v<appVersion>` from `Chart.yaml` | `ghcr.io/sendrec/sendrec` / `""` / `Always` |
 | `deploymentStrategy` | Passed through to the Deployment | `RollingUpdate` 25%/25% |
-| `resources` | Requests/limits. Raise substantially for local transcription or noise reduction | `100m` / `128Mi` requests |
+| `resources` | Requests/limits. See [Sizing the pod](#sizing-the-pod) | `200m` / `512Mi` requests, no limit |
 | `livenessProbe` / `readinessProbe` | Passed through as-is; both hit `/api/health` | see `values.yaml` |
 | `deployment.extraInitContainers` | Extra init containers, appended after the model downloader | `[]` |
 | `deployment.extraContainers` | Sidecars | `[]` |
@@ -268,6 +268,31 @@ Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `
 | `extraResources` | Arbitrary manifests rendered verbatim (CronJob, ConfigMap, ServiceMonitor, …) | `[]` |
 
 The Deployment carries `checksum/configmap` and `checksum/secret` annotations, so config changes roll pods automatically.
+
+### Sizing the pod
+
+**Editing has a memory floor, and it is well above what an HTTP server needs.** Transcode, normalize, trim, remove-segments and composite all run ffmpeg in this pod. Measured peak RSS for a single 1080p30 x264 encode, ffmpeg 7.1:
+
+| | peak RSS |
+| --- | --- |
+| ffmpeg defaults | ~540 MB |
+| the bounded settings the app now passes | ~300 MB |
+| stream copy, no encode | ~35 MB |
+
+Figures are approximate and move with the ffmpeg build, the input and the machine — run `hack/encoder-memory/run.sh` for numbers that describe your environment.
+
+Two things that table does **not** say. It measures the ffmpeg process alone, not the pod: the Go server sits alongside it. And it measures one encode — nothing in the app bounds how many run at once, so two concurrent edits want roughly twice this.
+
+The chart requests `512Mi` and sets no memory limit. The request is what gets the pod scheduled somewhere it can actually finish an encode; the absent limit is deliberate, because the app does not bound how many encodes run at once, so any default limit would be a hard kill threshold guessed without knowing your inputs. Set `resources.limits.memory` once you have measured your own workload.
+
+`512Mi` is not enough for everything:
+
+- **4K or high-DPI sources** scale roughly with pixel count. The app scales down to 1080p during transcode, but the decode side still holds full-resolution frames.
+- **Local transcription** runs whisper.cpp in the same pod and is both CPU and memory hungry.
+- **Noise reduction** adds an ffmpeg filter to every transcode.
+- **Concurrent jobs.** Nothing bounds how many edits run at once, so two simultaneous 1080p edits want roughly twice the memory. `512Mi` is a request sized for one; it is not a reservation that survives concurrency.
+
+Under-provisioning does not fail gracefully: the OOM killer takes the whole pod, so an edit triggered by one user drops every in-flight request. If you cannot give the pod headroom, keep `replicas: 1` and expect edits on large recordings to fail.
 
 ## Networking
 

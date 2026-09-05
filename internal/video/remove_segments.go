@@ -149,7 +149,7 @@ func audioCodecForContentType(ct string) string {
 func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments []segmentRange, audioPresent bool) []string {
 	betweenExpr := buildSegmentFilter(segments)
 
-	var args []string
+	args := append(globalThreads(), inputThreads()...)
 	args = append(args, "-i", inputPath)
 
 	if audioPresent {
@@ -170,6 +170,7 @@ func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments
 		args = append(args, "-c:v", videoCodecForContentType(contentType), "-an")
 	}
 
+	args = appendEncoderBounds(args, contentType)
 	args = append(args, "-y", outputPath)
 	return args
 }

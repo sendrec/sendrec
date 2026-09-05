@@ -23,6 +23,7 @@ SendRec includes a Helm chart at `helm/sendrec` for Kubernetes deployments.
 - Helm 3
 - PostgreSQL database
 - S3-compatible object storage
+- **At least 512 MB of memory for the app container**, whatever the deployment method. ffmpeg runs in the same process that serves HTTP, and a single 1080p encode peaks around 350 MB, so an under-provisioned container does not merely fail the edit — the OOM killer drops every in-flight request with it. Budget more for 4K sources, local transcription, or concurrent edits.
 
 ### 1. Create a values file
 

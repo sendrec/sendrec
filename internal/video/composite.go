@@ -33,7 +33,7 @@ func probeVideoInfo(path string) (frames int, info string, err error) {
 	return frames, info, nil
 }
 
-func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (string, error) {
+func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) []string {
 	// PiP filter: scale webcam, add border, normalize timestamps.
 	// setpts=PTS-STARTPTS normalizes webcam timestamps to start at 0.
 	pipSetup := "[1:v]setpts=PTS-STARTPTS,scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip]"
@@ -45,8 +45,10 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (s
 		// not the original (which may be high-DPI, e.g. 3242x2626).
 		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
 			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
-		args = []string{
-			"-i", screenPath,
+		args = append(globalThreads(), inputThreads()...)
+		args = append(args, "-i", screenPath)
+		args = append(args, inputThreads()...)
+		args = append(args,
 			"-i", webcamPath,
 			"-filter_complex", filterComplex,
 			"-map", "[vout]",
@@ -59,25 +61,32 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (s
 			"-r", "60",
 			"-c:a", "aac",
 			"-movflags", "+faststart",
-			"-y",
-			outputPath,
-		}
+		)
 	} else {
 		// For WebM, also scale down high-DPI screens before overlay
 		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
 			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
-		args = []string{
-			"-i", screenPath,
+		args = append(globalThreads(), inputThreads()...)
+		args = append(args, "-i", screenPath)
+		args = append(args, inputThreads()...)
+		args = append(args,
 			"-i", webcamPath,
 			"-filter_complex", filterComplex,
 			"-map", "[vout]",
 			"-map", "0:a?",
 			"-c:a", "copy",
 			"-c:v", "libvpx-vp9",
-			"-y",
-			outputPath,
-		}
+		)
 	}
+
+	// The bounds have to precede the output: ffmpeg applies options to the output
+	// that follows them and discards anything after the last one.
+	args = appendEncoderBounds(args, contentType)
+	return append(args, "-y", outputPath)
+}
+
+func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (string, error) {
+	args := buildCompositeArgs(screenPath, webcamPath, outputPath, contentType)
 
 	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
