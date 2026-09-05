@@ -36,6 +36,14 @@ func buildTranscodeArgs(inputPath, outputPath, audioFilter string) []string {
 // an ffmpeg binary or a real video fixture.
 var transcodeToMP4 = func(ctx context.Context, inputPath, outputPath, audioFilter string) error {
 	args := buildTranscodeArgs(inputPath, outputPath, audioFilter)
+	// Hold a slot only around ffmpeg itself: the download and upload either
+	// side are I/O and would waste the slot.
+	release, err := encoders().acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

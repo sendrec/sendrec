@@ -38,6 +38,11 @@ sendrec:
     maxVideoDurationSeconds: "0"  # per-recording length cap ("" = free plan, 300s)
     maxPlaylists: "0"             # per-user playlist cap ("" = free plan, 3)
 
+    # How many ffmpeg encodes may run at once in the pod. Each 1080p encode peaks
+    # around 300 MB, so this multiplies peak memory: raise it and resources.requests
+    # together. Extra edits queue rather than fail.
+    maxConcurrentEncodes: "1"
+
     # Features
     apiDocsEnabled: "true"        # serve the OpenAPI/Swagger docs route
     brandingEnabled: "true"       # allow custom logo/colors on watch pages

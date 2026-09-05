@@ -210,6 +210,12 @@ func main() {
 		slog.Info("AI summaries enabled", "model", getEnv("AI_MODEL", "mistral-small-latest"), "timeout", aiTimeout.String())
 	}
 
+	// Bounds how many ffmpeg encodes run at once. Each 1080p encode peaks around
+	// 300 MB inside this process, so concurrency multiplies peak memory directly;
+	// raise it together with the pod's memory, not on its own. Set before any
+	// worker starts: it replaces a package-level value those goroutines read.
+	video.SetEncoderConcurrency(int(getEnvInt64("MAX_CONCURRENT_ENCODES", video.DefaultEncoderConcurrency)))
+
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	defer cleanupCancel()
 	video.StartCleanupLoop(cleanupCtx, db.Pool, store, 10*time.Minute)
