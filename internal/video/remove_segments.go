@@ -133,7 +133,20 @@ func buildSegmentFilter(segments []segmentRange) string {
 	return strings.Join(parts, "+")
 }
 
-func removeSegmentsFromVideo(inputPath, outputPath, contentType string, segments []segmentRange, audioPresent bool) error {
+// audioCodecForContentType pairs the audio codec with the container the output
+// is written to. WebM accepts only Vorbis or Opus, so pairing it with AAC makes
+// ffmpeg refuse at header write — the filter graph re-times audio, so copying
+// the source stream is not an option either.
+func audioCodecForContentType(ct string) string {
+	switch ct {
+	case "video/mp4", "video/quicktime":
+		return "aac"
+	default:
+		return "libopus"
+	}
+}
+
+func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments []segmentRange, audioPresent bool) []string {
 	betweenExpr := buildSegmentFilter(segments)
 
 	var args []string
@@ -146,7 +159,7 @@ func removeSegmentsFromVideo(inputPath, outputPath, contentType string, segments
 		)
 		args = append(args, "-filter_complex", filterComplex)
 		args = append(args, "-map", "[v]", "-map", "[a]")
-		args = append(args, "-c:v", videoCodecForContentType(contentType), "-c:a", "aac")
+		args = append(args, "-c:v", videoCodecForContentType(contentType), "-c:a", audioCodecForContentType(contentType))
 	} else {
 		filterComplex := fmt.Sprintf(
 			"[0:v]select='not(%s)',setpts=N/FRAME_RATE/TB[v]",
@@ -158,6 +171,11 @@ func removeSegmentsFromVideo(inputPath, outputPath, contentType string, segments
 	}
 
 	args = append(args, "-y", outputPath)
+	return args
+}
+
+func removeSegmentsFromVideo(inputPath, outputPath, contentType string, segments []segmentRange, audioPresent bool) error {
+	args := buildRemoveSegmentsArgs(inputPath, outputPath, contentType, segments, audioPresent)
 
 	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
