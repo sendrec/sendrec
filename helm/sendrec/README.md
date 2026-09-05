@@ -303,23 +303,34 @@ The figures above are one ffmpeg process on synthetic content. The number that m
 POD=$(kubectl -n sendrec get pod -l app=sendrec -o jsonpath='{.items[0].metadata.name}')
 
 # 1. Idle baseline — the Go server and nothing else.
-kubectl -n sendrec exec "$POD" -c sendrec -- cat /sys/fs/cgroup/memory.peak
+kubectl -n sendrec exec "$POD" -c sendrec -- \
+  awk '/^anon /{printf "%.0f MB\n", $2/1048576}' /sys/fs/cgroup/memory.stat
 
-# 2. Trigger the heaviest edit you expect: your largest resolution, your
-#    longest recording, remove-segments with many cuts. Wait for it to finish.
-
-# 3. Peak for the app container, including that encode.
-kubectl -n sendrec exec "$POD" -c sendrec -- cat /sys/fs/cgroup/memory.peak
+# 2. Start this sampler, then trigger the heaviest edit you expect: your
+#    largest resolution, longest recording, remove-segments with many cuts.
+#    Stop it when the edit finishes; the last line it printed is your figure.
+kubectl -n sendrec exec "$POD" -c sendrec -- sh -c \
+  'while :; do awk "/^anon /{print \$2}" /sys/fs/cgroup/memory.stat; sleep 1; done' \
+  | awk '{ if ($1>m) { m=$1; printf "peak anon %.0f MB\n", m/1048576 } }' 
 ```
 
 `-c sendrec` matters: the chart renders `deployment.extraContainers` *before* the app container, so without it `kubectl exec` lands in your first sidecar and reports that container's memory instead. The figure is per container, not per pod — for the default single-container pod the two are the same.
 
-`memory.peak` is cgroup v2 on Linux 5.19 or newer, and is the high-water mark since the container started, so run step 2 on a freshly started pod or accept that earlier work is included. On an older cgroup v2 kernel the file does not exist; sample `/sys/fs/cgroup/memory.current` every second during step 2 and keep the largest value. On cgroup v1 read `/sys/fs/cgroup/memory/memory.max_usage_in_bytes` instead.
+**Sample `anon`, not `memory.peak`.** This is the easy thing to get wrong, and getting it wrong over-provisions badly. `memory.peak` and `memory.current` count page cache, and this app writes multi-hundred-megabyte temp files for every edit, so cache dominates the total. Page cache is *reclaimable* — under a limit the kernel evicts it rather than OOM-killing. Two consequences:
+
+- **With no limit set, `memory.peak` is inflated.** A production instance showed `memory.peak` of 1757 MB after three days while holding 8 MB of `anon` and 122 MB of cache. Sizing a request from that number reserves far more than the process needs.
+- **With a limit already set, `memory.peak` is circular** — it saturates at the limit. Writing 400 MB inside a 256 MB cgroup reports a peak of exactly 256 MB and zero OOM kills. Re-running the procedure after you set a limit hands you back the limit.
+
+`anon` is the non-reclaimable part — the encoder's real working set, and what the OOM killer acts on. cgroup v2 keeps no historical peak for it, hence the sampler. One-second polling is enough: an encode holds its allocation for the whole run rather than spiking.
+
+One caveat on `anon`: memory-backed volumes are charged as `shmem`, not `anon`, and unlike page cache they are *not* reclaimable. The chart's `emptyDir` volumes are disk-backed, so this does not apply as shipped — but if you mount `/tmp` or the transcription volume with `medium: Memory`, add their contents to the figure.
+
+Needs cgroup v2. On cgroup v1, read the `rss` line of `/sys/fs/cgroup/memory/memory.stat` the same way.
 
 Then size it:
 
-- **Request** = (step 1 + N × (step 3 − step 1)) with 20% headroom, where N is `env.maxConcurrentEncodes`. Step 3 already contains one encode, so with the default N = 1 this is just step 3 plus headroom; each further concurrent encode adds the step 3 − step 1 difference once more.
-- **Limit** = request plus whatever headroom you want for a recording bigger than the one you tested. Setting it below the step 3 figure means the OOM killer, not a slow edit.
+- **Request** = (step 1 + N × (step 2 − step 1)) with 20% headroom, where N is `env.maxConcurrentEncodes`. Step 2 already contains one encode, so with the default N = 1 this is just step 2 plus headroom; each further concurrent encode adds the step 2 − step 1 difference once more.
+- **Limit** = request plus whatever headroom you want for a recording bigger than the one you tested, plus room for page cache on top. Setting it below the step 2 figure means the OOM killer, not a slow edit; setting it only slightly above makes the kernel thrash reclaiming cache.
 
 Repeat when you change resolution limits, enable transcription or noise reduction, or raise the concurrency limit — each moves the floor.
 
