@@ -87,7 +87,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Run Go tests
-        run: go clean -cache && go test ./... -coverprofile=coverage.out -covermode=atomic | tee test-output.txt
+        run: go clean -cache && go test ./... -race -coverprofile=coverage.out -covermode=atomic | tee test-output.txt
 
       - name: Coverage summary
         run: |

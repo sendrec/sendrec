@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -145,6 +146,7 @@ func TestSetCommentMode_AllValidModes(t *testing.T) {
 // --- mockCommentNotifier ---
 
 type mockCommentNotifier struct {
+	mu            sync.Mutex
 	called        bool
 	toEmail       string
 	videoTitle    string
@@ -152,11 +154,36 @@ type mockCommentNotifier struct {
 }
 
 func (m *mockCommentNotifier) SendCommentNotification(_ context.Context, toEmail, toName, videoTitle, commentAuthor, commentBody, watchURL string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.called = true
 	m.toEmail = toEmail
 	m.videoTitle = videoTitle
 	m.commentAuthor = commentAuthor
 	return nil
+}
+
+func (m *mockCommentNotifier) wasCalled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.called
+}
+
+// waitCalled reports whether the notifier fired within d. PostWatchComment
+// notifies from a goroutine after responding, so a test cannot assert straight
+// after ServeHTTP; this replaces a fixed sleep that raced the write. For a
+// negative assertion, d is how long the test is willing to wait for nothing.
+func (m *mockCommentNotifier) waitCalled(d time.Duration) bool {
+	deadline := time.Now().Add(d)
+	for {
+		if m.wasCalled() {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(time.Millisecond)
+	}
 }
 
 // --- PostWatchComment Tests ---
@@ -559,8 +586,7 @@ func TestPostWatchComment_QuickReaction_DoesNotSendCommentNotification(t *testin
 	}
 
 	// Notification is sent asynchronously for non-reaction comments.
-	time.Sleep(50 * time.Millisecond)
-	if notifier.called {
+	if notifier.waitCalled(50 * time.Millisecond) {
 		t.Fatal("expected no comment notification for quick reactions")
 	}
 }
@@ -611,8 +637,7 @@ func TestPostWatchComment_NotificationModeViewsOnly_DoesNotSendCommentNotificati
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	if notifier.called {
+	if notifier.waitCalled(50 * time.Millisecond) {
 		t.Fatal("expected no comment notification when account mode is views_only")
 	}
 
@@ -671,8 +696,7 @@ func TestPostWatchComment_NotificationModeCommentsOnly_SendsCommentNotification(
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	if !notifier.called {
+	if !notifier.waitCalled(time.Second) {
 		t.Fatal("expected comment notification when account mode is comments_only")
 	}
 
