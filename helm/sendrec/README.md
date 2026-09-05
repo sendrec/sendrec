@@ -295,6 +295,32 @@ The chart requests `512Mi` and sets no memory limit. The request is what gets th
 
 Under-provisioning does not fail gracefully: the OOM killer takes the whole pod, so an edit triggered by one user drops every in-flight request. If you cannot give the pod headroom, keep `replicas: 1` and expect edits on large recordings to fail.
 
+#### Measuring your own floor
+
+The figures above are one ffmpeg process on synthetic content. The number that matters is the whole pod on your recordings, and only you can measure that. Ten minutes, no tooling:
+
+```sh
+POD=$(kubectl -n sendrec get pod -l app=sendrec -o jsonpath='{.items[0].metadata.name}')
+
+# 1. Idle baseline — the Go server and nothing else.
+kubectl -n sendrec exec "$POD" -- cat /sys/fs/cgroup/memory.peak
+
+# 2. Trigger the heaviest edit you expect: your largest resolution, your
+#    longest recording, remove-segments with many cuts. Wait for it to finish.
+
+# 3. Peak for the pod, including that encode.
+kubectl -n sendrec exec "$POD" -- cat /sys/fs/cgroup/memory.peak
+```
+
+`memory.peak` is cgroup v2 and is the high-water mark since the container started, so run step 2 on a freshly started pod or accept that earlier work is included. On cgroup v1 read `/sys/fs/cgroup/memory/memory.max_usage_in_bytes` instead.
+
+Then size it:
+
+- **Request** = the step 3 figure with 20% headroom, and if you raise `env.maxConcurrentEncodes` to N, add roughly N times the difference between steps 3 and 1.
+- **Limit** = request plus whatever headroom you want for a recording bigger than the one you tested. Setting it below the step 3 figure means the OOM killer, not a slow edit.
+
+Repeat when you change resolution limits, enable transcription or noise reduction, or raise the concurrency limit — each moves the floor.
+
 ## Networking
 
 | Values key | Meaning | Default |
