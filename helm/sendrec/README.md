@@ -115,7 +115,7 @@ Set any of these to `"0"` for unlimited. The chart ships `"0"` for all three, so
 | `env.maxVideosPerMonth` | `MAX_VIDEOS_PER_MONTH` | Videos a user may create per month | `0` (app: free plan, `25`) |
 | `env.maxVideoDurationSeconds` | `MAX_VIDEO_DURATION_SECONDS` | Max recording length | `0` (app: free plan, `300`) |
 | `env.maxPlaylists` | `MAX_PLAYLISTS` | Playlists a free-tier user may create | `0` (app: free plan, `3`) |
-| `env.maxConcurrentEncodes` | `MAX_CONCURRENT_ENCODES` | ffmpeg encodes allowed to run at once. Extra edits queue. Each 1080p encode peaks near 300 MB, so raise this and the memory request together | `1` |
+| `env.maxConcurrentEncodes` | `MAX_CONCURRENT_ENCODES` | ffmpeg encodes allowed to run at once **per pod**. Extra edits queue, holding their downloaded source on disk while they wait. Each 1080p encode peaks near 300 MB, so raise this and the memory request together | `1` |
 
 ### Features
 

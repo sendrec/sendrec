@@ -3,6 +3,7 @@ package video
 import (
 	"context"
 	"log/slog"
+	"sync/atomic"
 	"time"
 )
 
@@ -41,7 +42,7 @@ func newEncoderSlots(limit int) *encoderSlots {
 // acquire blocks until a slot is free or ctx is done. The returned function
 // returns the slot and must be called exactly once.
 func (s *encoderSlots) acquire(ctx context.Context) (release func(), err error) {
-	waited := time.Now()
+	start := time.Now()
 	select {
 	case s.tokens <- struct{}{}:
 	case <-ctx.Done():
@@ -50,8 +51,8 @@ func (s *encoderSlots) acquire(ctx context.Context) (release func(), err error) 
 
 	// Queueing is expected under load; queueing for a long time means the pod is
 	// undersized for its edit volume, which is invisible without this line.
-	if held := time.Since(waited); held > 5*time.Second {
-		slog.Info("encoder: waited for a free slot", "waited", held.String(), "limit", cap(s.tokens))
+	if waited := time.Since(start); waited > 5*time.Second {
+		slog.Info("encoder: waited for a free slot", "waited", waited.String(), "limit", cap(s.tokens))
 	}
 
 	var once bool
@@ -67,11 +68,27 @@ func (s *encoderSlots) acquire(ctx context.Context) (release func(), err error) 
 // ffmpegEncoders gates the five encoding paths. Probing, thumbnail extraction
 // and audio extraction stay outside it: they are cheap enough that queueing them
 // behind an encode would cost more than it saves.
-var ffmpegEncoders = newEncoderSlots(DefaultEncoderConcurrency)
+//
+// An atomic pointer rather than a plain variable, so replacing the gate is safe
+// however many goroutines are reading it. The startup ordering in main.go makes
+// that unnecessary today; this makes it unnecessary to keep remembering.
+var ffmpegEncoders atomic.Pointer[encoderSlots]
 
-// SetEncoderConcurrency replaces the process-wide limit. Called once at startup
-// from MAX_CONCURRENT_ENCODES, before any request is served.
+func init() {
+	ffmpegEncoders.Store(newEncoderSlots(DefaultEncoderConcurrency))
+}
+
+// encoders returns the current process-wide gate.
+func encoders() *encoderSlots {
+	return ffmpegEncoders.Load()
+}
+
+// SetEncoderConcurrency replaces the process-wide limit, from
+// MAX_CONCURRENT_ENCODES at startup. Encodes already holding a slot finish on
+// the gate they acquired from, so a swap mid-flight can briefly allow the old
+// and new limits together; in practice it runs once before any encode exists.
 func SetEncoderConcurrency(limit int) {
-	ffmpegEncoders = newEncoderSlots(limit)
-	slog.Info("encoder concurrency", "limit", cap(ffmpegEncoders.tokens))
+	s := newEncoderSlots(limit)
+	ffmpegEncoders.Store(s)
+	slog.Info("encoder concurrency", "limit", cap(s.tokens))
 }
