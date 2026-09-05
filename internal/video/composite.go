@@ -88,6 +88,14 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 func compositeOverlay(ctx context.Context, screenPath, webcamPath, outputPath, contentType string) (string, error) {
 	args := buildCompositeArgs(screenPath, webcamPath, outputPath, contentType)
 
+	// Hold a slot only around ffmpeg itself: the download and upload either
+	// side are I/O and would waste the slot.
+	release, err := ffmpegEncoders.acquire(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

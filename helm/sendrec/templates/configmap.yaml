@@ -18,6 +18,7 @@ data:
   MAX_VIDEOS_PER_MONTH: {{ .Values.sendrec.env.maxVideosPerMonth | quote }}
   MAX_VIDEO_DURATION_SECONDS: {{ .Values.sendrec.env.maxVideoDurationSeconds | quote }}
   MAX_PLAYLISTS: {{ .Values.sendrec.env.maxPlaylists | quote }}
+  MAX_CONCURRENT_ENCODES: {{ .Values.sendrec.env.maxConcurrentEncodes | quote }}
   API_DOCS_ENABLED: {{ .Values.sendrec.env.apiDocsEnabled | quote }}
   BRANDING_ENABLED: {{ .Values.sendrec.env.brandingEnabled | quote }}
   REGISTRATION_ENABLED: {{ .Values.sendrec.env.registrationEnabled | quote }}

@@ -131,6 +131,14 @@ func buildNormalizeArgs(inputPath, outputPath, audioFilter string) []string {
 // See transcodeToMP4 for why this is a var.
 var transcodeToIOSCompatible = func(ctx context.Context, inputPath, outputPath, audioFilter string) error {
 	args := buildNormalizeArgs(inputPath, outputPath, audioFilter)
+	// Hold a slot only around ffmpeg itself: the download and upload either
+	// side are I/O and would waste the slot.
+	release, err := ffmpegEncoders.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

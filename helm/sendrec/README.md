@@ -115,6 +115,7 @@ Set any of these to `"0"` for unlimited. The chart ships `"0"` for all three, so
 | `env.maxVideosPerMonth` | `MAX_VIDEOS_PER_MONTH` | Videos a user may create per month | `0` (app: free plan, `25`) |
 | `env.maxVideoDurationSeconds` | `MAX_VIDEO_DURATION_SECONDS` | Max recording length | `0` (app: free plan, `300`) |
 | `env.maxPlaylists` | `MAX_PLAYLISTS` | Playlists a free-tier user may create | `0` (app: free plan, `3`) |
+| `env.maxConcurrentEncodes` | `MAX_CONCURRENT_ENCODES` | ffmpeg encodes allowed to run at once. Extra edits queue. Each 1080p encode peaks near 300 MB, so raise this and the memory request together | `1` |
 
 ### Features
 
@@ -290,7 +291,7 @@ The chart requests `512Mi` and sets no memory limit. The request is what gets th
 - **4K or high-DPI sources** scale roughly with pixel count. The app scales down to 1080p during transcode, but the decode side still holds full-resolution frames.
 - **Local transcription** runs whisper.cpp in the same pod and is both CPU and memory hungry.
 - **Noise reduction** adds an ffmpeg filter to every transcode.
-- **Concurrent jobs.** Nothing bounds how many edits run at once, so two simultaneous 1080p edits want roughly twice the memory. `512Mi` is a request sized for one; it is not a reservation that survives concurrency.
+- **Concurrent jobs.** `env.maxConcurrentEncodes` defaults to `1`, so extra edits queue instead of running alongside each other. `512Mi` is sized for that one encode. Raising the limit multiplies peak memory, so raise the request with it.
 
 Under-provisioning does not fail gracefully: the OOM killer takes the whole pod, so an edit triggered by one user drops every in-flight request. If you cannot give the pod headroom, keep `replicas: 1` and expect edits on large recordings to fail.
 

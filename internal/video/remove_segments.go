@@ -178,6 +178,14 @@ func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments
 func removeSegmentsFromVideo(ctx context.Context, inputPath, outputPath, contentType string, segments []segmentRange, audioPresent bool) error {
 	args := buildRemoveSegmentsArgs(inputPath, outputPath, contentType, segments, audioPresent)
 
+	// Hold a slot only around ffmpeg itself: the download and upload either
+	// side are I/O and would waste the slot.
+	release, err := ffmpegEncoders.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

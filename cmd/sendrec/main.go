@@ -225,6 +225,11 @@ func main() {
 	video.StartSummaryWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
 	video.StartDocumentWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
 	video.StartDigestWorker(cleanupCtx, db.Pool, emailClient, baseURL)
+	// Bounds how many ffmpeg encodes run at once. Each 1080p encode peaks around
+	// 300 MB inside this process, so concurrency multiplies peak memory directly;
+	// raise it together with the pod's memory, not on its own.
+	video.SetEncoderConcurrency(int(getEnvInt64("MAX_CONCURRENT_ENCODES", video.DefaultEncoderConcurrency)))
+
 	video.StartTranscodeWorker(cleanupCtx, db.Pool, store, 2*time.Minute)
 	// Reclaims videos whose editing job died with the process. Runs more often
 	// than the 15 minute staleness bound so a stranded row is picked up soon
