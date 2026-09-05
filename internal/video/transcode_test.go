@@ -345,10 +345,10 @@ func TestNormalizeVideoAsync_StopsWhenBudgetExhausted(t *testing.T) {
 
 // stubFFmpeg replaces the ffmpeg call with one that just writes the output
 // file, so a test can reach the upload and db-update steps that follow.
-func stubFFmpeg(t *testing.T, target *func(string, string, string) error) {
+func stubFFmpeg(t *testing.T, target *func(context.Context, string, string, string) error) {
 	t.Helper()
 	original := *target
-	*target = func(_, outputPath, _ string) error {
+	*target = func(_ context.Context, _, outputPath, _ string) error {
 		return os.WriteFile(outputPath, []byte("fake mp4"), 0o600)
 	}
 	t.Cleanup(func() { *target = original })
@@ -422,7 +422,7 @@ func TestNormalizeVideoAsync_UploadFailureConsumesBudget(t *testing.T) {
 	// Report a non-h264 codec so needsNormalization() is true and the re-encode
 	// path runs instead of the early "already compatible" exit.
 	originalProbe := probeVideoProperties
-	probeVideoProperties = func(string) (videoProperties, error) {
+	probeVideoProperties = func(context.Context, string) (videoProperties, error) {
 		return videoProperties{CodecName: "vp9", Width: 1280, Height: 720}, nil
 	}
 	t.Cleanup(func() { probeVideoProperties = originalProbe })
@@ -477,7 +477,7 @@ func TestNormalizeVideoAsync_DBUpdateFailureConsumesBudget(t *testing.T) {
 
 	stubFFmpeg(t, &transcodeToIOSCompatible)
 	originalProbe := probeVideoProperties
-	probeVideoProperties = func(string) (videoProperties, error) {
+	probeVideoProperties = func(context.Context, string) (videoProperties, error) {
 		return videoProperties{CodecName: "vp9", Width: 1280, Height: 720}, nil
 	}
 	t.Cleanup(func() { probeVideoProperties = originalProbe })

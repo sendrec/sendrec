@@ -37,8 +37,8 @@ func isTranscriptionAvailable(t Transcriber) bool {
 
 var errNoAudio = fmt.Errorf("video has no audio stream")
 
-func hasAudioStream(inputPath string) bool {
-	cmd := exec.Command("ffprobe",
+func hasAudioStream(ctx context.Context, inputPath string) bool {
+	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
 		"-select_streams", "a",
 		"-show_entries", "stream=codec_type",
@@ -64,11 +64,17 @@ func buildAudioExtractArgs(inputPath, outputPath string) []string {
 	)
 }
 
-func extractAudio(inputPath, outputPath string) error {
-	if !hasAudioStream(inputPath) {
+func extractAudioAt(ctx context.Context, inputPath, outputPath string) error {
+	if !hasAudioStream(ctx, inputPath) {
+		// hasAudioStream collapses the probe's error into a bool, so a cancelled
+		// context is indistinguishable from a silent input at this level. Report
+		// the cancellation, which is the more useful of the two.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		return errNoAudio
 	}
-	cmd := exec.Command("ffmpeg", buildAudioExtractArgs(inputPath, outputPath)...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", buildAudioExtractArgs(inputPath, outputPath)...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg audio extraction: %w: %s", err, string(output))
@@ -158,7 +164,7 @@ func processTranscription(ctx context.Context, db database.DBTX, storage ObjectS
 	_ = tmpAudio.Close()
 	defer func() { _ = os.Remove(tmpAudioPath) }()
 
-	if err := extractAudio(tmpVideoPath, tmpAudioPath); err != nil {
+	if err := extractAudioAt(ctx, tmpVideoPath, tmpAudioPath); err != nil {
 		if errors.Is(err, errNoAudio) {
 			slog.Info("transcribe: video has no audio stream", "video_id", videoID)
 			if _, dbErr := db.Exec(ctx,

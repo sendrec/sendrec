@@ -1,6 +1,7 @@
 package video
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -140,7 +141,7 @@ func TestExtractAudio_NoAudioStream(t *testing.T) {
 	_ = tmpAudio.Close()
 	defer func() { _ = os.Remove(tmpAudioPath) }()
 
-	err = extractAudio(tmpVideoPath, tmpAudioPath)
+	err = extractAudioAt(context.Background(), tmpVideoPath, tmpAudioPath)
 	if !errors.Is(err, errNoAudio) {
 		t.Errorf("expected errNoAudio, got: %v", err)
 	}

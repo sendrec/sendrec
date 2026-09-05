@@ -115,8 +115,8 @@ func buildThumbnailArgs(inputPath, outputPath string, seekSeconds int) []string 
 	)
 }
 
-func extractFrameAt(inputPath, outputPath string, seekSeconds int) error {
-	cmd := exec.Command("ffmpeg", buildThumbnailArgs(inputPath, outputPath, seekSeconds)...)
+func extractFrameAt(ctx context.Context, inputPath, outputPath string, seekSeconds int) error {
+	cmd := exec.CommandContext(ctx, "ffmpeg", buildThumbnailArgs(inputPath, outputPath, seekSeconds)...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg: %w: %s", err, string(output))
@@ -124,8 +124,8 @@ func extractFrameAt(inputPath, outputPath string, seekSeconds int) error {
 	return nil
 }
 
-func extractFrame(inputPath, outputPath string) error {
-	return extractFrameAt(inputPath, outputPath, 2)
+func extractFrame(ctx context.Context, inputPath, outputPath string) error {
+	return extractFrameAt(ctx, inputPath, outputPath, 2)
 }
 
 func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey, thumbnailKey string) {
@@ -152,7 +152,7 @@ func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStor
 	_ = tmpThumb.Close()
 	defer func() { _ = os.Remove(tmpThumbPath) }()
 
-	if err := extractFrame(tmpVideoPath, tmpThumbPath); err != nil {
+	if err := extractFrame(ctx, tmpVideoPath, tmpThumbPath); err != nil {
 		slog.Error("thumbnail: ffmpeg failed", "video_id", videoID, "error", err)
 		return
 	}
@@ -160,7 +160,7 @@ func GenerateThumbnail(ctx context.Context, db database.DBTX, storage ObjectStor
 	// If -ss 2 produced a 0-byte file (video shorter than 2s), retry at the start
 	if info, err := os.Stat(tmpThumbPath); err == nil && info.Size() == 0 {
 		slog.Warn("thumbnail: video too short for seek=2, retrying at seek=0", "video_id", videoID)
-		if err := extractFrameAt(tmpVideoPath, tmpThumbPath, 0); err != nil {
+		if err := extractFrameAt(ctx, tmpVideoPath, tmpThumbPath, 0); err != nil {
 			slog.Error("thumbnail: ffmpeg retry failed", "video_id", videoID, "error", err)
 			return
 		}

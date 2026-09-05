@@ -28,7 +28,7 @@ func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage,
 		return
 	}
 
-	cmd := exec.Command("ffprobe",
+	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
 		"-show_entries", "format=duration",
 		"-of", "default=noprint_wrappers=1:nokey=1",

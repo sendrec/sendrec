@@ -11,8 +11,8 @@ import (
 	"github.com/sendrec/sendrec/internal/database"
 )
 
-func probeVideoInfo(path string) (frames int, info string, err error) {
-	cmd := exec.Command("ffprobe",
+func probeVideoInfo(ctx context.Context, path string) (frames int, info string, err error) {
+	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
 		"-select_streams", "v:0",
 		"-count_frames",
@@ -85,10 +85,10 @@ func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) 
 	return append(args, "-y", outputPath)
 }
 
-func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (string, error) {
+func compositeOverlay(ctx context.Context, screenPath, webcamPath, outputPath, contentType string) (string, error) {
 	args := buildCompositeArgs(screenPath, webcamPath, outputPath, contentType)
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), fmt.Errorf("ffmpeg composite: %w: %s", err, string(output))
@@ -155,7 +155,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	slog.Info("composite: files downloaded", "video_id", videoID, "screen_bytes", screenSize, "webcam_bytes", webcamSize)
 
 	// Verify both inputs have video frames before compositing
-	screenFrames, screenProbeInfo, screenProbeErr := probeVideoInfo(tmpScreenPath)
+	screenFrames, screenProbeInfo, screenProbeErr := probeVideoInfo(ctx, tmpScreenPath)
 	if screenProbeErr != nil || screenFrames == 0 {
 		slog.Warn("composite: screen has no video frames, skipping overlay", "video_id", videoID, "screen_bytes", screenSize, "probe_error", screenProbeErr)
 		setReadyFallback()
@@ -163,7 +163,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	}
 	slog.Info("composite: screen validated", "video_id", videoID, "screen_frames", screenFrames, "screen_info", screenProbeInfo)
 
-	webcamFrames, webcamProbeInfo, probeErr := probeVideoInfo(tmpWebcamPath)
+	webcamFrames, webcamProbeInfo, probeErr := probeVideoInfo(ctx, tmpWebcamPath)
 	if probeErr != nil {
 		slog.Error("composite: webcam probe failed", "video_id", videoID, "error", probeErr)
 		setReadyFallback()
@@ -186,7 +186,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	ffmpegOutput, err := compositeOverlay(tmpScreenPath, tmpWebcamPath, tmpOutputPath, contentType)
+	ffmpegOutput, err := compositeOverlay(ctx, tmpScreenPath, tmpWebcamPath, tmpOutputPath, contentType)
 	if err != nil {
 		slog.Error("composite: ffmpeg failed", "video_id", videoID, "error", err, "ffmpeg_output", ffmpegOutput)
 		setReadyFallback()

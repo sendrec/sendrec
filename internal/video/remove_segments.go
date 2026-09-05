@@ -175,10 +175,10 @@ func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments
 	return args
 }
 
-func removeSegmentsFromVideo(inputPath, outputPath, contentType string, segments []segmentRange, audioPresent bool) error {
+func removeSegmentsFromVideo(ctx context.Context, inputPath, outputPath, contentType string, segments []segmentRange, audioPresent bool) error {
 	args := buildRemoveSegmentsArgs(inputPath, outputPath, contentType, segments, audioPresent)
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg remove segments: %w: %s", err, string(output))
@@ -215,7 +215,7 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 		return
 	}
 
-	audioPresent := hasAudioStream(tmpInputPath)
+	audioPresent := hasAudioStream(ctx, tmpInputPath)
 
 	tmpOutput, err := os.CreateTemp("", "sendrec-remseg-output-*"+ext)
 	if err != nil {
@@ -227,7 +227,7 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	if err := removeSegmentsFromVideo(tmpInputPath, tmpOutputPath, contentType, segments, audioPresent); err != nil {
+	if err := removeSegmentsFromVideo(ctx, tmpInputPath, tmpOutputPath, contentType, segments, audioPresent); err != nil {
 		slog.Error("remove-segments: ffmpeg failed", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return
