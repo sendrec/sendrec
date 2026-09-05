@@ -102,8 +102,9 @@ func thumbnailFileKey(userID, shareToken string) string {
 	return fmt.Sprintf("recordings/%s/%s.jpg", userID, shareToken)
 }
 
-func extractFrameAt(inputPath, outputPath string, seekSeconds int) error {
-	cmd := exec.Command("ffmpeg",
+func buildThumbnailArgs(inputPath, outputPath string, seekSeconds int) []string {
+	args := append(globalThreads(), inputThreads()...)
+	return append(args,
 		"-i", inputPath,
 		"-ss", fmt.Sprintf("%d", seekSeconds),
 		"-frames:v", "1",
@@ -112,6 +113,10 @@ func extractFrameAt(inputPath, outputPath string, seekSeconds int) error {
 		"-y",
 		outputPath,
 	)
+}
+
+func extractFrameAt(inputPath, outputPath string, seekSeconds int) error {
+	cmd := exec.Command("ffmpeg", buildThumbnailArgs(inputPath, outputPath, seekSeconds)...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg: %w: %s", err, string(output))

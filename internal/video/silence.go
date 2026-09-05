@@ -141,15 +141,21 @@ func parseSilenceDetectOutput(stderr string) []segmentRange {
 	return segments
 }
 
-func detectSilence(inputPath string, noiseDB int, minDuration float64) ([]segmentRange, error) {
+func buildSilenceArgs(inputPath string, noiseDB int, minDuration float64) []string {
 	filterValue := fmt.Sprintf("silencedetect=noise=%ddB:d=%.2f", noiseDB, minDuration)
-	cmd := exec.Command("ffmpeg",
+	args := append(globalThreads(), inputThreads()...)
+	return append(args,
 		"-i", inputPath,
 		"-vn",
 		"-af", filterValue,
 		"-f", "null",
 		"-",
 	)
+}
+
+func detectSilence(inputPath string, noiseDB int, minDuration float64) ([]segmentRange, error) {
+	args := buildSilenceArgs(inputPath, noiseDB, minDuration)
+	cmd := exec.Command("ffmpeg", args...)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

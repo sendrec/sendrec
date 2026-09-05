@@ -221,3 +221,53 @@ func TestFFmpegHonoursTheBounds(t *testing.T) {
 		}
 	})
 }
+
+// Three ffmpeg calls decode without encoding video: silence detection, thumbnail
+// extraction and audio extraction for transcription. They allocate less than an
+// encode, but their decoder and filter pools size themselves from the visible
+// CPU count exactly like the others, so the caps that make peak memory
+// node-independent have to reach them too.
+func decodeOnlyBuilders() []struct {
+	name string
+	args []string
+} {
+	return []struct {
+		name string
+		args []string
+	}{
+		{"silence detect", buildSilenceArgs("in.mp4", -30, 0.5)},
+		{"thumbnail", buildThumbnailArgs("in.mp4", "out.jpg", 2)},
+		{"audio extract", buildAudioExtractArgs("in.mp4", "out.wav")},
+	}
+}
+
+func TestDecodeOnlyBuildersAreCapped(t *testing.T) {
+	for _, tc := range decodeOnlyBuilders() {
+		t.Run(tc.name, func(t *testing.T) {
+			at := slices.Index(tc.args, "-i")
+			if at == -1 {
+				t.Fatalf("no input in %v", tc.args)
+			}
+			if at < 2 || tc.args[at-2] != "-threads" || tc.args[at-1] != ffmpegThreadCap {
+				t.Errorf("input is not immediately preceded by -threads %s: %v", ffmpegThreadCap, tc.args)
+			}
+			for _, flag := range []string{"-filter_threads", "-filter_complex_threads"} {
+				i := slices.Index(tc.args, flag)
+				if i == -1 || i > at {
+					t.Errorf("%s missing or after the input: %v", flag, tc.args)
+				}
+			}
+		})
+	}
+}
+
+// These paths encode nothing, so libx264 parameters would be meaningless here.
+func TestDecodeOnlyBuildersCarryNoX264Params(t *testing.T) {
+	for _, tc := range decodeOnlyBuilders() {
+		t.Run(tc.name, func(t *testing.T) {
+			if slices.Contains(tc.args, "-x264-params") {
+				t.Errorf("-x264-params on a decode-only command: %v", tc.args)
+			}
+		})
+	}
+}

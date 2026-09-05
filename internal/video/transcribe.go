@@ -52,11 +52,9 @@ func hasAudioStream(inputPath string) bool {
 	return strings.TrimSpace(string(output)) != ""
 }
 
-func extractAudio(inputPath, outputPath string) error {
-	if !hasAudioStream(inputPath) {
-		return errNoAudio
-	}
-	cmd := exec.Command("ffmpeg",
+func buildAudioExtractArgs(inputPath, outputPath string) []string {
+	args := append(globalThreads(), inputThreads()...)
+	return append(args,
 		"-i", inputPath,
 		"-ar", "16000",
 		"-ac", "1",
@@ -64,6 +62,13 @@ func extractAudio(inputPath, outputPath string) error {
 		"-y",
 		outputPath,
 	)
+}
+
+func extractAudio(inputPath, outputPath string) error {
+	if !hasAudioStream(inputPath) {
+		return errNoAudio
+	}
+	cmd := exec.Command("ffmpeg", buildAudioExtractArgs(inputPath, outputPath)...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg audio extraction: %w: %s", err, string(output))
