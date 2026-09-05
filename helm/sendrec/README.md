@@ -129,11 +129,13 @@ Set any of these to `"0"` for unlimited.
 
 | Values key | Env var | Meaning | Default |
 | --- | --- | --- | --- |
-| `env.trustedProxy` | `TRUSTED_PROXY` | Whether `X-Forwarded-For` may be believed when identifying a client | `"false"` |
+| `env.trustedProxy` | `TRUSTED_PROXY` | Whether `X-Forwarded-For` may be believed when identifying a client | `"true"` (app default: `"false"`) |
 | `env.rateLimitEnabled` | `RATE_LIMIT_ENABLED` | Master switch for all per-IP rate limiting | `"true"` |
 | `env.webhookAllowPrivateTargets` | `WEBHOOK_ALLOW_PRIVATE_TARGETS` | Whether user-configured webhooks may resolve to private addresses | `"false"` |
 
-**`trustedProxy` is the one to think about.** The client address keys both rate limiting and unique-viewer dedup. Left `"false"` behind an ingress controller, every request appears to come from the controller's pod IP, so all users share a single rate-limit bucket and one busy client throttles everyone. Set it to `"true"` when the only path to the pod is a proxy you control that always sets `X-Forwarded-For` (Traefik, nginx and Caddy all do) - the app then trusts the *last* entry in that header. Do **not** set it if pods are reachable directly, because then clients can forge the header and evade limiting entirely. Pairing it with a `NetworkPolicy` that admits only your ingress namespace makes the assumption enforceable.
+**`trustedProxy` is the one to think about, and the chart deliberately differs from the app here.** The app defaults it to `"false"`; the chart ships `"true"`, because the chart's own defaults (`ingress.enabled: true`, `service.type: ClusterIP`) describe a pod that is only reachable through a proxy. The client address keys both rate limiting and unique-viewer dedup. Left `"false"` behind an ingress controller, every request appears to come from the controller's pod IP, so all users share a single rate-limit bucket and one busy client throttles everyone. Set it to `"true"` when the only path to the pod is a proxy you control that always sets `X-Forwarded-For` (Traefik, nginx and Caddy all do) - the app then trusts the *last* entry in that header. Do **not** set it if pods are reachable directly, because then clients can forge the header and evade limiting entirely. Pairing it with a `NetworkPolicy` that admits only your ingress namespace makes the assumption enforceable.
+
+If you expose the Service directly (`service.type: LoadBalancer` or `NodePort`), set `trustedProxy: "false"`. The chart prints a warning on install and upgrade when it detects that combination.
 
 Rate limits are fixed per route group (token bucket, requests/second + burst): auth and watch-page auth `0.5/5`, video writes `2/10`, comment writes `0.2/3`, comment reads and watch pages `5/20`. Rejected requests get `429` with `Retry-After: 10`. Only disable rate limiting in test/e2e stacks where the whole suite shares one source IP.
 
