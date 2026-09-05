@@ -260,7 +260,7 @@ Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `
 | `replicas` | Pod count. The app is stateless (state lives in Postgres and S3), but transcode/transcription jobs run in-process | `1` |
 | `image.repository` / `image.tag` / `image.pullPolicy` | Container image. An empty tag resolves to `v<appVersion>` from `Chart.yaml` | `ghcr.io/sendrec/sendrec` / `""` / `Always` |
 | `deploymentStrategy` | Passed through to the Deployment | `RollingUpdate` 25%/25% |
-| `resources` | Requests/limits. Raise substantially for local transcription or noise reduction | `100m` / `128Mi` requests |
+| `resources` | Requests/limits. See [Sizing the pod](#sizing-the-pod) | `200m` / `512Mi` requests, `2Gi` memory limit |
 | `livenessProbe` / `readinessProbe` | Passed through as-is; both hit `/api/health` | see `values.yaml` |
 | `deployment.extraInitContainers` | Extra init containers, appended after the model downloader | `[]` |
 | `deployment.extraContainers` | Sidecars | `[]` |
@@ -268,6 +268,25 @@ Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `
 | `extraResources` | Arbitrary manifests rendered verbatim (CronJob, ConfigMap, ServiceMonitor, …) | `[]` |
 
 The Deployment carries `checksum/configmap` and `checksum/secret` annotations, so config changes roll pods automatically.
+
+### Sizing the pod
+
+**Editing has a memory floor, and it is well above what an HTTP server needs.** Transcode, normalize, trim, remove-segments and composite all run ffmpeg in this pod. Measured peak RSS for a single 1080p30 x264 encode, ffmpeg 7.1:
+
+| | peak RSS | wall |
+| --- | --- | --- |
+| ffmpeg defaults | 523 MB | 283s |
+| the bounded encoder settings the app now passes | 338 MB | 135s |
+| stream copy, no encode | 35 MB | - |
+
+The chart defaults — `512Mi` requested, `2Gi` limit — leave room for one 1080p encode plus the Go runtime. They are not enough for everything:
+
+- **4K or high-DPI sources** scale roughly with pixel count. The app scales down to 1080p during transcode, but the decode side still holds full-resolution frames.
+- **Local transcription** runs whisper.cpp in the same pod and is both CPU and memory hungry.
+- **Noise reduction** adds an ffmpeg filter to every transcode.
+- **Concurrent jobs.** Nothing bounds how many edits run at once, so two simultaneous 1080p edits want roughly twice the memory.
+
+Under-provisioning does not fail gracefully: the OOM killer takes the whole pod, so an edit triggered by one user drops every in-flight request. If you cannot give the pod headroom, keep `replicas: 1` and expect edits on large recordings to fail.
 
 ## Networking
 

@@ -33,7 +33,7 @@ func probeVideoInfo(path string) (frames int, info string, err error) {
 	return frames, info, nil
 }
 
-func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (string, error) {
+func buildCompositeArgs(screenPath, webcamPath, outputPath, contentType string) []string {
 	// PiP filter: scale webcam, add border, normalize timestamps.
 	// setpts=PTS-STARTPTS normalizes webcam timestamps to start at 0.
 	pipSetup := "[1:v]setpts=PTS-STARTPTS,scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip]"
@@ -78,6 +78,12 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (s
 			outputPath,
 		}
 	}
+
+	return appendX264Params(args, contentType)
+}
+
+func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (string, error) {
+	args := buildCompositeArgs(screenPath, webcamPath, outputPath, contentType)
 
 	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()

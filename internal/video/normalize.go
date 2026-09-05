@@ -119,6 +119,7 @@ func buildNormalizeArgs(inputPath, outputPath, audioFilter string) []string {
 		"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
 		"-r", "60",
 	}
+	args = append(args, x264MemoryParams()...)
 	if audioFilter != "" {
 		args = append(args, "-af", audioFilter)
 	}

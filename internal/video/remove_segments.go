@@ -160,6 +160,7 @@ func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments
 		args = append(args, "-filter_complex", filterComplex)
 		args = append(args, "-map", "[v]", "-map", "[a]")
 		args = append(args, "-c:v", videoCodecForContentType(contentType), "-c:a", audioCodecForContentType(contentType))
+		args = appendX264Params(args, contentType)
 	} else {
 		filterComplex := fmt.Sprintf(
 			"[0:v]select='not(%s)',setpts=N/FRAME_RATE/TB[v]",
@@ -168,6 +169,7 @@ func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments
 		args = append(args, "-filter_complex", filterComplex)
 		args = append(args, "-map", "[v]")
 		args = append(args, "-c:v", videoCodecForContentType(contentType), "-an")
+		args = appendX264Params(args, contentType)
 	}
 
 	args = append(args, "-y", outputPath)

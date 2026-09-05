@@ -19,7 +19,7 @@ func videoCodecForContentType(ct string) string {
 	}
 }
 
-func trimVideo(inputPath, outputPath, contentType string, startSeconds, endSeconds float64) error {
+func buildTrimArgs(inputPath, outputPath, contentType string, startSeconds, endSeconds float64) []string {
 	var args []string
 	if contentType == "video/mp4" || contentType == "video/quicktime" {
 		// iOS-safe encoding: constrain resolution, set profile/level, transcode audio to AAC
@@ -50,6 +50,12 @@ func trimVideo(inputPath, outputPath, contentType string, startSeconds, endSecon
 			outputPath,
 		}
 	}
+
+	return appendX264Params(args, contentType)
+}
+
+func trimVideo(inputPath, outputPath, contentType string, startSeconds, endSeconds float64) error {
+	args := buildTrimArgs(inputPath, outputPath, contentType, startSeconds, endSeconds)
 
 	cmd := exec.Command("ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
