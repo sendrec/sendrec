@@ -55,10 +55,10 @@ func buildTrimArgs(inputPath, outputPath, contentType string, startSeconds, endS
 	return append(args, "-y", outputPath)
 }
 
-func trimVideo(inputPath, outputPath, contentType string, startSeconds, endSeconds float64) error {
+func trimVideo(ctx context.Context, inputPath, outputPath, contentType string, startSeconds, endSeconds float64) error {
 	args := buildTrimArgs(inputPath, outputPath, contentType, startSeconds, endSeconds)
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg trim: %w: %s", err, string(output))
@@ -105,7 +105,7 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	if err := trimVideo(tmpInputPath, tmpOutputPath, contentType, startSeconds, endSeconds); err != nil {
+	if err := trimVideo(ctx, tmpInputPath, tmpOutputPath, contentType, startSeconds, endSeconds); err != nil {
 		slog.Error("trim: ffmpeg failed", "video_id", videoID, "error", err)
 		setReadyFallback()
 		return

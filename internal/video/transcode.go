@@ -34,15 +34,21 @@ func buildTranscodeArgs(inputPath, outputPath, audioFilter string) []string {
 
 // Package-level var so tests can reach the steps after ffmpeg without needing
 // an ffmpeg binary or a real video fixture.
-var transcodeToMP4 = func(inputPath, outputPath, audioFilter string) error {
+var transcodeToMP4 = func(ctx context.Context, inputPath, outputPath, audioFilter string) error {
 	args := buildTranscodeArgs(inputPath, outputPath, audioFilter)
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg transcode: %w: %s", err, string(output))
 	}
 	return nil
 }
+
+// perJobTimeout bounds a single worker-driven encode. The HTTP-triggered jobs
+// already build a 10 minute context each; the periodic workers passed their own
+// long-lived context straight through, so before ffmpeg was bound to a context
+// that made no difference and now it would mean no deadline at all.
+const perJobTimeout = 10 * time.Minute
 
 // maxTranscodeAttempts bounds how often a single video is fed to ffmpeg before
 // it is abandoned. Without it a corrupt upload is retried on every worker tick
@@ -160,7 +166,7 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	if err := transcodeToMP4(tmpInputPath, tmpOutputPath, audioFilter); err != nil {
+	if err := transcodeToMP4(ctx, tmpInputPath, tmpOutputPath, audioFilter); err != nil {
 		slog.Error("transcode: ffmpeg failed", "video_id", videoID, "error", err)
 		recordTranscodeFailure(ctx, db, videoID, err)
 		return
@@ -218,7 +224,9 @@ func transcodeExistingWebM(ctx context.Context, db database.DBTX, storage Object
 			slog.Error("transcode-worker: failed to scan", "error", err)
 			continue
 		}
-		TranscodeWebMAsync(ctx, db, storage, videoID, fileKey, "")
+		jobCtx, cancel := context.WithTimeout(ctx, perJobTimeout)
+		TranscodeWebMAsync(jobCtx, db, storage, videoID, fileKey, "")
+		cancel()
 	}
 }
 
@@ -242,7 +250,9 @@ func normalizeExistingVideos(ctx context.Context, db database.DBTX, storage Obje
 			slog.Error("normalize-worker: failed to scan", "error", err)
 			continue
 		}
-		NormalizeVideoAsync(ctx, db, storage, videoID, fileKey, "")
+		jobCtx, cancel := context.WithTimeout(ctx, perJobTimeout)
+		NormalizeVideoAsync(jobCtx, db, storage, videoID, fileKey, "")
+		cancel()
 	}
 }
 

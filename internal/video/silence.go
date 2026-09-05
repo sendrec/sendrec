@@ -1,6 +1,7 @@
 package video
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -76,7 +77,7 @@ func (h *Handler) DetectSilence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	segments, err := detectSilence(downloadURL, noiseDB, minDuration)
+	segments, err := detectSilence(r.Context(), downloadURL, noiseDB, minDuration)
 	if err != nil {
 		slog.Error("detect-silence: ffmpeg failed", "video_id", videoID, "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to detect silence")
@@ -153,9 +154,9 @@ func buildSilenceArgs(inputPath string, noiseDB int, minDuration float64) []stri
 	)
 }
 
-func detectSilence(inputPath string, noiseDB int, minDuration float64) ([]segmentRange, error) {
+func detectSilence(ctx context.Context, inputPath string, noiseDB int, minDuration float64) ([]segmentRange, error) {
 	args := buildSilenceArgs(inputPath, noiseDB, minDuration)
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

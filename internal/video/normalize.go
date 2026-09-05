@@ -76,8 +76,8 @@ type ffprobeResult struct {
 }
 
 // See transcodeToMP4 for why this is a var.
-var probeVideoProperties = func(inputPath string) (videoProperties, error) {
-	cmd := exec.Command("ffprobe",
+var probeVideoProperties = func(ctx context.Context, inputPath string) (videoProperties, error) {
+	cmd := exec.CommandContext(ctx, "ffprobe",
 		"-v", "error",
 		"-select_streams", "v:0",
 		"-show_entries", "stream=width,height,level,r_frame_rate,codec_name",
@@ -129,9 +129,9 @@ func buildNormalizeArgs(inputPath, outputPath, audioFilter string) []string {
 }
 
 // See transcodeToMP4 for why this is a var.
-var transcodeToIOSCompatible = func(inputPath, outputPath, audioFilter string) error {
+var transcodeToIOSCompatible = func(ctx context.Context, inputPath, outputPath, audioFilter string) error {
 	args := buildNormalizeArgs(inputPath, outputPath, audioFilter)
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ffmpeg normalize: %w: %s", err, string(output))
@@ -174,7 +174,7 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 		return
 	}
 
-	props, err := probeVideoProperties(tmpInputPath)
+	props, err := probeVideoProperties(ctx, tmpInputPath)
 	if err != nil {
 		slog.Warn("normalize: probe failed, marking normalized", "video_id", videoID, "error", err)
 		markIOSNormalized(ctx, db, videoID)
@@ -201,7 +201,7 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	if err := transcodeToIOSCompatible(tmpInputPath, tmpOutputPath, audioFilter); err != nil {
+	if err := transcodeToIOSCompatible(ctx, tmpInputPath, tmpOutputPath, audioFilter); err != nil {
 		slog.Error("normalize: ffmpeg failed", "video_id", videoID, "error", err)
 		recordTranscodeFailure(ctx, db, videoID, err)
 		return

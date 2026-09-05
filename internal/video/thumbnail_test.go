@@ -28,7 +28,7 @@ func TestExtractFrame_InvalidInput(t *testing.T) {
 		t.Skip("ffmpeg not installed")
 	}
 
-	err := extractFrame("/nonexistent/input.webm", "/tmp/sendrec-test-output.jpg")
+	err := extractFrame(context.Background(), "/nonexistent/input.webm", "/tmp/sendrec-test-output.jpg")
 	if err == nil {
 		t.Error("expected error for nonexistent input file")
 	}
@@ -78,7 +78,7 @@ func TestExtractFrameAt_InvalidInput(t *testing.T) {
 		t.Skip("ffmpeg not installed")
 	}
 
-	err := extractFrameAt("/nonexistent/input.webm", "/tmp/sendrec-test-output.jpg", 2)
+	err := extractFrameAt(context.Background(), "/nonexistent/input.webm", "/tmp/sendrec-test-output.jpg", 2)
 	if err == nil {
 		t.Error("expected error for nonexistent input file")
 	}
@@ -89,7 +89,7 @@ func TestExtractFrameAt_SeekZero(t *testing.T) {
 		t.Skip("ffmpeg not installed")
 	}
 
-	err := extractFrameAt("/nonexistent/input.webm", "/tmp/sendrec-test-output.jpg", 0)
+	err := extractFrameAt(context.Background(), "/nonexistent/input.webm", "/tmp/sendrec-test-output.jpg", 0)
 	if err == nil {
 		t.Error("expected error for nonexistent input file")
 	}
