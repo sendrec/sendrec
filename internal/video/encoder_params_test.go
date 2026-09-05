@@ -1,6 +1,7 @@
 package video
 
 import (
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -156,7 +157,13 @@ func TestX264MemoryParamsBoundsTheKnownCosts(t *testing.T) {
 // back what it reports, which is the only check that has caught the defect class.
 func TestFFmpegHonoursTheBounds(t *testing.T) {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
-		t.Skip("ffmpeg not installed; hack/encoder-memory/run.sh covers this")
+		// CI installs ffmpeg precisely so this runs there. Skipping silently in
+		// CI would leave the defect class uncovered by the only check that has
+		// ever caught it, so fail instead.
+		if os.Getenv("CI") != "" {
+			t.Fatal("ffmpeg missing in CI; the execution check cannot be skipped here")
+		}
+		t.Skip("ffmpeg not installed locally; hack/encoder-memory/run.sh covers this")
 	}
 
 	dir := t.TempDir()
