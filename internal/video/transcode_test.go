@@ -286,8 +286,8 @@ func TestTranscodeWebMAsync_StopsWhenBudgetExhausted(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
-	if s.downloadToFileCount != 0 {
-		t.Errorf("expected no download, got %d", s.downloadToFileCount)
+	if s.downloadCalls() != 0 {
+		t.Errorf("expected no download, got %d", s.downloadCalls())
 	}
 }
 
@@ -314,8 +314,8 @@ func TestTranscodeWebMAsync_ProceedsBelowBudget(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
-	if s.downloadToFileCount != 1 {
-		t.Errorf("expected 1 download attempt, got %d", s.downloadToFileCount)
+	if s.downloadCalls() != 1 {
+		t.Errorf("expected 1 download attempt, got %d", s.downloadCalls())
 	}
 }
 
@@ -338,8 +338,8 @@ func TestNormalizeVideoAsync_StopsWhenBudgetExhausted(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
-	if s.downloadToFileCount != 0 {
-		t.Errorf("expected no download, got %d", s.downloadToFileCount)
+	if s.downloadCalls() != 0 {
+		t.Errorf("expected no download, got %d", s.downloadCalls())
 	}
 }
 

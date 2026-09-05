@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,6 +22,11 @@ import (
 )
 
 type mockStorage struct {
+	// Handlers hand work to goroutines that outlive the request, so several of
+	// them can hit one mock at once. Every mutation and every read goes
+	// through mu; the race detector found four places where they did not.
+	mu sync.Mutex
+
 	uploadURL              string
 	webcamUploadURL        string
 	uploadErr              error
@@ -62,6 +68,8 @@ func (m *mockStorage) GenerateDownloadURLWithDisposition(_ context.Context, _ st
 }
 
 func (m *mockStorage) DeleteObject(_ context.Context, key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.deleteCallCount++
 	if m.deleteCalled != nil {
 		m.deleteCalled <- key
@@ -83,15 +91,41 @@ func (m *mockStorage) HeadObject(_ context.Context, _ string) (int64, string, er
 }
 
 func (m *mockStorage) DownloadToFile(_ context.Context, _ string, _ string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.downloadToFileCount++
 	return m.downloadToFileErr
 }
 
 func (m *mockStorage) UploadFile(_ context.Context, key string, _ string, contentType string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.uploadFileCallCount++
 	m.uploadFileKeys = append(m.uploadFileKeys, key)
 	m.uploadFileContentTypes = append(m.uploadFileContentTypes, contentType)
 	return m.uploadFileErr
+}
+
+func (m *mockStorage) deleteCalls() int { m.mu.Lock(); defer m.mu.Unlock(); return m.deleteCallCount }
+func (m *mockStorage) downloadCalls() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.downloadToFileCount
+}
+func (m *mockStorage) uploadCalls() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.uploadFileCallCount
+}
+func (m *mockStorage) uploadedKeys() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.uploadFileKeys...)
+}
+func (m *mockStorage) uploadedContentTypes() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]string(nil), m.uploadFileContentTypes...)
 }
 
 const testJWTSecret = "test-secret-for-video-tests"
@@ -3400,8 +3434,8 @@ func TestDeleteWithRetry_SucceedsFirstAttempt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if s.deleteCallCount != 1 {
-		t.Errorf("expected 1 call, got %d", s.deleteCallCount)
+	if s.deleteCalls() != 1 {
+		t.Errorf("expected 1 call, got %d", s.deleteCalls())
 	}
 }
 
@@ -3414,8 +3448,8 @@ func TestDeleteWithRetry_SucceedsOnSecondAttempt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if s.deleteCallCount != 2 {
-		t.Errorf("expected 2 calls, got %d", s.deleteCallCount)
+	if s.deleteCalls() != 2 {
+		t.Errorf("expected 2 calls, got %d", s.deleteCalls())
 	}
 }
 
@@ -3427,8 +3461,8 @@ func TestDeleteWithRetry_FailsAfterAllAttempts(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if s.deleteCallCount != 3 {
-		t.Errorf("expected 3 calls, got %d", s.deleteCallCount)
+	if s.deleteCalls() != 3 {
+		t.Errorf("expected 3 calls, got %d", s.deleteCalls())
 	}
 }
 
@@ -3444,8 +3478,8 @@ func TestDeleteWithRetry_RespectsContextCancellation(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	// Should stop early due to cancelled context
-	if s.deleteCallCount > 2 {
-		t.Errorf("expected early stop, got %d calls", s.deleteCallCount)
+	if s.deleteCalls() > 2 {
+		t.Errorf("expected early stop, got %d calls", s.deleteCalls())
 	}
 }
 
@@ -6931,14 +6965,14 @@ func TestUploadTranscript_HappyPath(t *testing.T) {
 		t.Errorf("expected text %q, got %q", "hi", resp.Segments[0].Text)
 	}
 
-	if storage.uploadFileCallCount != 1 {
-		t.Errorf("expected storage.UploadFile called once, got %d", storage.uploadFileCallCount)
+	if storage.uploadCalls() != 1 {
+		t.Errorf("expected storage.UploadFile called once, got %d", storage.uploadCalls())
 	}
-	if len(storage.uploadFileKeys) == 1 && storage.uploadFileKeys[0] != "recordings/"+testUserID+"/"+shareToken+".vtt" {
-		t.Errorf("unexpected upload key: %s", storage.uploadFileKeys[0])
+	if len(storage.uploadedKeys()) == 1 && storage.uploadedKeys()[0] != "recordings/"+testUserID+"/"+shareToken+".vtt" {
+		t.Errorf("unexpected upload key: %s", storage.uploadedKeys()[0])
 	}
-	if len(storage.uploadFileContentTypes) == 1 && storage.uploadFileContentTypes[0] != "text/vtt" {
-		t.Errorf("unexpected content type: %s", storage.uploadFileContentTypes[0])
+	if len(storage.uploadedContentTypes()) == 1 && storage.uploadedContentTypes()[0] != "text/vtt" {
+		t.Errorf("unexpected content type: %s", storage.uploadedContentTypes()[0])
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -6974,8 +7008,8 @@ func TestUploadTranscript_RejectsNonVTT(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
 	}
 
-	if storage.uploadFileCallCount != 0 {
-		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadFileCallCount)
+	if storage.uploadCalls() != 0 {
+		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadCalls())
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -7023,8 +7057,8 @@ func TestUploadTranscript_RejectsOversized(t *testing.T) {
 		t.Fatalf("expected size-specific error message, got: %s", rec.Body.String())
 	}
 
-	if storage.uploadFileCallCount != 0 {
-		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadFileCallCount)
+	if storage.uploadCalls() != 0 {
+		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadCalls())
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -7074,8 +7108,8 @@ func TestUploadTranscript_RejectsOversized_OverRouteCeiling(t *testing.T) {
 		t.Fatalf("expected size-specific error message, got: %s", rec.Body.String())
 	}
 
-	if storage.uploadFileCallCount != 0 {
-		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadFileCallCount)
+	if storage.uploadCalls() != 0 {
+		t.Errorf("expected storage.UploadFile not called, got %d calls", storage.uploadCalls())
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

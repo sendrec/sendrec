@@ -37,8 +37,8 @@ func TestPurgeOrphanedFiles_DeletesUnpurgedFiles(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
-	if storage.deleteCallCount != 2 {
-		t.Errorf("expected 2 delete calls, got %d", storage.deleteCallCount)
+	if storage.deleteCalls() != 2 {
+		t.Errorf("expected 2 delete calls, got %d", storage.deleteCalls())
 	}
 }
 
@@ -59,8 +59,8 @@ func TestPurgeOrphanedFiles_SkipsWhenNoOrphans(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
-	if storage.deleteCallCount != 0 {
-		t.Errorf("expected 0 delete calls, got %d", storage.deleteCallCount)
+	if storage.deleteCalls() != 0 {
+		t.Errorf("expected 0 delete calls, got %d", storage.deleteCalls())
 	}
 }
 
@@ -132,8 +132,8 @@ func TestPurgeOrphanedFiles_DeletesTranscriptFile(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}
-	if storage.deleteCallCount != 2 {
-		t.Errorf("expected 2 delete calls (video + transcript), got %d", storage.deleteCallCount)
+	if storage.deleteCalls() != 2 {
+		t.Errorf("expected 2 delete calls (video + transcript), got %d", storage.deleteCalls())
 	}
 }
 
