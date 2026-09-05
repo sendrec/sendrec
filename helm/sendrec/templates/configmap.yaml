@@ -22,6 +22,9 @@ data:
   BRANDING_ENABLED: {{ .Values.sendrec.env.brandingEnabled | quote }}
   REGISTRATION_ENABLED: {{ .Values.sendrec.env.registrationEnabled | quote }}
   PLAN_BADGE_ENABLED: {{ .Values.sendrec.env.planBadgeEnabled | quote }}
+  TRUSTED_PROXY: {{ .Values.sendrec.env.trustedProxy | quote }}
+  RATE_LIMIT_ENABLED: {{ .Values.sendrec.env.rateLimitEnabled | quote }}
+  WEBHOOK_ALLOW_PRIVATE_TARGETS: {{ .Values.sendrec.env.webhookAllowPrivateTargets | quote }}
   TRANSCRIPTION_ENABLED: {{ .Values.sendrec.env.transcriptionEnabled | quote }}
   TRANSCRIPTION_PROVIDER: {{ .Values.sendrec.env.transcriptionProvider | quote }}
   TRANSCRIPTION_API_URL: {{ .Values.sendrec.env.transcriptionApiUrl | quote }}
@@ -32,10 +35,14 @@ data:
   AI_BASE_URL: {{ .Values.sendrec.env.aiBaseUrl | quote }}
   AI_MODEL: {{ .Values.sendrec.env.aiModel | quote }}
   AI_TIMEOUT: {{ .Values.sendrec.env.aiTimeout | quote }}
+  NOISE_REDUCTION_FILTER: {{ .Values.sendrec.env.noiseReductionFilter | quote }}
   ANALYTICS_SCRIPT: {{ .Values.sendrec.env.analyticsScript | quote }}
   ALLOWED_FRAME_ANCESTORS: {{ .Values.sendrec.env.allowedFrameAncestors | quote }}
   GOOGLE_AUTH_ALLOWED_DOMAINS: {{ .Values.sendrec.env.googleAuthAllowedDomains | quote }}
   CREEM_PRO_PRODUCT_ID: {{ .Values.sendrec.env.creemProProductId | quote }}
+  CREEM_BUSINESS_PRODUCT_ID: {{ .Values.sendrec.env.creemBusinessProductId | quote }}
+  CREEM_ORG_PRO_PRODUCT_ID: {{ .Values.sendrec.env.creemOrgProProductId | quote }}
+  CREEM_ORG_BUSINESS_PRODUCT_ID: {{ .Values.sendrec.env.creemOrgBusinessProductId | quote }}
   LISTMONK_URL: {{ .Values.sendrec.env.listmonkBaseUrl | quote }}
   LISTMONK_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkTemplateId | quote }}
   LISTMONK_COMMENT_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkCommentTemplateId | quote }}
@@ -47,6 +54,7 @@ data:
   LISTMONK_ORG_INVITE_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkOrgInviteTemplateId | quote }}
   LISTMONK_RETENTION_WARNING_TEMPLATE_ID: {{ .Values.sendrec.env.listmonkRetentionWarningTemplateId | quote }}
   EMAIL_ALLOWLIST: {{ .Values.sendrec.env.emailAllowlist | quote }}
+  DEVELOPER_EMAIL: {{ .Values.sendrec.env.developerEmail | quote }}
   EMAIL_FROM_ADDRESS: {{ .Values.sendrec.env.emailFromAddress | quote }}
   SMTP_HOST: {{ .Values.sendrec.env.smtpHost | quote }}
   SMTP_PORT: {{ .Values.sendrec.env.smtpPort | quote }}

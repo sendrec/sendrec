@@ -1,0 +1,36 @@
+{{ .Chart.Name }} {{ .Chart.AppVersion }} deployed as release {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+{{- if .Values.sendrec.ingress.enabled }}
+{{- range .Values.sendrec.ingress.hosts }}
+
+  URL: {{ if $.Values.sendrec.ingress.tls }}https{{ else }}http{{ end }}://{{ .name }}{{ .path }}
+{{- end }}
+{{- else }}
+
+  No Ingress rendered. Reach the app through the {{ .Values.sendrec.service.type }} Service on port {{ .Values.sendrec.service.port }}.
+{{- end }}
+
+Make sure sendrec.env.baseUrl matches how users actually reach the app: it is used for
+share links, cookies, CORS and OAuth redirect URIs.
+
+{{- if eq (toString .Values.sendrec.env.trustedProxy) "true" }}
+{{- if or (ne .Values.sendrec.service.type "ClusterIP") (not .Values.sendrec.ingress.enabled) }}
+
+WARNING: trustedProxy is "true" but this release does not look proxy-only
+  ({{ if ne .Values.sendrec.service.type "ClusterIP" }}service.type is {{ .Values.sendrec.service.type }}{{ else }}ingress.enabled is false{{ end }}).
+
+  With trustedProxy "true" the app believes the last X-Forwarded-For entry. Any
+  client that can reach a pod directly can forge that header, mint a fresh
+  rate-limit bucket per request and inflate unique-viewer counts.
+
+  Either set sendrec.env.trustedProxy to "false", or keep every path to the pod
+  behind a proxy you control - service.type: ClusterIP plus a NetworkPolicy that
+  admits only your ingress-controller namespace. See helm/sendrec/README.md.
+{{- end }}
+{{- end }}
+
+{{- if .Values.sendrec.existingSecret }}
+
+Using existing Secret {{ .Values.sendrec.existingSecret | quote }}. Rotating it does not
+roll the Deployment on its own - the checksum annotation cannot see external changes.
+{{- end }}

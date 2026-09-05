@@ -19,28 +19,35 @@ sendrec:
     extraVolumes: []         # pod-level volumes
     extraVolumeMounts: []    # mounts on the main sendrec container
 
+  # Every key below becomes an env var in the ConfigMap; an empty string means "unset", so the app default applies
   env:
-    baseUrl: "https://sendrec.yourdomain.com"
+    baseUrl: ""  # required; public URL used in share links, emails and OAuth redirect URIs (e.g. https://sendrec.yourdomain.com)
 
     # Storage (S3-compatible)
     s3Endpoint: "" # e.g. https://s3.amazonaws.com or https://<your-minio-endpoint>
     s3PublicEndpoint: "" # e.g. https://s3.amazonaws.com, used for generating public URLs to videos
     s3Bucket: "" # e.g. your-bucket-name
     s3Region: "" # e.g. us-east-1
-    awsRequestChecksumCalculation: "when_required"
-    awsResponseChecksumValidation: "when_required"
+    awsRequestChecksumCalculation: "when_required"  # read by the AWS SDK, not by SendRec: some S3-compatible
+    awsResponseChecksumValidation: "when_required"  # backends reject the SDK's default always-on CRC32 checksums
 
-    # Upload / recording limits (0 = unlimited)
-    maxUploadBytes: "524288000"   # 500 MB
-    maxVideosPerMonth: "0"
-    maxVideoDurationSeconds: "0"
-    maxPlaylists: "0"
+    # Upload / recording limits. "0" = unlimited, "" = the app's free-plan limit.
+    # The three quota keys ship as "0", so a default install enforces no per-user quota.
+    maxUploadBytes: "524288000"   # 500 MB per file; keep in sync with your ingress body-size limit
+    maxVideosPerMonth: "0"        # per-user monthly recording quota ("" = free plan, 25)
+    maxVideoDurationSeconds: "0"  # per-recording length cap ("" = free plan, 300s)
+    maxPlaylists: "0"             # per-user playlist cap ("" = free plan, 3)
 
     # Features
-    apiDocsEnabled: "true"
-    brandingEnabled: "true"
-    registrationEnabled: "false"
-    planBadgeEnabled: "false"
+    apiDocsEnabled: "true"        # serve the OpenAPI/Swagger docs route
+    brandingEnabled: "true"       # allow custom logo/colors on watch pages
+    registrationEnabled: "false"  # public sign-up; "false" makes the instance invite-only
+    planBadgeEnabled: "false"     # show plan badges in the UI, only useful with billing configured
+
+    # Security
+    trustedProxy: "true"               # "true" only when an ingress controller you control always sets X-Forwarded-For; otherwise every client shares one rate-limit bucket
+    rateLimitEnabled: "true"            # "false" only in test/e2e stacks
+    webhookAllowPrivateTargets: "false" # "true" lets user webhooks reach loopback/private ranges: an SSRF primitive, local development only
 
     # Transcription
     transcriptionEnabled: "false"
@@ -48,35 +55,42 @@ sendrec:
     transcriptionApiUrl: ""         # OpenAI-compatible base URL (e.g. https://api.openai.com, https://api.groq.com/openai)
     transcriptionModel: ""          # Provider-specific model override (e.g. whisper-large-v3, nova-3)
     transcriptionTimeoutSeconds: "" # HTTP timeout for cloud calls (default 300)
-    whisperModelPath: "/models/ggml-small.bin"
+    whisperModelPath: "/models/ggml-small.bin"  # in-pod model file, only read when transcriptionProvider is local
 
-    # AI
+    # AI (summaries, titles, chapters)
     aiEnabled: "false"
-    aiBaseUrl: ""
+    aiBaseUrl: ""                    # OpenAI-compatible chat completions base URL
     aiModel: "mistral-small-latest"
-    aiTimeout: "60s"
+    aiTimeout: "60s"                 # Go duration, per request
 
-    analyticsScript: ""
+    # Utils
+    noiseReductionFilter: ""  # e.g. arnndn=m=/app/models/std.rnnn (model ships in the image) or afftdn=nr=12:nf=-50
 
-    allowedFrameAncestors: "'self'"
+    analyticsScript: ""  # exactly one <script> tag, injected into public watch pages
+
+    allowedFrameAncestors: ""  # extra CSP frame-ancestors origins; 'self' is always prepended by the app
     googleAuthAllowedDomains: ""  # Comma-separated email domains allowed for Google SSO, e.g. example.com,example.org
 
-    # Billing (Creem)
+    # Billing (Creem). Product IDs map a Creem product to a plan; the app refuses to start when secrets.creemApiKey is set without secrets.creemWebhookSecret.
     creemProProductId: ""
+    creemBusinessProductId: ""
+    creemOrgProProductId: ""      # falls back to creemProProductId when empty
+    creemOrgBusinessProductId: "" # falls back to creemBusinessProductId when empty
 
-    # Email (Listmonk)
-    listmonkBaseUrl: ""
-    listmonkTemplateId: ""
-    listmonkCommentTemplateId: ""
-    listmonkViewTemplateId: ""
-    listmonkConfirmTemplateId: ""
-    listmonkWelcomeTemplateId: ""
-    listmonkOnboardingDay2TemplateId: ""
-    listmonkOnboardingDay7TemplateId: ""
-    listmonkOrgInviteTemplateId: ""
-    listmonkRetentionWarningTemplateId: ""
-    emailAllowlist: ""
-    emailFromAddress: ""
+    # Email (Listmonk). Template IDs are numeric Listmonk template IDs; empty disables that mail.
+    listmonkBaseUrl: ""                     # when set, transactional mail goes through Listmonk instead of SMTP
+    listmonkTemplateId: ""                  # fallback template for mails without a dedicated one
+    listmonkCommentTemplateId: ""           # new comment on your video
+    listmonkViewTemplateId: ""              # your video was watched
+    listmonkConfirmTemplateId: ""           # email address confirmation
+    listmonkWelcomeTemplateId: ""           # sent right after signup
+    listmonkOnboardingDay2TemplateId: ""    # onboarding drip, day 2
+    listmonkOnboardingDay7TemplateId: ""    # onboarding drip, day 7
+    listmonkOrgInviteTemplateId: ""         # organization invitation
+    listmonkRetentionWarningTemplateId: ""  # heads-up before retention deletes videos
+    emailAllowlist: ""                      # if set, only these addresses/domains receive mail and the rest is dropped
+    developerEmail: ""                      # when set, every outgoing email is redirected here
+    emailFromAddress: ""                    # From: header on outgoing mail
 
     # Email (SMTP — used when listmonkBaseUrl is unset)
     smtpHost: ""
