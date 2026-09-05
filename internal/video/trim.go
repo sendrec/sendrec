@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/sendrec/sendrec/internal/database"
 )
@@ -78,8 +79,10 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 	slog.Info("trim: starting", "video_id", videoID, "start_seconds", startSeconds, "end_seconds", endSeconds)
 
 	setReadyFallback := func() {
-		if _, err := db.Exec(ctx,
-			`UPDATE videos SET status = 'ready', processing_started_at = NULL, updated_at = now() WHERE id = $1`,
+		recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if _, err := db.Exec(recoveryCtx,
+			`UPDATE videos SET status = 'ready', processing_started_at = NULL, updated_at = now() WHERE id = $1 AND status = 'processing'`,
 			videoID,
 		); err != nil {
 			slog.Error("trim: failed to set fallback ready status", "video_id", videoID, "error", err)

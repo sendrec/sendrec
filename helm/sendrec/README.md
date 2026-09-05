@@ -115,7 +115,7 @@ Set any of these to `"0"` for unlimited. The chart ships `"0"` for all three, so
 | `env.maxVideosPerMonth` | `MAX_VIDEOS_PER_MONTH` | Videos a user may create per month | `0` (app: free plan, `25`) |
 | `env.maxVideoDurationSeconds` | `MAX_VIDEO_DURATION_SECONDS` | Max recording length | `0` (app: free plan, `300`) |
 | `env.maxPlaylists` | `MAX_PLAYLISTS` | Playlists a free-tier user may create | `0` (app: free plan, `3`) |
-| `env.maxConcurrentEncodes` | `MAX_CONCURRENT_ENCODES` | ffmpeg encodes allowed to run at once **per pod**. Extra edits queue, holding their downloaded source on disk while they wait. Each 1080p encode peaks near 300 MB, so raise this and the memory request together | `1` |
+| `env.maxConcurrentEncodes` | `MAX_CONCURRENT_ENCODES` | ffmpeg encodes allowed to run at once **per app process**. Extra edits queue, holding their downloaded source on disk while they wait. Raise this and the measured memory request together; other workers are outside the gate | `1` |
 
 ### Features
 
@@ -261,7 +261,7 @@ Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `
 | `replicas` | Pod count. The app is stateless (state lives in Postgres and S3), but transcode/transcription jobs run in-process | `1` |
 | `image.repository` / `image.tag` / `image.pullPolicy` | Container image. An empty tag resolves to `v<appVersion>` from `Chart.yaml` | `ghcr.io/sendrec/sendrec` / `""` / `Always` |
 | `deploymentStrategy` | Passed through to the Deployment | `RollingUpdate` 25%/25% |
-| `resources` | Requests/limits. See [Sizing the pod](#sizing-the-pod) | `200m` / `512Mi` requests, no limit |
+| `resources` | Requests/limits. See [Sizing the pod](#sizing-the-pod) | `200m` / `1Gi` requests, no limit |
 | `livenessProbe` / `readinessProbe` | Passed through as-is; both hit `/api/health` | see `values.yaml` |
 | `deployment.extraInitContainers` | Extra init containers, appended after the model downloader | `[]` |
 | `deployment.extraContainers` | Sidecars | `[]` |
@@ -272,67 +272,56 @@ The Deployment carries `checksum/configmap` and `checksum/secret` annotations, s
 
 ### Sizing the pod
 
-**Editing has a memory floor, and it is well above what an HTTP server needs.** Transcode, normalize, trim, remove-segments and composite all run ffmpeg in this pod. Measured peak RSS for a single 1080p30 x264 encode, ffmpeg 7.1:
+The chart requests **1Gi** and sets no memory limit. The former 512Mi request was based on a synthetic 1080p ffmpeg process, not a real app-container edit. A post-#208 staging image held **837.3 MiB anon** on a high-DPI edit: with 20% headroom that is already **1004.8 MiB**. That edit timed out, so this establishes a lower bound, not a universal ceiling. See the [measurement and its scope](../../SELF-HOSTING.md#sizing-the-container).
 
-| | peak RSS |
-| --- | --- |
-| ffmpeg defaults | ~540 MB |
-| the bounded settings the app now passes | ~300 MB |
-| stream copy, no encode | ~35 MB |
+The patched remove-segments path completed that same edit at **363.71 MiB anon**: **436.45 MiB** with 20% headroom, leaving **75.55 MiB** below 512Mi. That supports 512Mi for this one measured job on the patched image, not every input or enabled worker. The 1Gi default is a conservative starting reservation, not a measured universal ceiling.
 
-Figures are approximate and move with the ffmpeg build, the input and the machine — run `hack/encoder-memory/run.sh` for numbers that describe your environment.
+The default application image is still `v1.90.5`, older than #208, the concurrency gate and the remove-segments resolution/frame-rate fix. It ignores `MAX_CONCURRENT_ENCODES`, even though the chart sets it. A chart upgrade alone does not upgrade to those fixes. Set `image.tag` to a reviewed release containing them when available and remeasure; the figures above do not certify the older default image.
 
-Two things that table does **not** say. It measures the ffmpeg process alone, not the pod: the Go server sits alongside it. And it measures one encode — nothing in the app bounds how many run at once, so two concurrent edits want roughly twice this.
+`env.maxConcurrentEncodes` defaults to `1` per app process; extra encodes queue. Transcription, probes, thumbnails, downloads and uploads are outside that gate. Decoders still hold source-resolution frames even when output is scaled down. Measure high-DPI sources and all enabled workers before reducing the reservation or raising concurrency.
 
-The chart requests `512Mi` and sets no memory limit. The request is what gets the pod scheduled somewhere it can actually finish an encode; the absent limit is deliberate, because the app does not bound how many encodes run at once, so any default limit would be a hard kill threshold guessed without knowing your inputs. Set `resources.limits.memory` once you have measured your own workload.
-
-`512Mi` is not enough for everything:
-
-- **4K or high-DPI sources** scale roughly with pixel count. The app scales down to 1080p during transcode, but the decode side still holds full-resolution frames.
-- **Local transcription** runs whisper.cpp in the same pod and is both CPU and memory hungry.
-- **Noise reduction** adds an ffmpeg filter to every transcode.
-- **Concurrent jobs.** `env.maxConcurrentEncodes` defaults to `1`, so extra edits queue instead of running alongside each other. `512Mi` is sized for that one encode. Raising the limit multiplies peak memory, so raise the request with it.
-
-Under-provisioning does not fail gracefully: the OOM killer takes the whole pod, so an edit triggered by one user drops every in-flight request. If you cannot give the pod headroom, keep `replicas: 1` and expect edits on large recordings to fail.
+**Upgrade impact:** the higher request can leave pods Pending if a small cluster lacks allocatable memory. Override `sendrec.resources.requests.memory` only from a measurement of your workload. Requests reserve scheduling capacity; they neither guarantee edit completion nor impose a hard cap. Leaving `limits: {}` preserves bursting. Choose a limit separately after testing it under load; exceeding one can interrupt live HTTP traffic as well as the edit.
 
 #### Measuring your own floor
 
-The figures above are one ffmpeg process on synthetic content. The number that matters is the app container on your recordings, and only you can measure that. Ten minutes, no tooling:
+Follow the checks and interpretation in [Sizing the container](../../SELF-HOSTING.md#sizing-the-container): identify the image/code, verify cgroup scope and limits, start idle, observe a completed edit on a copy, account for every process, and check cleanup. For Kubernetes use this Bash sampler on your workstation:
 
-```sh
+```bash
 POD=$(kubectl -n sendrec get pod -l app=sendrec -o jsonpath='{.items[0].metadata.name}')
-
-# 1. Idle baseline — the Go server and nothing else.
-kubectl -n sendrec exec "$POD" -c sendrec -- \
-  awk '/^anon /{printf "%.0f MB\n", $2/1048576}' /sys/fs/cgroup/memory.stat
-
-# 2. Start this sampler, then trigger the heaviest edit you expect: your
-#    largest resolution, longest recording, remove-segments with many cuts.
-#    Stop it when the edit finishes; the last line it printed is your figure.
+kubectl -n sendrec get pod "$POD" -o jsonpath='{.status.containerStatuses}'
 kubectl -n sendrec exec "$POD" -c sendrec -- sh -c \
-  'while :; do awk "/^anon /{print \$2}" /sys/fs/cgroup/memory.stat; sleep 1; done' \
-  | awk '{ if ($1>m) { m=$1; printf "peak anon %.0f MB\n", m/1048576 } }' 
+  'cat /proc/1/cgroup /proc/self/cgroup; cat /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory.swap.current /sys/fs/cgroup/memory.events; df -T /tmp'
+sample() {
+  kubectl -n sendrec exec "$POD" -c sendrec -- sh -c '
+    test "$(cat /proc/1/cgroup)" = "0::/" &&
+    test "$(cat /proc/self/cgroup)" = "0::/" &&
+    awk '\''$4=="/" && $5=="/sys/fs/cgroup" && / - cgroup2 / {ok=1}
+      END{exit !ok}'\'' /proc/self/mountinfo || {
+      echo "Unsupported cgroup scope: resolve the app cgroup before sampling" >&2
+      exit 1
+    }
+    awk '\''$1=="anon"{a=$2} $1=="shmem"{s=$2}
+      END{printf "bytes %.0f %.0f %.0f\n", a, s, a+s}'\'' /sys/fs/cgroup/memory.stat &&
+    ps -o pid,ppid,comm'
+}
+sample  # idle baseline: bytes anon shmem sum
+# Trigger the edit in another terminal. Ctrl-C stops the LOCAL loop;
+# no loop or sleep is started in the app container.
+for ((i=0; i<900; i++)); do
+  date -u +%FT%TZ
+  sample || { echo "Sampling failed; discard this run" >&2; break; }
+  sleep 1
+done | awk '$1=="bytes" {if ($4>m) m=$4;
+  printf "anon=%.2f MiB shmem=%.2f MiB total=%.2f MiB peak=%.2f MiB\n", $2/1048576, $3/1048576, $4/1048576, m/1048576;
+  next} {print} {fflush()}'
+kubectl -n sendrec exec "$POD" -c sendrec -- sh -c \
+  'ps -o pid,ppid,comm; ls -la /tmp; cat /sys/fs/cgroup/memory.events'
+kubectl -n sendrec get pod "$POD" -o jsonpath='{.status.containerStatuses}'
 ```
 
-`-c sendrec` matters: the chart renders `deployment.extraContainers` *before* the app container, so without it `kubectl exec` lands in your first sidecar and reports that container's memory instead. The figure is per container, not per pod — for the default single-container pod the two are the same.
+Keep `-c sendrec`: sidecars have separate cgroups and separate requests. Verify the selected pod is the one executing the edit and that its container ID and restart count do not change. The scope guard requires a private cgroup namespace and a mount rooted at the app cgroup; if it rejects your runtime, resolve the app's exact cgroup path before adapting it. Check ancestor limits from the node too. The loop reports anon + shmem, includes tmpfs automatically, prints PIDs and timestamps, and creates no temporary files.
 
-**Sample `anon`, not `memory.peak`.** This is the easy thing to get wrong, and getting it wrong over-provisions badly. `memory.peak` and `memory.current` count page cache, and this app writes multi-hundred-megabyte temp files for every edit, so cache dominates the total. Page cache is *reclaimable* — under a limit the kernel evicts it rather than OOM-killing. Two consequences:
-
-- **With no limit set, `memory.peak` is inflated.** A production instance showed `memory.peak` of 1757 MB after three days while holding 8 MB of `anon` and 122 MB of cache. Sizing a request from that number reserves far more than the process needs.
-- **With a limit already set, `memory.peak` is circular** — it saturates at the limit. Writing 400 MB inside a 256 MB cgroup reports a peak of exactly 256 MB and zero OOM kills. Re-running the procedure after you set a limit hands you back the limit.
-
-`anon` is the non-reclaimable part — the encoder's real working set, and what the OOM killer acts on. cgroup v2 keeps no historical peak for it, hence the sampler. One-second polling is enough: an encode holds its allocation for the whole run rather than spiking.
-
-One caveat on `anon`: memory-backed volumes are charged as `shmem`, not `anon`, and unlike page cache they are *not* reclaimable. The chart's `emptyDir` volumes are disk-backed, so this does not apply as shipped — but if you mount `/tmp` or the transcription volume with `medium: Memory`, add their contents to the figure.
-
-Needs cgroup v2. On cgroup v1, read the `rss` line of `/sys/fs/cgroup/memory/memory.stat` the same way.
-
-Then size it:
-
-- **Request** = (step 1 + N × (step 2 − step 1)) with 20% headroom, where N is `env.maxConcurrentEncodes`. Step 2 already contains one encode, so with the default N = 1 this is just step 2 plus headroom; each further concurrent encode adds the step 2 − step 1 difference once more.
-- **Limit** = request plus whatever headroom you want for a recording bigger than the one you tested, plus room for page cache on top. Setting it below the step 2 figure means the OOM killer, not a slow edit; setting it only slightly above makes the kernel thrash reclaiming cache.
-
-Repeat when you change resolution limits, enable transcription or noise reduction, or raise the concurrency limit — each moves the floor.
+Starting **request = (idle + N × (peak − idle)) × 1.2**, where N is the running app's encoder concurrency. Validate the extrapolation with actual concurrent jobs and budget other workers separately. This resident estimate excludes disk page cache and kernel memory; it is not a hard-limit formula. One-second sampling can miss brief spikes, and a timed-out, swapping, or OOM-killed run cannot certify a completed-job ceiling. Remeasure after image, input-size or feature changes.
 
 ## Networking
 
