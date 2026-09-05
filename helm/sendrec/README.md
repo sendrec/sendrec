@@ -83,6 +83,8 @@ Set `sendrec.existingSecret: my-secret` to skip the chart-managed Secret (useful
 
 Every key under `sendrec.env` renders into the ConfigMap unconditionally. **An empty string behaves exactly like "unset"** - the app falls back to its own default - so leaving a key `""` is always safe.
 
+The **Default** column below is what this chart ships in `values.yaml`, which is not always what the app would do on its own. Where the two differ, the app's own default follows in parentheses.
+
 ### Core
 
 | Values key | Env var | Meaning | Default |
@@ -97,7 +99,7 @@ Every key under `sendrec.env` renders into the ConfigMap unconditionally. **An e
 | `env.s3Endpoint` | `S3_ENDPOINT` | API endpoint the **server** talks to; may be a cluster-internal address | *required* |
 | `env.s3PublicEndpoint` | `S3_PUBLIC_ENDPOINT` | Endpoint used to sign presigned URLs the **browser** must reach. Falls back to `S3_ENDPOINT`, which breaks whenever the internal address isn't publicly resolvable | `""` |
 | `env.s3Bucket` | `S3_BUCKET` | Bucket holding videos, thumbnails and transcripts | *required* |
-| `env.s3Region` | `S3_REGION` | Must match the region configured on the storage side | `""` |
+| `env.s3Region` | `S3_REGION` | Must match the region configured on the storage side | `""` (app: `eu-central-1`) |
 | `env.awsRequestChecksumCalculation` | `AWS_REQUEST_CHECKSUM_CALCULATION` | Keep `when_required` for non-AWS providers; the AWS SDK default sends checksums many S3 clones reject | `when_required` |
 | `env.awsResponseChecksumValidation` | `AWS_RESPONSE_CHECKSUM_VALIDATION` | Same, for responses | `when_required` |
 
@@ -105,25 +107,25 @@ Video bytes never pass through the server - the browser uploads straight to stor
 
 ### Limits
 
-Set any of these to `"0"` for unlimited.
+Set any of these to `"0"` for unlimited. The chart ships `"0"` for all three, so a default install enforces no per-user quota; leave them `""` to fall back to the app's free-plan limits instead.
 
 | Values key | Env var | Meaning | Default |
 | --- | --- | --- | --- |
 | `env.maxUploadBytes` | `MAX_UPLOAD_BYTES` | Max size per recording/upload. Keep the ingress body-size limits in sync | `524288000` (500 MB) |
-| `env.maxVideosPerMonth` | `MAX_VIDEOS_PER_MONTH` | Videos a user may create per month | `0` |
-| `env.maxVideoDurationSeconds` | `MAX_VIDEO_DURATION_SECONDS` | Max recording length | `0` |
-| `env.maxPlaylists` | `MAX_PLAYLISTS` | Playlists a free-tier user may create | `0` |
+| `env.maxVideosPerMonth` | `MAX_VIDEOS_PER_MONTH` | Videos a user may create per month | `0` (app: free plan, `25`) |
+| `env.maxVideoDurationSeconds` | `MAX_VIDEO_DURATION_SECONDS` | Max recording length | `0` (app: free plan, `300`) |
+| `env.maxPlaylists` | `MAX_PLAYLISTS` | Playlists a free-tier user may create | `0` (app: free plan, `3`) |
 
 ### Features
 
 | Values key | Env var | Meaning | Default |
 | --- | --- | --- | --- |
-| `env.apiDocsEnabled` | `API_DOCS_ENABLED` | Serve the interactive API reference at `/api/docs` | `"true"` |
-| `env.brandingEnabled` | `BRANDING_ENABLED` | Let users customise watch-page logo, colours, footer and custom CSS | `"true"` |
-| `env.registrationEnabled` | `REGISTRATION_ENABLED` | Allow self-signup. `"false"` hides the form *and* disables the API endpoint | `"false"` |
+| `env.apiDocsEnabled` | `API_DOCS_ENABLED` | Serve the interactive API reference at `/api/docs` | `"true"` (app: `"false"`) |
+| `env.brandingEnabled` | `BRANDING_ENABLED` | Let users customise watch-page logo, colours, footer and custom CSS | `"true"` (app: `"false"`) |
+| `env.registrationEnabled` | `REGISTRATION_ENABLED` | Allow self-signup. `"false"` hides the form *and* disables the API endpoint | `"false"` (app: `"true"`) |
 | `env.planBadgeEnabled` | `PLAN_BADGE_ENABLED` | Show the Free/Pro/Business badge next to the logo. Only useful with billing configured | `"false"` |
 | `env.analyticsScript` | `ANALYTICS_SCRIPT` | A full `<script>` tag injected into every watch page (Umami, Plausible, Matomo, …). The CSP nonce is added automatically | `""` |
-| `env.allowedFrameAncestors` | `ALLOWED_FRAME_ANCESTORS` | Space-separated CSP `frame-ancestors` list. Widen it to embed SendRec in Nextcloud, a wiki, etc. | `'self'` |
+| `env.allowedFrameAncestors` | `ALLOWED_FRAME_ANCESTORS` | **Extra** space-separated CSP `frame-ancestors` origins; the app always prepends `'self'`. Widen it to embed SendRec in Nextcloud, a wiki, etc. | `""` |
 
 ### Security
 
@@ -249,7 +251,7 @@ All product IDs must be recurring/subscription products. They are also used in r
 
 Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `JWT_SECRET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `GITHUB_SSO_CLIENT_ID`, `GITHUB_SSO_CLIENT_SECRET`, `AI_API_KEY`, `TRANSCRIPTION_API_KEY`, `LISTMONK_USER`, `LISTMONK_PASSWORD`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `CREEM_API_KEY`, `CREEM_WEBHOOK_SECRET`.
 
-`jwtSecret` signs auth tokens: generate it with `openssl rand -hex 32`, and note that changing it invalidates every session. The app refuses to start with an empty one when `BASE_URL` is HTTPS.
+`jwtSecret` signs auth tokens: generate it with `openssl rand -hex 32`, and note that changing it invalidates every session. The app refuses to start without one, regardless of `BASE_URL`.
 
 ## Workload configuration
 
@@ -317,5 +319,5 @@ This deletes everything the release owns, including the whisper model PVC - add 
 
 ## See also
 
-- [SELF-HOSTING.md](../../SELF-HOSTING.md) - full environment variable reference, provider notes and Docker Compose setup
+- [SELF-HOSTING.md](../../SELF-HOSTING.md) - provider notes and Docker Compose setup. It predates several of the variables above (`RATE_LIMIT_ENABLED`, `WEBHOOK_ALLOW_PRIVATE_TARGETS`, `NOISE_REDUCTION_FILTER`, `DEVELOPER_EMAIL`, the workspace Creem product IDs), so treat this page as the current reference for anything under `sendrec.env`
 - [Releases](https://github.com/sendrec/sendrec/releases) - changelog

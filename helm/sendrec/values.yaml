@@ -21,7 +21,7 @@ sendrec:
 
   # Every key below becomes an env var in the ConfigMap; an empty string means "unset", so the app default applies
   env:
-    baseUrl: "https://sendrec.yourdomain.com"  # public URL used in share links, emails and OAuth redirect URIs
+    baseUrl: ""  # required; public URL used in share links, emails and OAuth redirect URIs (e.g. https://sendrec.yourdomain.com)
 
     # Storage (S3-compatible)
     s3Endpoint: "" # e.g. https://s3.amazonaws.com or https://<your-minio-endpoint>
@@ -31,11 +31,12 @@ sendrec:
     awsRequestChecksumCalculation: "when_required"  # read by the AWS SDK, not by SendRec: some S3-compatible
     awsResponseChecksumValidation: "when_required"  # backends reject the SDK's default always-on CRC32 checksums
 
-    # Upload / recording limits (0 = unlimited)
+    # Upload / recording limits. "0" = unlimited, "" = the app's free-plan limit.
+    # The three quota keys ship as "0", so a default install enforces no per-user quota.
     maxUploadBytes: "524288000"   # 500 MB per file; keep in sync with your ingress body-size limit
-    maxVideosPerMonth: "0"        # per-user monthly recording quota (default: free plan limit)
-    maxVideoDurationSeconds: "0"  # per-recording length cap (default: free plan limit)
-    maxPlaylists: "0"             # per-user playlist cap (default: free plan limit)
+    maxVideosPerMonth: "0"        # per-user monthly recording quota ("" = free plan, 25)
+    maxVideoDurationSeconds: "0"  # per-recording length cap ("" = free plan, 300s)
+    maxPlaylists: "0"             # per-user playlist cap ("" = free plan, 3)
 
     # Features
     apiDocsEnabled: "true"        # serve the OpenAPI/Swagger docs route
@@ -67,7 +68,7 @@ sendrec:
 
     analyticsScript: ""  # exactly one <script> tag, injected into public watch pages
 
-    allowedFrameAncestors: "'self'"  # extra CSP frame-ancestors origins; 'self' is always prepended by the app
+    allowedFrameAncestors: ""  # extra CSP frame-ancestors origins; 'self' is always prepended by the app
     googleAuthAllowedDomains: ""  # Comma-separated email domains allowed for Google SSO, e.g. example.com,example.org
 
     # Billing (Creem). Product IDs map a Creem product to a plan; the app refuses to start when secrets.creemApiKey is set without secrets.creemWebhookSecret.
