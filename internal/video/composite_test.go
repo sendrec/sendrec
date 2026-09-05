@@ -34,7 +34,7 @@ func TestCompositeWithWebcam_ScreenDownloadError(t *testing.T) {
 	s := &mockStorage{downloadToFileErr: fmt.Errorf("s3 down")}
 
 	// On error, should still set status to "ready" (fallback to screen-only)
-	mock.ExpectExec(`UPDATE videos SET status = 'ready', webcam_key = NULL`).
+	mock.ExpectExec(`UPDATE videos SET status = 'ready', webcam_key = NULL, processing_started_at = NULL`).
 		WithArgs("video-123").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
@@ -57,7 +57,7 @@ func TestCompositeWithWebcam_FFmpegFailsFallsBackToReady(t *testing.T) {
 	s := &mockStorage{}
 
 	// On error, should still set status to "ready"
-	mock.ExpectExec(`UPDATE videos SET status = 'ready', webcam_key = NULL`).
+	mock.ExpectExec(`UPDATE videos SET status = 'ready', webcam_key = NULL, processing_started_at = NULL`).
 		WithArgs("video-123").
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 

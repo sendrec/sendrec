@@ -27,7 +27,7 @@ func TestRemoveSegments_Success(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
 			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
-	mock.ExpectExec(`UPDATE videos SET status = 'processing'`).
+	mock.ExpectExec(`UPDATE videos SET status = 'processing', processing_started_at = now\(\)`).
 		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
@@ -260,7 +260,7 @@ func TestRemoveSegments_ConcurrentProcessing(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"duration", "file_key", "share_token", "status", "content_type", "user_id"}).
 			AddRow(120, "recordings/user/video.webm", "abc123defghi", "ready", "video/webm", testUserID))
 
-	mock.ExpectExec(`UPDATE videos SET status = 'processing'`).
+	mock.ExpectExec(`UPDATE videos SET status = 'processing', processing_started_at = now\(\)`).
 		WithArgs(videoID, testUserID).
 		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
 

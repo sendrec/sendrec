@@ -226,6 +226,10 @@ func main() {
 	video.StartDocumentWorker(cleanupCtx, db.Pool, aiClient, 10*time.Second)
 	video.StartDigestWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 	video.StartTranscodeWorker(cleanupCtx, db.Pool, store, 2*time.Minute)
+	// Reclaims videos whose editing job died with the process. Runs more often
+	// than the 15 minute staleness bound so a stranded row is picked up soon
+	// after it becomes eligible.
+	video.StartStuckProcessingWorker(cleanupCtx, db.Pool, 5*time.Minute)
 	video.StartOnboardingWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 	video.StartRetentionWorker(cleanupCtx, db.Pool, emailClient, baseURL)
 
