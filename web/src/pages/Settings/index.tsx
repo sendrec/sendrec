@@ -51,6 +51,14 @@ interface LoadedState {
 
 export function Settings() {
   const [loaded, setLoaded] = useState<LoadedState | null>(null);
+  const [version, setVersion] = useState("");
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then((res) => res.json())
+      .then((data: { version?: string }) => setVersion(data.version ?? ""))
+      .catch(() => setVersion(""));
+  }, []);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -244,6 +252,12 @@ export function Settings() {
           initialBranding={loaded.branding}
           limits={loaded.limits}
         />
+      )}
+
+      {version && (
+        <p className="settings-version" data-testid="server-version">
+          SendRec {version}
+        </p>
       )}
     </div>
   );

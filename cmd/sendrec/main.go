@@ -155,6 +155,7 @@ func main() {
 		WebFS:                     webFS,
 		JWTSecret:                 jwtSecret,
 		BaseURL:                   baseURL,
+		Version:                   version,
 		RegistrationEnabled:       registrationEnabled,
 		PlanBadgeEnabled:          planBadgeEnabled,
 		MaxUploadBytes:            getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),

@@ -126,6 +126,12 @@ input:focus-visible {
   margin-bottom: var(--space-6);
 }
 
+.settings-version {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
 .settings-section h2 {
   font-size: 18px;
   font-weight: 700;

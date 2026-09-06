@@ -3,6 +3,7 @@ package server_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -119,9 +120,42 @@ func TestHealthEndpointReturnsOK(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
+	}
+}
+
+func TestHealthEndpointReportsVersion(t *testing.T) {
+	srv := server.New(server.Config{Version: "v1.90.6"})
+	rec := executeRequest(srv, http.MethodGet, "/api/health")
+
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":"v1.90.6"}`
+	if rec.Body.String() != expected {
+		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
+	}
+}
+
+func TestHealthEndpointVersionIsAlwaysValidJSON(t *testing.T) {
+	// `git describe` returns the tag bytes verbatim, and Git accepts a tag that
+	// is not valid UTF-8. Go-syntax escaping would emit `\xff` here, which no
+	// JSON parser accepts — and every SPA page parses this payload.
+	srv := server.New(server.Config{Version: "v1.0-\xff"})
+	rec := executeRequest(srv, http.MethodGet, "/api/health")
+
+	if !json.Valid(rec.Body.Bytes()) {
+		t.Fatalf("health body is not valid JSON: %s", rec.Body.String())
+	}
+
+	var body struct {
+		Status  string `json:"status"`
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode health body: %v", err)
+	}
+	if body.Status != "ok" {
+		t.Errorf("expected status %q, got %q", "ok", body.Status)
 	}
 }
 
@@ -147,7 +181,7 @@ func TestHealthEndpointWithPingSuccess(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -176,7 +210,7 @@ func TestHealthEndpointIncludesRegistrationEnabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","registrationEnabled":true,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":true,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -189,7 +223,7 @@ func TestHealthEndpointRegistrationDisabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -202,7 +236,7 @@ func TestHealthEndpointPlanBadgeEnabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":true}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":true,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -214,7 +248,7 @@ func TestHealthEndpointPlanBadgeDefaultDisabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -851,7 +885,7 @@ func TestSPADoesNotInterceptHealthEndpoint(t *testing.T) {
 		t.Errorf("expected status 200 for health endpoint with SPA, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected health JSON, got %q", rec.Body.String())
 	}
