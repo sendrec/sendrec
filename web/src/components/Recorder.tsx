@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
-import { useCanvasCompositing } from "../hooks/useCanvasCompositing";
 import {
   useRecordingLifecycle,
   type RecordingCommand,
 } from "../hooks/useRecordingLifecycle";
+import { overlayDrawingOnTrack } from "../utils/drawingOverlay";
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
 import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
@@ -41,13 +41,12 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     }
   }, []);
 
-  // Drawing and compositing refs
   const drawingCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const compositingCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const {
     drawMode,
+    hasDrawing,
     drawColor,
     lineWidth,
     toggleDrawMode,
@@ -59,13 +58,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     handlePointerUp,
     handlePointerLeave,
   } = useDrawingCanvas({ canvasRef: drawingCanvasRef, captureWidth, captureHeight });
-
-  const { startCompositing, stopCompositing } =
-    useCanvasCompositing({
-      compositingCanvasRef,
-      screenVideoRef,
-      drawingCanvasRef,
-    });
 
   const stopWebcamStream = useCallback(() => {
     if (webcamStreamRef.current) {
@@ -134,7 +126,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       }
       webcamRecorderRef.current.stop();
     }
-    stopCompositing();
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
     }
@@ -145,7 +136,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     if (!hasActiveRecorder) {
       stopAllStreams();
     }
-  }, [stopAllStreams, stopCompositing]);
+  }, [stopAllStreams]);
 
   const recording = useRecordingLifecycle({
     maxDurationSeconds,
@@ -167,7 +158,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
   const abortCountdown = useCallback(() => {
     dispatch({ type: "cancel-countdown" });
-    stopCompositing();
     if (screenVideoRef.current) {
       screenVideoRef.current.srcObject = null;
     }
@@ -175,7 +165,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     mediaRecorderRef.current = null;
     webcamRecorderRef.current = null;
     webcamBlobPromiseRef.current = null;
-  }, [dispatch, stopAllStreams, stopCompositing]);
+  }, [dispatch, stopAllStreams]);
 
   async function toggleWebcam() {
     setMediaError(null);
@@ -211,38 +201,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       const screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
       screenStreamRef.current = screenStream;
 
-      // Capture microphone audio separately — getDisplayMedia only provides
-      // system/tab audio, never microphone input. MediaRecorder only records
-      // one audio track, so we use AudioContext to mix system + mic audio
-      // into a single track.
-      let recordingStream: MediaStream = screenStream;
-      if (systemAudioEnabled) {
-        try {
-          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-          micStreamRef.current = micStream;
-
-          const audioContext = new AudioContext();
-          audioContextRef.current = audioContext;
-          const destination = audioContext.createMediaStreamDestination();
-
-          // Connect system audio (if present) to the mixer
-          if (screenStream.getAudioTracks().length > 0) {
-            audioContext.createMediaStreamSource(screenStream).connect(destination);
-          }
-
-          // Connect microphone to the mixer
-          audioContext.createMediaStreamSource(micStream).connect(destination);
-
-          // Build recording stream: screen video + mixed audio
-          recordingStream = new MediaStream([
-            ...screenStream.getVideoTracks(),
-            ...destination.stream.getAudioTracks(),
-          ]);
-        } catch (micErr) {
-          console.warn("Microphone access denied, recording without mic audio", micErr);
-        }
-      }
-
       // Play screen stream on preview video first
       if (screenVideoRef.current) {
         screenVideoRef.current.srcObject = screenStream;
@@ -255,23 +213,59 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       setCaptureWidth(width);
       setCaptureHeight(height);
 
-      // Set canvas dimensions to match actual video frames
-      if (compositingCanvasRef.current) {
-        compositingCanvasRef.current.width = width;
-        compositingCanvasRef.current.height = height;
-      }
+      // Match the drawing canvas to the captured frames so annotations land on
+      // the same pixels once they are burned into the recording.
       if (drawingCanvasRef.current) {
         drawingCanvasRef.current.width = width;
         drawingCanvasRef.current.height = height;
       }
 
-      // Start compositing loop (for visual preview only)
-      startCompositing();
+      // Record the display track itself, not a canvas — canvas compositing
+      // freezes when the tab goes to the background because both
+      // requestAnimationFrame and setInterval are throttled there. Annotations
+      // are burned into the track's frames instead, which is frame-driven and
+      // survives a hidden tab.
+      let videoTrack = screenStream.getVideoTracks()[0];
+      if (videoTrack && drawingCanvasRef.current) {
+        videoTrack = overlayDrawingOnTrack(
+          videoTrack,
+          drawingCanvasRef.current,
+          () => hasDrawing.current,
+        );
+      }
 
-      // Record the combined stream (screen video + system audio + mic audio)
-      // directly — NOT through the canvas. Canvas compositing freezes when the
-      // tab goes to the background because requestAnimationFrame/setInterval are
-      // throttled. The raw streams keep capturing regardless of tab visibility.
+      // Capture microphone audio separately — getDisplayMedia only provides
+      // system/tab audio, never microphone input. MediaRecorder only records
+      // one audio track, so we use AudioContext to mix system + mic audio
+      // into a single track.
+      let audioTracks = screenStream.getAudioTracks();
+      if (systemAudioEnabled) {
+        try {
+          const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          micStreamRef.current = micStream;
+
+          const audioContext = new AudioContext();
+          audioContextRef.current = audioContext;
+          const destination = audioContext.createMediaStreamDestination();
+
+          // Connect system audio (if present) to the mixer
+          if (audioTracks.length > 0) {
+            audioContext.createMediaStreamSource(screenStream).connect(destination);
+          }
+
+          // Connect microphone to the mixer
+          audioContext.createMediaStreamSource(micStream).connect(destination);
+
+          audioTracks = destination.stream.getAudioTracks();
+        } catch (micErr) {
+          console.warn("Microphone access denied, recording without mic audio", micErr);
+        }
+      }
+
+      const recordingStream = new MediaStream(
+        [videoTrack, ...audioTracks].filter(Boolean),
+      );
+
       const mimeType = getSupportedMimeType();
       mimeTypeRef.current = mimeType;
 
@@ -390,10 +384,9 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
   useEffect(() => {
     return () => {
-      stopCompositing();
       stopAllStreams();
     };
-  }, [stopAllStreams, stopCompositing]);
+  }, [stopAllStreams]);
 
   useEffect(() => {
     if (previewExpanded) {
@@ -492,13 +485,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
           </div>
         )}
       </div>
-
-      {/* Hidden compositing canvas — always mounted so ref is available */}
-      <canvas
-        ref={compositingCanvasRef}
-        data-testid="compositing-canvas"
-        style={{ display: "none" }}
-      />
 
       {/* Idle UI */}
       {isIdle && (

@@ -9,6 +9,8 @@ interface UseDrawingCanvasOptions {
 
 interface UseDrawingCanvasResult {
   drawMode: boolean;
+  /** False while the canvas is blank, so the recorder can skip compositing. */
+  hasDrawing: RefObject<boolean>;
   drawColor: string;
   lineWidth: number;
   toggleDrawMode: () => void;
@@ -30,6 +32,7 @@ export function useDrawingCanvas({
   const [drawColor, setDrawColor] = useState("#ff0000");
   const [lineWidth, setLineWidth] = useState(2);
   const isDrawing = useRef(false);
+  const hasDrawing = useRef(false);
   const lastPosition = useRef({ x: 0, y: 0 });
   const pendingPointerRef = useRef<PointerEvent | null>(null);
   const rafIdRef = useRef<number>(0);
@@ -58,6 +61,7 @@ export function useDrawingCanvas({
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (ctx) ctx.clearRect(0, 0, captureWidth, captureHeight);
+    hasDrawing.current = false;
   }, [canvasRef, captureWidth, captureHeight]);
 
   const handlePointerDown = useCallback(
@@ -92,6 +96,7 @@ export function useDrawingCanvas({
         ctx.moveTo(lastPosition.current.x, lastPosition.current.y);
         ctx.lineTo(pos.x, pos.y);
         ctx.stroke();
+        hasDrawing.current = true;
         lastPosition.current = pos;
       });
     },
@@ -116,6 +121,7 @@ export function useDrawingCanvas({
 
   return {
     drawMode,
+    hasDrawing,
     drawColor,
     lineWidth,
     toggleDrawMode,
