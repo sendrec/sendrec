@@ -38,9 +38,8 @@ sendrec:
     maxVideoDurationSeconds: "0"  # per-recording length cap ("" = free plan, 300s)
     maxPlaylists: "0"             # per-user playlist cap ("" = free plan, 3)
 
-    # How many ffmpeg encodes may run at once in the pod. Each 1080p encode peaks
-    # around 300 MB, so this multiplies peak memory: raise it and resources.requests
-    # together. Extra edits queue rather than fail.
+    # Encodes per app process. Extra edits queue. Raise this and the measured
+    # memory request together; transcription and decode-only jobs are separate.
     maxConcurrentEncodes: "1"
 
     # Features
@@ -136,21 +135,17 @@ sendrec:
 
   port: 8080
 
-  # Sized for video work, not for an idle HTTP server. Transcode, trim,
-  # remove-segments and composite all run ffmpeg inside this pod, and a 1080p
-  # x264 encode peaks around 350 MB on its own. 128Mi was enough to serve
-  # requests and not enough to finish an edit, which OOM-killed the pod and took
-  # live traffic with it. Raise both numbers again for 4K sources or local
-  # transcription.
+  # Starting reservation for one encode, not a memory ceiling. A real high-DPI
+  # edit held 837.3 MiB anon before timing out; with 20% headroom that already
+  # exceeds the former 512Mi request. See README for scope and remeasurement.
+  # A 1Gi request may leave pods Pending on small clusters; size from recordings.
   resources:
-    # No memory limit by default. The app does not bound how many encodes run at
-    # once, so any limit picked here is a hard kill threshold guessed without
-    # knowing your input sizes or concurrency. Set one once you have measured
-    # your own workload.
+    # Concurrency is bounded, input memory is not. Keep bursting available;
+    # choose a hard limit only after testing inputs and all enabled workers.
     limits: {}
     requests:
       cpu: 200m
-      memory: 512Mi
+      memory: 1Gi
 
   livenessProbe:
     httpGet:

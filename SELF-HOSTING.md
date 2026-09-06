@@ -23,7 +23,7 @@ SendRec includes a Helm chart at `helm/sendrec` for Kubernetes deployments.
 - Helm 3
 - PostgreSQL database
 - S3-compatible object storage
-- **At least 512 MB of memory for the app container**, whatever the deployment method. ffmpeg runs in the same process that serves HTTP, and a single 1080p encode peaks around 350 MB, so an under-provisioned container does not merely fail the edit — the OOM killer drops every in-flight request with it. Budget more for 4K sources, local transcription, or concurrent edits.
+- **Start with 1 GiB for the app container and measure your workload** using [Sizing the container](#sizing-the-container). ffmpeg is a child process in the HTTP server's container: memory pressure can take down live traffic as well as the edit. High-resolution sources, local transcription and concurrent jobs can require more.
 
 ### 1. Create a values file
 
@@ -223,35 +223,83 @@ Set `TRUSTED_PROXY=true` **only** when an edge proxy you control always sets `X-
 
 ## Sizing the container
 
-ffmpeg runs inside the process that serves HTTP, so an under-provisioned container does not just fail the edit — the OOM killer drops every in-flight request with it. A 1080p encode holds roughly 300 MB on top of the server itself.
+ffmpeg runs as a child process in the HTTP server's container. Encoder settings do not impose a container memory ceiling: decoders still hold full-resolution input frames, even when the output is scaled down.
 
-`MAX_CONCURRENT_ENCODES` (default `1`) caps how many encodes run at once, so extra edits queue rather than multiplying that figure. Raise it and the memory allowance together, never on its own.
+`MAX_CONCURRENT_ENCODES` (default `1`) caps simultaneous encodes per app process. Extra edits queue. It does not cover local transcription, probes, thumbnails, or downloads/uploads. Raise concurrency and the memory allowance together.
+
+The chart now requests **1Gi**, without a default memory limit. This replaces the 512Mi estimate from a synthetic 1080p encode. On 2026-09-05, staging image `6219d0a` (after #208) held **837.3 MiB of anon** while removing 200 ranges from a 3242×2626, 1000 fps recording; idle was **6.64 MiB**, shmem was zero, and only one encode ran. With N=1 and 20% headroom, that requires **1004.8 MiB**, exceeding 512Mi by **492.8 MiB**. The job timed out after ten minutes, so this is a measured lower bound, not a completed-job ceiling. Remove-segments now scales its output to fit 1920×1080 at 60 fps; remeasure after upgrading. The 1Gi default is a starting reservation, not a guarantee for every source.
+
+With these fixes, the same 200-cut edit on a copy completed in **367.3 seconds**. A disposable container using staging's FFmpeg 6.1.2 runtime and the patched binary (SHA-256 `534ea9aaeec27bd31464f1ca0c7c2473a761648dea84f70c71640bfc2400c5b8`, image created 2026-09-05 21:36 UTC) measured:
+
+| Measurement | Result |
+| --- | --- |
+| Idle anon | 5,836,800 bytes (5.57 MiB) |
+| Peak anon | 381,378,560 bytes (363.71 MiB) |
+| Within 5% of peak | 362.0 seconds, 363 one-second samples |
+| Shmem / swap / OOMs / restarts | Zero |
+| N=1 reservation: `(idle + (peak − idle)) × 1.2` | 457,654,272 bytes (436.45 MiB) |
+| Margin below 512Mi / 1Gi | 75.55 MiB / 587.55 MiB |
+
+This was the largest-resolution staging recording: 3242×2626, 43.167 seconds, 43,167 video frames, with audio. The completed output was 1334×1080 at 60 fps; video lasted 37.183 seconds and audio 37.172 seconds. The host exposed four CPUs, `/tmp` was disk-backed, and neither the container nor its ancestors imposed a memory limit. Only the app, its one edit subprocess at a time, and short-lived sampler commands ran in the measured cgroup; transcription was disabled and no other edit was active. The source and final-output probes ran separately, outside the measured container. The copied recording, container and sampler resources were removed; the original recording was unchanged.
+
+**512Mi covers this completed single-job run, not every accepted input or worker combination.** The 1Gi default remains a conservative starting reservation; reducing it requires a measurement on the image and workload you actually deploy. Decoding larger sources and enabling other workers can still exceed it.
+
+**Image matters:** the chart still defaults to `v1.90.5`, which predates #208, the concurrency gate and these edit fixes. That image ignores `MAX_CONCURRENT_ENCODES`; do not assume N=1 just because the chart sets it. Updating the chart alone does not install the fixed application. Select a reviewed image containing these fixes once released, then measure it; neither measurement certifies the older default image.
 
 ### Measuring your own floor
 
-Numbers from someone else's recordings are a starting point. Measure yours — a few minutes, no tooling beyond Docker:
+Use staging or a disposable copy of a recording. Confirm the container serves the intended hostname and its image contains the changes being tested; a later image creation date alone does not prove which code it contains. Wait for unrelated work to finish. These commands require Bash on the host and cgroup v2 in the container:
 
 ```bash
-C=sendrec   # your container name, from: docker ps
+C=$(docker inspect --format '{{.Id}}' sendrec)  # replace sendrec with your container
+docker inspect --format 'name={{.Name}} image={{.Image}} restarts={{.RestartCount}}' "$C"
+docker image inspect --format 'created={{.Created}} labels={{json .Config.Labels}}' \
+  "$(docker inspect --format '{{.Image}}' "$C")"
+docker exec "$C" sh -c 'cat /proc/1/cgroup /proc/self/cgroup; cat /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory.swap.current /sys/fs/cgroup/memory.events; df -T /tmp'
 
-# 1. Idle baseline: the Go server and nothing else.
-docker exec "$C" awk '/^anon /{printf "%.0f MB\n", $2/1048576}' /sys/fs/cgroup/memory.stat
+# Require a private cgroup namespace with its root mounted here. Matching
+# /proc paths alone can still mean memory.stat belongs to the host root.
+# Do not certify a run with swapping, OOMs, or a restart.
+sample() {
+  docker exec "$C" sh -c '
+    test "$(cat /proc/1/cgroup)" = "0::/" &&
+    test "$(cat /proc/self/cgroup)" = "0::/" &&
+    awk '\''$4=="/" && $5=="/sys/fs/cgroup" && / - cgroup2 / {ok=1}
+      END{exit !ok}'\'' /proc/self/mountinfo || {
+      echo "Unsupported cgroup scope: resolve the app cgroup before sampling" >&2
+      exit 1
+    }
+    awk '\''$1=="anon"{a=$2} $1=="shmem"{s=$2}
+      END{printf "bytes %.0f %.0f %.0f\n", a, s, a+s}'\'' /sys/fs/cgroup/memory.stat &&
+    ps -o pid,ppid,comm'
+}
+sample  # idle baseline: bytes anon shmem sum; check the process list
 
-# 2. Start this sampler, then trigger the heaviest edit you expect: largest
-#    resolution, longest recording, remove-segments with many cuts.
-#    Stop it when the edit finishes; the last line printed is your figure.
-docker exec "$C" sh -c \
-  'while :; do awk "/^anon /{print \$2}" /sys/fs/cgroup/memory.stat; sleep 1; done' \
-  | awk '{ if ($1>m) { m=$1; printf "peak anon %.0f MB\n", m/1048576 } }'
+# Trigger the heaviest edit on a COPY in another terminal. Record whether it
+# completes. The loop is on the HOST, bounded to 900 samples, with no remote
+# sleep/loop to survive Ctrl-C. Every exec is a single short-lived snapshot.
+for ((i=0; i<900; i++)); do
+  date -u +%FT%TZ
+  sample || { echo "Sampling failed; discard this run" >&2; break; }
+  sleep 1
+done | awk '$1=="bytes" {if ($4>m) m=$4;
+  printf "anon=%.2f MiB shmem=%.2f MiB total=%.2f MiB peak=%.2f MiB\n", $2/1048576, $3/1048576, $4/1048576, m/1048576;
+  next} {print} {fflush()}'
+
+# After stopping: verify no sampler or edit remains inside the container.
+docker exec "$C" sh -c 'ps -o pid,ppid,comm; ls -la /tmp; cat /sys/fs/cgroup/memory.events'
+docker inspect --format 'restarts={{.RestartCount}}' "$C"
 ```
 
-Then set `mem_limit` (Compose) or `--memory` to **step 1 + N × (step 2 − step 1)**, plus about 20% headroom, where N is `MAX_CONCURRENT_ENCODES`. Step 2 already includes one encode, so at the default `N = 1` that is just step 2 plus headroom.
+If the scope check fails, stop: on a host-cgroup-namespace container, resolve the app's exact cgroup path and mount before adapting the sampler. Do not remove the guard and read the host root instead. Also check ancestor limits from the host; they may not be visible inside a private namespace.
 
-**Read `anon`, not `docker stats` or `memory.current`.** Both include page cache, and this app writes multi-hundred-megabyte temp files for every edit, so cache dominates the total. Cache is reclaimable — the kernel evicts it under pressure instead of OOM-killing — so sizing from it over-provisions substantially. A production instance of this app reported 1757 MB of `memory.peak` while holding 8 MB of `anon` and 122 MB of cache.
+The samples must rise when ffmpeg starts and fall when it exits. Keep timestamps and PIDs: a second job taking the slot, another process, or an unexpected shared cgroup changes what the peak means. Report the peak and time held within 5% of it. A failed/timed-out encode supplies only a lower bound; repeat through successful completion before certifying a size. Compare each stream's output duration as well as the job status.
 
-`anon` is the non-reclaimable working set, and what the OOM killer acts on. Memory-backed volumes are the exception: they are charged as `shmem` rather than `anon` and are *not* reclaimable, so add their contents by hand if you mount `/tmp` as tmpfs.
+Use **(idle + N × (peak − idle)) × 1.2** as a starting memory reservation, with idle and peak both measured as anon + shmem, and N taken from the running app's `MAX_CONCURRENT_ENCODES` setting/startup log. At N=1 this is peak × 1.2. Test actual concurrency before relying on the extrapolation; queued downloads, thumbnails and transcription need their own allowance.
 
-Needs cgroup v2. On cgroup v1, read the `rss` line of `/sys/fs/cgroup/memory/memory.stat` the same way.
+**This is not a formula for a hard limit.** `mem_limit` (Compose) and `--memory` include kernel memory and page cache too. Measure their behavior under the proposed limit with headroom for larger inputs; a request/reservation does not enforce a limit. Docker/Coolify does not perform Kubernetes request-based scheduling.
+
+Read **anon + shmem**, not `docker stats`, `memory.current` or `memory.peak`, for this resident working-set estimate. Those totals include reclaimable disk page cache from temporary files, and a constrained total can merely report the limit. Anonymous memory and tmpfs/shmem cannot be reclaimed without swapping; the sampler includes shmem automatically. They are not the whole charged footprint: kernel memory and actively used file-backed pages can also matter. One-second snapshots can miss brief spikes. If the container or an ancestor has a tight limit, or `memory.swap.current` is nonzero, do not treat its resident peak as unconstrained demand.
 
 Re-measure when you change resolution limits, enable transcription or noise reduction, or raise the concurrency limit — each moves the floor.
 

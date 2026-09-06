@@ -146,26 +146,53 @@ func audioCodecForContentType(ct string) string {
 	}
 }
 
+// Split audio once at sample-accurate boundaries. aselect drops whole decoded
+// packets: a two-millisecond cut can otherwise remove 1024 samples. asegment
+// routes successive samples to successive outputs without duplicating input.
+func buildSegmentAudioFilter(segments []segmentRange) string {
+	timestamps := make([]string, 0, 2*len(segments))
+	for _, seg := range segments {
+		timestamps = append(timestamps, fmt.Sprintf("%.3f", seg.Start), fmt.Sprintf("%.3f", seg.End))
+	}
+	outputs := make([]string, 2*len(segments)+1)
+	filters := make([]string, len(outputs))
+	kept := make([]string, 0, len(segments)+1)
+	for i := range outputs {
+		outputs[i] = fmt.Sprintf("[aseg%d]", i)
+		if i%2 == 0 {
+			label := fmt.Sprintf("[akeep%d]", i)
+			filters[i] = outputs[i] + "asetpts=PTS-STARTPTS" + label
+			kept = append(kept, label)
+		} else {
+			filters[i] = outputs[i] + "anullsink"
+		}
+	}
+	return "[0:a]asettb=1/sr,asetpts=N,asegment=timestamps='" + strings.Join(timestamps, "|") + "'" + strings.Join(outputs, "") + ";" +
+		strings.Join(filters, ";") + ";" + strings.Join(kept, "") + fmt.Sprintf("concat=n=%d:v=0:a=1[a]", len(kept))
+}
+
 func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments []segmentRange, audioPresent bool) []string {
 	betweenExpr := buildSegmentFilter(segments)
+	removedTime := make([]string, len(segments))
+	for i, seg := range segments {
+		removedTime[i] = fmt.Sprintf("gte(T,%.3f)*(%.3f-%.3f)", seg.End, seg.End, seg.Start)
+	}
+	// Cut before reducing frame rate: cuts aimed at the reduced frame grid could
+	// otherwise erase retained source frames. Bound frames before scaling/encoding.
+	// Shift by elapsed cut time, not retained frame count: rounding every cut to
+	// whole frames accumulates A/V drift when many boundaries fall between frames.
+	videoFilter := fmt.Sprintf("[0:v]setpts=PTS-STARTPTS,select='not(%s)',setpts='PTS-(%s)/TB',fps=60,scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[v]", betweenExpr, strings.Join(removedTime, "+"))
 
 	args := append(globalThreads(), inputThreads()...)
 	args = append(args, "-i", inputPath)
 
 	if audioPresent {
-		filterComplex := fmt.Sprintf(
-			"[0:v]select='not(%s)',setpts=N/FRAME_RATE/TB[v];[0:a]aselect='not(%s)',asetpts=N/SR/TB[a]",
-			betweenExpr, betweenExpr,
-		)
+		filterComplex := videoFilter + ";" + buildSegmentAudioFilter(segments)
 		args = append(args, "-filter_complex", filterComplex)
 		args = append(args, "-map", "[v]", "-map", "[a]")
 		args = append(args, "-c:v", videoCodecForContentType(contentType), "-c:a", audioCodecForContentType(contentType))
 	} else {
-		filterComplex := fmt.Sprintf(
-			"[0:v]select='not(%s)',setpts=N/FRAME_RATE/TB[v]",
-			betweenExpr,
-		)
-		args = append(args, "-filter_complex", filterComplex)
+		args = append(args, "-filter_complex", videoFilter)
 		args = append(args, "-map", "[v]")
 		args = append(args, "-c:v", videoCodecForContentType(contentType), "-an")
 	}
@@ -191,6 +218,9 @@ func removeSegmentsFromVideo(ctx context.Context, inputPath, outputPath, content
 	if err != nil {
 		return fmt.Errorf("ffmpeg remove segments: %w: %s", err, string(output))
 	}
+	if _, err := probeVideoProperties(ctx, outputPath); err != nil {
+		return fmt.Errorf("invalid edited video: %w", err)
+	}
 	return nil
 }
 
@@ -198,8 +228,10 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 	slog.Info("remove-segments: starting", "video_id", videoID, "segments", len(segments))
 
 	setReadyFallback := func() {
-		if _, err := db.Exec(ctx,
-			`UPDATE videos SET status = 'ready', processing_started_at = NULL, updated_at = now() WHERE id = $1`,
+		recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if _, err := db.Exec(recoveryCtx,
+			`UPDATE videos SET status = 'ready', processing_started_at = NULL, updated_at = now() WHERE id = $1 AND status = 'processing'`,
 			videoID,
 		); err != nil {
 			slog.Error("remove-segments: failed to set fallback ready status", "video_id", videoID, "error", err)

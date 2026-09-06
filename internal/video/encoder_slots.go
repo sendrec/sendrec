@@ -10,18 +10,15 @@ import (
 // DefaultEncoderConcurrency is how many ffmpeg encodes may run at once when
 // MAX_CONCURRENT_ENCODES is unset.
 //
-// One, because the deployment is sized for one. A 1080p encode peaks around
-// 300 MB and the chart requests 512Mi, so a second concurrent encode wants
-// memory the pod never reserved. Raise it together with the memory request,
-// not on its own.
+// Raise it together with the measured memory reservation, not on its own.
 const DefaultEncoderConcurrency = 1
 
 // encoderSlots bounds how many ffmpeg encodes run concurrently in this process.
 //
-// Every encode runs in the process that serves HTTP, so concurrency multiplies
+// Every encode runs in the container that serves HTTP, so concurrency multiplies
 // peak memory directly: two 1080p edits at once want roughly twice what one
 // does, and the pod is sized for one. Without this the memory bounds in
-// x264MemoryParams and ffmpegPipelineThreads cap a single encode while nothing
+// x264MemoryParams and the thread helpers bound a single encode while nothing
 // caps how many there are — a per-encode ceiling with no process-wide one.
 //
 // Queueing is the intended behaviour. An edit that waits is slower; an edit that
