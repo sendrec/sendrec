@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getSupportedMimeType, getSupportedVideoMimeType, blobTypeFromMimeType } from "./mediaFormat";
+import { getSupportedMimeType, getSupportedVideoMimeType, getSupportedWebMMimeType, blobTypeFromMimeType } from "./mediaFormat";
 
 describe("getSupportedMimeType", () => {
   const originalMediaRecorder = globalThis.MediaRecorder;
@@ -109,5 +109,34 @@ describe("blobTypeFromMimeType", () => {
 
   it("returns video/mp4 for unknown types", () => {
     expect(blobTypeFromMimeType("video/quicktime")).toBe("video/mp4");
+  });
+});
+
+describe("getSupportedWebMMimeType", () => {
+  const originalMediaRecorder = globalThis.MediaRecorder;
+
+  afterEach(() => {
+    globalThis.MediaRecorder = originalMediaRecorder;
+  });
+
+  it("never returns mp4, even where mp4 is supported", () => {
+    globalThis.MediaRecorder = {
+      isTypeSupported: vi.fn(() => true),
+    } as unknown as typeof MediaRecorder;
+    expect(getSupportedWebMMimeType()).toBe("video/webm;codecs=vp9,opus");
+  });
+
+  it("falls back down the webm chain", () => {
+    globalThis.MediaRecorder = {
+      isTypeSupported: vi.fn((type: string) => type === "video/webm;codecs=vp8,opus" || type === "video/mp4"),
+    } as unknown as typeof MediaRecorder;
+    expect(getSupportedWebMMimeType()).toBe("video/webm;codecs=vp8,opus");
+  });
+
+  it("gives up to the default chain where no webm is supported", () => {
+    globalThis.MediaRecorder = {
+      isTypeSupported: vi.fn((type: string) => type === "video/mp4"),
+    } as unknown as typeof MediaRecorder;
+    expect(getSupportedWebMMimeType()).toBe("video/mp4");
   });
 });

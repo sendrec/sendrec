@@ -5,7 +5,11 @@ import { Recorder } from "./Recorder";
 import { expectNoA11yViolations } from "../test-utils/a11y";
 
 // Polyfill MediaStream for jsdom
+const mediaStreamArgs: unknown[][] = [];
 class MockMediaStream {
+  constructor(tracks: unknown[] = []) {
+    mediaStreamArgs.push(tracks);
+  }
   addTrack = vi.fn();
   getVideoTracks = vi.fn().mockReturnValue([]);
   getAudioTracks = vi.fn().mockReturnValue([]);
@@ -22,6 +26,7 @@ let mockDrawMode = false;
 vi.mock("../hooks/useDrawingCanvas", () => ({
   useDrawingCanvas: () => ({
     drawMode: mockDrawMode,
+    hasDrawing: { current: false },
     drawColor: "#ff0000",
     toggleDrawMode: mockToggleDrawMode,
     setDrawColor: mockSetDrawColor,
@@ -33,19 +38,15 @@ vi.mock("../hooks/useDrawingCanvas", () => ({
   }),
 }));
 
-// Mock useCanvasCompositing
-const mockStartCompositing = vi.fn();
-const mockStopCompositing = vi.fn();
-const mockGetCompositedStream = vi
-  .fn()
-  .mockReturnValue(new MockMediaStream());
+// Mock the annotation overlay: the recorded video track is the track it returns.
+const OVERLAY_TRACK = { kind: "video", stop: vi.fn() };
+const mockOverlayDrawingOnTrack = vi.fn().mockReturnValue(OVERLAY_TRACK);
 
-vi.mock("../hooks/useCanvasCompositing", () => ({
-  useCanvasCompositing: () => ({
-    startCompositing: mockStartCompositing,
-    stopCompositing: mockStopCompositing,
-    getCompositedStream: mockGetCompositedStream,
-  }),
+let mockCanRecordAnnotations = true;
+
+vi.mock("../utils/drawingOverlay", () => ({
+  overlayDrawingOnTrack: (...args: unknown[]) => mockOverlayDrawingOnTrack(...args),
+  canRecordAnnotations: () => mockCanRecordAnnotations,
 }));
 
 // Mock browser media APIs
@@ -65,6 +66,7 @@ const mockScreenStream = {
 const LARGE_CHUNK = new Blob([new Uint8Array(2048)], { type: "video/webm" });
 
 const mediaRecorderInstances: MockMediaRecorder[] = [];
+const mediaRecorderOptions: ({ mimeType: string } | undefined)[] = [];
 
 class MockMediaRecorder {
   static isTypeSupported = vi.fn().mockReturnValue(true);
@@ -73,8 +75,9 @@ class MockMediaRecorder {
   onstop: (() => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
 
-  constructor() {
+  constructor(_stream?: unknown, options?: { mimeType: string }) {
     mediaRecorderInstances.push(this);
+    mediaRecorderOptions.push(options);
   }
 
   start = vi.fn().mockImplementation(() => {
@@ -99,7 +102,11 @@ class MockMediaRecorder {
 beforeEach(() => {
   mockDrawMode = false;
   mediaRecorderInstances.length = 0;
+  mediaRecorderOptions.length = 0;
+  mediaStreamArgs.length = 0;
+  mockCanRecordAnnotations = true;
   vi.clearAllMocks();
+  mockOverlayDrawingOnTrack.mockReturnValue(OVERLAY_TRACK);
 
   Object.defineProperty(globalThis.navigator, "mediaDevices", {
     value: {
@@ -170,16 +177,6 @@ describe("Recorder", () => {
     expect(canvas.style.touchAction).toBe("none");
   });
 
-  it("has hidden compositing canvas during recording", async () => {
-    const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Start recording" }));
-    await user.click(screen.getByTestId("countdown-overlay"));
-
-    const canvas = screen.getByTestId("compositing-canvas");
-    expect(canvas.style.display).toBe("none");
-  });
-
   it("shows Pause and Stop buttons during recording", async () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
@@ -237,12 +234,16 @@ describe("Recorder", () => {
     expect(mockClearCanvas).toHaveBeenCalledTimes(1);
   });
 
-  it("starts compositing when recording starts", async () => {
+  it("records the annotated track so drawings end up in the recording", async () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
 
-    expect(mockStartCompositing).toHaveBeenCalledTimes(1);
+    expect(mockOverlayDrawingOnTrack).toHaveBeenCalledTimes(1);
+    const [track, canvas] = mockOverlayDrawingOnTrack.mock.calls[0];
+    expect(track).toBe(mockScreenStream.getVideoTracks()[0]);
+    expect(canvas).toBe(screen.getByTestId("drawing-canvas"));
+    expect(mediaStreamArgs.at(-1)).toContain(OVERLAY_TRACK);
   });
 
   it("shows max duration message when maxDurationSeconds is provided", () => {
@@ -338,8 +339,6 @@ describe("Recorder", () => {
 
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
-    // After stop, compositing is cleaned up
-    expect(mockStopCompositing).toHaveBeenCalled();
     // The onstop callback fires asynchronously and triggers onRecordingComplete
     await vi.waitFor(() => {
       expect(onComplete).toHaveBeenCalledTimes(1);
@@ -372,16 +371,17 @@ describe("Recorder", () => {
     vi.useRealTimers();
   });
 
-  it("calls stopCompositing when recording stops", async () => {
+  it("detaches the preview when recording stops", async () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
     await user.click(screen.getByTestId("countdown-overlay"));
 
-    mockStopCompositing.mockClear();
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
-    expect(mockStopCompositing).toHaveBeenCalledTimes(1);
+    expect(
+      (screen.getByTestId("screen-preview") as HTMLVideoElement).srcObject,
+    ).toBeNull();
   });
 
   it("stops all screen stream tracks when recording stops", async () => {
@@ -499,17 +499,16 @@ describe("Recorder", () => {
     expect(screen.getByText(/remaining/)).toBeInTheDocument();
   });
 
-  it("stops compositing and streams when stopping from paused state", async () => {
+  it("stops the recorder when stopping from paused state", async () => {
     const user = userEvent.setup();
     render(<Recorder onRecordingComplete={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Start recording" }));
     await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
 
-    mockStopCompositing.mockClear();
     await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
-    expect(mockStopCompositing).toHaveBeenCalledTimes(1);
+    expect(mediaRecorderInstances[0].stop).toHaveBeenCalledTimes(1);
   });
 
   it("resumes a paused webcam recorder before stopping it", async () => {
@@ -556,8 +555,8 @@ describe("Recorder", () => {
       vi.advanceTimersByTime(3000);
     });
 
-    // stopCompositing should have been called by the auto-stop
-    expect(mockStopCompositing).toHaveBeenCalled();
+    // The auto-stop should have stopped the recorder
+    expect(mediaRecorderInstances[0].stop).toHaveBeenCalled();
 
     vi.useRealTimers();
   });
@@ -636,12 +635,11 @@ describe("Recorder", () => {
     expect(endedCallback).toBeDefined();
 
     // Simulate screen share track ending (user clicks "Stop sharing")
-    mockStopCompositing.mockClear();
     act(() => {
       endedCallback!();
     });
 
-    expect(mockStopCompositing).toHaveBeenCalledTimes(1);
+    expect(mediaRecorderInstances[0].stop).toHaveBeenCalledTimes(1);
   });
 
   it("returns to idle when screen sharing ends during countdown", async () => {
@@ -665,7 +663,6 @@ describe("Recorder", () => {
 
     expect(screen.queryByTestId("countdown-overlay")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
-    expect(mockStopCompositing).toHaveBeenCalled();
     expect(stopTrack).toHaveBeenCalled();
     expect(mediaRecorderInstances[0].stop).not.toHaveBeenCalled();
   });
@@ -673,6 +670,10 @@ describe("Recorder", () => {
   it("falls back from a runtime MP4 encoder error to WebM", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     MockMediaRecorder.isTypeSupported = vi.fn().mockReturnValue(true);
+    // MP4 is only chosen where no overlay is applied; compositing pins WebM up
+    // front, so there is no MP4 encoder error to recover from there.
+    mockCanRecordAnnotations = false;
+    mockOverlayDrawingOnTrack.mockImplementation((track: unknown) => track);
     const onComplete = vi.fn();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
@@ -841,5 +842,46 @@ describe("Recorder", () => {
   it("has no accessibility violations", async () => {
     const { container } = render(<Recorder onRecordingComplete={vi.fn()} />);
     await expectNoA11yViolations(container);
+  });
+
+  it("warns that drawing is preview-only where the browser cannot record it", async () => {
+    mockCanRecordAnnotations = false;
+    mockDrawMode = true;
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(screen.getByTestId("draw-preview-only")).toBeInTheDocument();
+  });
+
+  it("stays quiet about drawing where the browser can record it", async () => {
+    mockDrawMode = true;
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(screen.queryByTestId("draw-preview-only")).not.toBeInTheDocument();
+  });
+
+  it("records WebM when annotations are composited into the track", async () => {
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    // Chrome's MP4 muxer produces a black, silent file from the generator
+    // track's canvas-derived frames.
+    expect(mediaRecorderOptions.at(-1)?.mimeType).toMatch(/^video\/webm/);
+  });
+
+  it("keeps the preferred container where no overlay is applied", async () => {
+    mockCanRecordAnnotations = false;
+    mockOverlayDrawingOnTrack.mockImplementation((track: unknown) => track);
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(mediaRecorderOptions.at(-1)?.mimeType).toBe("video/mp4");
   });
 });

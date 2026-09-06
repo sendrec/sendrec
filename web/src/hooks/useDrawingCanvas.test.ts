@@ -206,4 +206,21 @@ describe("useDrawingCanvas", () => {
 
     expect(ctx.beginPath).not.toHaveBeenCalled();
   });
+
+  it("reports no drawing until a stroke lands, and again after clearing", () => {
+    const { result } = renderHook(() =>
+      useDrawingCanvas({ canvasRef, captureWidth: 1920, captureHeight: 1080 }),
+    );
+    act(() => result.current.toggleDrawMode());
+    expect(result.current.hasDrawing.current).toBe(false);
+
+    act(() => {
+      result.current.handlePointerDown(pointerEvent(10, 10));
+      result.current.handlePointerMove(pointerEvent(20, 20));
+    });
+    expect(result.current.hasDrawing.current).toBe(true);
+
+    act(() => result.current.clearCanvas());
+    expect(result.current.hasDrawing.current).toBe(false);
+  });
 });
