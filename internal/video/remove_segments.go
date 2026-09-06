@@ -130,7 +130,22 @@ func buildSegmentFilter(segments []segmentRange) string {
 	for i, seg := range segments {
 		parts[i] = fmt.Sprintf("between(t,%.3f,%.3f)", seg.Start, seg.End)
 	}
-	return strings.Join(parts, "+")
+	return balancedSum(parts)
+}
+
+// balancedSum joins terms with '+' as a balanced tree. ffmpeg's expression
+// parser (libavutil/eval.c, MAX_DEPTH) rejects trees deeper than 100 levels,
+// and a flat a+b+c chain nests one level per term — so the 200 cuts the API
+// allows overflow it on ffmpeg 7+. Balanced, depth grows with log2(n).
+func balancedSum(parts []string) string {
+	switch len(parts) {
+	case 0:
+		return "0"
+	case 1:
+		return parts[0]
+	}
+	mid := len(parts) / 2
+	return "(" + balancedSum(parts[:mid]) + "+" + balancedSum(parts[mid:]) + ")"
 }
 
 // audioCodecForContentType pairs the audio codec with the container the output
@@ -181,7 +196,7 @@ func buildRemoveSegmentsArgs(inputPath, outputPath, contentType string, segments
 	// otherwise erase retained source frames. Bound frames before scaling/encoding.
 	// Shift by elapsed cut time, not retained frame count: rounding every cut to
 	// whole frames accumulates A/V drift when many boundaries fall between frames.
-	videoFilter := fmt.Sprintf("[0:v]setpts=PTS-STARTPTS,select='not(%s)',setpts='PTS-(%s)/TB',fps=60,scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[v]", betweenExpr, strings.Join(removedTime, "+"))
+	videoFilter := fmt.Sprintf("[0:v]setpts=PTS-STARTPTS,select='not(%s)',setpts='PTS-%s/TB',fps=60,scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[v]", betweenExpr, balancedSum(removedTime))
 
 	args := append(globalThreads(), inputThreads()...)
 	args = append(args, "-i", inputPath)
