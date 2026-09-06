@@ -47,6 +47,7 @@ type Config struct {
 	NoiseReductionFilter      string
 	AllowedFrameAncestors     string
 	AnalyticsScript           string
+	Version                   string
 	EmailSender               auth.EmailSender
 	CommentNotifier           video.CommentNotifier
 	ViewNotifier              video.ViewNotifier
@@ -86,6 +87,7 @@ type Server struct {
 	registrationEnabled bool
 	planBadgeEnabled    bool
 	analyticsScript     string
+	version             string
 }
 
 func New(cfg Config) *Server {
@@ -98,7 +100,7 @@ func New(cfg Config) *Server {
 		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
 	}))
 
-	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript}
+	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript, version: cfg.Version}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -544,9 +546,10 @@ func (s *Server) routes() {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	// The exact build version is only useful to someone matching the deployment
-	// against known CVEs, and nothing consumes it here (SR-15). The feature flags
-	// stay: the SPA reads them to decide what to render.
+	// The SPA reads these to decide what to render: the feature flags gate UI,
+	// and the version is shown on the settings page so self-hosters can tell
+	// which build they are running (#218). Reversing SR-15: the build string is
+	// visible to anyone, which does make CVE-matching a deployment easier.
 	if s.pinger != nil {
 		if err := s.pinger.Ping(r.Context()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -554,7 +557,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_, _ = fmt.Fprintf(w, `{"status":"ok","registrationEnabled":%t,"planBadgeEnabled":%t}`, s.registrationEnabled, s.planBadgeEnabled)
+	_, _ = fmt.Fprintf(w, `{"status":"ok","registrationEnabled":%t,"planBadgeEnabled":%t,"version":%q}`, s.registrationEnabled, s.planBadgeEnabled, s.version)
 }
 
 func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {

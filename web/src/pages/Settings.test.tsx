@@ -1463,4 +1463,38 @@ describe("Settings", () => {
 
     expect(screen.getByRole("button", { name: "Disconnect" })).toBeEnabled();
   });
+
+  it("shows the server version", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found"))
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ identities: [], hasPassword: false });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ json: async () => ({ version: "v1.90.6" }) }),
+    );
+    renderSettings();
+
+    expect(await screen.findByText("SendRec v1.90.6")).toBeInTheDocument();
+  });
+
+  it("omits the version line when the server reports none", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+      .mockResolvedValueOnce({ notificationMode: "off" })
+      .mockResolvedValueOnce({ brandingEnabled: false })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("Not Found"))
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ identities: [], hasPassword: false });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ json: async () => ({}) }));
+    renderSettings();
+
+    await screen.findByText("Settings");
+    expect(screen.queryByTestId("server-version")).not.toBeInTheDocument();
+  });
 });

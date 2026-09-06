@@ -119,7 +119,17 @@ func TestHealthEndpointReturnsOK(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
+	if rec.Body.String() != expected {
+		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
+	}
+}
+
+func TestHealthEndpointReportsVersion(t *testing.T) {
+	srv := server.New(server.Config{Version: "v1.90.6"})
+	rec := executeRequest(srv, http.MethodGet, "/api/health")
+
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":"v1.90.6"}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -147,7 +157,7 @@ func TestHealthEndpointWithPingSuccess(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -176,7 +186,7 @@ func TestHealthEndpointIncludesRegistrationEnabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","registrationEnabled":true,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":true,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -189,7 +199,7 @@ func TestHealthEndpointRegistrationDisabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -202,7 +212,7 @@ func TestHealthEndpointPlanBadgeEnabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":true}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":true,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -214,7 +224,7 @@ func TestHealthEndpointPlanBadgeDefaultDisabled(t *testing.T) {
 	})
 	rec := executeRequest(srv, http.MethodGet, "/api/health")
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
 	}
@@ -851,7 +861,7 @@ func TestSPADoesNotInterceptHealthEndpoint(t *testing.T) {
 		t.Errorf("expected status 200 for health endpoint with SPA, got %d", rec.Code)
 	}
 
-	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false}`
+	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":""}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected health JSON, got %q", rec.Body.String())
 	}
