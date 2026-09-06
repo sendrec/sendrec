@@ -5,7 +5,7 @@ import {
   type RecordingCommand,
 } from "../hooks/useRecordingLifecycle";
 import { overlayDrawingOnTrack, canRecordAnnotations } from "../utils/drawingOverlay";
-import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
+import { getSupportedMimeType, getSupportedWebMMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
 import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
 
@@ -225,7 +225,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       // requestAnimationFrame and setInterval are throttled there. Annotations
       // are burned into the track's frames instead, which is frame-driven and
       // survives a hidden tab.
-      let videoTrack = screenStream.getVideoTracks()[0];
+      const sourceTrack = screenStream.getVideoTracks()[0];
+      let videoTrack = sourceTrack;
       if (videoTrack && drawingCanvasRef.current) {
         videoTrack = overlayDrawingOnTrack(
           videoTrack,
@@ -233,6 +234,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
           () => hasDrawing.current,
         );
       }
+      const compositing = videoTrack !== sourceTrack;
 
       // Capture microphone audio separately — getDisplayMedia only provides
       // system/tab audio, never microphone input. MediaRecorder only records
@@ -266,7 +268,11 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         [videoTrack, ...audioTracks].filter(Boolean),
       );
 
-      const mimeType = getSupportedMimeType();
+      // Composited frames leave the canvas as full-range BGRA where the capture
+      // track delivers limited-range I420, and Chrome's MP4 muxer turns that
+      // into a black, silent file. WebM handles it, which is the same reason
+      // the webcam recorder below is pinned to WebM.
+      const mimeType = compositing ? getSupportedWebMMimeType() : getSupportedMimeType();
       mimeTypeRef.current = mimeType;
 
       const recorder = new MediaRecorder(recordingStream, {
