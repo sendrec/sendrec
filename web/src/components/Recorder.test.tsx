@@ -42,8 +42,11 @@ vi.mock("../hooks/useDrawingCanvas", () => ({
 const OVERLAY_TRACK = { kind: "video", stop: vi.fn() };
 const mockOverlayDrawingOnTrack = vi.fn().mockReturnValue(OVERLAY_TRACK);
 
+let mockCanRecordAnnotations = true;
+
 vi.mock("../utils/drawingOverlay", () => ({
   overlayDrawingOnTrack: (...args: unknown[]) => mockOverlayDrawingOnTrack(...args),
+  canRecordAnnotations: () => mockCanRecordAnnotations,
 }));
 
 // Mock browser media APIs
@@ -98,6 +101,7 @@ beforeEach(() => {
   mockDrawMode = false;
   mediaRecorderInstances.length = 0;
   mediaStreamArgs.length = 0;
+  mockCanRecordAnnotations = true;
   vi.clearAllMocks();
   mockOverlayDrawingOnTrack.mockReturnValue(OVERLAY_TRACK);
 
@@ -831,5 +835,26 @@ describe("Recorder", () => {
   it("has no accessibility violations", async () => {
     const { container } = render(<Recorder onRecordingComplete={vi.fn()} />);
     await expectNoA11yViolations(container);
+  });
+
+  it("warns that drawing is preview-only where the browser cannot record it", async () => {
+    mockCanRecordAnnotations = false;
+    mockDrawMode = true;
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(screen.getByTestId("draw-preview-only")).toBeInTheDocument();
+  });
+
+  it("stays quiet about drawing where the browser can record it", async () => {
+    mockDrawMode = true;
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    await user.click(screen.getByTestId("countdown-overlay"));
+
+    expect(screen.queryByTestId("draw-preview-only")).not.toBeInTheDocument();
   });
 });

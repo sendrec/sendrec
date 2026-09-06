@@ -1874,6 +1874,11 @@ textarea.form-input {
   background: var(--color-accent-hover);
 }
 
+.draw-preview-only {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .btn-draw {
   background: transparent;
   color: var(--color-text-secondary);

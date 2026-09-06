@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { overlayDrawingOnTrack } from "./drawingOverlay";
+import { overlayDrawingOnTrack, canRecordAnnotations } from "./drawingOverlay";
 
 class MockVideoFrame {
   displayWidth = 1920;
@@ -59,6 +59,7 @@ describe("overlayDrawingOnTrack", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("returns the original track when the browser has no breakout box support", () => {
@@ -103,5 +104,71 @@ describe("overlayDrawingOnTrack", () => {
     expect((written[0] as MockVideoFrame).timestamp).toBe(12_345);
     // The source frame must be released or the encoder starves.
     expect(frame.close).toHaveBeenCalled();
+  });
+
+  it("keeps recording the plain capture when compositing a frame fails", async () => {
+    const frames = [new MockVideoFrame(), new MockVideoFrame()];
+    frames[0].timestamp = 1;
+    frames[1].timestamp = 2;
+    const written = installBreakoutBox(frames);
+    // One allocation failure must not end the video track, or the recording
+    // silently continues as audio-only.
+    let calls = 0;
+    vi.stubGlobal(
+      "VideoFrame",
+      class extends MockVideoFrame {
+        constructor(source?: unknown, init?: { timestamp: number; duration?: number }) {
+          super(source, init);
+          if (++calls === 1) throw new DOMException("out of memory", "OperationError");
+        }
+      },
+    );
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    overlayDrawingOnTrack(makeTrack(), drawingCanvas, () => true);
+    await vi.waitFor(() => expect(written).toHaveLength(2));
+
+    // The failed frame is passed through untouched rather than dropped or leaked.
+    expect(written[0]).toBe(frames[0]);
+    expect(frames[0].close).not.toHaveBeenCalled();
+    // The next frame still composites.
+    expect(written[1]).not.toBe(frames[1]);
+    expect(frames[1].close).toHaveBeenCalled();
+  });
+
+  it("warns once rather than per frame when compositing keeps failing", async () => {
+    const written = installBreakoutBox([new MockVideoFrame(), new MockVideoFrame()]);
+    vi.stubGlobal(
+      "VideoFrame",
+      class {
+        constructor() {
+          throw new DOMException("out of memory", "OperationError");
+        }
+      },
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    overlayDrawingOnTrack(makeTrack(), drawingCanvas, () => true);
+    await vi.waitFor(() => expect(written).toHaveLength(2));
+
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("canRecordAnnotations", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("is false where the breakout box is missing", () => {
+    vi.stubGlobal("MediaStreamTrackProcessor", undefined);
+    vi.stubGlobal("MediaStreamTrackGenerator", undefined);
+    expect(canRecordAnnotations()).toBe(false);
+  });
+
+  it("is true where both constructors exist", () => {
+    vi.stubGlobal("MediaStreamTrackProcessor", class {});
+    vi.stubGlobal("MediaStreamTrackGenerator", class {});
+    expect(canRecordAnnotations()).toBe(true);
   });
 });

@@ -4,7 +4,7 @@ import {
   useRecordingLifecycle,
   type RecordingCommand,
 } from "../hooks/useRecordingLifecycle";
-import { overlayDrawingOnTrack } from "../utils/drawingOverlay";
+import { overlayDrawingOnTrack, canRecordAnnotations } from "../utils/drawingOverlay";
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
 import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
@@ -574,6 +574,16 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
           >
             Draw
           </button>
+
+          {drawMode && !canRecordAnnotations() && (
+            <span
+              role="note"
+              data-testid="draw-preview-only"
+              className="draw-preview-only"
+            >
+              Preview only — this browser cannot save drawings to the recording
+            </span>
+          )}
 
           {drawMode && (
             <input

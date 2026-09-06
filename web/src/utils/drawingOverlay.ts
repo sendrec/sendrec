@@ -6,6 +6,19 @@ type TrackGenerator = new (init: { kind: "video" }) => MediaStreamTrack & {
   writable: WritableStream<VideoFrame>;
 };
 
+function breakoutBox() {
+  return globalThis as unknown as {
+    MediaStreamTrackProcessor?: TrackProcessor;
+    MediaStreamTrackGenerator?: TrackGenerator;
+  };
+}
+
+/** Whether this browser can put annotations into the recording, not just the preview. */
+export function canRecordAnnotations(): boolean {
+  const api = breakoutBox();
+  return Boolean(api.MediaStreamTrackProcessor && api.MediaStreamTrackGenerator);
+}
+
 /**
  * Burns the drawing canvas into the frames of a screen-capture track.
  *
@@ -23,10 +36,7 @@ export function overlayDrawingOnTrack(
   drawingCanvas: HTMLCanvasElement,
   hasDrawing: () => boolean,
 ): MediaStreamTrack {
-  const api = globalThis as unknown as {
-    MediaStreamTrackProcessor?: TrackProcessor;
-    MediaStreamTrackGenerator?: TrackGenerator;
-  };
+  const api = breakoutBox();
   if (!api.MediaStreamTrackProcessor || !api.MediaStreamTrackGenerator) return track;
 
   const scratch = document.createElement("canvas");
@@ -34,6 +44,32 @@ export function overlayDrawingOnTrack(
   if (!ctx) return track;
 
   const generator = new api.MediaStreamTrackGenerator({ kind: "video" });
+
+  let warned = false;
+
+  // Returns null when this frame cannot be composited — a frame allocation can
+  // fail under memory pressure at capture resolution.
+  function composite(frame: VideoFrame): VideoFrame | null {
+    try {
+      if (scratch.width !== frame.displayWidth || scratch.height !== frame.displayHeight) {
+        scratch.width = frame.displayWidth;
+        scratch.height = frame.displayHeight;
+      }
+      ctx!.drawImage(frame, 0, 0, scratch.width, scratch.height);
+      ctx!.drawImage(drawingCanvas, 0, 0, scratch.width, scratch.height);
+      return new VideoFrame(scratch, {
+        timestamp: frame.timestamp,
+        ...(frame.duration == null ? {} : { duration: frame.duration }),
+      });
+    } catch (err) {
+      // Once, not per frame: a persistent failure runs at the capture framerate.
+      if (!warned) {
+        warned = true;
+        console.warn("Annotation compositing failed, recording without it", err);
+      }
+      return null;
+    }
+  }
 
   new api.MediaStreamTrackProcessor({ track }).readable
     .pipeThrough(
@@ -45,16 +81,15 @@ export function overlayDrawingOnTrack(
             controller.enqueue(frame);
             return;
           }
-          if (scratch.width !== frame.displayWidth || scratch.height !== frame.displayHeight) {
-            scratch.width = frame.displayWidth;
-            scratch.height = frame.displayHeight;
+          const composited = composite(frame);
+          if (!composited) {
+            // Record the plain capture for this frame. Throwing instead would
+            // end the generated track and leave the rest of the recording
+            // audio-only — and the source track stays live, so nothing in
+            // Recorder would notice.
+            controller.enqueue(frame);
+            return;
           }
-          ctx.drawImage(frame, 0, 0, scratch.width, scratch.height);
-          ctx.drawImage(drawingCanvas, 0, 0, scratch.width, scratch.height);
-          const composited = new VideoFrame(scratch, {
-            timestamp: frame.timestamp,
-            ...(frame.duration == null ? {} : { duration: frame.duration }),
-          });
           frame.close();
           controller.enqueue(composited);
         },
