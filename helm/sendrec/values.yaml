@@ -135,17 +135,18 @@ sendrec:
 
   port: 8080
 
-  # Starting reservation for one encode, not a memory ceiling. A real high-DPI
-  # edit held 837.3 MiB anon before timing out; with 20% headroom that already
-  # exceeds the former 512Mi request. See README for scope and remeasurement.
-  # A 1Gi request may leave pods Pending on small clusters; size from recordings.
+  # Starting reservation for one encode, not a memory ceiling. Sized against
+  # v1.90.6, which bounds the edit output: a 200-cut edit of a 3242x2626 source
+  # peaked at 311 MiB anon, so 512Mi covers it with ~139 MiB spare. The same edit
+  # on the pre-1.90.6 code peaked at 757 MiB and needed more than 1Gi reserved.
+  # Pin an older image and you must raise this. See README for scope.
   resources:
     # Concurrency is bounded, input memory is not. Keep bursting available;
     # choose a hard limit only after testing inputs and all enabled workers.
     limits: {}
     requests:
       cpu: 200m
-      memory: 1Gi
+      memory: 512Mi
 
   livenessProbe:
     httpGet:

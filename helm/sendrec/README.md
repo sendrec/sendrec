@@ -261,7 +261,7 @@ Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `
 | `replicas` | Pod count. The app is stateless (state lives in Postgres and S3), but transcode/transcription jobs run in-process | `1` |
 | `image.repository` / `image.tag` / `image.pullPolicy` | Container image. An empty tag resolves to `v<appVersion>` from `Chart.yaml` | `ghcr.io/sendrec/sendrec` / `""` / `Always` |
 | `deploymentStrategy` | Passed through to the Deployment | `RollingUpdate` 25%/25% |
-| `resources` | Requests/limits. See [Sizing the pod](#sizing-the-pod) | `200m` / `1Gi` requests, no limit |
+| `resources` | Requests/limits. See [Sizing the pod](#sizing-the-pod) | `200m` / `512Mi` requests, no limit |
 | `livenessProbe` / `readinessProbe` | Passed through as-is; both hit `/api/health` | see `values.yaml` |
 | `deployment.extraInitContainers` | Extra init containers, appended after the model downloader | `[]` |
 | `deployment.extraContainers` | Sidecars | `[]` |
@@ -272,11 +272,11 @@ The Deployment carries `checksum/configmap` and `checksum/secret` annotations, s
 
 ### Sizing the pod
 
-The chart requests **1Gi** and sets no memory limit. The former 512Mi request was based on a synthetic 1080p ffmpeg process, not a real app-container edit. A post-#208 staging image held **837.3 MiB anon** on a high-DPI edit: with 20% headroom that is already **1004.8 MiB**. That edit timed out, so this establishes a lower bound, not a universal ceiling. See the [measurement and its scope](../../SELF-HOSTING.md#sizing-the-container).
+The chart requests **512Mi** and sets no memory limit. That figure is measured against the default image, `v1.90.6`, which bounds the edit output to 1920×1080 at 60 fps. On a staging container, a 200-cut edit of a 3242×2626 source peaked at **311 MiB** anon — **373 MiB** with 20% headroom, leaving about 139 MiB of margin. See the [measurement and its scope](../../SELF-HOSTING.md#sizing-the-container).
 
-The patched remove-segments path completed that same edit at **363.71 MiB anon**: **436.45 MiB** with 20% headroom, leaving **75.55 MiB** below 512Mi. That supports 512Mi for this one measured job on the patched image, not every input or enabled worker. The 1Gi default is a conservative starting reservation, not a measured universal ceiling.
+**The request is tied to the image.** The identical edit on the pre-`v1.90.6` code peaked at **757 MiB** — over 900 MiB once reserved, which 512Mi cannot cover. If you pin `image.tag` to an older release, raise the request above 1Gi or you will OOM the pod. 512Mi covers one measured job on the default image; it does not certify every input, nor local transcription and the other workers running alongside.
 
-The default application image is still `v1.90.5`, older than #208, the concurrency gate and the remove-segments resolution/frame-rate fix. It ignores `MAX_CONCURRENT_ENCODES`, even though the chart sets it. A chart upgrade alone does not upgrade to those fixes. Set `image.tag` to a reviewed release containing them when available and remeasure; the figures above do not certify the older default image.
+The default application image is `v1.90.6`, which contains the concurrency gate, the thread bounds and the remove-segments resolution/frame-rate fix. Overriding `image.tag` with anything older reintroduces the unbounded edit path and invalidates the sizing above — remeasure if you do.
 
 `env.maxConcurrentEncodes` defaults to `1` per app process; extra encodes queue. Transcription, probes, thumbnails, downloads and uploads are outside that gate. Decoders still hold source-resolution frames even when output is scaled down. Measure high-DPI sources and all enabled workers before reducing the reservation or raising concurrency.
 
