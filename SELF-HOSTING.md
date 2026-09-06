@@ -244,7 +244,7 @@ This was the largest-resolution staging recording: 3242×2626, 43.167 seconds, 4
 
 **512Mi covers this completed single-job run, not every accepted input or worker combination.** The 1Gi default remains a conservative starting reservation; reducing it requires a measurement on the image and workload you actually deploy. Decoding larger sources and enabling other workers can still exceed it.
 
-**Image matters:** the chart still defaults to `v1.90.5`, which predates #208, the concurrency gate and these edit fixes. That image ignores `MAX_CONCURRENT_ENCODES`; do not assume N=1 just because the chart sets it. Updating the chart alone does not install the fixed application. Select a reviewed image containing these fixes once released, then measure it; neither measurement certifies the older default image.
+**Image matters:** these figures are for `v1.90.6` or newer, which bounds the edit output and honours `MAX_CONCURRENT_ENCODES`. Running an older image reintroduces the unbounded path — the same edit that peaks at 311 MiB here peaked at 757 MiB before the fix — so measure again if you pin one.
 
 ### Measuring your own floor
 
