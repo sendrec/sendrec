@@ -3,6 +3,7 @@ package server_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -132,6 +133,29 @@ func TestHealthEndpointReportsVersion(t *testing.T) {
 	expected := `{"status":"ok","registrationEnabled":false,"planBadgeEnabled":false,"version":"v1.90.6"}`
 	if rec.Body.String() != expected {
 		t.Errorf("expected body %q, got %q", expected, rec.Body.String())
+	}
+}
+
+func TestHealthEndpointVersionIsAlwaysValidJSON(t *testing.T) {
+	// `git describe` returns the tag bytes verbatim, and Git accepts a tag that
+	// is not valid UTF-8. Go-syntax escaping would emit `\xff` here, which no
+	// JSON parser accepts — and every SPA page parses this payload.
+	srv := server.New(server.Config{Version: "v1.0-\xff"})
+	rec := executeRequest(srv, http.MethodGet, "/api/health")
+
+	if !json.Valid(rec.Body.Bytes()) {
+		t.Fatalf("health body is not valid JSON: %s", rec.Body.String())
+	}
+
+	var body struct {
+		Status  string `json:"status"`
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode health body: %v", err)
+	}
+	if body.Status != "ok" {
+		t.Errorf("expected status %q, got %q", "ok", body.Status)
 	}
 }
 

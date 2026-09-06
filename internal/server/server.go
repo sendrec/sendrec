@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log"
@@ -557,7 +558,13 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	_, _ = fmt.Fprintf(w, `{"status":"ok","registrationEnabled":%t,"planBadgeEnabled":%t,"version":%q}`, s.registrationEnabled, s.planBadgeEnabled, s.version)
+	// fmt %q is Go-syntax escaping, not JSON: a tag that is not valid UTF-8
+	// would emit \xff and break every caller parsing this payload.
+	version, err := json.Marshal(s.version)
+	if err != nil {
+		version = []byte(`""`)
+	}
+	_, _ = fmt.Fprintf(w, `{"status":"ok","registrationEnabled":%t,"planBadgeEnabled":%t,"version":%s}`, s.registrationEnabled, s.planBadgeEnabled, version)
 }
 
 func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
