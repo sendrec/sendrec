@@ -15,9 +15,13 @@ export function VideoEditorModal({
 }: VideoEditorModalProps) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(duration);
   const [error, setError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const draggingTrimRef = useRef<"start" | "end" | null>(null);
 
   useEffect(() => {
     apiFetch<{ downloadUrl: string }>(`/api/videos/${videoId}/download`)
@@ -32,6 +36,10 @@ export function VideoEditorModal({
   }, [videoId]);
 
   useEffect(() => {
+    setTrimEnd(duration);
+  }, [duration]);
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
@@ -39,6 +47,69 @@ export function VideoEditorModal({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
+
+  function timeFromClientX(clientX: number) {
+    const timeline = timelineRef.current;
+    if (!timeline || !duration) return 0;
+
+    const rect = timeline.getBoundingClientRect();
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    return (x / rect.width) * duration;
+  }
+
+  function handleTrimPointerDown(handle: "start" | "end") {
+    return (e: React.MouseEvent | React.TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      draggingTrimRef.current = handle;
+
+      const fixedStart = trimStart;
+      const fixedEnd = trimEnd;
+      const minimumGap = 0.1;
+
+      function onMove(ev: MouseEvent | TouchEvent) {
+        const point = "touches" in ev ? ev.touches[0] : ev;
+        if (!point) return;
+
+        const rawTime = timeFromClientX(point.clientX);
+
+        let nextTime = rawTime;
+
+        if (handle === "start") {
+          nextTime = Math.max(
+            0,
+            Math.min(rawTime, fixedEnd - minimumGap)
+          );
+          setTrimStart(nextTime);
+        } else {
+          nextTime = Math.min(
+            duration,
+            Math.max(rawTime, fixedStart + minimumGap)
+          );
+          setTrimEnd(nextTime);
+        }
+
+        setCurrentTime(nextTime);
+
+        if (videoRef.current) {
+          videoRef.current.currentTime = nextTime;
+        }
+      }
+
+      function onUp() {
+        draggingTrimRef.current = null;
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        document.removeEventListener("touchmove", onMove);
+        document.removeEventListener("touchend", onUp);
+      }
+
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      document.addEventListener("touchmove", onMove, { passive: false });
+      document.addEventListener("touchend", onUp);
+    };
+  }
 
   function handleTimelineClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!duration) return;
@@ -58,6 +129,12 @@ export function VideoEditorModal({
     duration > 0
       ? Math.max(0, Math.min(100, (currentTime / duration) * 100))
       : 0;
+
+  const trimStartPct =
+    duration > 0 ? (trimStart / duration) * 100 : 0;
+
+  const trimEndPct =
+    duration > 0 ? (trimEnd / duration) * 100 : 100;
 
   return (
     <div
@@ -156,6 +233,39 @@ export function VideoEditorModal({
         <div
           style={{
             display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <button
+            type="button"
+            style={{
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 14px",
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              fontWeight: 600,
+              cursor: "default",
+            }}
+          >
+            ✂ Trimmen
+          </button>
+
+          <span
+            style={{
+              fontSize: 13,
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            Bereich mit den beiden Griffen auswählen – noch nicht gespeichert
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
             justifyContent: "space-between",
             fontSize: 13,
             color: "var(--color-text-secondary)",
@@ -167,6 +277,7 @@ export function VideoEditorModal({
         </div>
 
         <div
+          ref={timelineRef}
           onClick={handleTimelineClick}
           style={{
             position: "relative",
@@ -208,6 +319,70 @@ export function VideoEditorModal({
               position: "absolute",
               top: 0,
               bottom: 0,
+              left: 0,
+              width: `${trimStartPct}%`,
+              background: "rgba(15, 23, 42, 0.6)",
+              pointerEvents: "none",
+            }}
+          />
+
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: `${trimEndPct}%`,
+              right: 0,
+              background: "rgba(15, 23, 42, 0.6)",
+              pointerEvents: "none",
+            }}
+          />
+
+          <div
+            onMouseDown={handleTrimPointerDown("start")}
+            onTouchStart={handleTrimPointerDown("start")}
+            title="Trim-Anfang"
+            style={{
+              position: "absolute",
+              top: 4,
+              bottom: 4,
+              left: `${trimStartPct}%`,
+              width: 14,
+              transform: "translateX(-7px)",
+              background: "#fff",
+              border: "2px solid var(--color-accent)",
+              borderRadius: 5,
+              cursor: "ew-resize",
+              zIndex: 4,
+              touchAction: "none",
+            }}
+          />
+
+          <div
+            onMouseDown={handleTrimPointerDown("end")}
+            onTouchStart={handleTrimPointerDown("end")}
+            title="Trim-Ende"
+            style={{
+              position: "absolute",
+              top: 4,
+              bottom: 4,
+              left: `${trimEndPct}%`,
+              width: 14,
+              transform: "translateX(-7px)",
+              background: "#fff",
+              border: "2px solid var(--color-accent)",
+              borderRadius: 5,
+              cursor: "ew-resize",
+              zIndex: 4,
+              touchAction: "none",
+            }}
+          />
+
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
               left: `${playheadPct}%`,
               width: 2,
               background: "#fff",
@@ -233,12 +408,19 @@ export function VideoEditorModal({
 
         <div
           style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
             marginTop: 10,
             fontSize: 12,
             color: "var(--color-text-secondary)",
           }}
         >
-          Timeline – Klick setzt die Abspielposition
+          <span>Anfang: {formatDuration(trimStart)}</span>
+          <span>
+            Auswahl: {formatDuration(Math.max(0, trimEnd - trimStart))}
+          </span>
+          <span>Ende: {formatDuration(trimEnd)}</span>
         </div>
       </div>
     </div>
