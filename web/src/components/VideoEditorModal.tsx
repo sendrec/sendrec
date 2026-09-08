@@ -28,6 +28,7 @@ export function VideoEditorModal({
   const [trimEnd, setTrimEnd] = useState(duration);
   const [trimming, setTrimming] = useState(false);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [clipHistory, setClipHistory] = useState<EditorClip[][]>([]);
   const [clips, setClips] = useState<EditorClip[]>([
     {
       id: "clip-1",
@@ -67,6 +68,7 @@ export function VideoEditorModal({
     ]);
     nextClipIdRef.current = 2;
     setSelectedClipId(null);
+    setClipHistory([]);
   }, [duration, videoId]);
 
   useEffect(() => {
@@ -203,6 +205,25 @@ export function VideoEditorModal({
     }
   }
 
+  function rememberClipState() {
+    setClipHistory((history) => [
+      ...history.slice(-49),
+      clips.map((clip) => ({ ...clip })),
+    ]);
+  }
+
+  function handleUndo() {
+    if (clipHistory.length === 0) return;
+
+    const previousClips =
+      clipHistory[clipHistory.length - 1];
+
+    setClips(previousClips);
+    setClipHistory((history) => history.slice(0, -1));
+    setSelectedClipId(null);
+    setError(null);
+  }
+
   function handleSplit() {
     const minimumDistance = 0.1;
 
@@ -218,6 +239,8 @@ export function VideoEditorModal({
       );
       return;
     }
+
+    rememberClipState();
 
     setClips((previousClips) => {
       const index = previousClips.findIndex(
@@ -270,6 +293,8 @@ export function VideoEditorModal({
     );
 
     if (!selectedClip) return;
+
+    rememberClipState();
 
     setClips((previousClips) =>
       previousClips.filter(
@@ -518,6 +543,28 @@ export function VideoEditorModal({
               Clip löschen
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={handleUndo}
+            disabled={clipHistory.length === 0}
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "8px 14px",
+              background: "#FFFFFF",
+              color: "#0F172A",
+              fontWeight: 600,
+              cursor:
+                clipHistory.length === 0
+                  ? "default"
+                  : "pointer",
+              opacity:
+                clipHistory.length === 0 ? 0.45 : 1,
+            }}
+          >
+            ↶ Rückgängig
+          </button>
 
           <span
             style={{
