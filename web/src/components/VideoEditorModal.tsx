@@ -78,6 +78,49 @@ export function VideoEditorModal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  const timelineDuration = clips.reduce(
+    (sum, clip) => sum + Math.max(0, clip.end - clip.start),
+    0,
+  );
+
+  function sourceTimeToTimelineTime(sourceTime: number) {
+    let offset = 0;
+
+    for (const clip of clips) {
+      const clipDuration = clip.end - clip.start;
+
+      if (sourceTime < clip.start) {
+        return offset;
+      }
+
+      if (sourceTime <= clip.end) {
+        return offset + (sourceTime - clip.start);
+      }
+
+      offset += clipDuration;
+    }
+
+    return offset;
+  }
+
+  function timelineTimeToSourceTime(timelineTime: number) {
+    let remaining = Math.max(0, timelineTime);
+
+    for (const clip of clips) {
+      const clipDuration = clip.end - clip.start;
+
+      if (remaining <= clipDuration) {
+        return clip.start + remaining;
+      }
+
+      remaining -= clipDuration;
+    }
+
+    return clips.length > 0
+      ? clips[clips.length - 1].end
+      : 0;
+  }
+
   function timeFromClientX(clientX: number) {
     const timeline = timelineRef.current;
     if (!timeline || !duration) return 0;
@@ -142,11 +185,16 @@ export function VideoEditorModal({
   }
 
   function handleTimelineClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!duration) return;
+    if (!timelineDuration) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-    const nextTime = (x / rect.width) * duration;
+
+    const timelineTime =
+      (x / rect.width) * timelineDuration;
+
+    const nextTime =
+      timelineTimeToSourceTime(timelineTime);
 
     setCurrentTime(nextTime);
 
@@ -279,9 +327,18 @@ export function VideoEditorModal({
     }
   }
 
+  const timelineCurrentTime =
+    sourceTimeToTimelineTime(currentTime);
+
   const playheadPct =
-    duration > 0
-      ? Math.max(0, Math.min(100, (currentTime / duration) * 100))
+    timelineDuration > 0
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            (timelineCurrentTime / timelineDuration) * 100,
+          ),
+        )
       : 0;
 
   const trimStartPct =
@@ -289,6 +346,24 @@ export function VideoEditorModal({
 
   const trimEndPct =
     duration > 0 ? (trimEnd / duration) * 100 : 100;
+
+  let timelineOffset = 0;
+
+  const clipLayout = clips.map((clip) => {
+    const clipDuration = Math.max(0, clip.end - clip.start);
+    const timelineStart = timelineOffset;
+
+    timelineOffset += clipDuration;
+
+    return {
+      clip,
+      clipDuration,
+      timelineStart,
+    };
+  });
+
+  const hasDeletedTime =
+    timelineDuration < duration - 0.001;
 
   return (
     <div
@@ -463,8 +538,8 @@ export function VideoEditorModal({
             marginBottom: 8,
           }}
         >
-          <span>{formatDuration(currentTime)}</span>
-          <span>{formatDuration(duration)}</span>
+          <span>{formatDuration(timelineCurrentTime)}</span>
+          <span>{formatDuration(timelineDuration)}</span>
         </div>
 
         <div
@@ -480,12 +555,16 @@ export function VideoEditorModal({
             userSelect: "none",
           }}
         >
-          {clips.map((clip, index) => {
+          {clipLayout.map(
+            ({ clip, clipDuration, timelineStart }, index) => {
             const left =
-              duration > 0 ? (clip.start / duration) * 100 : 0;
+              timelineDuration > 0
+                ? (timelineStart / timelineDuration) * 100
+                : 0;
+
             const width =
-              duration > 0
-                ? ((clip.end - clip.start) / duration) * 100
+              timelineDuration > 0
+                ? (clipDuration / timelineDuration) * 100
                 : 0;
 
             return (
@@ -665,6 +744,7 @@ export function VideoEditorModal({
             onClick={handleApplyTrim}
             disabled={
               trimming ||
+              hasDeletedTime ||
               (trimStart <= 0.001 && trimEnd >= duration - 0.001)
             }
             style={{
@@ -677,6 +757,7 @@ export function VideoEditorModal({
               cursor: trimming ? "default" : "pointer",
               opacity:
                 trimming ||
+                hasDeletedTime ||
                 (trimStart <= 0.001 && trimEnd >= duration - 0.001)
                   ? 0.6
                   : 1,
