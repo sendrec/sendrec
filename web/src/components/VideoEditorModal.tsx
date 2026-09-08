@@ -27,6 +27,7 @@ export function VideoEditorModal({
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(duration);
   const [trimming, setTrimming] = useState(false);
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [clips, setClips] = useState<EditorClip[]>([
     {
       id: "clip-1",
@@ -65,6 +66,7 @@ export function VideoEditorModal({
       },
     ]);
     nextClipIdRef.current = 2;
+    setSelectedClipId(null);
   }, [duration, videoId]);
 
   useEffect(() => {
@@ -200,6 +202,7 @@ export function VideoEditorModal({
       ];
     });
 
+    setSelectedClipId(null);
     setError(null);
   }
 
@@ -440,6 +443,10 @@ export function VideoEditorModal({
             return (
               <div
                 key={clip.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedClipId(clip.id);
+                }}
                 style={{
                   position: "absolute",
                   top: 10,
@@ -448,6 +455,11 @@ export function VideoEditorModal({
                   width: `${width}%`,
                   background: "#1E293B",
                   border: "1px solid rgba(255,255,255,0.35)",
+                  outline:
+                    selectedClipId === clip.id
+                      ? "3px solid #E6467A"
+                      : "none",
+                  outlineOffset: "-3px",
                   boxSizing: "border-box",
                   display: "flex",
                   alignItems: "center",
@@ -457,7 +469,8 @@ export function VideoEditorModal({
                   fontWeight: 600,
                   overflow: "hidden",
                   whiteSpace: "nowrap",
-                  pointerEvents: "none",
+                  cursor: "pointer",
+                  zIndex: selectedClipId === clip.id ? 2 : 1,
                 }}
               >
                 Clip {index + 1}
