@@ -206,6 +206,33 @@ export function VideoEditorModal({
     setError(null);
   }
 
+  function handleDeleteSelectedClip() {
+    if (!selectedClipId) {
+      setError("Bitte zuerst einen Clip auswählen.");
+      return;
+    }
+
+    if (clips.length <= 1) {
+      setError("Der letzte verbleibende Clip kann nicht gelöscht werden.");
+      return;
+    }
+
+    const selectedClip = clips.find(
+      (clip) => clip.id === selectedClipId,
+    );
+
+    if (!selectedClip) return;
+
+    setClips((previousClips) =>
+      previousClips.filter(
+        (clip) => clip.id !== selectedClipId,
+      ),
+    );
+
+    setSelectedClipId(null);
+    setError(null);
+  }
+
   function handleResetTrim() {
     setTrimStart(0);
     setTrimEnd(duration);
@@ -395,6 +422,27 @@ export function VideoEditorModal({
           >
             Teilen
           </button>
+
+          {selectedClipId && (
+            <button
+              type="button"
+              onClick={handleDeleteSelectedClip}
+              disabled={clips.length <= 1}
+              style={{
+                border: "1px solid #B42318",
+                borderRadius: 8,
+                padding: "8px 14px",
+                background: "#FFFFFF",
+                color: "#B42318",
+                fontWeight: 600,
+                cursor:
+                  clips.length <= 1 ? "default" : "pointer",
+                opacity: clips.length <= 1 ? 0.5 : 1,
+              }}
+            >
+              Clip löschen
+            </button>
+          )}
 
           <span
             style={{
