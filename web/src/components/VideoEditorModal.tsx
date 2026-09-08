@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
 import { formatDuration } from "../utils/format";
+import type { Video } from "../types/video";
 
 interface EditorClip {
   id: string;
@@ -24,6 +25,10 @@ export function VideoEditorModal({
 }: VideoEditorModalProps) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [showInsertPicker, setShowInsertPicker] = useState(false);
+  const [libraryVideos, setLibraryVideos] = useState<Video[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [selectedInsertVideo, setSelectedInsertVideo] = useState<Video | null>(null);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(duration);
   const [trimming, setTrimming] = useState(false);
@@ -202,6 +207,33 @@ export function VideoEditorModal({
 
     if (videoRef.current) {
       videoRef.current.currentTime = nextTime;
+    }
+  }
+
+  async function handleOpenInsertPicker() {
+    setShowInsertPicker(true);
+    setLoadingLibrary(true);
+    setError(null);
+
+    try {
+      const videos = await apiFetch<Video[]>("/api/videos");
+
+      setLibraryVideos(
+        (videos ?? []).filter(
+          (video) =>
+            video.id !== videoId &&
+            video.status === "ready" &&
+            video.duration > 0,
+        ),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Videobibliothek konnte nicht geladen werden.",
+      );
+    } finally {
+      setLoadingLibrary(false);
     }
   }
 
@@ -546,6 +578,22 @@ export function VideoEditorModal({
 
           <button
             type="button"
+            onClick={handleOpenInsertPicker}
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "8px 14px",
+              background: "#0F172A",
+              color: "#FFFFFF",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            + Video einfügen
+          </button>
+
+          <button
+            type="button"
             onClick={handleUndo}
             disabled={clipHistory.length === 0}
             style={{
@@ -575,6 +623,124 @@ export function VideoEditorModal({
             Abspielkopf setzen und mit „Teilen“ einen neuen Clip erzeugen
           </span>
         </div>
+
+        {showInsertPicker && (
+          <div
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 10,
+              padding: 14,
+              marginBottom: 18,
+              background: "var(--color-surface)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <strong style={{ color: "var(--color-text)" }}>
+                Video aus Bibliothek auswählen
+              </strong>
+
+              <button
+                type="button"
+                onClick={() => setShowInsertPicker(false)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--color-text-secondary)",
+                  cursor: "pointer",
+                  fontSize: 18,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {loadingLibrary ? (
+              <div style={{ color: "var(--color-text-secondary)" }}>
+                Bibliothek wird geladen...
+              </div>
+            ) : libraryVideos.length === 0 ? (
+              <div style={{ color: "var(--color-text-secondary)" }}>
+                Keine weiteren fertigen Videos gefunden.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(220px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {libraryVideos.map((video) => (
+                  <button
+                    key={video.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedInsertVideo(video);
+                      setShowInsertPicker(false);
+                    }}
+                    style={{
+                      textAlign: "left",
+                      border:
+                        selectedInsertVideo?.id === video.id
+                          ? "2px solid #E6467A"
+                          : "1px solid var(--color-border)",
+                      borderRadius: 8,
+                      padding: 10,
+                      background: "#FFFFFF",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        color: "#0F172A",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {video.title || "Unbenanntes Video"}
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      {formatDuration(video.duration)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedInsertVideo && (
+          <div
+            style={{
+              marginBottom: 14,
+              padding: "8px 12px",
+              borderRadius: 8,
+              background: "#F8FAFC",
+              color: "#0F172A",
+              fontSize: 13,
+            }}
+          >
+            Zum Einfügen ausgewählt:{" "}
+            <strong>
+              {selectedInsertVideo.title || "Unbenanntes Video"}
+            </strong>{" "}
+            ({formatDuration(selectedInsertVideo.duration)})
+          </div>
+        )}
 
         <div
           style={{
