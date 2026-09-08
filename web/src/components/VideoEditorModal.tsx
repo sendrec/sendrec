@@ -6,6 +6,7 @@ import type { Video } from "../types/video";
 interface EditorClip {
   id: string;
   sourceVideoId: string;
+  sourceTitle?: string;
   start: number;
   end: number;
 }
@@ -25,6 +26,7 @@ export function VideoEditorModal({
 }: VideoEditorModalProps) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [timelinePlayheadTime, setTimelinePlayheadTime] = useState(0);
   const [showInsertPicker, setShowInsertPicker] = useState(false);
   const [libraryVideos, setLibraryVideos] = useState<Video[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
@@ -74,6 +76,7 @@ export function VideoEditorModal({
     nextClipIdRef.current = 2;
     setSelectedClipId(null);
     setClipHistory([]);
+    setTimelinePlayheadTime(0);
   }, [duration, videoId]);
 
   useEffect(() => {
@@ -90,18 +93,23 @@ export function VideoEditorModal({
     0,
   );
 
-  function sourceTimeToTimelineTime(sourceTime: number) {
+  function sourceTimeToTimelineTime(
+    sourceVideoId: string,
+    sourceTime: number,
+  ) {
     let offset = 0;
 
     for (const clip of clips) {
       const clipDuration = clip.end - clip.start;
 
-      if (sourceTime < clip.start) {
-        return offset;
-      }
+      if (clip.sourceVideoId === sourceVideoId) {
+        if (sourceTime < clip.start) {
+          return offset;
+        }
 
-      if (sourceTime <= clip.end) {
-        return offset + (sourceTime - clip.start);
+        if (sourceTime <= clip.end) {
+          return offset + (sourceTime - clip.start);
+        }
       }
 
       offset += clipDuration;
@@ -110,22 +118,42 @@ export function VideoEditorModal({
     return offset;
   }
 
-  function timelineTimeToSourceTime(timelineTime: number) {
-    let remaining = Math.max(0, timelineTime);
+  function timelineTimeToClipPosition(timelineTime: number) {
+    if (clips.length === 0) return null;
 
-    for (const clip of clips) {
+    const clampedTime = Math.max(
+      0,
+      Math.min(timelineTime, timelineDuration),
+    );
+
+    let offset = 0;
+
+    for (let index = 0; index < clips.length; index += 1) {
+      const clip = clips[index];
       const clipDuration = clip.end - clip.start;
+      const clipTimelineEnd = offset + clipDuration;
 
-      if (remaining <= clipDuration) {
-        return clip.start + remaining;
+      if (
+        clampedTime <= clipTimelineEnd ||
+        index === clips.length - 1
+      ) {
+        const insideClip = Math.max(
+          0,
+          Math.min(clampedTime - offset, clipDuration),
+        );
+
+        return {
+          clip,
+          index,
+          timelineStart: offset,
+          sourceTime: clip.start + insideClip,
+        };
       }
 
-      remaining -= clipDuration;
+      offset = clipTimelineEnd;
     }
 
-    return clips.length > 0
-      ? clips[clips.length - 1].end
-      : 0;
+    return null;
   }
 
   function timeFromClientX(clientX: number) {
@@ -200,13 +228,24 @@ export function VideoEditorModal({
     const timelineTime =
       (x / rect.width) * timelineDuration;
 
-    const nextTime =
-      timelineTimeToSourceTime(timelineTime);
+    const position =
+      timelineTimeToClipPosition(timelineTime);
 
-    setCurrentTime(nextTime);
+    if (!position) return;
 
-    if (videoRef.current) {
-      videoRef.current.currentTime = nextTime;
+    setTimelinePlayheadTime(timelineTime);
+    setSelectedClipId(position.clip.id);
+    setError(null);
+
+    // Der Player zeigt momentan noch das Ausgangsvideo.
+    // Fremde Videoquellen werden im nächsten Schritt
+    // auch in der Vorschau umgeschaltet.
+    if (position.clip.sourceVideoId === videoId) {
+      setCurrentTime(position.sourceTime);
+
+      if (videoRef.current) {
+        videoRef.current.currentTime = position.sourceTime;
+      }
     }
   }
 
@@ -237,6 +276,96 @@ export function VideoEditorModal({
     }
   }
 
+  function handleInsertSelectedVideo() {
+    if (!selectedInsertVideo) {
+      setError("Bitte zuerst ein Video auswählen.");
+      return;
+    }
+
+    const insertAt = Math.max(
+      0,
+      Math.min(timelinePlayheadTime, timelineDuration),
+    );
+
+    const position =
+      timelineTimeToClipPosition(insertAt);
+
+    const insertedId =
+      `clip-${nextClipIdRef.current++}`;
+
+    const insertedClip: EditorClip = {
+      id: insertedId,
+      sourceVideoId: selectedInsertVideo.id,
+      sourceTitle:
+        selectedInsertVideo.title || "Unbenanntes Video",
+      start: 0,
+      end: selectedInsertVideo.duration,
+    };
+
+    rememberClipState();
+
+    setClips((previousClips) => {
+      if (!position) {
+        return [...previousClips, insertedClip];
+      }
+
+      const { clip, index, sourceTime, timelineStart } =
+        position;
+
+      const clipDuration = clip.end - clip.start;
+      const distanceFromStart =
+        insertAt - timelineStart;
+      const distanceFromEnd =
+        clipDuration - distanceFromStart;
+
+      // Genau am Anfang eines Clips
+      if (distanceFromStart <= 0.001) {
+        return [
+          ...previousClips.slice(0, index),
+          insertedClip,
+          ...previousClips.slice(index),
+        ];
+      }
+
+      // Genau am Ende eines Clips
+      if (distanceFromEnd <= 0.001) {
+        return [
+          ...previousClips.slice(0, index + 1),
+          insertedClip,
+          ...previousClips.slice(index + 1),
+        ];
+      }
+
+      // Mitten im Clip: automatisch teilen
+      const leftClip: EditorClip = {
+        ...clip,
+        id: `clip-${nextClipIdRef.current++}`,
+        end: sourceTime,
+      };
+
+      const rightClip: EditorClip = {
+        ...clip,
+        id: `clip-${nextClipIdRef.current++}`,
+        start: sourceTime,
+      };
+
+      return [
+        ...previousClips.slice(0, index),
+        leftClip,
+        insertedClip,
+        rightClip,
+        ...previousClips.slice(index + 1),
+      ];
+    });
+
+    setTimelinePlayheadTime(
+      insertAt + selectedInsertVideo.duration,
+    );
+    setSelectedClipId(insertedId);
+    setSelectedInsertVideo(null);
+    setError(null);
+  }
+
   function rememberClipState() {
     setClipHistory((history) => [
       ...history.slice(-49),
@@ -259,13 +388,20 @@ export function VideoEditorModal({
   function handleSplit() {
     const minimumDistance = 0.1;
 
-    const clipIndex = clips.findIndex(
-      (clip) =>
-        currentTime > clip.start + minimumDistance &&
-        currentTime < clip.end - minimumDistance,
-    );
+    const position =
+      timelineTimeToClipPosition(timelinePlayheadTime);
 
-    if (clipIndex === -1) {
+    if (!position) {
+      setError("Zum Teilen muss der Abspielkopf innerhalb eines Clips stehen.");
+      return;
+    }
+
+    const { clip, index, sourceTime } = position;
+
+    if (
+      sourceTime <= clip.start + minimumDistance ||
+      sourceTime >= clip.end - minimumDistance
+    ) {
       setError(
         "Zum Teilen muss der Abspielkopf innerhalb eines Clips stehen.",
       );
@@ -274,36 +410,24 @@ export function VideoEditorModal({
 
     rememberClipState();
 
-    setClips((previousClips) => {
-      const index = previousClips.findIndex(
-        (clip) =>
-          currentTime > clip.start + minimumDistance &&
-          currentTime < clip.end - minimumDistance,
-      );
+    const leftClip: EditorClip = {
+      ...clip,
+      id: `clip-${nextClipIdRef.current++}`,
+      end: sourceTime,
+    };
 
-      if (index === -1) return previousClips;
+    const rightClip: EditorClip = {
+      ...clip,
+      id: `clip-${nextClipIdRef.current++}`,
+      start: sourceTime,
+    };
 
-      const clip = previousClips[index];
-
-      const leftClip: EditorClip = {
-        ...clip,
-        id: `clip-${nextClipIdRef.current++}`,
-        end: currentTime,
-      };
-
-      const rightClip: EditorClip = {
-        ...clip,
-        id: `clip-${nextClipIdRef.current++}`,
-        start: currentTime,
-      };
-
-      return [
-        ...previousClips.slice(0, index),
-        leftClip,
-        rightClip,
-        ...previousClips.slice(index + 1),
-      ];
-    });
+    setClips((previousClips) => [
+      ...previousClips.slice(0, index),
+      leftClip,
+      rightClip,
+      ...previousClips.slice(index + 1),
+    ]);
 
     setSelectedClipId(null);
     setError(null);
@@ -342,6 +466,7 @@ export function VideoEditorModal({
     setTrimStart(0);
     setTrimEnd(duration);
     setCurrentTime(0);
+    setTimelinePlayheadTime(0);
 
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
@@ -385,7 +510,7 @@ export function VideoEditorModal({
   }
 
   const timelineCurrentTime =
-    sourceTimeToTimelineTime(currentTime);
+    timelinePlayheadTime;
 
   const playheadPct =
     timelineDuration > 0
@@ -420,7 +545,8 @@ export function VideoEditorModal({
   });
 
   const hasDeletedTime =
-    timelineDuration < duration - 0.001;
+    timelineDuration < duration - 0.001 ||
+    clips.some((clip) => clip.sourceVideoId !== videoId);
 
   return (
     <div
@@ -503,9 +629,18 @@ export function VideoEditorModal({
             ref={videoRef}
             src={videoUrl}
             controls
-            onTimeUpdate={(e) =>
-              setCurrentTime(e.currentTarget.currentTime)
-            }
+            onTimeUpdate={(e) => {
+              const sourceTime =
+                e.currentTarget.currentTime;
+
+              setCurrentTime(sourceTime);
+              setTimelinePlayheadTime(
+                sourceTimeToTimelineTime(
+                  videoId,
+                  sourceTime,
+                ),
+              );
+            }}
             style={{
               width: "100%",
               maxHeight: 480,
@@ -732,13 +867,36 @@ export function VideoEditorModal({
               background: "#F8FAFC",
               color: "#0F172A",
               fontSize: 13,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
             }}
           >
-            Zum Einfügen ausgewählt:{" "}
-            <strong>
-              {selectedInsertVideo.title || "Unbenanntes Video"}
-            </strong>{" "}
-            ({formatDuration(selectedInsertVideo.duration)})
+            <span>
+              Zum Einfügen ausgewählt:{" "}
+              <strong>
+                {selectedInsertVideo.title || "Unbenanntes Video"}
+              </strong>{" "}
+              ({formatDuration(selectedInsertVideo.duration)})
+            </span>
+
+            <button
+              type="button"
+              onClick={handleInsertSelectedVideo}
+              style={{
+                border: "none",
+                borderRadius: 8,
+                padding: "8px 14px",
+                background: "#0F172A",
+                color: "#FFFFFF",
+                fontWeight: 600,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Hier einfügen
+            </button>
           </div>
         )}
 
@@ -813,7 +971,11 @@ export function VideoEditorModal({
                   zIndex: selectedClipId === clip.id ? 2 : 1,
                 }}
               >
-                Clip {index + 1}
+                {clip.sourceVideoId === videoId
+                  ? `Clip ${index + 1}`
+                  : clip.sourceTitle
+                    ? `Eingefügt: ${clip.sourceTitle}`
+                    : "Eingefügtes Video"}
               </div>
             );
           })}
