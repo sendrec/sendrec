@@ -27,6 +27,7 @@ export function VideoEditorModal({
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [timelinePlayheadTime, setTimelinePlayheadTime] = useState(0);
+  const [timelineZoom, setTimelineZoom] = useState(1);
   const [showInsertPicker, setShowInsertPicker] = useState(false);
   const [libraryVideos, setLibraryVideos] = useState<Video[]>([]);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
@@ -903,6 +904,73 @@ export function VideoEditorModal({
         <div
           style={{
             display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 12,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setTimelineZoom(1)}
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 7,
+              padding: "5px 10px",
+              background: "#FFFFFF",
+              color: "#0F172A",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Fit
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setTimelineZoom((zoom) => Math.max(1, zoom - 0.5))
+            }
+            disabled={timelineZoom <= 1}
+          >
+            −
+          </button>
+
+          <input
+            type="range"
+            min="1"
+            max="12"
+            step="0.5"
+            value={timelineZoom}
+            onChange={(e) =>
+              setTimelineZoom(Number(e.currentTarget.value))
+            }
+            aria-label="Timeline-Zoom"
+            style={{ width: 190 }}
+          />
+
+          <button
+            type="button"
+            onClick={() =>
+              setTimelineZoom((zoom) => Math.min(12, zoom + 0.5))
+            }
+            disabled={timelineZoom >= 12}
+          >
+            +
+          </button>
+
+          <span
+            style={{
+              fontSize: 12,
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            {timelineZoom.toFixed(1)}×
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
             justifyContent: "space-between",
             fontSize: 13,
             color: "var(--color-text-secondary)",
@@ -914,18 +982,27 @@ export function VideoEditorModal({
         </div>
 
         <div
-          ref={timelineRef}
-          onClick={handleTimelineClick}
           style={{
-            position: "relative",
-            height: 64,
-            borderRadius: 8,
-            background: "var(--color-border)",
-            cursor: "pointer",
-            overflow: "hidden",
-            userSelect: "none",
+            overflowX: "auto",
+            overflowY: "hidden",
+            paddingBottom: 6,
           }}
         >
+          <div
+            ref={timelineRef}
+            onClick={handleTimelineClick}
+            style={{
+              position: "relative",
+              height: 64,
+              width: `${timelineZoom * 100}%`,
+              minWidth: "100%",
+              borderRadius: 8,
+              background: "var(--color-border)",
+              cursor: "pointer",
+              overflow: "hidden",
+              userSelect: "none",
+            }}
+          >
           {clipLayout.map(
             ({ clip, clipDuration, timelineStart }, index) => {
             const left =
@@ -1070,6 +1147,8 @@ export function VideoEditorModal({
               pointerEvents: "none",
             }}
           />
+        </div>
+
         </div>
 
         <div
