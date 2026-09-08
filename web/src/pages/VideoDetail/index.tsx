@@ -5,6 +5,7 @@ import { useOrganization } from "../../hooks/useOrganization";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import { useToast } from "../../hooks/useToast";
 import { TrimModal } from "../../components/TrimModal";
+import { VideoEditorModal } from "../../components/VideoEditorModal";
 import { FillerRemovalModal } from "../../components/FillerRemovalModal";
 import { SilenceRemovalModal } from "../../components/SilenceRemovalModal";
 import { Toast } from "../../components/Toast";
@@ -83,6 +84,7 @@ export function VideoDetail() {
   const [ctaUrl, setCtaUrl] = useState("");
 
   const [showTrimModal, setShowTrimModal] = useState(false);
+  const [showVideoEditor, setShowVideoEditor] = useState(false);
   const [showFillerModal, setShowFillerModal] = useState(false);
   const [showSilenceModal, setShowSilenceModal] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -819,7 +821,18 @@ export function VideoDetail() {
         )}
 
         <div className="detail-setting-row">
-          <span className="detail-setting-label">Trimmen</span>
+          <span className="detail-setting-label">Bearbeiten</span>
+        <button
+          onClick={() => setShowVideoEditor(true)}
+          className="detail-btn detail-btn--accent"
+          disabled={video.status === "processing"}
+        >
+          Video bearbeiten
+        </button>
+      </div>
+
+      <div className="detail-setting-row">
+        <span className="detail-setting-label">Trimmen</span>
           <button
             onClick={() => setShowTrimModal(true)}
             className="detail-btn"
@@ -1097,6 +1110,15 @@ export function VideoDetail() {
             Video löschen
           </button>
         </div>
+      )}
+
+      {/* Video Editor */}
+      {showVideoEditor && (
+        <VideoEditorModal
+          videoId={video.id}
+          duration={video.duration}
+          onClose={() => setShowVideoEditor(false)}
+        />
       )}
 
       {/* Trim Modal */}
