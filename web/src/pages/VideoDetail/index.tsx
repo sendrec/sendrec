@@ -1118,6 +1118,11 @@ export function VideoDetail() {
           videoId={video.id}
           duration={video.duration}
           onClose={() => setShowVideoEditor(false)}
+          onTrimStarted={() => {
+            setVideo((prev) =>
+              prev ? { ...prev, status: "processing" } : prev,
+            );
+          }}
         />
       )}
 

@@ -6,17 +6,20 @@ interface VideoEditorModalProps {
   videoId: string;
   duration: number;
   onClose: () => void;
+  onTrimStarted?: () => void;
 }
 
 export function VideoEditorModal({
   videoId,
   duration,
   onClose,
+  onTrimStarted,
 }: VideoEditorModalProps) {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(duration);
+  const [trimming, setTrimming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -65,7 +68,7 @@ export function VideoEditorModal({
 
       const fixedStart = trimStart;
       const fixedEnd = trimEnd;
-      const minimumGap = 0.1;
+      const minimumGap = 1;
 
       function onMove(ev: MouseEvent | TouchEvent) {
         const point = "touches" in ev ? ev.touches[0] : ev;
@@ -122,6 +125,52 @@ export function VideoEditorModal({
 
     if (videoRef.current) {
       videoRef.current.currentTime = nextTime;
+    }
+  }
+
+  function handleResetTrim() {
+    setTrimStart(0);
+    setTrimEnd(duration);
+    setCurrentTime(0);
+
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+    }
+  }
+
+  async function handleApplyTrim() {
+    if (trimEnd - trimStart < 1) {
+      setError("Der verbleibende Bereich muss mindestens 1 Sekunde lang sein.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Das aktuelle Video wird durch die getrimmte Version ersetzt. Möchtest du fortfahren?"
+    );
+
+    if (!confirmed) return;
+
+    setTrimming(true);
+    setError(null);
+
+    try {
+      await apiFetch(`/api/videos/${videoId}/trim`, {
+        method: "POST",
+        body: JSON.stringify({
+          startSeconds: trimStart,
+          endSeconds: trimEnd,
+        }),
+      });
+
+      onTrimStarted?.();
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Trimmen fehlgeschlagen."
+      );
+      setTrimming(false);
     }
   }
 
@@ -421,6 +470,57 @@ export function VideoEditorModal({
             Auswahl: {formatDuration(Math.max(0, trimEnd - trimStart))}
           </span>
           <span>Ende: {formatDuration(trimEnd)}</span>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+            marginTop: 18,
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleResetTrim}
+            disabled={trimming}
+            style={{
+              background: "transparent",
+              color: "var(--color-text-secondary)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "9px 16px",
+              fontWeight: 600,
+              cursor: trimming ? "default" : "pointer",
+            }}
+          >
+            Zurücksetzen
+          </button>
+
+          <button
+            type="button"
+            onClick={handleApplyTrim}
+            disabled={
+              trimming ||
+              (trimStart <= 0.001 && trimEnd >= duration - 0.001)
+            }
+            style={{
+              background: "var(--color-accent)",
+              color: "var(--color-text)",
+              border: "none",
+              borderRadius: 8,
+              padding: "9px 18px",
+              fontWeight: 600,
+              cursor: trimming ? "default" : "pointer",
+              opacity:
+                trimming ||
+                (trimStart <= 0.001 && trimEnd >= duration - 0.001)
+                  ? 0.6
+                  : 1,
+            }}
+          >
+            {trimming ? "Wird getrimmt..." : "Trimmen anwenden"}
+          </button>
         </div>
       </div>
     </div>
