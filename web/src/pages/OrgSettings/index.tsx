@@ -118,18 +118,18 @@ export function OrgSettings() {
             setScimConfigured(false);
             setScimCreatedAt("");
             setScimToken("");
-            setScimError("Failed to load SCIM status");
+            setScimError("SCIM-Status konnte nicht geladen werden");
           }
         }
       })
-      .catch(() => setError("Failed to load workspace"))
+      .catch(() => setError("Arbeitsbereich konnte nicht geladen werden"))
       .finally(() => setLoading(false));
   }, [orgId, canManage, selectedOrgId]);
 
   if (orgsLoading || !canManage || loading) {
     return (
       <div className="page-container page-container--centered">
-        <p className="status-message status-message--success">Loading...</p>
+        <p className="status-message status-message--success">Wird geladen...</p>
       </div>
     );
   }
@@ -145,7 +145,7 @@ export function OrgSettings() {
   if (!org || !orgId) {
     return (
       <div className="page-container page-container--centered">
-        <p className="status-message status-message--error">Workspace not found</p>
+        <p className="status-message status-message--error">Arbeitsbereich nicht gefunden</p>
       </div>
     );
   }
@@ -154,7 +154,7 @@ export function OrgSettings() {
 
   return (
     <div className="page-container">
-      <h1 className="page-title">Workspace Settings</h1>
+      <h1 className="page-title">Arbeitsbereich-Einstellungen</h1>
 
       {error && (
         <p className="status-message status-message--error">{error}</p>

@@ -128,7 +128,7 @@ export function Analytics() {
     return (
       <div className="page-container page-container--centered">
         <p style={{ color: "var(--color-error)", fontSize: 16 }}>
-          Failed to load analytics.
+          Analysedaten konnten nicht geladen werden.
         </p>
       </div>
     );
@@ -138,7 +138,7 @@ export function Analytics() {
     <div className="page-container">
       {view === "video" && id && (
         <Link to={`/videos/${id}`} className="back-link">
-          &larr; Back
+          &larr; Zurück
         </Link>
       )}
 
@@ -147,7 +147,7 @@ export function Analytics() {
           <h1
             style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}
           >
-            Analytics
+            Analysen
           </h1>
           <div className="analytics-toggle">
             <button
@@ -201,7 +201,7 @@ export function Analytics() {
       ) : (
         <div className="page-container page-container--centered">
           <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>
-            No data available.
+            Keine Daten verfügbar.
           </p>
         </div>
       )}

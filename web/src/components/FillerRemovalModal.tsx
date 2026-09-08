@@ -94,7 +94,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
       });
       onRemovalStarted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove fillers");
+      setError(err instanceof Error ? err.message : "Füllwörter konnten nicht entfernt werden");
     } finally {
       setRemoving(false);
     }
@@ -108,11 +108,11 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
           display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
         }}
       >
-        <div role="dialog" aria-modal="true" aria-label="Remove Filler Words" style={{
+        <div role="dialog" aria-modal="true" aria-label="Füllwörter entfernen" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Loading transcript...</p>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Transkript wird geladen...</p>
         </div>
       </div>
     );
@@ -127,13 +127,13 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
         }}
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div role="dialog" aria-modal="true" aria-label="Remove Filler Words" style={{
+        <div role="dialog" aria-modal="true" aria-label="Füllwörter entfernen" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
-          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Remove Filler Words</h2>
+          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Füllwörter entfernen</h2>
           <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: "0 0 16px" }}>
-            Unable to load transcript.
+            Transkript konnte nicht geladen werden.
           </p>
           <button
             onClick={onClose}
@@ -143,7 +143,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
               padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
-            Close
+            Schließen
           </button>
         </div>
       </div>
@@ -159,13 +159,13 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
         }}
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div role="dialog" aria-modal="true" aria-label="Remove Filler Words" style={{
+        <div role="dialog" aria-modal="true" aria-label="Füllwörter entfernen" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
-          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Remove Filler Words</h2>
+          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Füllwörter entfernen</h2>
           <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: "0 0 16px" }}>
-            No filler words detected in this video's transcript.
+            Im Transkript dieses Videos wurden keine Füllwörter erkannt.
           </p>
           <button
             onClick={onClose}
@@ -175,7 +175,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
               padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
-            Close
+            Schließen
           </button>
         </div>
       </div>
@@ -190,12 +190,12 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div ref={contentRef} role="dialog" aria-modal="true" aria-label="Remove Filler Words" style={{
+      <div ref={contentRef} role="dialog" aria-modal="true" aria-label="Füllwörter entfernen" style={{
         background: "var(--color-surface)", border: "1px solid var(--color-border)",
         borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
       }}>
         <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 12px" }}>
-          Remove Filler Words
+          Füllwörter entfernen
         </h2>
 
         <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 12px" }}>
@@ -209,7 +209,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
             padding: 0, fontSize: 12, cursor: "pointer", marginBottom: 8,
           }}
         >
-          {checked.size === fillers.length ? "Deselect all" : "Select all"}
+          {checked.size === fillers.length ? "Auswahl aufheben" : "Alle auswählen"}
         </button>
 
         <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--color-border)", borderRadius: 8, marginBottom: 16 }}>
@@ -253,7 +253,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
               padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
-            Cancel
+            Abbrechen
           </button>
           <button
             onClick={handleRemove}
@@ -265,7 +265,7 @@ export function FillerRemovalModal({ videoId, shareToken, onClose, onRemovalStar
               opacity: (checked.size === 0 || removing) ? 0.5 : 1,
             }}
           >
-            {removing ? "Removing..." : `Remove ${checked.size} filler${checked.size !== 1 ? "s" : ""} (${savedSeconds.toFixed(1)}s)`}
+            {removing ? "Wird entfernt..." : `${checked.size} Füllwort${checked.size !== 1 ? "wörter" : ""} entfernen (${savedSeconds.toFixed(1)} s)`}
           </button>
         </div>
       </div>

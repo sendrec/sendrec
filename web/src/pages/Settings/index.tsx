@@ -17,6 +17,7 @@ import { NotificationSection } from "./NotificationSection";
 import { WebhookSection } from "./WebhookSection";
 import { IntegrationSection } from "./IntegrationSection";
 import { BrandingSection } from "./BrandingSection";
+import { useI18n } from "../../i18n/I18nContext";
 
 interface LoadedState {
   profile: UserProfile;
@@ -50,6 +51,7 @@ interface LoadedState {
 }
 
 export function Settings() {
+  const { t } = useI18n();
   const [loaded, setLoaded] = useState<LoadedState | null>(null);
 
   useEffect(() => {
@@ -185,14 +187,14 @@ export function Settings() {
   if (!loaded) {
     return (
       <div className="page-container page-container--centered">
-        <p className="status-message status-message--success">Loading...</p>
+        <p className="status-message status-message--success">{t("common.loading")}</p>
       </div>
     );
   }
 
   return (
     <div className="page-container">
-      <h1 className="page-title">Settings</h1>
+      <h1 className="page-title">{t("settings.title")}</h1>
 
       {loaded.billingEnabled && loaded.billing && (
         <BillingSection billing={loaded.billing} />
@@ -245,6 +247,35 @@ export function Settings() {
           limits={loaded.limits}
         />
       )}
+
+      <section className="card settings-section" aria-labelledby="open-source-heading">
+        <h2 id="open-source-heading">{t("openSource.title")}</h2>
+        <p className="card-description">
+          {t("openSource.description")}
+        </p>
+        <p className="card-description">{t("openSource.sourceDescription")}</p>
+        <div className="btn-row">
+          <a className="btn btn--secondary" href="/source/99tools-record-source-v1.90.4.tar.gz">
+            {t("openSource.sourceButton")}
+          </a>
+          <a
+            className="btn btn--secondary"
+            href="https://github.com/sendrec/sendrec/tree/v1.90.4"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t("openSource.originalButton")}
+          </a>
+          <a
+            className="btn btn--secondary"
+            href="https://www.gnu.org/licenses/agpl-3.0.html"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t("openSource.licenseButton")}
+          </a>
+        </div>
+      </section>
     </div>
   );
 }

@@ -31,8 +31,8 @@ export function MembersSection({
 
   async function handleRemoveMember(userId: string, memberName: string) {
     setConfirmDialog({
-      message: `Remove ${memberName} from this workspace?`,
-      confirmLabel: "Remove",
+      message: `${memberName} aus diesem Arbeitsbereich entfernen?`,
+      confirmLabel: "Entfernen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -42,7 +42,7 @@ export function MembersSection({
           });
           setMembers((prev) => prev.filter((m) => m.userId !== userId));
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to remove member");
+          setError(err instanceof Error ? err.message : "Mitglied konnte nicht entfernt werden");
         }
       },
     });
@@ -58,7 +58,7 @@ export function MembersSection({
         prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m))
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update role");
+      setError(err instanceof Error ? err.message : "Rolle konnte nicht aktualisiert werden");
     }
   }
 
@@ -68,7 +68,7 @@ export function MembersSection({
     setInviteMessage("");
 
     if (!inviteEmail.trim()) {
-      setInviteError("Email is required");
+      setInviteError("E-Mail-Adresse ist erforderlich");
       return;
     }
 
@@ -81,11 +81,11 @@ export function MembersSection({
       if (result) {
         setInvites((prev) => [...prev, result]);
       }
-      setInviteMessage("Invite sent");
+      setInviteMessage("Einladung gesendet");
       setInviteEmail("");
       setInviteRole("member");
     } catch (err) {
-      setInviteError(err instanceof Error ? err.message : "Failed to send invite");
+      setInviteError(err instanceof Error ? err.message : "Einladung konnte nicht gesendet werden");
     } finally {
       setSendingInvite(false);
     }
@@ -98,14 +98,14 @@ export function MembersSection({
       });
       setInvites((prev) => prev.filter((i) => i.id !== inviteId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke invite");
+      setError(err instanceof Error ? err.message : "Einladung konnte nicht widerrufen werden");
     }
   }
 
   return (
     <>
       <div className="card settings-section">
-        <h2>Members</h2>
+        <h2>Mitglieder</h2>
         <p className="card-description">
           {members.length} {members.length === 1 ? "member" : "members"} in this workspace.
         </p>
@@ -125,7 +125,7 @@ export function MembersSection({
                     className="form-input"
                     value={member.role}
                     onChange={(e) => handleRoleChange(member.userId, e.target.value)}
-                    aria-label={`Role for ${member.name || member.email}`}
+                    aria-label={`Rolle für ${member.name || member.email}`}
                     style={{ width: "auto" }}
                   >
                     {ROLES.filter((r) => r !== "owner").map((r) => (
@@ -141,7 +141,7 @@ export function MembersSection({
                     className="btn btn--danger btn--danger-sm"
                     onClick={() => handleRemoveMember(member.userId, member.name || member.email)}
                   >
-                    Remove
+                    Entfernen
                   </button>
                 )}
               </div>
@@ -152,14 +152,14 @@ export function MembersSection({
 
       {canManage && (
         <div className="card settings-section">
-          <h2>Invites</h2>
+          <h2>Einladungen</h2>
           <p className="card-description">
-            Invite new members to this workspace by email.
+            Lade neue Mitglieder per E-Mail in diesen Arbeitsbereich ein.
           </p>
 
           <form onSubmit={handleSendInvite} className="api-key-form-row">
             <div className="form-field" style={{ flex: 1 }}>
-              <label className="form-label" htmlFor="invite-email">Email</label>
+              <label className="form-label" htmlFor="invite-email">E-Mail</label>
               <input
                 id="invite-email"
                 type="email"
@@ -171,15 +171,15 @@ export function MembersSection({
               />
             </div>
             <div className="form-field">
-              <label className="form-label" htmlFor="invite-role">Role</label>
+              <label className="form-label" htmlFor="invite-role">Rolle</label>
               <select
                 id="invite-role"
                 className="form-input"
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value)}
               >
-                <option value="viewer">Viewer</option>
-                <option value="member">Member</option>
+                <option value="viewer">Betrachter</option>
+                <option value="member">Mitglied</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -188,7 +188,7 @@ export function MembersSection({
               className="btn btn--primary"
               disabled={sendingInvite}
             >
-              {sendingInvite ? "Sending..." : "Send invite"}
+              {sendingInvite ? "Wird gesendet..." : "Einladung senden"}
             </button>
           </form>
 
@@ -201,7 +201,7 @@ export function MembersSection({
 
           {invites.length > 0 && (
             <>
-              <h3>Pending invites</h3>
+              <h3>Ausstehende Einladungen</h3>
               <div className="key-list">
                 {invites.map((invite) => (
                   <div key={invite.id} className="api-key-row">
@@ -219,7 +219,7 @@ export function MembersSection({
                           navigator.clipboard.writeText(invite.acceptLink!);
                         }}
                       >
-                        Copy link
+                        Link kopieren
                       </button>
                     )}
                     <button
@@ -227,7 +227,7 @@ export function MembersSection({
                       className="btn btn--danger btn--danger-sm"
                       onClick={() => handleRevokeInvite(invite.id)}
                     >
-                      Revoke
+                      Widerrufen
                     </button>
                   </div>
                 ))}

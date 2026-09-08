@@ -85,7 +85,7 @@ export function Playlists() {
       fetchPlaylists();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to create playlist",
+        err instanceof Error ? err.message : "Playlist konnte nicht erstellt werden",
       );
     } finally {
       setCreating(false);
@@ -94,7 +94,7 @@ export function Playlists() {
 
   const handleDelete = (id: string) => {
     setConfirmDialog({
-      message: "Delete this playlist? Videos will not be deleted.",
+      message: "Diese Playlist löschen? Die Videos selbst werden nicht gelöscht.",
       onConfirm: async () => {
         setConfirmDialog(null);
         try {
@@ -149,7 +149,7 @@ export function Playlists() {
           className="detail-btn detail-btn--accent"
           onClick={() => setShowCreate(!showCreate)}
         >
-          {showCreate ? "Cancel" : "New Playlist"}
+          {showCreate ? "Abbrechen" : "Neue Playlist"}
         </button>
       </div>
 
@@ -167,7 +167,7 @@ export function Playlists() {
             type="text"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Playlist title"
+            placeholder="Playlist-Titel"
             maxLength={limits?.fieldLimits?.playlistTitle ?? 200}
             autoFocus
             style={{
@@ -185,7 +185,7 @@ export function Playlists() {
             className="detail-btn detail-btn--accent"
             disabled={creating || !newTitle.trim()}
           >
-            {creating ? "Creating..." : "Create"}
+            {creating ? "Wird erstellt..." : "Erstellen"}
           </button>
           {error && (
             <p
@@ -204,8 +204,8 @@ export function Playlists() {
       {limits && limits.maxPlaylists > 0 && (
         <div className="playlist-usage">
           <span>
-            <strong>{limits.playlistsUsed}</strong> of {limits.maxPlaylists}{" "}
-            playlists used
+            <strong>{limits.playlistsUsed}</strong> von {limits.maxPlaylists}{" "}
+            Playlists verwendet
           </span>
           <div className="playlist-usage-bar">
             <div className="usage-bar">
@@ -219,7 +219,7 @@ export function Playlists() {
           </div>
           {limits.playlistsUsed >= limits.maxPlaylists && (
             <Link to="/settings" className="detail-btn detail-btn--accent" style={{ textDecoration: "none", whiteSpace: "nowrap", fontSize: 12, padding: "4px 12px" }}>
-              Upgrade to Pro
+              Auf Pro upgraden
             </Link>
           )}
         </div>
@@ -245,15 +245,15 @@ export function Playlists() {
               <polygon points="10,7 10,13 15,10" />
             </svg>
           </div>
-          <h2 className="empty-state-title">No playlists yet</h2>
+          <h2 className="empty-state-title">Noch keine Playlists</h2>
           <p className="empty-state-desc">
-            Create a playlist to organize and share collections of videos.
+            Erstelle eine Playlist, um Videos zu organisieren und gemeinsam zu teilen.
           </p>
           <button
             className="detail-btn detail-btn--accent"
             onClick={() => setShowCreate(true)}
           >
-            Create your first playlist
+            Erste Playlist erstellen
           </button>
         </div>
       ) : (
@@ -270,7 +270,7 @@ export function Playlists() {
                   e.stopPropagation();
                   setMenuId(menuId === playlist.id ? null : playlist.id);
                 }}
-                aria-label="Playlist options"
+                aria-label="Playlist-Optionen"
               >
                 &middot;&middot;&middot;
               </button>
@@ -286,7 +286,7 @@ export function Playlists() {
                       setMenuId(null);
                     }}
                   >
-                    Edit
+                    Bearbeiten
                   </button>
                   <button
                     className="playlist-context-menu-danger"
@@ -295,7 +295,7 @@ export function Playlists() {
                       setMenuId(null);
                     }}
                   >
-                    Delete
+                    Löschen
                   </button>
                 </div>
               )}
@@ -310,7 +310,7 @@ export function Playlists() {
                   )}
                   <span className="playlist-thumb-count">
                     {playlist.videoCount}{" "}
-                    {playlist.videoCount === 1 ? "video" : "videos"}
+                    {playlist.videoCount === 1 ? "Video" : "Videos"}
                   </span>
                 </div>
               </div>
@@ -325,16 +325,16 @@ export function Playlists() {
                 <div className="playlist-card-meta">
                   <span className="playlist-card-meta-text">
                     {playlist.videoCount}{" "}
-                    {playlist.videoCount === 1 ? "video" : "videos"}
+                    {playlist.videoCount === 1 ? "Video" : "Videos"}
                   </span>
                   <span
                     className={`playlist-card-badge ${playlist.isShared ? "playlist-card-badge--shared" : "playlist-card-badge--private"}`}
                   >
-                    {playlist.isShared ? "Shared" : "Private"}
+                    {playlist.isShared ? "Geteilt" : "Privat"}
                   </span>
                 </div>
                 <div className="playlist-card-date">
-                  Created {formatDate(playlist.createdAt)}
+                  Erstellt am {formatDate(playlist.createdAt)}
                 </div>
               </div>
             </div>
@@ -345,7 +345,7 @@ export function Playlists() {
       {confirmDialog && (
         <ConfirmDialog
           message={confirmDialog.message}
-          confirmLabel="Delete"
+          confirmLabel="Löschen"
           danger
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}

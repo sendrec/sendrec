@@ -63,10 +63,14 @@ func (h *Handler) EnqueueJob(ctx context.Context, jobType JobType, videoID strin
 		webcamKey, _ := payload["webcamKey"].(string)
 		thumbKey, _ := payload["thumbnailKey"].(string)
 		contentType, _ := payload["contentType"].(string)
+		cameraPosition, _ := payload["cameraPosition"].(string)
+		if cameraPosition == "" {
+			cameraPosition = "bottom-right"
+		}
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
-			CompositeWithWebcam(ctx, h.db, h.storage, videoID, fileKey, webcamKey, thumbKey, contentType)
+			CompositeWithWebcam(ctx, h.db, h.storage, videoID, fileKey, webcamKey, thumbKey, contentType, cameraPosition)
 		}()
 	}
 }

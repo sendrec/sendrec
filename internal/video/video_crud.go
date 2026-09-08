@@ -34,8 +34,9 @@ type createResponse struct {
 }
 
 type updateRequest struct {
-	Status string `json:"status"`
-	Title  string `json:"title"`
+	Status         string `json:"status"`
+	Title          string `json:"title"`
+	CameraPosition string `json:"cameraPosition"`
 }
 
 type uploadRequest struct {
@@ -352,9 +353,6 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 
 		newStatus := "ready"
-		if webcamKey != nil {
-			newStatus = "processing"
-		}
 
 		tag, err := h.db.Exec(r.Context(),
 			`UPDATE videos SET status = $1, updated_at = now()
@@ -405,6 +403,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 				"webcamKey":    *webcamKey,
 				"thumbnailKey": thumbnailFileKey(userID, shareToken),
 				"contentType":  expectedContentType,
+			"cameraPosition": req.CameraPosition,
 			})
 		} else {
 			h.EnqueueJob(r.Context(), JobTypeThumbnail, videoID, map[string]any{

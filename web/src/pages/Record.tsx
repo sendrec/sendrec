@@ -5,6 +5,7 @@ import { CameraRecorder } from "../components/CameraRecorder";
 import { Recorder } from "../components/Recorder";
 import { LimitsResponse } from "../types/limits";
 import { Upload } from "./Upload";
+import { useI18n } from "../i18n/I18nContext";
 
 interface CreateVideoResponse {
   id: string;
@@ -30,14 +31,15 @@ function uploadWithProgress(
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error("Upload failed"));
+      else reject(new Error("Upload fehlgeschlagen"));
     };
-    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
     xhr.send(blob);
   });
 }
 
 export function Record() {
+  const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<"record" | "upload">(() =>
     searchParams.get("tab") === "upload" ? "upload" : "record"
@@ -64,15 +66,15 @@ export function Record() {
     fetchLimits();
   }, []);
 
-  async function handleRecordingComplete(blob: Blob, duration: number, webcamBlob?: Blob) {
+  async function handleRecordingComplete(blob: Blob, duration: number, webcamBlob?: Blob, cameraPosition = "bottom-right") {
     setUploading(true);
     setError(null);
     let videoId: string | null = null;
 
     try {
-      setUploadStep("Creating video...");
+      setUploadStep("Video wird erstellt...");
       const now = new Date();
-      const title = `Recording ${now.toLocaleDateString("en-GB")} ${now.toLocaleTimeString("en-GB")}`;
+      const title = `Aufnahme ${now.toLocaleDateString("de-DE")} ${now.toLocaleTimeString("de-DE")}`;
 
       const contentType = blob.type || "video/webm";
       const createBody: Record<string, unknown> = { title, duration, fileSize: blob.size, contentType };
@@ -87,25 +89,25 @@ export function Record() {
       });
 
       if (!result) {
-        throw new Error("Failed to create video");
+        throw new Error("Video konnte nicht erstellt werden");
       }
 
       videoId = result.id;
 
-      setUploadStep("Uploading recording...");
+      setUploadStep("Aufnahme wird hochgeladen...");
       setUploadPercent(0);
       await uploadWithProgress(result.uploadUrl, blob, contentType, setUploadPercent);
 
       if (webcamBlob && result.webcamUploadUrl) {
-        setUploadStep("Uploading camera...");
+        setUploadStep("Kamera-Aufnahme wird hochgeladen...");
         setUploadPercent(0);
         await uploadWithProgress(result.webcamUploadUrl, webcamBlob, webcamBlob.type || "video/webm", setUploadPercent);
       }
 
-      setUploadStep("Finalizing...");
+      setUploadStep("Wird fertiggestellt...");
       await apiFetch(`/api/videos/${result.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ status: "ready" }),
+        body: JSON.stringify({ status: "ready", cameraPosition }),
       });
 
       setShareUrl(`${window.location.origin}/watch/${result.shareToken}`);
@@ -113,7 +115,7 @@ export function Record() {
       if (videoId) {
         apiFetch(`/api/videos/${videoId}`, { method: "DELETE" }).catch(() => {});
       }
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(err instanceof Error ? err.message : "Upload fehlgeschlagen");
     } finally {
       setUploading(false);
     }
@@ -168,7 +170,7 @@ export function Record() {
   if (loadingLimits) {
     return (
       <div className="page-container page-container--centered">
-        <p className="max-duration-label">Loading...</p>
+        <p className="max-duration-label">Wird geladen...</p>
       </div>
     );
   }
@@ -177,8 +179,8 @@ export function Record() {
     return (
       <div className="page-container page-container--centered">
         <div style={{ textAlign: "center" }}>
-          <p className="max-duration-label" style={{ marginBottom: 8 }}>{uploadStep || "Uploading..."}</p>
-          {uploadStep.includes("Uploading") && (
+          <p className="max-duration-label" style={{ marginBottom: 8 }}>{uploadStep || "Wird hochgeladen..."}</p>
+          {uploadStep.includes("hochgeladen") && (
             <>
               <div className="upload-progress-bar">
                 <div className="upload-progress-fill" style={{ width: `${uploadPercent}%` }} />
@@ -186,7 +188,7 @@ export function Record() {
               <p className="upload-progress-percent">{uploadPercent}%</p>
             </>
           )}
-          <p className="max-duration-label" style={{ opacity: 0.7 }}>Please don't close this page</p>
+          <p className="max-duration-label" style={{ opacity: 0.7 }}>Bitte diese Seite nicht schließen</p>
         </div>
       </div>
     );
@@ -196,7 +198,7 @@ export function Record() {
     return (
       <div className="page-container page-container--centered">
         <p className="error-message">{error}</p>
-        <button className="btn-record" onClick={recordAnother}>Try again</button>
+        <button className="btn-record" onClick={recordAnother}>Erneut versuchen</button>
       </div>
     );
   }
@@ -216,12 +218,12 @@ export function Record() {
   if (!screenRecordingSupported && !cameraSupported) {
     return (
       <div className="page-container page-container--centered">
-        <h1 className="page-heading">Recording is not available</h1>
+        <h1 className="page-heading">Aufnahme ist nicht verfügbar</h1>
         <p className="quota-submessage">
-          Recording is not supported on this device. Please use a modern browser, or{" "}
-          <button onClick={() => setTab("upload")} style={{ color: "var(--color-accent)", background: "none", border: "none", cursor: "pointer", font: "inherit", textDecoration: "underline", padding: 0 }}>upload a video</button> instead.
+          Auf diesem Gerät wird die Aufnahme nicht unterstützt. Bitte verwende einen aktuellen Browser oder lade stattdessen{" "}
+          <button onClick={() => setTab("upload")} style={{ color: "var(--color-accent)", background: "none", border: "none", cursor: "pointer", font: "inherit", textDecoration: "underline", padding: 0 }}>ein Video hoch</button>.
         </p>
-        <button className="btn-record" onClick={() => setTab("upload")}>Go to Upload</button>
+        <button className="btn-record" onClick={() => setTab("upload")}>Zum Upload</button>
       </div>
     );
   }
@@ -233,12 +235,12 @@ export function Record() {
           <div className="usage-bar-fill usage-bar-fill--warning" style={{ width: "100%" }} />
         </div>
         <p className="quota-message">
-          You've reached your limit of {limits!.maxVideosPerMonth} videos this month.
+          Du hast dein Limit von {limits!.maxVideosPerMonth} Videos für diesen Monat erreicht.
         </p>
-        <p className="quota-submessage">Delete unused recordings or wait until next month.</p>
+        <p className="quota-submessage">Lösche nicht benötigte Aufnahmen oder warte bis zum nächsten Monat.</p>
         <div className="quota-actions">
-          <Link to="/library" className="btn-primary">Go to Library</Link>
-          <Link to="/settings" className="btn-outline">Upgrade to Pro</Link>
+          <Link to="/library" className="btn-primary">Zur Bibliothek</Link>
+          <Link to="/settings" className="btn-outline">Auf Pro upgraden</Link>
         </div>
       </div>
     );
@@ -250,11 +252,11 @@ export function Record() {
         <div className="share-container">
           <div className="share-checkmark">
             <svg viewBox="0 0 48 48" fill="none">
-              <circle cx="24" cy="24" r="24" fill="rgba(0, 182, 122, 0.12)" />
-              <path d="M15 25l6 6 12-12" stroke="#00b67a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="24" cy="24" r="24" fill="rgba(230, 70, 122, 0.12)" />
+              <path d="M15 25l6 6 12-12" stroke="#E6467A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h2 className="share-heading">Your video is ready!</h2>
+          <h2 className="share-heading">Dein Video ist fertig!</h2>
           <div className="share-link-row">
             <input
               type="text"
@@ -264,15 +266,15 @@ export function Record() {
               onClick={(e) => (e.target as HTMLInputElement).select()}
             />
             <button className="btn-copy" onClick={copyShareUrl}>
-              {copied ? "Copied!" : "Copy link"}
+              {copied ? "Kopiert!" : "Link kopieren"}
             </button>
           </div>
           <div className="share-actions">
             <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
-              Watch video
+              Video ansehen
             </a>
-            <button className="btn-outline" onClick={recordAnother}>Record another</button>
-            <Link to="/library" className="btn-ghost">Go to Library</Link>
+            <button className="btn-outline" onClick={recordAnother}>Weitere Aufnahme</button>
+            <Link to="/library" className="btn-ghost">Zur Bibliothek</Link>
           </div>
         </div>
       </div>
@@ -286,25 +288,25 @@ export function Record() {
 
   return (
     <div className="page-container page-container--centered">
-      <h1 className="page-heading">New Recording</h1>
+      <h1 className="page-heading">{t("record.new")}</h1>
       <div className="record-tabs">
         <button
           className={`record-tab${tab === "record" ? " record-tab--active" : ""}`}
           onClick={() => setTab("record")}
         >
-          Record
+          {t("nav.record")}
         </button>
         <button
           className={`record-tab${tab === "upload" ? " record-tab--active" : ""}`}
           onClick={() => setTab("upload")}
         >
-          Upload
+          {t("record.upload")}
         </button>
       </div>
       {hasLimits && (
         <div className="usage-section">
           <p className="usage-label">
-            {limits.videosUsedThisMonth} / {limits.maxVideosPerMonth} videos this month
+            {t("record.monthUsage", { used: limits.videosUsedThisMonth, max: limits.maxVideosPerMonth })}
           </p>
           <div
             className="usage-bar"
@@ -322,19 +324,19 @@ export function Record() {
       )}
       {tab === "record" && limits && limits.videosUsedThisMonth === 0 && (
         <div className="onboarding-card">
-          <p className="onboarding-title">Get started in 3 steps</p>
+          <p className="onboarding-title">{t("record.getStarted")}</p>
           <div className="onboarding-steps">
             <div className="onboarding-step">
               <span className="onboarding-step-num">1.</span>
-              <span className="onboarding-step-text">Record your screen or upload a video</span>
+              <span className="onboarding-step-text">{t("record.step1")}</span>
             </div>
             <div className="onboarding-step">
               <span className="onboarding-step-num">2.</span>
-              <span className="onboarding-step-text">Share the link with anyone</span>
+              <span className="onboarding-step-text">{t("record.step2")}</span>
             </div>
             <div className="onboarding-step">
               <span className="onboarding-step-num">3.</span>
-              <span className="onboarding-step-text">Track views and get feedback</span>
+              <span className="onboarding-step-text">{t("record.step3")}</span>
             </div>
           </div>
         </div>

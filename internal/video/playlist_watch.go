@@ -43,10 +43,10 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{.Title}} — SendRec</title>
+    <title>{{.Title}} — 99tools Record</title>
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :focus-visible { outline: 2px solid #00b67a; outline-offset: 2px; }
+        :focus-visible { outline: 2px solid #E6467A; outline-offset: 2px; }
         body {
             background: #0a1628;
             color: #ffffff;
@@ -68,17 +68,17 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             border: 1px solid #334155; background: #1e293b; color: #fff;
             font-size: 1rem; margin-bottom: 1rem; outline: none;
         }
-        .gate-container input[type="password"]:focus { border-color: #00b67a; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
+        .gate-container input[type="password"]:focus { border-color: #E6467A; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
         .gate-container input[type="password"]::placeholder { color: #94a3b8; opacity: 0.5; }
         .gate-container button {
-            width: 100%; background: #00b67a; color: #fff; padding: 0.75rem 1.5rem;
+            width: 100%; background: #E6467A; color: #fff; padding: 0.75rem 1.5rem;
             border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
             transition: background 0.15s;
         }
         .gate-container button:hover { background: #00a06b; }
         .gate-container button:disabled { opacity: 0.5; cursor: not-allowed; }
         .gate-branding { margin-top: 24px; font-size: 12px; color: #8892a4; }
-        .gate-branding a { color: #00b67a; text-decoration: none; }
+        .gate-branding a { color: #E6467A; text-decoration: none; }
         .gate-branding a:hover { text-decoration: underline; }
         {{else if .NeedsEmail}}
         body { display: flex; align-items: center; justify-content: center; }
@@ -93,17 +93,17 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             border: 1px solid #334155; background: #1e293b; color: #fff;
             font-size: 1rem; margin-bottom: 1rem; outline: none;
         }
-        .gate-container input[type="email"]:focus { border-color: #00b67a; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
+        .gate-container input[type="email"]:focus { border-color: #E6467A; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
         .gate-container input[type="email"]::placeholder { color: #94a3b8; opacity: 0.5; }
         .gate-container button {
-            width: 100%; background: #00b67a; color: #fff; padding: 0.75rem 1.5rem;
+            width: 100%; background: #E6467A; color: #fff; padding: 0.75rem 1.5rem;
             border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
             transition: background 0.15s;
         }
         .gate-container button:hover { background: #00a06b; }
         .gate-container button:disabled { opacity: 0.5; cursor: not-allowed; }
         .gate-branding { margin-top: 24px; font-size: 12px; color: #8892a4; }
-        .gate-branding a { color: #00b67a; text-decoration: none; }
+        .gate-branding a { color: #E6467A; text-decoration: none; }
         .gate-branding a:hover { text-decoration: underline; }
         {{else}}
 ` + playerCSS + safariWarningCSS + `
@@ -144,7 +144,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             color: #8892a4;
         }
         .now-playing-label strong {
-            color: #00b67a;
+            color: #E6467A;
             font-weight: 600;
         }
         .auto-advance-toggle {
@@ -166,8 +166,8 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             border: 1px solid #1e2d45;
         }
         .aa-toggle-track.active {
-            background: #00b67a;
-            border-color: #00b67a;
+            background: #E6467A;
+            border-color: #E6467A;
         }
         .aa-toggle-knob {
             position: absolute;
@@ -225,7 +225,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .video-list-item.active {
             background: #1e3a5f;
-            border-left: 3px solid #00b67a;
+            border-left: 3px solid #E6467A;
             padding-left: 13px;
         }
         .video-list-item .position {
@@ -237,13 +237,13 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             font-family: monospace;
         }
         .video-list-item.active .position {
-            color: #00b67a;
+            color: #E6467A;
             font-weight: 600;
         }
         .now-playing-tag {
             font-size: 10px;
             font-weight: 600;
-            color: #00b67a;
+            color: #E6467A;
             text-transform: uppercase;
             letter-spacing: 0.3px;
             display: none;
@@ -310,7 +310,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             margin-top: 2px;
         }
         .video-list-item .watched-badge {
-            color: #00b67a;
+            color: #E6467A;
             font-size: 14px;
             flex-shrink: 0;
         }
@@ -405,7 +405,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .next-progress-fill {
             height: 100%;
-            background: #00b67a;
+            background: #E6467A;
             border-radius: 2px;
             width: 100%;
             transition: width 0.1s linear;
@@ -424,7 +424,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             transition: all 0.15s;
         }
         .btn-play-now {
-            background: #00b67a;
+            background: #E6467A;
             color: #fff;
         }
         .btn-play-now:hover { background: #00a06b; }
@@ -493,7 +493,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             <input type="password" id="password-input" placeholder="Enter password" required maxlength="128" autofocus>
             <button type="submit" id="submit-btn">Continue</button>
         </form>
-        <div class="gate-branding">Powered by <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a></div>
+        <div class="gate-branding">Powered by <a href="/" target="_blank" rel="noopener">SendRec</a></div>
     </div>
     <script nonce="{{.Nonce}}">
         document.getElementById('password-form').addEventListener('submit', function(e) {
@@ -525,7 +525,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             <input type="email" id="email-input" placeholder="you@example.com" required maxlength="320" autofocus>
             <button type="submit" id="submit-btn">Watch Playlist</button>
         </form>
-        <div class="gate-branding">Powered by <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a></div>
+        <div class="gate-branding">Powered by <a href="/" target="_blank" rel="noopener">SendRec</a></div>
     </div>
     <script nonce="{{.Nonce}}">
         document.getElementById('email-gate-form').addEventListener('submit', function(e) {
@@ -610,7 +610,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                 </div>
             </div>
             <div class="branding-footer">
-                Shared via <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a>
+                Shared via <a href="/" target="_blank" rel="noopener">SendRec</a>
             </div>
 ` + safariWarningHTML + `
         </main>

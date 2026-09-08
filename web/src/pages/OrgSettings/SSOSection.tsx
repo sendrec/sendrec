@@ -100,7 +100,7 @@ export function SSOSection({
         method: "PUT",
         body: JSON.stringify(body),
       });
-      setSsoMessage("SSO settings saved");
+      setSsoMessage("SSO-Einstellungen gespeichert");
       setSsoConfigured(true);
       setSsoClientSecret("");
       setSamlMetadataXml("");
@@ -112,7 +112,7 @@ export function SSOSection({
         setSpMetadataUrl(ssoData.spMetadataUrl || "");
       }
     } catch (err) {
-      setSsoError(err instanceof Error ? err.message : "Failed to save SSO settings");
+      setSsoError(err instanceof Error ? err.message : "SSO-Einstellungen konnten nicht gespeichert werden");
     } finally {
       setSavingSso(false);
     }
@@ -120,8 +120,8 @@ export function SSOSection({
 
   function handleRemoveSso() {
     setConfirmDialog({
-      message: "Remove SSO configuration? Members will need to use password login.",
-      confirmLabel: "Remove SSO",
+      message: "SSO-Konfiguration entfernen? Mitglieder müssen sich anschließend mit Passwort anmelden.",
+      confirmLabel: "SSO entfernen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -141,9 +141,9 @@ export function SSOSection({
           setSamlEntityId("");
           setSamlSsoUrl("");
           setSpMetadataUrl("");
-          setSsoMessage("SSO configuration removed");
+          setSsoMessage("SSO-Konfiguration entfernt");
         } catch (err) {
-          setSsoError(err instanceof Error ? err.message : "Failed to remove SSO");
+          setSsoError(err instanceof Error ? err.message : "SSO konnte nicht entfernt werden");
         } finally {
           setRemovingSso(false);
         }
@@ -165,10 +165,10 @@ export function SSOSection({
         setScimToken(resp.token);
         setScimConfigured(true);
         setScimCreatedAt(new Date().toISOString());
-        setScimMessage("Token generated. Copy it now — it won't be shown again.");
+        setScimMessage("Token erstellt. Kopiere ihn jetzt – er wird später nicht erneut angezeigt.");
       }
     } catch (err) {
-      setScimError(err instanceof Error ? err.message : "Failed to generate token");
+      setScimError(err instanceof Error ? err.message : "Token konnte nicht erstellt werden");
     } finally {
       setScimGenerating(false);
     }
@@ -176,8 +176,8 @@ export function SSOSection({
 
   function handleRegenerateScimToken() {
     setConfirmDialog({
-      message: "Regenerate SCIM token? The current token will stop working immediately.",
-      confirmLabel: "Regenerate",
+      message: "SCIM-Token neu erzeugen? Der aktuelle Token funktioniert danach sofort nicht mehr.",
+      confirmLabel: "Neu erstellen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -188,8 +188,8 @@ export function SSOSection({
 
   function handleRevokeScimToken() {
     setConfirmDialog({
-      message: "Revoke SCIM token? Automated provisioning will stop working.",
-      confirmLabel: "Revoke",
+      message: "SCIM-Token widerrufen? Die automatische Bereitstellung wird dadurch beendet.",
+      confirmLabel: "Widerrufen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -199,9 +199,9 @@ export function SSOSection({
           setScimConfigured(false);
           setScimToken("");
           setScimCreatedAt("");
-          setScimMessage("SCIM token revoked");
+          setScimMessage("SCIM-Token widerrufen");
         } catch (err) {
-          setScimError(err instanceof Error ? err.message : "Failed to revoke token");
+          setScimError(err instanceof Error ? err.message : "Token konnte nicht widerrufen werden");
         }
       },
     });
@@ -212,11 +212,11 @@ export function SSOSection({
       <form onSubmit={handleSsoSave} className="card settings-section">
         <h2>Single Sign-On</h2>
         <p className="card-description">
-          Configure single sign-on for your workspace. Members can sign in using your identity provider.
+          Richte Single Sign-On für deinen Arbeitsbereich ein. Mitglieder können sich über deinen Identity Provider anmelden.
         </p>
 
         <div className="form-field">
-          <label className="form-label">Protocol</label>
+          <label className="form-label">Protokoll</label>
           <div style={{ display: "flex", gap: "1rem" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
               <input
@@ -244,7 +244,7 @@ export function SSOSection({
         {ssoProvider === "oidc" ? (
           <>
             <div className="form-field">
-              <label className="form-label" htmlFor="sso-issuer-url">Issuer URL</label>
+              <label className="form-label" htmlFor="sso-issuer-url">Issuer-URL</label>
               <input
                 id="sso-issuer-url"
                 type="url"
@@ -256,7 +256,7 @@ export function SSOSection({
             </div>
 
             <div className="form-field">
-              <label className="form-label" htmlFor="sso-client-id">Client ID</label>
+              <label className="form-label" htmlFor="sso-client-id">Client-ID</label>
               <input
                 id="sso-client-id"
                 type="text"
@@ -267,7 +267,7 @@ export function SSOSection({
             </div>
 
             <div className="form-field">
-              <label className="form-label" htmlFor="sso-client-secret">Client Secret</label>
+              <label className="form-label" htmlFor="sso-client-secret">Client-Secret</label>
               <input
                 id="sso-client-secret"
                 type="password"
@@ -291,7 +291,7 @@ export function SSOSection({
    • Client ID — from the application you created
    • Client Secret — from the application you created
 
-4. Click "Save SSO settings" and test the login flow.
+4. Click "SSO-Einstellungen speichern" and test the login flow.
 
 Common issuer URLs:
   Google:   https://accounts.google.com
@@ -303,7 +303,7 @@ Common issuer URLs:
         ) : (
           <>
             <div className="form-field">
-              <label className="form-label" htmlFor="saml-metadata-url">Metadata URL</label>
+              <label className="form-label" htmlFor="saml-metadata-url">Metadaten-URL</label>
               <input
                 id="saml-metadata-url"
                 type="url"
@@ -314,7 +314,7 @@ Common issuer URLs:
               />
             </div>
             <div className="form-field">
-              <label className="form-label" htmlFor="saml-metadata-xml">Or paste metadata XML</label>
+              <label className="form-label" htmlFor="saml-metadata-xml">Oder Metadaten-XML einfügen</label>
               <textarea
                 id="saml-metadata-xml"
                 className="form-input"
@@ -327,18 +327,18 @@ Common issuer URLs:
             {samlEntityId && (
               <>
                 <div className="form-field">
-                  <label className="form-label">IdP Entity ID</label>
+                  <label className="form-label">IdP-Entity-ID</label>
                   <input className="form-input" value={samlEntityId} readOnly />
                 </div>
                 <div className="form-field">
-                  <label className="form-label">IdP SSO URL</label>
+                  <label className="form-label">IdP-SSO-URL</label>
                   <input className="form-input" value={samlSsoUrl} readOnly />
                 </div>
               </>
             )}
             {spMetadataUrl && (
               <div className="form-field">
-                <label className="form-label">SP Metadata URL</label>
+                <label className="form-label">SP-Metadaten-URL</label>
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                   <input className="form-input" value={spMetadataUrl} readOnly style={{ flex: 1 }} />
                   <button
@@ -346,14 +346,14 @@ Common issuer URLs:
                     className="btn btn--secondary btn--sm"
                     onClick={() => navigator.clipboard.writeText(spMetadataUrl)}
                   >
-                    Copy
+                    Kopieren
                   </button>
                 </div>
-                <small className="form-hint">Provide this URL to your IdP administrator</small>
+                <small className="form-hint">Diese URL deinem IdP-Administrator bereitstellen</small>
               </div>
             )}
             <details className="settings-details">
-              <summary>SAML setup guide</summary>
+              <summary>SAML-Einrichtungsanleitung</summary>
               <pre>{`1. In your IdP (Okta, Auth0, Azure AD, OneLogin, etc.),
    create a SAML 2.0 application.
 
@@ -368,10 +368,10 @@ Common issuer URLs:
    above — your IdP can auto-configure from it.`}
 
 3. From your IdP, copy the metadata URL and paste it
-   in "Metadata URL" above. Or download the metadata
+   in "Metadaten-URL" above. Or download the metadata
    XML and paste it in the text area.
 
-4. Click "Save SSO settings". The IdP Entity ID and
+4. Click "SSO-Einstellungen speichern". The IdP Entity ID and
    SSO URL will be extracted automatically.
 
 5. Test the login flow by signing in with SSO.
@@ -392,12 +392,12 @@ Attribute mapping (sent in SAML assertion):
             style={{ width: "auto" }}
           />
           <label htmlFor="sso-enforce" className="form-label" style={{ margin: 0 }}>
-            Enforce SSO for all members
+            SSO für alle Mitglieder erzwingen
           </label>
         </div>
         {ssoEnforce && (
           <p className="form-hint" style={{ color: "var(--color-warning)" }}>
-            When enforced, members must sign in through your identity provider. Password login will be disabled for workspace members.
+            Wenn dies erzwungen wird, müssen sich Mitglieder über deinen Identity Provider anmelden. Die Passwort-Anmeldung ist für Mitglieder des Arbeitsbereichs dann deaktiviert.
           </p>
         )}
 
@@ -418,7 +418,7 @@ Attribute mapping (sent in SAML assertion):
               (ssoProvider === "saml" && !samlMetadataUrl.trim() && !samlMetadataXml.trim())
             }
           >
-            {savingSso ? "Saving..." : "Save SSO settings"}
+            {savingSso ? "Wird gespeichert..." : "SSO-Einstellungen speichern"}
           </button>
           {ssoConfigured && (
             <button
@@ -427,16 +427,16 @@ Attribute mapping (sent in SAML assertion):
               onClick={handleRemoveSso}
               disabled={removingSso}
             >
-              {removingSso ? "Removing..." : "Remove SSO"}
+              {removingSso ? "Wird entfernt..." : "SSO entfernen"}
             </button>
           )}
         </div>
       </form>
 
       <div className="card settings-section">
-        <h2>SCIM Provisioning</h2>
+        <h2>SCIM-Bereitstellung</h2>
         <p className="card-description">
-          Automatically provision and deprovision workspace members from your identity provider.
+          Mitglieder des Arbeitsbereichs automatisch über deinen Identity Provider bereitstellen und entfernen.
         </p>
 
         {scimError && <p className="form-error">{scimError}</p>}
@@ -448,13 +448,13 @@ Attribute mapping (sent in SAML assertion):
               <label className="form-label">Status</label>
               <p>
                 {scimCreatedAt
-                  ? `Active (created ${new Date(scimCreatedAt).toLocaleDateString()})`
+                  ? `Aktiv (erstellt am ${new Date(scimCreatedAt).toLocaleDateString("de-DE")})`
                   : "Active"}
               </p>
             </div>
 
             <div className="form-field">
-              <label className="form-label">SCIM Base URL</label>
+              <label className="form-label">SCIM-Basis-URL</label>
               <div style={{ display: "flex", gap: "0.5rem" }}>
                 <input
                   type="text"
@@ -471,14 +471,14 @@ Attribute mapping (sent in SAML assertion):
                     );
                   }}
                 >
-                  Copy
+                  Kopieren
                 </button>
               </div>
             </div>
 
             {scimToken && (
               <div className="form-field">
-                <label className="form-label">Bearer Token</label>
+                <label className="form-label">Bearer-Token</label>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <input type="text" className="form-input" readOnly value={scimToken} />
                   <button
@@ -486,15 +486,15 @@ Attribute mapping (sent in SAML assertion):
                     className="btn"
                     onClick={() => navigator.clipboard.writeText(scimToken)}
                   >
-                    Copy
+                    Kopieren
                   </button>
                 </div>
-                <p className="form-hint">Copy this token now. It won't be shown again.</p>
+                <p className="form-hint">Kopiere diesen Token jetzt. Er wird später nicht erneut angezeigt.</p>
               </div>
             )}
 
             <details className="settings-details">
-              <summary>Setup Guide</summary>
+              <summary>Einrichtungsanleitung</summary>
               <pre>{`SCIM Base URL:
   ${window.location.origin}/api/organizations/${orgId}/scim/v2
 
@@ -517,14 +517,14 @@ Azure AD:
                 onClick={handleRegenerateScimToken}
                 disabled={scimGenerating}
               >
-                {scimGenerating ? "Generating..." : "Regenerate Token"}
+                {scimGenerating ? "Wird erstellt..." : "Token neu erzeugen"}
               </button>
               <button
                 type="button"
                 className="btn btn--danger"
                 onClick={handleRevokeScimToken}
               >
-                Revoke Token
+                Token widerrufen
               </button>
             </div>
           </>
@@ -535,7 +535,7 @@ Azure AD:
             onClick={handleGenerateScimToken}
             disabled={scimGenerating}
           >
-            {scimGenerating ? "Generating..." : "Generate SCIM Token"}
+            {scimGenerating ? "Wird erstellt..." : "SCIM-Token erzeugen"}
           </button>
         )}
       </div>

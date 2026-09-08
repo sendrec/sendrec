@@ -37,11 +37,11 @@ export function Upload() {
   function acceptFiles(selected: File[]) {
     const valid = selected.filter((f) => SUPPORTED_TYPES.includes(f.type));
     if (valid.length === 0) {
-      setError("Only MP4, WebM, and MOV files are supported");
+      setError("Unterstützt werden nur MP4-, WebM- und MOV-Dateien");
       return;
     }
     if (valid.length < selected.length) {
-      setError(`${selected.length - valid.length} unsupported file(s) skipped`);
+      setError(`${selected.length - valid.length} nicht unterstützte Datei(en) übersprungen`);
     } else {
       setError(null);
     }
@@ -50,10 +50,10 @@ export function Upload() {
     if (total > MAX_FILES) {
       const allowed = valid.slice(0, MAX_FILES - files.length);
       if (allowed.length === 0) {
-        setError(`Maximum ${MAX_FILES} files allowed`);
+        setError(`Maximal ${MAX_FILES} Dateien erlaubt`);
         return;
       }
-      setError(`Only ${allowed.length} of ${valid.length} files added (maximum ${MAX_FILES})`);
+      setError(`Nur ${allowed.length} von ${valid.length} Dateien hinzugefügt (maximal ${MAX_FILES})`);
       setFiles((prev) => [
         ...prev,
         ...allowed.map((f) => ({ file: f, title: f.name.replace(/\.[^.]+$/, "") })),
@@ -127,8 +127,8 @@ export function Upload() {
         if (files.length > remaining) {
           setError(
             remaining <= 0
-              ? "Monthly video limit reached"
-              : `You can only upload ${remaining} more video${remaining === 1 ? "" : "s"} this month`
+              ? "Monatliches Video-Limit erreicht"
+              : `Du kannst diesen Monat nur noch ${remaining} Video${remaining === 1 ? "" : "s"} hochladen`
           );
           return;
         }
@@ -169,7 +169,7 @@ export function Upload() {
         });
 
         if (!result) {
-          throw new Error("Failed to create upload");
+          throw new Error("Upload konnte nicht erstellt werden");
         }
 
         videoId = result.id;
@@ -187,8 +187,8 @@ export function Upload() {
           xhr.onload = () =>
             xhr.status >= 200 && xhr.status < 300
               ? resolve()
-              : reject(new Error("Upload failed"));
-          xhr.onerror = () => reject(new Error("Upload failed"));
+              : reject(new Error("Upload fehlgeschlagen"));
+          xhr.onerror = () => reject(new Error("Upload fehlgeschlagen"));
           xhr.send(entry.file);
         });
 
@@ -209,7 +209,7 @@ export function Upload() {
         uploadResults.push({
           fileName: entry.file.name,
           shareUrl: "",
-          error: err instanceof Error ? err.message : "Upload failed",
+          error: err instanceof Error ? err.message : "Upload fehlgeschlagen",
         });
       }
     }
@@ -301,9 +301,9 @@ export function Upload() {
             <h2 className="success-title">
               {failed.length === 0
                 ? results.length === 1
-                  ? "Upload complete"
-                  : `${succeeded.length} videos uploaded`
-                : `${succeeded.length} of ${results.length} uploaded`}
+                  ? "Upload abgeschlossen"
+                  : `${succeeded.length} Videos hochgeladen`
+                : `${succeeded.length} von ${results.length} hochgeladen`}
             </h2>
 
             {succeeded.map((result, i) => (
@@ -316,7 +316,7 @@ export function Upload() {
                   data-testid={`copy-btn-${i}`}
                   className="result-copy-btn"
                 >
-                  {copiedIndex === i ? "Copied!" : "Copy"}
+                  {copiedIndex === i ? "Kopiert!" : "Kopieren"}
                 </button>
               </div>
             ))}
@@ -331,10 +331,10 @@ export function Upload() {
 
             <div className="result-actions">
               <button onClick={uploadAnother} className="btn-primary">
-                Upload more
+                Weitere hochladen
               </button>
               <Link to="/library" className="btn-ghost">
-                Go to Library
+                Zur Bibliothek
               </Link>
             </div>
           </div>
@@ -384,7 +384,7 @@ export function Upload() {
                   {files.length} file{files.length !== 1 ? "s" : ""} selected
                 </p>
                 <p className="drop-zone-compact-subtitle">
-                  Click or drop to add more
+                  Klicken oder weitere Dateien hier ablegen
                 </p>
               </div>
             </div>
@@ -398,7 +398,7 @@ export function Upload() {
                 </svg>
               </div>
               <p className="drop-zone-title">
-                Drag and drop your videos here
+                Ziehe deine Videos hierher
               </p>
               <p className="drop-zone-subtitle">
                 or click to browse (up to {MAX_FILES} files)
@@ -427,7 +427,7 @@ export function Upload() {
                       value={entry.title}
                       onChange={(e) => updateTitle(i, e.target.value)}
                       maxLength={500}
-                      aria-label={`Title for ${entry.file.name}`}
+                      aria-label={`Titel für ${entry.file.name}`}
                       className="file-entry-input"
                     />
                     <p className="file-entry-meta">
@@ -436,7 +436,7 @@ export function Upload() {
                   </div>
                   <button
                     onClick={() => removeFile(i)}
-                    aria-label={`Remove ${entry.file.name}`}
+                    aria-label={`${entry.file.name} entfernen`}
                     className="file-remove-btn"
                   >
                     &times;

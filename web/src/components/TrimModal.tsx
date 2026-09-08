@@ -125,7 +125,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
       });
       onTrimStarted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Trim failed");
+      setError(err instanceof Error ? err.message : "Trimmen fehlgeschlagen");
     } finally {
       setTrimming(false);
     }
@@ -164,7 +164,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
         }}
       >
         <h2 id="trim-modal-title" style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>
-          Trim Video
+          Video trimmen
         </h2>
 
         {videoUrl && (
@@ -276,7 +276,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
                   color: setMode === "start" ? "#fff" : "var(--color-text-secondary)",
                 }}
               >
-                Set Start
+                Start setzen
               </button>
               <button
                 onClick={() => setSetMode("end")}
@@ -286,7 +286,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
                   color: setMode === "end" ? "#fff" : "var(--color-text-secondary)",
                 }}
               >
-                Set End
+                Ende setzen
               </button>
             </div>
             <div
@@ -311,7 +311,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
                     }}
                     style={{
                       padding: "4px 8px", cursor: "pointer", borderRadius: 4, fontSize: 13,
-                      background: inRange ? "rgba(0,182,122,0.1)" : "transparent",
+                      background: inRange ? "rgba(230,70,122,0.1)" : "transparent",
                       opacity: inRange ? 1 : 0.4,
                     }}
                   >
@@ -346,7 +346,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
               cursor: "pointer",
             }}
           >
-            Cancel
+            Abbrechen
           </button>
           <button
             onClick={handleTrim}
@@ -363,7 +363,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
               opacity: trimming ? 0.7 : 1,
             }}
           >
-            {trimming ? "Trimming..." : "Trim"}
+            {trimming ? "Wird getrimmt..." : "Trimmen"}
           </button>
         </div>
       </div>

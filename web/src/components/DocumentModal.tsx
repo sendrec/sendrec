@@ -39,7 +39,7 @@ export function DocumentModal({ document, onClose }: DocumentModalProps) {
         background: "var(--color-surface)", border: "1px solid var(--color-border)",
         borderRadius: 12, padding: 24, width: 720, maxWidth: "90vw", maxHeight: "80vh", overflow: "auto",
       }}>
-        <h2 id="document-modal-title" style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Generated Document</h2>
+        <h2 id="document-modal-title" style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Erstelltes Dokument</h2>
         <div style={{ textAlign: "left", lineHeight: 1.6, color: "var(--color-text)" }}>
           <ReactMarkdown>{document}</ReactMarkdown>
         </div>
@@ -51,7 +51,7 @@ export function DocumentModal({ document, onClose }: DocumentModalProps) {
               padding: "8px 16px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
             }}
           >
-            {copied ? "Copied!" : "Copy to clipboard"}
+            {copied ? "Kopiert!" : "In die Zwischenablage kopieren"}
           </button>
           <button
             onClick={onClose}
@@ -61,7 +61,7 @@ export function DocumentModal({ document, onClose }: DocumentModalProps) {
               padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
-            Close
+            Schließen
           </button>
         </div>
       </div>

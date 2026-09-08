@@ -31,30 +31,30 @@ export function VideoAnalyticsView({
     <>
       <div className="analytics-stats">
         <StatCard
-          label="Total Views"
+          label="Aufrufe gesamt"
           value={data.summary.totalViews}
           trend={trends?.views ?? null}
         />
         <StatCard
-          label="Unique Views"
+          label="Eindeutige Aufrufe"
           value={data.summary.uniqueViews}
           trend={trends?.uniqueViews ?? null}
         />
         <StatCard
-          label="Avg / Day"
+          label="Ø / Tag"
           value={data.summary.averageDailyViews}
         />
         <StatCard
-          label="Peak Day"
+          label="Stärkster Tag"
           value={data.summary.peakDayViews}
           sub={data.summary.peakDay ? formatChartDate(data.summary.peakDay) : undefined}
         />
         <StatCard
-          label="CTA Clicks"
+          label="CTA-Klicks"
           value={data.summary.totalCtaClicks}
           sub={
             data.summary.totalViews > 0
-              ? `${(data.summary.ctaClickRate * 100).toFixed(1)}% click rate`
+              ? `${(data.summary.ctaClickRate * 100).toFixed(1)} % Klickrate`
               : undefined
           }
         />
@@ -77,9 +77,9 @@ export function VideoAnalyticsView({
                 <path d="M18 20V10M12 20V4M6 20v-6" />
               </svg>
             </div>
-            <div className="empty-state-title">No views in this period</div>
+            <div className="empty-state-title">Keine Aufrufe in diesem Zeitraum</div>
             <div className="empty-state-desc">
-              Share your video to start getting analytics data.
+              Teile dein Video, damit Analysedaten erfasst werden können.
             </div>
           </div>
         </div>
@@ -88,7 +88,7 @@ export function VideoAnalyticsView({
       {hasViews && data.daily.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">
-            <h3 className="card-title" style={{ margin: 0 }}>Views Over Time</h3>
+            <h3 className="card-title" style={{ margin: 0 }}>Aufrufe im Zeitverlauf</h3>
             <span className="card-subtitle">{RANGE_SUBTITLES[range]}</span>
           </div>
           <CssBarChart daily={data.daily} />
@@ -98,7 +98,7 @@ export function VideoAnalyticsView({
       {hasViews && data.heatmap && data.heatmap.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">
-            <h3 className="card-title" style={{ margin: 0 }}>Viewer Retention</h3>
+            <h3 className="card-title" style={{ margin: 0 }}>Zuschauerbindung</h3>
             <span className="card-subtitle">Avg: {Math.round(data.heatmap.reduce((sum, s) => sum + s.intensity, 0) / data.heatmap.length * 100)}%</span>
           </div>
           <div className="heatmap-bar-container">
@@ -109,7 +109,7 @@ export function VideoAnalyticsView({
                 <div
                   key={i}
                   className="heatmap-segment"
-                  data-tooltip={`${i * 2}%-${(i + 1) * 2}%: ${seg ? seg.watchCount : 0} views`}
+                  data-tooltip={`${i * 2} %–${(i + 1) * 2} %: ${seg ? seg.watchCount : 0} Aufrufe`}
                   style={{ opacity: Math.max(intensity, 0.08) }}
                 />
               );
@@ -174,7 +174,7 @@ export function VideoAnalyticsView({
 
       {hasViews && data.referrers.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <h3 className="card-title">Top Referrers</h3>
+          <h3 className="card-title">Top-Quellen</h3>
           {data.referrers.map((r) => (
             <div key={r.source} className="referrer-row">
               <span className="referrer-label">{r.source}</span>

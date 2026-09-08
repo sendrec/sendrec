@@ -101,9 +101,9 @@ export function PlaylistVideos({
       setShowAddVideos(false);
       setSelectedVideoIds(new Set());
       await onPlaylistRefresh();
-      showToast(`Added ${selectedVideoIds.size} video(s)`);
+      showToast(`${selectedVideoIds.size} Video(s) hinzugefügt`);
     } catch {
-      showToast("Failed to add videos");
+      showToast("Videos konnten nicht hinzugefügt werden");
     } finally {
       setAddingVideos(false);
     }
@@ -233,7 +233,7 @@ export function PlaylistVideos({
                   <button
                     onClick={() => moveVideo(video.id, "up")}
                     disabled={index === 0}
-                    aria-label={`Move ${video.title} up`}
+                    aria-label={`${video.title} nach oben verschieben`}
                     style={{
                       background: "none",
                       border: "none",
@@ -251,7 +251,7 @@ export function PlaylistVideos({
                   <button
                     onClick={() => moveVideo(video.id, "down")}
                     disabled={index === videos.length - 1}
-                    aria-label={`Move ${video.title} down`}
+                    aria-label={`${video.title} nach unten verschieben`}
                     style={{
                       background: "none",
                       border: "none",
@@ -271,11 +271,11 @@ export function PlaylistVideos({
                   </button>
                   <button
                     onClick={() => removeVideo(video.id)}
-                    aria-label={`Remove ${video.title}`}
+                    aria-label={`${video.title} entfernen`}
                     className="detail-btn detail-btn--danger"
                     style={{ padding: "4px 10px", fontSize: 12 }}
                   >
-                    Remove
+                    Entfernen
                   </button>
                 </div>
               </div>
@@ -326,7 +326,7 @@ export function PlaylistVideos({
                 type="text"
                 value={videoSearch}
                 onChange={(e) => setVideoSearch(e.target.value)}
-                placeholder="Search videos..."
+                placeholder="Videos durchsuchen..."
                 autoFocus
                 style={{
                   width: "100%",
@@ -357,7 +357,7 @@ export function PlaylistVideos({
                     fontSize: 14,
                   }}
                 >
-                  No available videos to add
+                  Keine verfügbaren Videos zum Hinzufügen
                 </p>
               ) : (
                 <div
@@ -431,14 +431,14 @@ export function PlaylistVideos({
                 className="detail-btn detail-btn--accent"
               >
                 {addingVideos
-                  ? "Adding..."
-                  : `Add ${selectedVideoIds.size} video(s)`}
+                  ? "Wird hinzugefügt..."
+                  : `${selectedVideoIds.size} Video(s) hinzufügen`}
               </button>
               <button
                 onClick={() => setShowAddVideos(false)}
                 className="detail-btn"
               >
-                Cancel
+                Abbrechen
               </button>
             </div>
           </div>

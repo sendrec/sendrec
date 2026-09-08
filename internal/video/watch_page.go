@@ -149,7 +149,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             border-radius: 8px;
             overflow: hidden;
             aspect-ratio: 16/9;
-            --player-accent: var(--brand-accent, #00b67a);
+            --player-accent: var(--brand-accent, #E6467A);
         }
 ` + playerCSS + `
         .video-title {
@@ -241,7 +241,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             transition: background 0.15s;
         }
         .download-btn:hover {
-            background: rgba(0, 182, 122, 0.1);
+            background: rgba(230, 70, 122, 0.1);
         }
         .download-btn svg {
             width: 14px;
@@ -394,7 +394,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         .reaction-btn:hover {
             transform: scale(1.15);
             border-color: var(--brand-accent);
-            background: rgba(0, 182, 122, 0.1);
+            background: rgba(230, 70, 122, 0.1);
         }
         .reaction-btn:active {
             transform: scale(0.95);
@@ -452,8 +452,8 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             animation: glow 1.5s ease-out;
         }
         @keyframes glow {
-            0% { box-shadow: 0 0 0 3px rgba(0, 182, 122, 0.5); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 182, 122, 0); }
+            0% { box-shadow: 0 0 0 3px rgba(230, 70, 122, 0.5); }
+            100% { box-shadow: 0 0 0 0 rgba(230, 70, 122, 0); }
         }
         .comment-timestamp {
             background: var(--brand-accent);
@@ -487,12 +487,12 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             color: #cbd5e1;
         }
         .timestamp-toggle.active {
-            background: rgba(0, 182, 122, 0.15);
+            background: rgba(230, 70, 122, 0.15);
             color: var(--brand-accent);
             font-weight: 600;
         }
         .timestamp-toggle.active:hover {
-            background: rgba(0, 182, 122, 0.25);
+            background: rgba(230, 70, 122, 0.25);
         }
         .timestamp-edit-input {
             display: none;
@@ -646,7 +646,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             background: rgba(255,255,255,0.05);
         }
         .chapter-item.active {
-            background: rgba(0, 182, 122, 0.1);
+            background: rgba(230, 70, 122, 0.1);
         }
         .chapter-timestamp {
             color: var(--brand-accent);
@@ -690,7 +690,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             background: rgba(255, 255, 255, 0.05);
         }
         .transcript-segment.active {
-            background: rgba(0, 182, 122, 0.1);
+            background: rgba(230, 70, 122, 0.1);
         }
         .transcript-timestamp {
             color: var(--brand-accent);
@@ -1655,7 +1655,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{end}}
         </script>
         {{end}}
-        {{if or (eq .SubscriptionPlan "pro") (eq .SubscriptionPlan "business")}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}<a href="https://sendrec.eu">Recorded with SendRec</a> — free and open source</p>{{end}}
+        {{if or (eq .SubscriptionPlan "pro") (eq .SubscriptionPlan "business")}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}<a href="/">99tools Record</a> — free and open source</p>{{end}}
     </div>
 {{.AnalyticsScript}}
 </body>
@@ -1666,7 +1666,7 @@ var expiredPageTemplate = template.Must(template.New("expired").Parse(`<!DOCTYPE
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Link Expired — SendRec</title>
+    <title>Link Expired — 99tools Record</title>
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1683,7 +1683,7 @@ var expiredPageTemplate = template.Must(template.New("expired").Parse(`<!DOCTYPE
         p { color: #94a3b8; margin-bottom: 1.5rem; }
         a {
             display: inline-block;
-            background: #00b67a;
+            background: #E6467A;
             color: #fff;
             padding: 0.625rem 1.5rem;
             border-radius: 8px;
@@ -1697,7 +1697,7 @@ var expiredPageTemplate = template.Must(template.New("expired").Parse(`<!DOCTYPE
     <div class="container">
         <h1>This link has expired</h1>
         <p>The video owner can extend the link to make it available again.</p>
-        <a href="https://sendrec.eu">Go to SendRec</a>
+        <a href="/">Go to 99tools Record</a>
     </div>
 </body>
 </html>`))
@@ -1707,7 +1707,7 @@ var notFoundPageTemplate = template.Must(template.New("notfound").Parse(`<!DOCTY
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Video Not Found — SendRec</title>
+    <title>Video Not Found — 99tools Record</title>
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1724,7 +1724,7 @@ var notFoundPageTemplate = template.Must(template.New("notfound").Parse(`<!DOCTY
         p { color: #94a3b8; margin-bottom: 1.5rem; }
         a {
             display: inline-block;
-            background: #00b67a;
+            background: #E6467A;
             color: #fff;
             padding: 0.625rem 1.5rem;
             border-radius: 8px;
@@ -1738,7 +1738,7 @@ var notFoundPageTemplate = template.Must(template.New("notfound").Parse(`<!DOCTY
     <div class="container">
         <h1>Video not found</h1>
         <p>This video doesn't exist or has been deleted.</p>
-        <a href="https://sendrec.eu">Go to SendRec</a>
+        <a href="/">Go to 99tools Record</a>
     </div>
 </body>
 </html>`))
@@ -1905,7 +1905,7 @@ var emailGatePageTemplate = template.Must(template.New("emailgate").Parse(`<!DOC
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{.Title}} — SendRec</title>
+    <title>{{.Title}} — 99tools Record</title>
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -1945,11 +1945,11 @@ var emailGatePageTemplate = template.Must(template.New("emailgate").Parse(`<!DOC
             outline: none;
             font-family: inherit;
         }
-        input[type="email"]:focus { border-color: #00b67a; }
+        input[type="email"]:focus { border-color: #E6467A; }
         input[type="email"]::placeholder { color: #94a3b8; }
         button {
             width: 100%;
-            background: #00b67a;
+            background: #E6467A;
             color: #fff;
             padding: 0.75rem 1.5rem;
             border: none;
@@ -1961,7 +1961,7 @@ var emailGatePageTemplate = template.Must(template.New("emailgate").Parse(`<!DOC
         }
         button:hover { opacity: 0.9; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
-        button:focus-visible { outline: 2px solid #00b67a; outline-offset: 2px; }
+        button:focus-visible { outline: 2px solid #E6467A; outline-offset: 2px; }
     </style>
 </head>
 <body>

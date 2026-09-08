@@ -108,14 +108,14 @@ export const RANGE_LABELS: Record<Range, string> = {
   "7d": "7d",
   "30d": "30d",
   "90d": "90d",
-  all: "All",
+  all: "Alle",
 };
 
 export const RANGE_SUBTITLES: Record<Range, string> = {
-  "7d": "Last 7 days",
-  "30d": "Last 30 days",
-  "90d": "Last 90 days",
-  all: "All time",
+  "7d": "Letzte 7 Tage",
+  "30d": "Letzte 30 Tage",
+  "90d": "Letzte 90 Tage",
+  all: "Gesamter Zeitraum",
 };
 
 export function formatWatchTime(seconds: number): string {

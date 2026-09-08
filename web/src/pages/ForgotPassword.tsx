@@ -21,12 +21,12 @@ export function ForgotPassword() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Something went wrong");
+        throw new Error(data.error || "Etwas ist schiefgelaufen");
       }
 
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Etwas ist schiefgelaufen");
     } finally {
       setLoading(false);
     }
@@ -37,18 +37,18 @@ export function ForgotPassword() {
       <main className="auth-container">
         <div className="auth-brand">
           <span className="auth-logo">
-            <span className="auth-logo-send">Send</span>
-            <span className="auth-logo-rec">Rec</span>
+            <span className="auth-logo-send">99tools</span>
+            <span className="auth-logo-rec"> Record</span>
           </span>
         </div>
         <div className="auth-card auth-centered">
-          <h1>Check your email</h1>
+          <h1>Prüfe dein E-Mail-Postfach</h1>
           <p className="auth-subtitle">
-            If an account with that email exists, we&apos;ve sent a password
-            reset link. The link expires in 1 hour.
+            Wenn ein Konto mit dieser E-Mail-Adresse existiert, haben wir einen Link
+            zum Zurücksetzen des Passworts gesendet. Der Link ist 1 Stunde gültig.
           </p>
           <div className="auth-footer">
-            <Link to="/login">Back to sign in</Link>
+            <Link to="/login">Zurück zur Anmeldung</Link>
           </div>
         </div>
       </main>
@@ -59,15 +59,15 @@ export function ForgotPassword() {
     <main className="auth-container">
       <div className="auth-brand">
         <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
+          <span className="auth-logo-send">99tools</span>
+          <span className="auth-logo-rec"> Record</span>
         </span>
       </div>
       <form onSubmit={handleSubmit} className="auth-card">
-        <h1>Reset password</h1>
+        <h1>Passwort zurücksetzen</h1>
 
         <label>
-          <span>Email</span>
+          <span>E-Mail</span>
           <input
             type="email"
             value={email}
@@ -83,11 +83,11 @@ export function ForgotPassword() {
         )}
 
         <button type="submit" disabled={loading}>
-          {loading ? "Sending..." : "Send reset link"}
+          {loading ? "Wird gesendet..." : "Link zum Zurücksetzen senden"}
         </button>
 
         <div className="auth-footer">
-          <Link to="/login">Back to sign in</Link>
+          <Link to="/login">Zurück zur Anmeldung</Link>
         </div>
       </form>
     </main>

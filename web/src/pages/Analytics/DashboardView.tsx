@@ -10,19 +10,19 @@ export function DashboardView({ data, range }: { data: DashboardData; range: Ran
   return (
     <>
       <div className="analytics-stats">
-        <StatCard label="Total Views" value={data.summary.totalViews} />
+        <StatCard label="Aufrufe gesamt" value={data.summary.totalViews} />
         <StatCard
-          label="Unique Viewers"
+          label="Eindeutige Zuschauer"
           value={data.summary.uniqueViews}
         />
-        <StatCard label="Avg / Day" value={data.summary.avgDailyViews} />
-        <StatCard label="Total Videos" value={data.summary.totalVideos} />
+        <StatCard label="Ø / Tag" value={data.summary.avgDailyViews} />
+        <StatCard label="Videos gesamt" value={data.summary.totalVideos} />
         <StatCard
-          label="Watch Time"
+          label="Wiedergabezeit"
           value={formatWatchTime(data.summary.totalWatchTimeSeconds)}
         />
         <StatCard
-          label="Avg Completion"
+          label="Ø Wiedergabe"
           value={`${Math.round(data.summary.avgCompletion)}%`}
         />
       </div>
@@ -48,7 +48,7 @@ export function DashboardView({ data, range }: { data: DashboardData; range: Ran
               No analytics yet
             </div>
             <div className="empty-state-desc">
-              Views will appear here once your videos are watched.
+              Aufrufe erscheinen hier, sobald deine Videos angesehen werden.
             </div>
           </div>
         </div>
@@ -57,7 +57,7 @@ export function DashboardView({ data, range }: { data: DashboardData; range: Ran
       {hasViews && data.topVideos.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">
-            <h3 className="card-title" style={{ margin: 0 }}>Top Videos</h3>
+            <h3 className="card-title" style={{ margin: 0 }}>Top-Videos</h3>
             <span className="card-subtitle">{RANGE_SUBTITLES[range]}</span>
           </div>
           {data.topVideos.map((video, index) => (
@@ -78,7 +78,7 @@ export function DashboardView({ data, range }: { data: DashboardData; range: Ran
               <div className="top-video-stats">
                 <div className="top-video-stat">
                   <div className="top-video-stat-value">{video.views}</div>
-                  <div className="top-video-stat-label">views</div>
+                  <div className="top-video-stat-label">Aufrufe</div>
                 </div>
                 <div className="top-video-stat">
                   <div className="top-video-stat-value">
@@ -101,7 +101,7 @@ export function DashboardView({ data, range }: { data: DashboardData; range: Ran
       {hasViews && data.daily.length > 0 && (
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title" style={{ margin: 0 }}>Total Views Over Time</h3>
+            <h3 className="card-title" style={{ margin: 0 }}>Aufrufe im Zeitverlauf</h3>
             <span className="card-subtitle">{RANGE_SUBTITLES[range]}</span>
           </div>
           <CssBarChart daily={data.daily} />

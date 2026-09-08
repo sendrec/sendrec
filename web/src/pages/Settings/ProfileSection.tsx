@@ -4,6 +4,8 @@ import { useTheme } from "../../hooks/useTheme";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import { TRANSCRIPTION_LANGUAGES } from "../../constants/languages";
 import { UserProfile } from "./types";
+import { useI18n } from "../../i18n/I18nContext";
+import { LanguageSelect } from "../../components/LanguageSelect";
 
 interface ProfileSectionProps {
   profile: UserProfile;
@@ -23,6 +25,7 @@ export function ProfileSection({
   initialRetentionDays,
 }: ProfileSectionProps) {
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const [name, setName] = useState(profile.name);
   const [nameMessage, setNameMessage] = useState("");
   const [nameError, setNameError] = useState("");
@@ -41,7 +44,7 @@ export function ProfileSection({
     setNameMessage("");
 
     if (!name.trim()) {
-      setNameError("Name is required");
+      setNameError(t("settings.nameRequired"));
       return;
     }
 
@@ -51,10 +54,10 @@ export function ProfileSection({
         method: "PATCH",
         body: JSON.stringify({ name: name.trim() }),
       });
-      setNameMessage("Name updated");
+      setNameMessage(t("settings.nameUpdated"));
       setCurrentProfile((prev) => ({ ...prev, name: name.trim() }));
     } catch (err) {
-      setNameError(err instanceof Error ? err.message : "Failed to update name");
+      setNameError(err instanceof Error ? err.message : t("settings.nameUpdateFailed"));
     } finally {
       setSavingName(false);
     }
@@ -105,10 +108,10 @@ export function ProfileSection({
         onSubmit={handleNameSubmit}
         className="card settings-section"
       >
-        <h2>Profile</h2>
+        <h2>{t("settings.profile")}</h2>
 
         <div className="form-field">
-          <label className="form-label" htmlFor="profile-email">Email</label>
+          <label className="form-label" htmlFor="profile-email">{t("auth.email")}</label>
           <input
             id="profile-email"
             type="email"
@@ -119,7 +122,7 @@ export function ProfileSection({
         </div>
 
         <div className="form-field">
-          <label className="form-label" htmlFor="profile-name">Name</label>
+          <label className="form-label" htmlFor="profile-name">{t("auth.name")}</label>
           <input
             id="profile-name"
             type="text"
@@ -143,21 +146,21 @@ export function ProfileSection({
             className="btn btn--primary"
             disabled={savingName || name.trim() === currentProfile.name}
           >
-            {savingName ? "Saving..." : "Save name"}
+            {savingName ? t("settings.saving") : t("settings.saveName")}
           </button>
         </div>
       </form>
 
       <div className="card settings-section">
-        <h2>Appearance</h2>
+        <h2>{t("settings.appearance")}</h2>
         <p className="card-description">
-          Choose how SendRec looks to you.
+          {t("settings.appearanceDescription")}
         </p>
 
         <fieldset className="btn-row" style={{ border: "none", padding: 0, margin: 0 }}>
-          <legend className="sr-only">Theme preference</legend>
+          <legend className="sr-only">{t("settings.appearance")}</legend>
           {(["dark", "light", "system"] as const).map((option) => {
-            const labels: Record<string, string> = { dark: "Dark", light: "Light", system: "System" };
+            const labels: Record<string, string> = { dark: t("settings.theme.dark"), light: t("settings.theme.light"), system: t("settings.theme.system") };
             const selected = theme === option;
             return (
               <label
@@ -180,17 +183,24 @@ export function ProfileSection({
         </fieldset>
       </div>
 
+      <div className="card settings-section">
+        <h2>{t("language.label")}</h2>
+        <p className="card-description">{t("language.description")}</p>
+        <LanguageSelect />
+        <p className="form-hint" style={{ marginTop: 8 }}>{t("language.browser")}</p>
+      </div>
+
       <RecordingDefaults />
 
       {(transcriptionEnabled || noiseReductionEnabled) && (
         <div className="card settings-section">
-          <h2>Audio</h2>
+          <h2>{t("settings.audio")}</h2>
           <p className="card-description">
-            Configure transcription and audio processing for new recordings.
+            {t("settings.audioDescription")}
           </p>
           {transcriptionEnabled && (
             <div className="form-field">
-              <label className="form-label" htmlFor="transcription-language">Default transcription language</label>
+              <label className="form-label" htmlFor="transcription-language">{t("settings.transcriptionLanguage")}</label>
               <select
                 id="transcription-language"
                 className="form-input"
@@ -205,15 +215,15 @@ export function ProfileSection({
           )}
           {noiseReductionEnabled && (
             <div className="form-field">
-              <label className="form-label" htmlFor="noise-reduction">Noise reduction</label>
+              <label className="form-label" htmlFor="noise-reduction">{t("settings.noiseReduction")}</label>
               <select
                 id="noise-reduction"
                 className="form-input"
                 value={noiseReduction ? "on" : "off"}
                 onChange={(e) => handleNoiseReductionChange(e.target.value === "on")}
               >
-                <option value="on">Enabled — reduce background noise in new recordings</option>
-                <option value="off">Disabled</option>
+                <option value="on">{t("settings.noiseOn")}</option>
+                <option value="off">{t("settings.disabled")}</option>
               </select>
             </div>
           )}
@@ -221,24 +231,24 @@ export function ProfileSection({
       )}
 
       <div className="card settings-section">
-        <h2>Data Retention</h2>
+        <h2>{t("settings.retention")}</h2>
         <p className="card-description">
-          Automatically delete videos after a set number of days. Pinned videos are excluded.
+          {t("settings.retentionDescription")}
         </p>
         <div className="form-field">
-          <label className="form-label" htmlFor="retention-days">Auto-delete after</label>
+          <label className="form-label" htmlFor="retention-days">{t("settings.deleteAfter")}</label>
           <select
             id="retention-days"
             className="form-input"
             value={retentionDays}
             onChange={(e) => handleRetentionDaysChange(Number(e.target.value))}
           >
-            <option value={0}>Off</option>
-            <option value={30}>30 days</option>
-            <option value={60}>60 days</option>
-            <option value={90}>90 days</option>
-            <option value={180}>180 days</option>
-            <option value={365}>365 days</option>
+            <option value={0}>{t("common.off")}</option>
+            <option value={30}>{t("settings.days", { days: 30 })}</option>
+            <option value={60}>{t("settings.days", { days: 60 })}</option>
+            <option value={90}>{t("settings.days", { days: 90 })}</option>
+            <option value={180}>{t("settings.days", { days: 180 })}</option>
+            <option value={365}>{t("settings.days", { days: 365 })}</option>
           </select>
         </div>
       </div>
@@ -271,22 +281,22 @@ function RecordingDefaults() {
   }
 
   const modes: { value: RecordingMode; label: string }[] = [
-    { value: "camera", label: "Camera" },
-    { value: "screen", label: "Screen" },
-    { value: "screen-camera", label: "Screen + Camera" },
+    { value: "camera", label: "Kamera" },
+    { value: "screen", label: "Bildschirm" },
+    { value: "screen-camera", label: "Bildschirm + Kamera" },
   ];
 
   return (
     <div className="card settings-section">
-      <h2>Recording Defaults</h2>
+      <h2>Aufnahme-Standards</h2>
       <p className="card-description">
-        Set your preferred recording mode and options.
+        Lege deinen bevorzugten Aufnahmemodus und die Optionen fest.
       </p>
 
       <div className="form-field">
-        <label className="form-label">Default recording mode</label>
+        <label className="form-label">Standard-Aufnahmemodus</label>
         <fieldset className="btn-row" style={{ border: "none", padding: 0, margin: 0 }}>
-          <legend className="sr-only">Recording mode</legend>
+          <legend className="sr-only">Aufnahmemodus</legend>
           {modes.map((m) => (
             <label
               key={m.value}
@@ -307,7 +317,7 @@ function RecordingDefaults() {
       </div>
 
       <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <label className="form-label" style={{ margin: 0 }}>Countdown timer</label>
+        <label className="form-label" style={{ margin: 0 }}>Countdown</label>
         <button
           type="button"
           className={`toggle-track${countdown ? " active" : ""}`}
@@ -320,7 +330,7 @@ function RecordingDefaults() {
       </div>
 
       <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <label className="form-label" style={{ margin: 0 }}>System audio capture</label>
+        <label className="form-label" style={{ margin: 0 }}>Systemaudio aufnehmen</label>
         <button
           type="button"
           className={`toggle-track${systemAudio ? " active" : ""}`}

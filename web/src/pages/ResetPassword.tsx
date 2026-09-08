@@ -16,17 +16,17 @@ export function ResetPassword() {
       <main className="auth-container">
         <div className="auth-brand">
           <span className="auth-logo">
-            <span className="auth-logo-send">Send</span>
-            <span className="auth-logo-rec">Rec</span>
+            <span className="auth-logo-send">99tools</span>
+            <span className="auth-logo-rec"> Record</span>
           </span>
         </div>
         <div className="auth-card auth-centered">
-          <h1>Invalid reset link</h1>
+          <h1>Ungültiger Link zum Zurücksetzen</h1>
           <p className="auth-subtitle">
-            This password reset link is invalid. Please request a new one.
+            Dieser Link zum Zurücksetzen des Passworts ist ungültig. Bitte fordere einen neuen an.
           </p>
           <div className="auth-footer">
-            <Link to="/forgot-password">Request new reset link</Link>
+            <Link to="/forgot-password">Neuen Link zum Zurücksetzen anfordern</Link>
           </div>
         </div>
       </main>
@@ -38,17 +38,17 @@ export function ResetPassword() {
       <main className="auth-container">
         <div className="auth-brand">
           <span className="auth-logo">
-            <span className="auth-logo-send">Send</span>
-            <span className="auth-logo-rec">Rec</span>
+            <span className="auth-logo-send">99tools</span>
+            <span className="auth-logo-rec"> Record</span>
           </span>
         </div>
         <div className="auth-card auth-centered">
-          <h1>Password updated</h1>
+          <h1>Passwort aktualisiert</h1>
           <p className="auth-subtitle">
-            Your password has been reset successfully.
+            Dein Passwort wurde erfolgreich zurückgesetzt.
           </p>
           <div className="auth-footer">
-            <Link to="/login">Sign in</Link>
+            <Link to="/login">Anmelden</Link>
           </div>
         </div>
       </main>
@@ -60,12 +60,12 @@ export function ResetPassword() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("Die Passwörter stimmen nicht überein");
       return;
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+      setError("Das Passwort muss mindestens 8 Zeichen lang sein");
       return;
     }
 
@@ -80,12 +80,12 @@ export function ResetPassword() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Something went wrong");
+        throw new Error(data.error || "Etwas ist schiefgelaufen");
       }
 
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Etwas ist schiefgelaufen");
     } finally {
       setLoading(false);
     }
@@ -95,15 +95,15 @@ export function ResetPassword() {
     <main className="auth-container">
       <div className="auth-brand">
         <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
+          <span className="auth-logo-send">99tools</span>
+          <span className="auth-logo-rec"> Record</span>
         </span>
       </div>
       <form onSubmit={handleSubmit} className="auth-card">
-        <h1>Set new password</h1>
+        <h1>Neues Passwort festlegen</h1>
 
         <label>
-          <span>New password</span>
+          <span>Neues Passwort</span>
           <input
             type="password"
             value={password}
@@ -114,7 +114,7 @@ export function ResetPassword() {
         </label>
 
         <label>
-          <span>Confirm password</span>
+          <span>Passwort bestätigen</span>
           <input
             type="password"
             value={confirmPassword}
@@ -131,11 +131,11 @@ export function ResetPassword() {
         )}
 
         <button type="submit" disabled={loading}>
-          {loading ? "Updating..." : "Reset password"}
+          {loading ? "Wird aktualisiert..." : "Passwort zurücksetzen"}
         </button>
 
         <div className="auth-footer">
-          <Link to="/forgot-password">Request new reset link</Link>
+          <Link to="/forgot-password">Neuen Link zum Zurücksetzen anfordern</Link>
         </div>
       </form>
     </main>

@@ -117,7 +117,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .embed-processing-bar-fill {
             width: 40%;
             height: 100%;
-            background: #00b67a;
+            background: #E6467A;
             border-radius: 2px;
             animation: indeterminate 1.5s ease-in-out infinite;
         }
@@ -154,7 +154,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .footer a:hover { color: #e2e8f0; }
         .cta-overlay { display: none; position: absolute; bottom: 48px; left: 0; right: 0; padding: 12px; text-align: center; background: rgba(15, 23, 42, 0.9); }
         .cta-overlay.visible { display: block; }
-        .cta-overlay a { display: inline-block; padding: 8px 24px; background: #00b67a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
+        .cta-overlay a { display: inline-block; padding: 8px 24px; background: #E6467A; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
         .cta-overlay a:hover { opacity: 0.9; color: #fff; }
 ` + safariWarningCSS + `
         .browser-warning {
@@ -173,7 +173,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
 {{if eq .VideoStatus "processing"}}
             <div class="embed-processing">
                 <div class="embed-processing-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00b67a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#E6467A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10" opacity="0.2"/>
                         <path d="M12 2a10 10 0 0 1 10 10" class="embed-processing-spinner"/>
                     </svg>
@@ -198,7 +198,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
 {{end}}
         <div class="footer">
             <span class="footer-title">{{.Title}}</span>
-            <a href="{{.BaseURL}}/watch/{{.ShareToken}}" target="_blank" rel="noopener">Watch on SendRec</a>
+            <a href="{{.BaseURL}}/watch/{{.ShareToken}}" target="_blank" rel="noopener">Watch on 99tools Record</a>
         </div>
 ` + safariWarningHTML + `
     </div>
@@ -411,10 +411,10 @@ var embedPasswordPageTemplate = template.Must(template.New("embed-password").Par
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="password"]:focus { border-color: #00b67a; }
+        input[type="password"]:focus { border-color: #E6467A; }
         button {
             width: 100%;
-            background: #00b67a;
+            background: #E6467A;
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;
@@ -491,10 +491,10 @@ var embedEmailGatePageTemplate = template.Must(template.New("embed-emailgate").P
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="email"]:focus { border-color: #00b67a; }
+        input[type="email"]:focus { border-color: #E6467A; }
         button {
             width: 100%;
-            background: #00b67a;
+            background: #E6467A;
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;

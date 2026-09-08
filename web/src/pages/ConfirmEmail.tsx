@@ -6,7 +6,7 @@ export function ConfirmEmail() {
   const token = searchParams.get("token");
 
   const [status, setStatus] = useState<"loading" | "success" | "error">(token ? "loading" : "error");
-  const [errorMessage, setErrorMessage] = useState(token ? "" : "Missing confirmation token.");
+  const [errorMessage, setErrorMessage] = useState(token ? "" : "Bestätigungstoken fehlt.");
 
   useEffect(() => {
     if (!token) return;
@@ -21,12 +21,12 @@ export function ConfirmEmail() {
 
         if (!response.ok) {
           const data = await response.json();
-          throw new Error(data.error || "Confirmation failed");
+          throw new Error(data.error || "Bestätigung fehlgeschlagen");
         }
 
         setStatus("success");
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : "Confirmation failed");
+        setErrorMessage(err instanceof Error ? err.message : "Bestätigung fehlgeschlagen");
         setStatus("error");
       }
     }
@@ -38,35 +38,35 @@ export function ConfirmEmail() {
     <main className="auth-container">
       <div className="auth-brand">
         <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
+          <span className="auth-logo-send">99tools</span>
+          <span className="auth-logo-rec"> Record</span>
         </span>
       </div>
       <div className="auth-card auth-centered">
         {status === "loading" && (
-          <h1>Confirming your email...</h1>
+          <h1>E-Mail-Adresse wird bestätigt...</h1>
         )}
 
         {status === "success" && (
           <>
-            <h1>Email confirmed</h1>
+            <h1>E-Mail-Adresse bestätigt</h1>
             <p className="auth-subtitle">
-              Your account is now active. You can sign in.
+              Dein Konto ist jetzt aktiv. Du kannst dich anmelden.
             </p>
             <div className="auth-footer">
-              <Link to="/login">Sign in</Link>
+              <Link to="/login">Anmelden</Link>
             </div>
           </>
         )}
 
         {status === "error" && (
           <>
-            <h1>Confirmation failed</h1>
+            <h1>Bestätigung fehlgeschlagen</h1>
             <div className="auth-error-banner">
               {errorMessage}
             </div>
             <div className="auth-footer">
-              <Link to="/register">Try again</Link>
+              <Link to="/register">Erneut versuchen</Link>
             </div>
           </>
         )}

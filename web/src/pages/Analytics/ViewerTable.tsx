@@ -24,7 +24,7 @@ export function ViewerTable({
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <h3 className="card-title">Viewer Activity</h3>
+      <h3 className="card-title">Zuschaueraktivität</h3>
       <table className="viewers-table">
         <thead>
           <tr>
@@ -57,7 +57,7 @@ export function ViewerTable({
                     v.email
                   ) : (
                     <span className="viewer-anonymous">
-                      Anonymous
+                      Anonym
                     </span>
                   )}
                 </td>

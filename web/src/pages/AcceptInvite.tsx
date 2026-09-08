@@ -10,7 +10,7 @@ export function AcceptInvite() {
   const token = searchParams.get("token");
 
   const [pageState, setPageState] = useState<PageState>(token ? "checking" : "error");
-  const [errorMessage, setErrorMessage] = useState(token ? "" : "Missing invite token.");
+  const [errorMessage, setErrorMessage] = useState(token ? "" : "Einladungstoken fehlt.");
 
   useEffect(() => {
     if (!token) return;
@@ -40,7 +40,7 @@ export function AcceptInvite() {
         setPageState("success");
         setTimeout(() => navigate("/"), 2000);
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : "Failed to accept invite");
+        setErrorMessage(err instanceof Error ? err.message : "Einladung konnte nicht angenommen werden");
         setPageState("error");
       }
     }
@@ -54,53 +54,53 @@ export function AcceptInvite() {
     <main className="auth-container">
       <div className="auth-brand">
         <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
+          <span className="auth-logo-send">99tools</span>
+          <span className="auth-logo-rec"> Record</span>
         </span>
       </div>
       <div className="auth-card auth-centered">
         {pageState === "checking" && (
-          <h1>Checking authentication...</h1>
+          <h1>Anmeldung wird geprüft...</h1>
         )}
 
         {pageState === "unauthenticated" && (
           <>
-            <h1>You've been invited</h1>
+            <h1>Du wurdest eingeladen</h1>
             <p className="auth-subtitle">
-              You've been invited to join a workspace. Sign in or create an account to accept.
+              Du wurdest zu einem Arbeitsbereich eingeladen. Melde dich an oder erstelle ein Konto, um die Einladung anzunehmen.
             </p>
             <div className="auth-footer" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <Link to={`/login?redirect=${encodeURIComponent(redirectPath)}`} className="btn btn--primary" style={{ display: "block", textAlign: "center" }}>
-                Sign in
+                Anmelden
               </Link>
               <Link to={`/register?redirect=${encodeURIComponent(redirectPath)}`}>
-                Create account
+                Konto erstellen
               </Link>
             </div>
           </>
         )}
 
         {pageState === "accepting" && (
-          <h1>Accepting invite...</h1>
+          <h1>Einladung wird angenommen...</h1>
         )}
 
         {pageState === "success" && (
           <>
-            <h1>Invite accepted</h1>
+            <h1>Einladung angenommen</h1>
             <p className="auth-subtitle">
-              You have joined the workspace. Redirecting...
+              Du bist dem Arbeitsbereich beigetreten. Weiterleitung...
             </p>
           </>
         )}
 
         {pageState === "error" && (
           <>
-            <h1>Invite failed</h1>
+            <h1>Einladung fehlgeschlagen</h1>
             <div className="auth-error-banner">
               {errorMessage}
             </div>
             <div className="auth-footer">
-              <Link to="/">Go to dashboard</Link>
+              <Link to="/">Zum Dashboard</Link>
             </div>
           </>
         )}

@@ -30,7 +30,7 @@ export function TransferDialog({ videoId, videoTitle, onTransferred, onCancel }:
   // Build destination options: personal + all non-viewer workspaces, excluding current scope
   const destinations: { id: string | null; label: string }[] = [];
   if (selectedOrgId) {
-    destinations.push({ id: null, label: "Personal" });
+    destinations.push({ id: null, label: "Persönlich" });
   }
   for (const org of orgs) {
     if (org.id === selectedOrgId) continue;
@@ -48,7 +48,7 @@ export function TransferDialog({ videoId, videoTitle, onTransferred, onCancel }:
       });
       onTransferred();
     } catch {
-      setError("Failed to transfer video");
+      setError("Video konnte nicht übertragen werden");
       setTransferring(false);
     }
   }
@@ -72,7 +72,7 @@ export function TransferDialog({ videoId, videoTitle, onTransferred, onCancel }:
         ref={contentRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Transfer video"
+        aria-label="Video übertragen"
         style={{
           background: "var(--color-surface)",
           border: "1px solid var(--color-border)",
@@ -83,7 +83,7 @@ export function TransferDialog({ videoId, videoTitle, onTransferred, onCancel }:
         }}
       >
         <h3 style={{ color: "var(--color-text)", fontSize: 16, fontWeight: 600, margin: "0 0 4px" }}>
-          Move video
+          Video verschieben
         </h3>
         <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 16px" }}>
           {videoTitle}
@@ -91,7 +91,7 @@ export function TransferDialog({ videoId, videoTitle, onTransferred, onCancel }:
 
         {destinations.length === 0 ? (
           <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: "0 0 16px" }}>
-            No other workspaces available.
+            Keine weiteren Arbeitsbereiche verfügbar.
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
@@ -142,7 +142,7 @@ export function TransferDialog({ videoId, videoTitle, onTransferred, onCancel }:
               cursor: "pointer",
             }}
           >
-            Cancel
+            Abbrechen
           </button>
           <button
             onClick={handleTransfer}
@@ -159,7 +159,7 @@ export function TransferDialog({ videoId, videoTitle, onTransferred, onCancel }:
               opacity: (destinations.length === 0 || transferring) ? 0.5 : 1,
             }}
           >
-            {transferring ? "Moving..." : "Move"}
+            {transferring ? "Wird verschoben..." : "Move"}
           </button>
         </div>
       </div>

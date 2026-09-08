@@ -8,15 +8,25 @@ import {
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
 import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
+import { useI18n } from "../i18n/I18nContext";
 
 interface RecorderProps {
-  onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void;
+  onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob, cameraPosition?: string) => void;
   onRecordingError?: (message: string) => void;
   maxDurationSeconds?: number;
 }
 
 export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSeconds = 0 }: RecorderProps) {
-  const [webcamEnabled, setWebcamEnabled] = useState(() => localStorage.getItem("recording-mode") === "screen-camera");
+  const { t } = useI18n();
+  const [webcamEnabled, setWebcamEnabled] = useState(false);
+  const [cameraPosition, setCameraPosition] = useState(() => {
+    if (typeof window === "undefined") return "bottom-right";
+    return localStorage.getItem("recording-camera-position") || "bottom-right";
+  });
+  useEffect(() => {
+    localStorage.setItem("recording-camera-position", cameraPosition);
+  }, [cameraPosition]);
+
   const [captureWidth, setCaptureWidth] = useState(1920);
   const [captureHeight, setCaptureHeight] = useState(1080);
   const [previewExpanded, setPreviewExpanded] = useState(false);
@@ -192,8 +202,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       webcamStreamRef.current = stream;
       setWebcamEnabled(true);
     } catch (err) {
-      console.error("Webcam access failed", err);
-      setMediaError("Could not access your camera. Please allow camera access and try again.");
+      console.error("Kamerazugriff fehlgeschlagen", err);
+      setMediaError("Auf die Kamera konnte nicht zugegriffen werden. Bitte erlaube den Kamerazugriff und versuche es erneut.");
     }
   }
 
@@ -239,7 +249,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
             ...destination.stream.getAudioTracks(),
           ]);
         } catch (micErr) {
-          console.warn("Microphone access denied, recording without mic audio", micErr);
+          console.warn("Mikrofonzugriff verweigert – Aufnahme ohne Mikrofonton", micErr);
         }
       }
 
@@ -322,7 +332,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         if (webcamBlobPromiseRef.current) {
           const timeout = new Promise<undefined>((resolve) => {
             setTimeout(() => {
-              console.warn("Webcam blob promise timed out after 10s");
+              console.warn("Kamera-Verarbeitung nach 10 Sekunden abgebrochen");
               resolve(undefined);
             }, 10_000);
           });
@@ -332,11 +342,11 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         stopAllStreams();
 
         if (elapsed < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES) {
-          onRecordingError?.("Recording too short. Please record for at least 1 second.");
+          onRecordingError?.("Die Aufnahme ist zu kurz. Bitte nimm mindestens 1 Sekunde auf.");
           return;
         }
 
-        onRecordingComplete(blob, elapsed, webcamBlob);
+        onRecordingComplete(blob, elapsed, webcamBlob, cameraPosition);
       };
 
       // Track whether the encoder failed so the original onstop is skipped
@@ -382,8 +392,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         countdown: countdownEnabled.current,
       });
     } catch (err) {
-      console.error("Screen capture failed", err);
-      setMediaError("Screen recording was blocked or failed. Please allow screen capture and try again.");
+      console.error("Bildschirmaufnahme fehlgeschlagen", err);
+      setMediaError("Die Bildschirmaufnahme wurde blockiert oder ist fehlgeschlagen. Bitte erlaube die Bildschirmfreigabe und versuche es erneut.");
       stopAllStreams();
     }
   }
@@ -457,7 +467,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         />
         <button
           onClick={() => setPreviewExpanded((prev) => !prev)}
-          aria-label={previewExpanded ? "Collapse preview" : "Expand preview"}
+          aria-label={previewExpanded ? "Vorschau einklappen" : "Vorschau ausklappen"}
           data-testid="expand-preview"
           style={{
             position: "absolute",
@@ -488,7 +498,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
             onClick={() => dispatch({ type: "start-now" })}
           >
             <div className="countdown-number">{countdownValue}</div>
-            <div className="countdown-hint">Click to start now</div>
+            <div className="countdown-hint">Klicken, um sofort zu starten</div>
           </div>
         )}
       </div>
@@ -522,7 +532,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
               <span style={{ color: "var(--color-error)", fontSize: 13 }}>{mediaError}</span>
               <button
                 onClick={() => setMediaError(null)}
-                aria-label="Dismiss error"
+                aria-label="Fehler schließen"
                 style={{
                   background: "transparent",
                   color: "var(--color-error)",
@@ -539,30 +549,56 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
           )}
           {maxDurationSeconds > 0 && (
             <p className="max-duration-label">
-              Maximum recording length: {formatDuration(maxDurationSeconds)}
+              {t("record.maxDuration", { duration: formatDuration(maxDurationSeconds) })}
             </p>
           )}
           <div className="record-controls">
             <button
               onClick={toggleWebcam}
-              aria-label={webcamEnabled ? "Disable camera" : "Enable camera"}
+              aria-label={webcamEnabled ? t("record.cameraDisable") : t("record.cameraEnable")}
               className={`btn-secondary${webcamEnabled ? " btn-secondary--active" : ""}`}
             >
-              {webcamEnabled ? "Camera On" : "Camera Off"}
+              {webcamEnabled ? t("record.cameraOn") : t("record.cameraOff")}
             </button>
+        {webcamEnabled && (
+          <div
+            className="camera-position-controls"
+            style={{ display: "flex", gap: 6, alignItems: "center" }}
+          >
+            {[
+              ["top-left", "↖"],
+              ["top-right", "↗"],
+              ["bottom-left", "↙"],
+              ["bottom-right", "↘"],
+            ].map(([position, symbol]) => (
+              <button
+                key={position}
+                type="button"
+                onClick={() => setCameraPosition(position)}
+                className={`btn-secondary${cameraPosition === position ? " btn-secondary--active" : ""}`}
+                aria-label={`Kameraposition ${position}`}
+                title={`Kameraposition ${position}`}
+                style={{ minWidth: 38, padding: "8px 10px" }}
+              >
+                {symbol}
+              </button>
+            ))}
+          </div>
+        )}
+
             <button
               onClick={() => setSystemAudioEnabled((prev) => !prev)}
-              aria-label={systemAudioEnabled ? "Disable system audio" : "Enable system audio"}
+              aria-label={systemAudioEnabled ? t("record.audioDisable") : t("record.audioEnable")}
               className={`btn-secondary${systemAudioEnabled ? " btn-secondary--active" : ""}`}
             >
-              {systemAudioEnabled ? "Audio On" : "Audio Off"}
+              {systemAudioEnabled ? t("record.audioOn") : t("record.audioOff")}
             </button>
             <button
               onClick={startRecording}
-              aria-label="Start recording"
+              aria-label={t("record.start")}
               className="btn-record"
             >
-              Start Recording
+              {t("record.start")}
             </button>
           </div>
         </>
@@ -574,19 +610,19 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
           <div className={`recording-indicator ${isPaused ? "recording-indicator--paused" : "recording-indicator--active"}`}>
             <div className={`recording-dot ${isPaused ? "recording-dot--paused" : "recording-dot--active"}`} />
             {formatDuration(duration)}
-            {isPaused && <span className="recording-remaining">(Paused)</span>}
+            {isPaused && <span className="recording-remaining">({t("record.paused")})</span>}
             {!isPaused && remaining !== null && (
-              <span className="recording-remaining">({formatDuration(remaining)} remaining)</span>
+              <span className="recording-remaining">({t("record.remaining", { duration: formatDuration(remaining) })})</span>
             )}
           </div>
 
           <button
             onClick={toggleDrawMode}
-            aria-label={drawMode ? "Disable drawing" : "Enable drawing"}
+            aria-label={drawMode ? "Zeichnen ausschalten" : "Zeichnen einschalten"}
             data-testid="draw-toggle"
             className={`btn-draw${drawMode ? " btn-draw--active" : ""}`}
           >
-            Draw
+            {t("record.draw")}
           </button>
 
           {drawMode && (
@@ -594,7 +630,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
               type="color"
               value={drawColor}
               onChange={(e) => setDrawColor(e.target.value)}
-              aria-label="Drawing color"
+              aria-label="Zeichenfarbe"
               data-testid="color-picker"
               style={{
                 width: 36,
@@ -611,11 +647,11 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
           {drawMode && (
             <button
               onClick={clearCanvas}
-              aria-label="Clear drawing"
+              aria-label="Zeichnung löschen"
               data-testid="clear-drawing"
               className="btn-pause"
             >
-              Clear
+              {t("record.clear")}
             </button>
           )}
 
@@ -625,7 +661,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
                 <button
                   key={w}
                   onClick={() => setLineWidth(w)}
-                  aria-label={`Line width ${w}`}
+                  aria-label={`Linienstärke ${w}`}
                   style={{
                     width: 28,
                     height: 28,
@@ -653,17 +689,17 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
           )}
 
           {isPaused ? (
-            <button onClick={resumeRecording} aria-label="Resume recording" className="btn-resume">
-              Resume
+            <button onClick={resumeRecording} aria-label="Aufnahme fortsetzen" className="btn-resume">
+              {t("record.resume")}
             </button>
           ) : (
-            <button onClick={pauseRecording} aria-label="Pause recording" className="btn-pause">
-              Pause
+            <button onClick={pauseRecording} aria-label="Aufnahme pausieren" className="btn-pause">
+              {t("record.pause")}
             </button>
           )}
 
-          <button onClick={stopRecording} aria-label="Stop recording" className="btn-stop">
-            Stop Recording
+          <button onClick={stopRecording} aria-label="Aufnahme stoppen" className="btn-stop">
+            {t("record.stop")}
           </button>
         </div>
       )}

@@ -115,7 +115,7 @@ export function PromptDialog({
                 cursor: "pointer",
               }}
             >
-              Cancel
+              Abbrechen
             </button>
             <button
               type="submit"

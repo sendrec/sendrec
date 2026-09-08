@@ -39,7 +39,7 @@ export function GeneralSection({
     setNameMessage("");
 
     if (!orgName.trim()) {
-      setNameError("Workspace name is required");
+      setNameError("Der Name des Arbeitsbereichs ist erforderlich");
       return;
     }
 
@@ -49,10 +49,10 @@ export function GeneralSection({
         method: "PATCH",
         body: JSON.stringify({ name: orgName.trim(), slug: orgSlug.trim() }),
       });
-      setNameMessage("Workspace updated");
+      setNameMessage("Arbeitsbereich aktualisiert");
       setOrg((prev) => prev ? { ...prev, name: orgName.trim(), slug: orgSlug.trim() } : prev);
     } catch (err) {
-      setNameError(err instanceof Error ? err.message : "Failed to update workspace");
+      setNameError(err instanceof Error ? err.message : "Arbeitsbereich konnte nicht aktualisiert werden");
     } finally {
       setSavingName(false);
     }
@@ -73,8 +73,8 @@ export function GeneralSection({
 
   function handleDeleteOrg() {
     setConfirmDialog({
-      message: "Are you sure you want to delete this workspace? This action cannot be undone. All workspace data will be permanently deleted.",
-      confirmLabel: "Delete workspace",
+      message: "Diesen Arbeitsbereich wirklich löschen? Dies kann nicht rückgängig gemacht werden. Alle Daten des Arbeitsbereichs werden dauerhaft gelöscht.",
+      confirmLabel: "Arbeitsbereich löschen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -84,7 +84,7 @@ export function GeneralSection({
           await apiFetch(`/api/organizations/${orgId}`, { method: "DELETE" });
           navigate("/settings");
         } catch (err) {
-          setDeleteError(err instanceof Error ? err.message : "Failed to delete workspace");
+          setDeleteError(err instanceof Error ? err.message : "Arbeitsbereich konnte nicht gelöscht werden");
         } finally {
           setDeleting(false);
         }
@@ -95,10 +95,10 @@ export function GeneralSection({
   return (
     <>
       <form onSubmit={handleGeneralSave} className="card settings-section">
-        <h2>General</h2>
+        <h2>Allgemein</h2>
 
         <div className="form-field">
-          <label className="form-label" htmlFor="org-name">Workspace name</label>
+          <label className="form-label" htmlFor="org-name">Name des Arbeitsbereichs</label>
           <input
             id="org-name"
             type="text"
@@ -137,7 +137,7 @@ export function GeneralSection({
               className="btn btn--primary"
               disabled={savingName || (orgName.trim() === org.name && orgSlug.trim() === org.slug)}
             >
-              {savingName ? "Saving..." : "Save"}
+              {savingName ? "Wird gespeichert..." : "Speichern"}
             </button>
           </div>
         )}
@@ -145,24 +145,24 @@ export function GeneralSection({
 
       {canManage && (
         <div className="card settings-section">
-          <h2>Data Retention</h2>
+          <h2>Datenaufbewahrung</h2>
           <p className="card-description">
-            Automatically delete workspace videos after a set number of days. Pinned videos are excluded.
+            Videos des Arbeitsbereichs nach einer festgelegten Anzahl von Tagen automatisch löschen. Angeheftete Videos sind ausgenommen.
           </p>
           <div className="form-field">
-            <label className="form-label" htmlFor="org-retention-days">Auto-delete after</label>
+            <label className="form-label" htmlFor="org-retention-days">Automatisch löschen nach</label>
             <select
               id="org-retention-days"
               className="form-input"
               value={retentionDays}
               onChange={(e) => handleRetentionDaysChange(Number(e.target.value))}
             >
-              <option value={0}>Off</option>
-              <option value={30}>30 days</option>
-              <option value={60}>60 days</option>
-              <option value={90}>90 days</option>
-              <option value={180}>180 days</option>
-              <option value={365}>365 days</option>
+              <option value={0}>Aus</option>
+              <option value={30}>30 Tagen</option>
+              <option value={60}>60 Tagen</option>
+              <option value={90}>90 Tagen</option>
+              <option value={180}>180 Tagen</option>
+              <option value={365}>365 Tagen</option>
             </select>
           </div>
         </div>
@@ -170,12 +170,12 @@ export function GeneralSection({
 
       {isOwner && (
         <div className="card settings-section card--danger">
-          <h2 style={{ color: "var(--color-error)" }}>Danger Zone</h2>
+          <h2 style={{ color: "var(--color-error)" }}>Gefahrenbereich</h2>
 
           <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <p className="form-label" style={{ margin: 0 }}>Delete workspace</p>
-              <p className="form-hint">Permanently delete this workspace and all its data.</p>
+              <p className="form-label" style={{ margin: 0 }}>Arbeitsbereich löschen</p>
+              <p className="form-hint">Diesen Arbeitsbereich und alle zugehörigen Daten dauerhaft löschen.</p>
             </div>
             <button
               type="button"
@@ -184,7 +184,7 @@ export function GeneralSection({
               onClick={handleDeleteOrg}
               disabled={deleting}
             >
-              {deleting ? "Deleting..." : "Delete workspace"}
+              {deleting ? "Wird gelöscht..." : "Arbeitsbereich löschen"}
             </button>
           </div>
           {deleteError && (

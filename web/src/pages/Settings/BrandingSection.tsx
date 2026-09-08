@@ -24,7 +24,7 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
 
     for (const [key, value] of Object.entries(branding)) {
       if (key.startsWith("color") && value && !hexColorPattern.test(value)) {
-        setBrandingError(`Invalid color for ${key}`);
+        setBrandingError(`Ungültige Farbe für ${key}`);
         return;
       }
     }
@@ -44,9 +44,9 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
           customCss: branding.customCss || null,
         }),
       });
-      setBrandingMessage("Branding saved");
+      setBrandingMessage("Branding gespeichert");
     } catch (err) {
-      setBrandingError(err instanceof Error ? err.message : "Failed to save branding");
+      setBrandingError(err instanceof Error ? err.message : "Branding konnte nicht gespeichert werden");
     } finally {
       setSavingBranding(false);
     }
@@ -62,11 +62,11 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
 
   async function handleLogoUpload(file: File) {
     if (file.type !== "image/png" && file.type !== "image/svg+xml") {
-      setBrandingError("Logo must be PNG or SVG");
+      setBrandingError("Das Logo muss PNG oder SVG sein");
       return;
     }
     if (file.size > 512 * 1024) {
-      setBrandingError("Logo must be 512KB or smaller");
+      setBrandingError("Das Logo darf maximal 512 KB groß sein");
       return;
     }
 
@@ -77,19 +77,19 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
         method: "POST",
         body: JSON.stringify({ contentType: file.type, contentLength: file.size }),
       });
-      if (!result) throw new Error("Failed to get upload URL");
+      if (!result) throw new Error("Upload-URL konnte nicht erstellt werden");
 
       const uploadResp = await fetch(result.uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": file.type },
         body: file,
       });
-      if (!uploadResp.ok) throw new Error("Failed to upload logo");
+      if (!uploadResp.ok) throw new Error("Logo konnte nicht hochgeladen werden");
 
       setBranding((prev) => ({ ...prev, logoKey: result.logoKey }));
-      setBrandingMessage("Logo uploaded");
+      setBrandingMessage("Logo hochgeladen");
     } catch (err) {
-      setBrandingError(err instanceof Error ? err.message : "Failed to upload logo");
+      setBrandingError(err instanceof Error ? err.message : "Logo konnte nicht hochgeladen werden");
     } finally {
       setUploadingLogo(false);
     }
@@ -100,9 +100,9 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
     try {
       await apiFetch("/api/settings/branding/logo", { method: "DELETE" });
       setBranding((prev) => ({ ...prev, logoKey: null }));
-      setBrandingMessage("Logo removed");
+      setBrandingMessage("Logo entfernt");
     } catch (err) {
-      setBrandingError(err instanceof Error ? err.message : "Failed to remove logo");
+      setBrandingError(err instanceof Error ? err.message : "Logo konnte nicht entfernt werden");
     }
   }
 
@@ -113,17 +113,17 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
     >
       <h2>Branding</h2>
       <p className="card-description">
-        Customize how your shared video pages look to viewers.
+        Passe das Erscheinungsbild deiner freigegebenen Videoseiten an.
       </p>
 
       <div className="form-field">
-        <label className="form-label">Company name</label>
+        <label className="form-label">Firmenname</label>
         <input
           type="text"
           className="form-input"
           value={branding.companyName ?? ""}
           onChange={(e) => setBranding({ ...branding, companyName: e.target.value || null })}
-          placeholder="SendRec"
+          placeholder="99tools Record"
           maxLength={limits?.fieldLimits?.companyName ?? 200}
         />
       </div>
@@ -141,24 +141,24 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
                 className="btn btn--danger btn--danger-sm"
                 onClick={handleLogoRemove}
               >
-                Remove
+                Entfernen
               </button>
             </>
           ) : branding.logoKey === "none" ? (
             <>
-              <span className="logo-section-status">Logo hidden</span>
+              <span className="logo-section-status">Logo ausgeblendet</span>
               <button
                 type="button"
                 className="btn btn--secondary"
                 onClick={handleLogoRemove}
               >
-                Show default logo
+                Standardlogo anzeigen
               </button>
             </>
           ) : (
             <>
               <label className="btn btn--secondary" style={{ cursor: uploadingLogo ? "default" : "pointer" }}>
-                {uploadingLogo ? "Uploading..." : "Upload logo (PNG or SVG, max 512KB)"}
+                {uploadingLogo ? "Wird hochgeladen..." : "Logo hochladen (PNG oder SVG, max. 512 KB)"}
                 <input
                   type="file"
                   accept="image/png,image/svg+xml"
@@ -176,7 +176,7 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
                 className="btn btn--secondary"
                 onClick={() => setBranding((prev) => ({ ...prev, logoKey: "none" }))}
               >
-                Hide logo
+                Logo ausblenden
               </button>
             </>
           )}
@@ -184,12 +184,12 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
       </div>
 
       <div className="form-field">
-        <label className="form-label">Footer text</label>
+        <label className="form-label">Footer-Text</label>
         <textarea
           className="form-input"
           value={branding.footerText ?? ""}
           onChange={(e) => setBranding({ ...branding, footerText: e.target.value || null })}
-          placeholder="Custom footer message"
+          placeholder="Eigene Footer-Nachricht"
           maxLength={limits?.fieldLimits?.footerText ?? 500}
           rows={2}
         />
@@ -207,7 +207,7 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
             colorBackground: "#0a1628",
             colorSurface: "#1e293b",
             colorText: "#ffffff",
-            colorAccent: "#00b67a",
+            colorAccent: "#E6467A",
           };
           return (
             <div key={key} className="color-field">
@@ -237,17 +237,17 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
         className="branding-preview"
         style={{ background: branding.colorBackground ?? "#0a1628" }}
       >
-        <p className="branding-preview-label">Preview</p>
-        <div className="branding-preview-title" style={{ color: branding.colorAccent ?? "#00b67a" }}>
-          {branding.companyName || "SendRec"}
+        <p className="branding-preview-label">Vorschau</p>
+        <div className="branding-preview-title" style={{ color: branding.colorAccent ?? "#E6467A" }}>
+          {branding.companyName || "99tools Record"}
         </div>
         <div className="branding-preview-card" style={{ background: branding.colorSurface ?? "#1e293b" }}>
-          <span style={{ color: branding.colorText ?? "#ffffff", fontSize: 14 }}>Sample video title</span>
+          <span style={{ color: branding.colorText ?? "#ffffff", fontSize: 14 }}>Beispiel-Videotitel</span>
         </div>
       </div>
 
       <div className="form-field">
-        <label className="form-label">Custom CSS</label>
+        <label className="form-label">Eigenes CSS</label>
         <textarea
           className="form-input form-input--mono"
           value={branding.customCss ?? ""}
@@ -257,10 +257,10 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
           rows={6}
         />
         <span className="form-hint">
-          Injected into the watch page &lt;style&gt; tag. Max 10KB. No @import url() or closing style tags.
+          Wird in das &lt;style&gt;-Tag der Wiedergabeseite eingefügt. Max. 10 KB. Kein @import url() und keine schließenden style-Tags.
         </span>
         <details className="settings-details">
-          <summary>Available CSS selectors</summary>
+          <summary>Verfügbare CSS-Selektoren</summary>
           <pre>{`/* CSS Variables */
 :root {
   --brand-bg;       /* Page background */
@@ -281,7 +281,7 @@ body                /* Background, font, text color */
 /* Header & Footer */
 .logo               /* Logo + name link */
 .logo img           /* Logo image */
-.branding           /* "Shared via SendRec" footer */
+.branding           /* "Geteilt mit 99tools Record" footer */
 .branding a         /* Footer link */
 
 /* Video Player */
@@ -319,13 +319,13 @@ body                /* Background, font, text color */
 .comment-meta       /* Author + badges */
 .comment-author     /* Commenter name */
 .comment-body       /* Comment text */
-.comment-owner-badge   /* "Owner" badge */
-.comment-private-badge /* "Private" badge */
+.comment-owner-badge   /* "Besitzer" badge */
+.comment-private-badge /* "Privat" badge */
 .comment-timestamp  /* Timestamp link */
 .comment-form       /* New comment form */
 .comment-form input /* Name + email fields */
 .comment-form textarea /* Text area */
-.comment-submit     /* "Post comment" button */
+.comment-submit     /* "Kommentar veröffentlichen" button */
 .no-comments        /* Empty state text */
 
 /* Reactions */
@@ -382,14 +382,14 @@ body                /* Background, font, text color */
           className="btn btn--primary"
           disabled={savingBranding}
         >
-          {savingBranding ? "Saving..." : "Save branding"}
+          {savingBranding ? "Wird gespeichert..." : "Branding speichern"}
         </button>
         <button
           type="button"
           className="btn btn--secondary"
           onClick={handleBrandingReset}
         >
-          Reset to defaults
+          Auf Standard zurücksetzen
         </button>
       </div>
     </form>

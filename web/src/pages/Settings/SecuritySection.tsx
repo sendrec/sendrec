@@ -46,7 +46,7 @@ function ChangePassword() {
     setPasswordMessage("");
 
     if (newPassword !== confirmPassword) {
-      setPasswordError("Passwords do not match");
+      setPasswordError("Die Passwörter stimmen nicht überein");
       return;
     }
 
@@ -56,12 +56,12 @@ function ChangePassword() {
         method: "PATCH",
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-      setPasswordMessage("Password updated");
+      setPasswordMessage("Passwort aktualisiert");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : "Failed to update password");
+      setPasswordError(err instanceof Error ? err.message : "Passwort konnte nicht aktualisiert werden");
     } finally {
       setSavingPassword(false);
     }
@@ -72,10 +72,10 @@ function ChangePassword() {
       onSubmit={handlePasswordSubmit}
       className="card settings-section"
     >
-      <h2>Change Password</h2>
+      <h2>Passwort ändern</h2>
 
       <div className="form-field">
-        <label className="form-label" htmlFor="current-password">Current password</label>
+        <label className="form-label" htmlFor="current-password">Aktuelles Passwort</label>
         <input
           id="current-password"
           type="password"
@@ -88,7 +88,7 @@ function ChangePassword() {
       </div>
 
       <div className="form-field">
-        <label className="form-label" htmlFor="new-password">New password</label>
+        <label className="form-label" htmlFor="new-password">Neues Passwort</label>
         <input
           id="new-password"
           type="password"
@@ -99,11 +99,11 @@ function ChangePassword() {
           minLength={8}
           autoComplete="new-password"
         />
-        <span className="form-hint">Must be at least 8 characters</span>
+        <span className="form-hint">Mindestens 8 Zeichen erforderlich</span>
       </div>
 
       <div className="form-field">
-        <label className="form-label" htmlFor="confirm-password">Confirm new password</label>
+        <label className="form-label" htmlFor="confirm-password">Neues Passwort bestätigen</label>
         <input
           id="confirm-password"
           type="password"
@@ -129,7 +129,7 @@ function ChangePassword() {
           className="btn btn--primary"
           disabled={savingPassword}
         >
-          {savingPassword ? "Updating..." : "Change password"}
+          {savingPassword ? "Wird aktualisiert..." : "Passwort ändern"}
         </button>
       </div>
     </form>
@@ -151,7 +151,7 @@ function ConnectedAccounts({ initialIdentities, initialIdentityHasPassword }: Co
       await apiFetch(`/api/user/identities/${provider}`, { method: "DELETE" });
       setIdentities((prev) => prev.filter((i) => i.provider !== provider));
     } catch (err) {
-      setIdentityError(err instanceof Error ? err.message : "Failed to disconnect");
+      setIdentityError(err instanceof Error ? err.message : "Trennen fehlgeschlagen");
     }
   }
 
@@ -159,9 +159,9 @@ function ConnectedAccounts({ initialIdentities, initialIdentityHasPassword }: Co
 
   return (
     <div className="card settings-section">
-      <h2>Connected Accounts</h2>
+      <h2>Verknüpfte Konten</h2>
       <p className="card-description">
-        External accounts linked to your SendRec account.
+        Externe Konten, die mit deinem 99tools-Record-Konto verknüpft sind.
       </p>
 
       {identityError && (
@@ -180,9 +180,9 @@ function ConnectedAccounts({ initialIdentities, initialIdentityHasPassword }: Co
               className="btn btn--danger btn--danger-sm"
               onClick={() => handleDisconnectIdentity(identity.provider)}
               disabled={identities.length <= 1 && !initialIdentityHasPassword}
-              title={identities.length <= 1 && !initialIdentityHasPassword ? "Cannot disconnect your only login method" : undefined}
+              title={identities.length <= 1 && !initialIdentityHasPassword ? "Die einzige Anmeldemethode kann nicht getrennt werden" : undefined}
             >
-              Disconnect
+              Trennen
             </button>
           </div>
         ))}
@@ -214,12 +214,12 @@ function APIKeys({ limits, initialApiKeys }: APIKeysProps) {
         method: "POST",
         body: JSON.stringify({ name: newKeyName.trim() }),
       });
-      if (!result) throw new Error("Failed to create API key");
+      if (!result) throw new Error("API-Schlüssel konnte nicht erstellt werden");
       setGeneratedKey(result.key);
       setApiKeys((prev) => [{ id: result.id, name: result.name, createdAt: result.createdAt, lastUsedAt: null }, ...prev]);
       setNewKeyName("");
     } catch (err) {
-      setApiKeyError(err instanceof Error ? err.message : "Failed to create API key");
+      setApiKeyError(err instanceof Error ? err.message : "API-Schlüssel konnte nicht erstellt werden");
     } finally {
       setCreatingKey(false);
     }
@@ -231,26 +231,26 @@ function APIKeys({ limits, initialApiKeys }: APIKeysProps) {
       await apiFetch(`/api/settings/api-keys/${id}`, { method: "DELETE" });
       setApiKeys((prev) => prev.filter((k) => k.id !== id));
     } catch (err) {
-      setApiKeyError(err instanceof Error ? err.message : "Failed to delete API key");
+      setApiKeyError(err instanceof Error ? err.message : "API-Schlüssel konnte nicht gelöscht werden");
     }
   }
 
   return (
     <div className="card settings-section">
-      <h2>API Keys</h2>
+      <h2>API-Schlüssel</h2>
       <p className="card-description">
-        Generate API keys for integrations like Nextcloud. Keys are shown only once when created.
+        Erstelle API-Schlüssel für Integrationen wie Nextcloud. Schlüssel werden nur einmal direkt nach der Erstellung angezeigt.
       </p>
 
       <form onSubmit={handleCreateAPIKey} className="api-key-form-row">
         <div className="form-field" style={{ flex: 1 }}>
-          <label className="form-label">Label</label>
+          <label className="form-label">Bezeichnung</label>
           <input
             type="text"
             className="form-input"
             value={newKeyName}
             onChange={(e) => setNewKeyName(e.target.value)}
-            placeholder="e.g. My Nextcloud"
+            placeholder="z. B. Mein Nextcloud"
             maxLength={limits?.fieldLimits?.apiKeyName ?? 100}
           />
         </div>
@@ -259,14 +259,14 @@ function APIKeys({ limits, initialApiKeys }: APIKeysProps) {
           className="btn btn--primary"
           disabled={creatingKey}
         >
-          {creatingKey ? "Creating..." : "Create key"}
+          {creatingKey ? "Wird erstellt..." : "Schlüssel erstellen"}
         </button>
       </form>
 
       {generatedKey && (
         <div className="api-key-display">
           <span className="api-key-display-notice">
-            Copy this key now — it won't be shown again
+            Kopiere diesen Schlüssel jetzt – er wird später nicht erneut angezeigt
           </span>
           <div className="api-key-display-row">
             <code className="api-key-display-code">
@@ -281,7 +281,7 @@ function APIKeys({ limits, initialApiKeys }: APIKeysProps) {
                 setTimeout(() => setCopiedKey(false), 2000);
               }}
             >
-              {copiedKey ? "Copied" : "Copy"}
+              {copiedKey ? "Copied" : "Kopieren"}
             </button>
           </div>
         </div>
@@ -297,11 +297,11 @@ function APIKeys({ limits, initialApiKeys }: APIKeysProps) {
             <div key={key.id} className="api-key-row">
               <div className="api-key-info">
                 <span className="api-key-name">
-                  {key.name || "Unnamed key"}
+                  {key.name || "Unbenannter Schlüssel"}
                 </span>
                 <span className="api-key-meta">
-                  Created {new Date(key.createdAt).toLocaleDateString("en-GB")}
-                  {key.lastUsedAt && ` \u00B7 Last used ${new Date(key.lastUsedAt).toLocaleDateString("en-GB")}`}
+                  Erstellt am {new Date(key.createdAt).toLocaleDateString("de-DE")}
+                  {key.lastUsedAt && ` · Zuletzt verwendet am ${new Date(key.lastUsedAt).toLocaleDateString("de-DE")}`}
                 </span>
               </div>
               <button
@@ -309,7 +309,7 @@ function APIKeys({ limits, initialApiKeys }: APIKeysProps) {
                 className="btn btn--danger btn--danger-sm"
                 onClick={() => handleDeleteAPIKey(key.id)}
               >
-                Delete
+                Löschen
               </button>
             </div>
           ))}
@@ -333,7 +333,7 @@ function DangerZone() {
 
   function handleDeleteAccount() {
     setConfirmDialog({
-      message: "Are you sure you want to delete your account? This action cannot be undone. All your videos and data will be permanently deleted.",
+      message: "Konto wirklich löschen? Dies kann nicht rückgängig gemacht werden. Alle Videos und Daten werden dauerhaft gelöscht.",
       onConfirm: async () => {
         setConfirmDialog(null);
         setDeleting(true);
@@ -343,7 +343,7 @@ function DangerZone() {
           setAccessToken(null);
           navigate("/login");
         } catch (err) {
-          setDeleteError(err instanceof Error ? err.message : "Failed to delete account");
+          setDeleteError(err instanceof Error ? err.message : "Konto konnte nicht gelöscht werden");
         } finally {
           setDeleting(false);
         }
@@ -353,22 +353,22 @@ function DangerZone() {
 
   return (
     <div className="card settings-section card--danger">
-      <h2 style={{ color: "var(--color-error)" }}>Danger Zone</h2>
+      <h2 style={{ color: "var(--color-error)" }}>Gefahrenbereich</h2>
 
       <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <p className="form-label" style={{ margin: 0 }}>Sign out</p>
-          <p className="form-hint">Sign out of your account on this device.</p>
+          <p className="form-label" style={{ margin: 0 }}>Abmelden</p>
+          <p className="form-hint">Melde dein Konto auf diesem Gerät ab.</p>
         </div>
         <button type="button" className="btn btn--secondary" onClick={handleSignOut}>
-          Sign out
+          Abmelden
         </button>
       </div>
 
       <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <p className="form-label" style={{ margin: 0 }}>Delete account</p>
-          <p className="form-hint">Permanently delete your account and all data.</p>
+          <p className="form-label" style={{ margin: 0 }}>Konto löschen</p>
+          <p className="form-hint">Lösche dein Konto und alle Daten dauerhaft.</p>
         </div>
         <button
           type="button"
@@ -377,7 +377,7 @@ function DangerZone() {
           onClick={handleDeleteAccount}
           disabled={deleting}
         >
-          {deleting ? "Deleting..." : "Delete account"}
+          {deleting ? "Wird gelöscht..." : "Konto löschen"}
         </button>
       </div>
       {deleteError && (
@@ -386,7 +386,7 @@ function DangerZone() {
       {confirmDialog && (
         <ConfirmDialog
           message={confirmDialog.message}
-          confirmLabel="Delete account"
+          confirmLabel="Konto löschen"
           danger
           onConfirm={confirmDialog.onConfirm}
           onCancel={() => setConfirmDialog(null)}

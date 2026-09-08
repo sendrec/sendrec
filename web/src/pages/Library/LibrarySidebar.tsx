@@ -71,19 +71,19 @@ export function LibrarySidebar({
         className={`sidebar-item${activeFilter === "all" ? " sidebar-item--active" : ""}`}
         onClick={() => onFilterChange("all")}
       >
-        All Videos
+        Alle Videos
       </button>
       <button
         className={`sidebar-item${activeFilter === "unfiled" ? " sidebar-item--active" : ""}`}
         onClick={() => onFilterChange("unfiled")}
       >
-        Unfiled
+        Ohne Ordner
       </button>
 
       <div className="sidebar-section">
         <div className="sidebar-section-header">
-          <span>Folders</span>
-          <button className="sidebar-add-btn" onClick={() => onSetCreatingFolder(true)} title="New folder">+</button>
+          <span>Ordner</span>
+          <button className="sidebar-add-btn" onClick={() => onSetCreatingFolder(true)} title="Neuer Ordner">+</button>
         </div>
         {creatingFolder && (
           <div style={{ padding: "4px 8px" }}>
@@ -92,7 +92,7 @@ export function LibrarySidebar({
               value={newFolderName}
               onChange={(e) => onSetNewFolderName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") onCreateFolder(); if (e.key === "Escape") onSetCreatingFolder(false); }}
-              placeholder="Folder name"
+              placeholder="Ordnername"
               maxLength={limits?.fieldLimits?.folderName ?? 100}
               style={{ width: "100%", padding: "4px 8px", fontSize: 13, background: "var(--color-background)", border: "1px solid var(--color-border)", borderRadius: 4, color: "var(--color-text)" }}
             />
@@ -126,8 +126,8 @@ export function LibrarySidebar({
             </button>
             {sidebarMenuId === `folder-${folder.id}` && (
               <div className="sidebar-item-menu" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => { onSetEditingSidebarId(`folder-${folder.id}`); onSetEditingSidebarName(folder.name); onSetSidebarMenuId(null); }}>Rename</button>
-                <button onClick={() => { onDeleteSidebarItem("folder", folder.id); onSetSidebarMenuId(null); }}>Delete</button>
+                <button onClick={() => { onSetEditingSidebarId(`folder-${folder.id}`); onSetEditingSidebarName(folder.name); onSetSidebarMenuId(null); }}>Umbenennen</button>
+                <button onClick={() => { onDeleteSidebarItem("folder", folder.id); onSetSidebarMenuId(null); }}>Löschen</button>
               </div>
             )}
           </div>
@@ -137,7 +137,7 @@ export function LibrarySidebar({
       <div className="sidebar-section">
         <div className="sidebar-section-header">
           <span>Tags</span>
-          <button className="sidebar-add-btn" onClick={() => onSetCreatingTag(true)} title="New tag">+</button>
+          <button className="sidebar-add-btn" onClick={() => onSetCreatingTag(true)} title="Neuer Tag">+</button>
         </div>
         {creatingTag && (
           <div style={{ padding: "4px 8px" }}>
@@ -153,7 +153,7 @@ export function LibrarySidebar({
                 value={newTagName}
                 onChange={(e) => onSetNewTagName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") onCreateTag(); if (e.key === "Escape") onSetCreatingTag(false); }}
-                placeholder="Tag name"
+                placeholder="Tag-Name"
                 maxLength={limits?.fieldLimits?.tagName ?? 50}
                 style={{ flex: 1, padding: "4px 8px", fontSize: 13, background: "var(--color-background)", border: "1px solid var(--color-border)", borderRadius: 4, color: "var(--color-text)" }}
               />
@@ -189,8 +189,8 @@ export function LibrarySidebar({
             </button>
             {sidebarMenuId === `tag-${tag.id}` && (
               <div className="sidebar-item-menu" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => { onSetEditingSidebarId(`tag-${tag.id}`); onSetEditingSidebarName(tag.name); onSetSidebarMenuId(null); }}>Rename</button>
-                <button onClick={() => { onDeleteSidebarItem("tag", tag.id); onSetSidebarMenuId(null); }}>Delete</button>
+                <button onClick={() => { onSetEditingSidebarId(`tag-${tag.id}`); onSetEditingSidebarName(tag.name); onSetSidebarMenuId(null); }}>Umbenennen</button>
+                <button onClick={() => { onDeleteSidebarItem("tag", tag.id); onSetSidebarMenuId(null); }}>Löschen</button>
               </div>
             )}
           </div>

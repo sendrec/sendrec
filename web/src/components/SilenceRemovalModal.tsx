@@ -88,7 +88,7 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
       });
       onRemovalStarted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove silence");
+      setError(err instanceof Error ? err.message : "Stille Pausen konnten nicht entfernt werden");
     } finally {
       setRemoving(false);
     }
@@ -102,11 +102,11 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
           display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
         }}
       >
-        <div role="dialog" aria-modal="true" aria-label="Remove Silent Pauses" style={{
+        <div role="dialog" aria-modal="true" aria-label="Stille Pausen entfernen" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Detecting silence...</p>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Stille wird erkannt...</p>
         </div>
       </div>
     );
@@ -121,13 +121,13 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
         }}
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div role="dialog" aria-modal="true" aria-label="Remove Silent Pauses" style={{
+        <div role="dialog" aria-modal="true" aria-label="Stille Pausen entfernen" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
-          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Remove Silent Pauses</h2>
+          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Stille Pausen entfernen</h2>
           <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: "0 0 16px" }}>
-            Failed to detect silence.
+            Stille konnte nicht erkannt werden.
           </p>
           <button
             onClick={onClose}
@@ -137,7 +137,7 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
               padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
-            Close
+            Schließen
           </button>
         </div>
       </div>
@@ -153,11 +153,11 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
         }}
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div role="dialog" aria-modal="true" aria-label="Remove Silent Pauses" style={{
+        <div role="dialog" aria-modal="true" aria-label="Stille Pausen entfernen" style={{
           background: "var(--color-surface)", border: "1px solid var(--color-border)",
           borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
         }}>
-          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Remove Silent Pauses</h2>
+          <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 16px" }}>Stille Pausen entfernen</h2>
           <p style={{ color: "var(--color-text-secondary)", fontSize: 14, margin: "0 0 16px" }}>
             No silent pauses detected.
           </p>
@@ -169,7 +169,7 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
               padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
-            Close
+            Schließen
           </button>
         </div>
       </div>
@@ -184,12 +184,12 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div ref={contentRef} role="dialog" aria-modal="true" aria-label="Remove Silent Pauses" style={{
+      <div ref={contentRef} role="dialog" aria-modal="true" aria-label="Stille Pausen entfernen" style={{
         background: "var(--color-surface)", border: "1px solid var(--color-border)",
         borderRadius: 12, padding: 24, width: 500, maxWidth: "90vw",
       }}>
         <h2 style={{ color: "var(--color-text)", fontSize: 18, margin: "0 0 12px" }}>
-          Remove Silent Pauses
+          Stille Pausen entfernen
         </h2>
 
         <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "0 0 12px" }}>
@@ -203,7 +203,7 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
             padding: 0, fontSize: 12, cursor: "pointer", marginBottom: 8,
           }}
         >
-          {checked.size === segments.length ? "Deselect all" : "Select all"}
+          {checked.size === segments.length ? "Auswahl aufheben" : "Alle auswählen"}
         </button>
 
         <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--color-border)", borderRadius: 8, marginBottom: 16 }}>
@@ -247,7 +247,7 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
               padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
-            Cancel
+            Abbrechen
           </button>
           <button
             onClick={handleRemove}
@@ -259,7 +259,7 @@ export function SilenceRemovalModal({ videoId, onClose, onRemovalStarted }: Sile
               opacity: (checked.size === 0 || removing) ? 0.5 : 1,
             }}
           >
-            {removing ? "Removing..." : `Remove ${checked.size} pause${checked.size !== 1 ? "s" : ""} (${savedSeconds.toFixed(1)}s)`}
+            {removing ? "Wird entfernt..." : `${checked.size} Pause${checked.size !== 1 ? "n" : ""} entfernen (${savedSeconds.toFixed(1)} s)`}
           </button>
         </div>
       </div>

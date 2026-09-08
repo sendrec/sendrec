@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
+import { useI18n } from "../i18n/I18nContext";
 
 export function NotFound() {
+  const { t } = useI18n();
   return (
     <div className="error-page-content">
       <main className="error-block">
@@ -25,17 +27,17 @@ export function NotFound() {
         </div>
 
         <p className="error-code" aria-hidden="true">404</p>
-        <h1 className="error-heading">Page not found</h1>
+        <h1 className="error-heading">{t("notFound.title")}</h1>
         <p className="error-subtext">
-          The page you're looking for doesn't exist or has been moved.
+          {t("notFound.text")}
         </p>
 
         <div className="error-btn-group">
           <Link to="/library" className="error-btn error-btn--primary">
-            Go to Library
+            {t("record.library")}
           </Link>
           <Link to="/" className="error-btn error-btn--secondary">
-            Start Recording
+            {t("notFound.record")}
           </Link>
         </div>
       </main>

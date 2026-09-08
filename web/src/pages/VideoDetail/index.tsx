@@ -47,12 +47,12 @@ interface CommentsResponse {
 
 function viewCountLabel(viewCount: number, uniqueViewCount: number): string {
   if (viewCount === 0) {
-    return "No views yet";
+    return "Noch keine Aufrufe";
   }
   if (viewCount === uniqueViewCount) {
-    return `${viewCount} view${viewCount !== 1 ? "s" : ""}`;
+    return `${viewCount} Aufruf${viewCount !== 1 ? "e" : ""}`;
   }
-  return `${viewCount} views (${uniqueViewCount} unique)`;
+  return `${viewCount} Aufrufe (${uniqueViewCount} eindeutig)`;
 }
 
 export function VideoDetail() {
@@ -165,11 +165,11 @@ export function VideoDetail() {
         { method: "POST", body: JSON.stringify({ provider }) },
       );
       if (result) {
-        toast.show(`Issue created: ${result.issueKey}`);
+        toast.show(`Issue erstellt: ${result.issueKey}`);
         window.open(result.issueUrl, "_blank", "noopener");
       }
     } catch (err) {
-      toast.show(err instanceof Error ? err.message : "Failed to create issue");
+      toast.show(err instanceof Error ? err.message : "Issue konnte nicht erstellt werden");
     } finally {
       setCreatingIssue(false);
     }
@@ -193,7 +193,7 @@ export function VideoDetail() {
   async function copyLink() {
     if (!video) return;
     await copyToClipboard(video.shareUrl);
-    toast.show("Link copied");
+    toast.show("Link kopiert");
   }
 
   async function togglePin() {
@@ -203,7 +203,7 @@ export function VideoDetail() {
     });
     if (resp) {
       setVideo((prev) => (prev ? { ...prev, pinned: resp.pinned } : prev));
-      toast.show(resp.pinned ? "Video pinned" : "Video unpinned");
+      toast.show(resp.pinned ? "Video angeheftet" : "Video nicht mehr angeheftet");
     }
   }
 
@@ -218,9 +218,9 @@ export function VideoDetail() {
         prev ? { ...prev, ctaText, ctaUrl } : prev,
       );
       setCtaFormOpen(false);
-      toast.show("CTA saved");
+      toast.show("CTA gespeichert");
     } catch (err) {
-      toast.show(err instanceof Error ? err.message : "Failed to save CTA");
+      toast.show(err instanceof Error ? err.message : "CTA konnte nicht gespeichert werden");
     }
   }
 
@@ -234,7 +234,7 @@ export function VideoDetail() {
       prev ? { ...prev, ctaText: null, ctaUrl: null } : prev,
     );
     setCtaFormOpen(false);
-    toast.show("CTA removed");
+    toast.show("CTA entfernt");
   }
 
   async function saveTitle() {
@@ -274,7 +274,7 @@ export function VideoDetail() {
         ? { ...prev, title: prev.suggestedTitle!, suggestedTitle: null }
         : prev,
     );
-    toast.show("Title updated");
+    toast.show("Titel aktualisiert");
   }
 
   async function dismissSuggestedTitle() {
@@ -341,8 +341,8 @@ export function VideoDetail() {
   function deleteVideo() {
     if (!video) return;
     setConfirmDialog({
-      message: "Delete this recording? This cannot be undone.",
-      confirmLabel: "Delete",
+      message: "Diese Aufnahme löschen? Dies kann nicht rückgängig gemacht werden.",
+      confirmLabel: "Löschen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -403,7 +403,7 @@ export function VideoDetail() {
     return (
       <div className="page-container page-container--centered">
         <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>
-          Video not found
+          Video nicht gefunden
         </p>
         <Link
           to="/library"
@@ -414,7 +414,7 @@ export function VideoDetail() {
             marginTop: 8,
           }}
         >
-          Back to Library
+          Zurück zur Bibliothek
         </Link>
       </div>
     );
@@ -433,7 +433,7 @@ export function VideoDetail() {
         }}
       >
         <Link to="/library" className="back-link">
-          &larr; Library
+          &larr; Bibliothek
         </Link>
         <a
           href={`/watch/${video.shareToken}`}
@@ -445,7 +445,7 @@ export function VideoDetail() {
             fontSize: 14,
           }}
         >
-          View as viewer &rarr;
+          Als Betrachter ansehen &rarr;
         </a>
       </div>
 
@@ -460,7 +460,7 @@ export function VideoDetail() {
                   <line x1="1" y1="1" x2="23" y2="23" />
                 </svg>
                 <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginTop: 12 }}>
-                  Video failed to load
+                  Video konnte nicht geladen werden
                 </p>
               </div>
             ) : (
@@ -475,7 +475,7 @@ export function VideoDetail() {
           ) : video.thumbnailUrl ? (
             <img
               src={video.thumbnailUrl}
-              alt="Video thumbnail"
+              alt="Video-Vorschaubild"
               className="video-detail-thumbnail"
             />
           ) : (
@@ -488,8 +488,8 @@ export function VideoDetail() {
           )}
           {video.status === "processing" && (
             <div className="hero-processing-overlay">
-              <p className="hero-processing-pulse">Processing video...</p>
-              <p className="hero-processing-sub">This usually takes a minute or two</p>
+              <p className="hero-processing-pulse">Video wird verarbeitet...</p>
+              <p className="hero-processing-sub">Das dauert normalerweise ein bis zwei Minuten</p>
             </div>
           )}
         </div>
@@ -506,7 +506,7 @@ export function VideoDetail() {
                 }}
                 onBlur={() => saveTitle()}
                 autoFocus
-                aria-label="Edit title"
+                aria-label="Titel bearbeiten"
                 style={{
                   color: "var(--color-text)",
                   fontSize: 24,
@@ -540,7 +540,7 @@ export function VideoDetail() {
                       setEditingTitle(true);
                       setEditTitle(video.title);
                     }}
-                    aria-label="Edit title"
+                    aria-label="Titel bearbeiten"
                     style={{
                       background: "none",
                       border: "none",
@@ -580,13 +580,13 @@ export function VideoDetail() {
             {video.noiseReduction && (
               <>
                 <span>&middot;</span>
-                <span style={{ color: "var(--color-accent)" }}>Noise reduced</span>
+                <span style={{ color: "var(--color-accent)" }}>Rauschen reduziert</span>
               </>
             )}
             {video.pinned && (
               <>
                 <span>&middot;</span>
-                <span style={{ color: "var(--color-accent)" }}>Pinned</span>
+                <span style={{ color: "var(--color-accent)" }}>Angeheftet</span>
               </>
             )}
           </p>
@@ -594,7 +594,7 @@ export function VideoDetail() {
           {video.status === "processing" && (
             <span className="status-badge status-badge--processing">
               <span className="status-badge-dot" />
-              Processing
+              Verarbeitung
             </span>
           )}
 
@@ -649,7 +649,7 @@ export function VideoDetail() {
           style={{ opacity: video.status === "processing" ? 0.5 : undefined }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          Copy share link
+          Freigabelink kopieren
         </button>
         <button
           className="detail-btn"
@@ -658,19 +658,19 @@ export function VideoDetail() {
           style={{ opacity: video.status === "processing" ? 0.5 : undefined }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
-          View analytics
+          Analysen ansehen
         </button>
         {video.status === "ready" && videoUrl && (
           <a href={videoUrl} download className="detail-btn" style={{ textDecoration: "none" }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Download
+            Herunterladen
           </a>
         )}
         {!isViewer && (
           <button
             className="detail-btn"
             onClick={togglePin}
-            aria-label={video.pinned ? "Unpin video" : "Pin video"}
+            aria-label={video.pinned ? "Video lösen" : "Video anheften"}
           >
             <svg viewBox="0 0 24 24" fill={video.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h-6v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/><line x1="14" y1="6" x2="14" y2="2"/><line x1="10" y1="6" x2="10" y2="2"/></svg>
             {video.pinned ? "Unpin" : "Pin"}
@@ -696,8 +696,8 @@ export function VideoDetail() {
                 <line x1="5" y1="8" x2="11" y2="8" />
               </svg>
               {creatingIssue
-                ? "Creating..."
-                : `Create ${integrations[0].provider === "github" ? "GitHub" : "Jira"} Issue`}
+                ? "Wird erstellt..."
+                : `${integrations[0].provider === "github" ? "GitHub" : "Jira"}-Issue erstellen`}
             </button>
           ) : (
             <div style={{ position: "relative" }}>
@@ -721,7 +721,7 @@ export function VideoDetail() {
                   <line x1="8" y1="5" x2="8" y2="11" />
                   <line x1="5" y1="8" x2="11" y2="8" />
                 </svg>
-                {creatingIssue ? "Creating..." : "Create Issue"}
+                {creatingIssue ? "Wird erstellt..." : "Issue erstellen"}
               </button>
               {issueDropdownOpen && (
                 <div
@@ -755,8 +755,8 @@ export function VideoDetail() {
                       }}
                     >
                       {intg.provider === "github"
-                        ? "GitHub Issue"
-                        : "Jira Issue"}
+                        ? "GitHub-Issue"
+                        : "Jira-Issue"}
                     </button>
                   ))}
                 </div>
@@ -789,11 +789,11 @@ export function VideoDetail() {
 
       {/* Editing */}
       {!isViewer && <div className="video-detail-section">
-        <h2 className="video-detail-section-title">Editing</h2>
+        <h2 className="video-detail-section-title">Bearbeitung</h2>
 
         {video.suggestedTitle && (
           <div className="detail-setting-row">
-            <span className="detail-setting-label">Suggested title</span>
+            <span className="detail-setting-label">Vorgeschlagener Titel</span>
             <div className="detail-setting-value">
               <span
                 style={{
@@ -819,24 +819,24 @@ export function VideoDetail() {
         )}
 
         <div className="detail-setting-row">
-          <span className="detail-setting-label">Trim</span>
+          <span className="detail-setting-label">Trimmen</span>
           <button
             onClick={() => setShowTrimModal(true)}
             className="detail-btn"
             disabled={video.status === "processing"}
           >
-            Trim video
+            Video trimmen
           </button>
         </div>
 
         {video.status === "ready" && (
           <div className="detail-setting-row">
-            <span className="detail-setting-label">Silence</span>
+            <span className="detail-setting-label">Stille</span>
             <button
               onClick={() => setShowSilenceModal(true)}
               className="detail-btn"
             >
-              Remove silence
+              Stille entfernen
             </button>
           </div>
         )}
@@ -849,7 +849,7 @@ export function VideoDetail() {
               className="detail-btn"
               disabled={video.status === "processing"}
             >
-              Remove fillers
+              Füllwörter entfernen
             </button>
           </div>
         )}
@@ -860,9 +860,9 @@ export function VideoDetail() {
         <h2 className="video-detail-section-title">Organize</h2>
 
         <div className="detail-setting-row">
-          <span className="detail-setting-label">Folder</span>
+          <span className="detail-setting-label">Ordner</span>
           <select
-            aria-label="Folder"
+            aria-label="Ordner"
             value={video.folderId ?? ""}
             onChange={(e) => moveToFolder(e.target.value || null)}
             style={{
@@ -942,7 +942,7 @@ export function VideoDetail() {
                 type="text"
                 value={playlistSearch}
                 onChange={(e) => setPlaylistSearch(e.target.value)}
-                placeholder="Search playlists..."
+                placeholder="Playlists durchsuchen..."
                 style={{
                   padding: "4px 8px",
                   fontSize: 13,
@@ -985,12 +985,12 @@ export function VideoDetail() {
         )}
       </div>}
 
-      {/* Call to Action */}
+      {/* Call-to-Action */}
       {!isViewer && <div className="video-detail-section">
-        <h2 className="video-detail-section-title">Call to Action</h2>
+        <h2 className="video-detail-section-title">Call-to-Action</h2>
 
         <div className="detail-setting-row">
-          <span className="detail-setting-label">Call to action</span>
+          <span className="detail-setting-label">Call-to-Action</span>
           <div className="detail-setting-value">
             <span>{video.ctaText ?? "None"}</span>
             <button
@@ -1001,7 +1001,7 @@ export function VideoDetail() {
               }}
               className="detail-btn"
             >
-              {video.ctaText ? "Edit CTA" : "Add CTA"}
+              {video.ctaText ? "CTA bearbeiten" : "CTA hinzufügen"}
             </button>
           </div>
         </div>
@@ -1018,11 +1018,11 @@ export function VideoDetail() {
           >
             <input
               type="text"
-              placeholder="Button text (e.g. Book a demo)"
+              placeholder="Button-Text (z. B. Demo buchen)"
               value={ctaText}
               onChange={(e) => setCtaText(e.target.value)}
               maxLength={100}
-              aria-label="CTA text"
+              aria-label="CTA-Text"
               style={{
                 width: "100%",
                 padding: "8px 10px",
@@ -1040,7 +1040,7 @@ export function VideoDetail() {
               value={ctaUrl}
               onChange={(e) => setCtaUrl(e.target.value)}
               maxLength={2000}
-              aria-label="CTA URL"
+              aria-label="CTA-URL"
               style={{
                 width: "100%",
                 padding: "8px 10px",
@@ -1058,21 +1058,21 @@ export function VideoDetail() {
                 disabled={!ctaText.trim() || !ctaUrl.trim()}
                 className="detail-btn detail-btn--accent"
               >
-                Save
+                Speichern
               </button>
               {video.ctaText && (
                 <button
                   onClick={clearCTA}
                   className="detail-btn detail-btn--danger"
                 >
-                  Remove
+                  Entfernen
                 </button>
               )}
               <button
                 onClick={() => setCtaFormOpen(false)}
                 className="detail-btn"
               >
-                Cancel
+                Abbrechen
               </button>
             </div>
           </div>
@@ -1094,7 +1094,7 @@ export function VideoDetail() {
             className="detail-btn detail-btn--danger"
             style={{ padding: "8px 20px" }}
           >
-            Delete video
+            Video löschen
           </button>
         </div>
       )}
@@ -1127,7 +1127,7 @@ export function VideoDetail() {
               prev ? { ...prev, status: "processing" } : prev,
             );
             setShowFillerModal(false);
-            toast.show("Removing filler words...");
+            toast.show("Füllwörter werden entfernt...");
           }}
         />
       )}
@@ -1144,7 +1144,7 @@ export function VideoDetail() {
               prev ? { ...prev, status: "processing" } : prev,
             );
             setShowSilenceModal(false);
-            toast.show("Removing silent pauses...");
+            toast.show("Stille Pausen werden entfernt...");
           }}
         />
       )}

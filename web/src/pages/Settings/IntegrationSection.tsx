@@ -49,7 +49,7 @@ export function IntegrationSection({
       const data = await apiFetch<IntegrationConfig[]>("/api/settings/integrations");
       if (data) setIntegrations(data);
     } catch (err) {
-      setIntgError(err instanceof Error ? err.message : "Failed to save");
+      setIntgError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
     } finally {
       setIntgSaving(false);
     }
@@ -60,9 +60,9 @@ export function IntegrationSection({
     setIntgMessage("");
     try {
       await apiFetch(`/api/settings/integrations/${provider}/test`, { method: "POST" });
-      setIntgMessage("Connected successfully");
+      setIntgMessage("Erfolgreich verbunden");
     } catch (err) {
-      setIntgError(err instanceof Error ? err.message : "Connection failed");
+      setIntgError(err instanceof Error ? err.message : "Verbindung fehlgeschlagen");
     }
   }
 
@@ -74,14 +74,14 @@ export function IntegrationSection({
       setIntegrations((prev) => prev.filter((i) => i.provider !== provider));
       setIntgMessage("Disconnected");
     } catch (err) {
-      setIntgError(err instanceof Error ? err.message : "Failed to disconnect");
+      setIntgError(err instanceof Error ? err.message : "Trennen fehlgeschlagen");
     }
   }
 
   return (
     <div className="card settings-section">
-      <h2>Integrations</h2>
-      <p className="card-description">Connect external services to create issues from videos.</p>
+      <h2>Integrationen</h2>
+      <p className="card-description">Verbinde externe Dienste, um aus Videos Issues zu erstellen.</p>
       {intgMessage && <p className="status-message status-message--success">{intgMessage}</p>}
       {intgError && <p className="status-message status-message--error">{intgError}</p>}
 
@@ -96,7 +96,7 @@ export function IntegrationSection({
             >
               <span style={{ fontWeight: 500 }}>{provider === "github" ? "GitHub" : "Jira"}</span>
               <span style={{ fontSize: "0.85rem", color: connected ? "var(--color-success, #22c55e)" : "var(--color-text-muted)" }}>
-                {connected ? "Connected" : "Not connected"}
+                {connected ? "Connected" : "Nicht verbunden"}
               </span>
             </div>
             {expanded && (
@@ -104,11 +104,11 @@ export function IntegrationSection({
                 {provider === "github" ? (
                   <>
                     <div className="form-field">
-                      <label className="form-label">Personal access token</label>
+                      <label className="form-label">Persönlicher Zugriffstoken</label>
                       <input className="form-input" type="password" value={ghToken} onChange={(e) => setGhToken(e.target.value)} placeholder="ghp_..." />
                     </div>
                     <div className="form-field">
-                      <label className="form-label">Owner</label>
+                      <label className="form-label">Besitzer</label>
                       <input className="form-input" value={ghOwner} onChange={(e) => setGhOwner(e.target.value)} placeholder="org-or-user" />
                     </div>
                     <div className="form-field">
@@ -119,30 +119,30 @@ export function IntegrationSection({
                 ) : (
                   <>
                     <div className="form-field">
-                      <label className="form-label">Jira URL</label>
+                      <label className="form-label">Jira-URL</label>
                       <input className="form-input" value={jiraBaseUrl} onChange={(e) => setJiraBaseUrl(e.target.value)} placeholder="https://yourteam.atlassian.net" />
                     </div>
                     <div className="form-field">
-                      <label className="form-label">Email</label>
+                      <label className="form-label">E-Mail</label>
                       <input className="form-input" type="email" value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} />
                     </div>
                     <div className="form-field">
-                      <label className="form-label">API Token</label>
+                      <label className="form-label">API-Token</label>
                       <input className="form-input" type="password" value={jiraApiToken} onChange={(e) => setJiraApiToken(e.target.value)} />
                     </div>
                     <div className="form-field">
-                      <label className="form-label">Project Key</label>
+                      <label className="form-label">Projekt-Key</label>
                       <input className="form-input" value={jiraProjectKey} onChange={(e) => setJiraProjectKey(e.target.value)} placeholder="PROJ" />
                     </div>
                   </>
                 )}
                 <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
                   <button className="btn btn--primary" onClick={() => saveIntegration(provider)} disabled={intgSaving}>
-                    {intgSaving ? "Saving..." : "Save"}
+                    {intgSaving ? "Wird gespeichert..." : "Speichern"}
                   </button>
-                  <button className="btn btn--secondary" onClick={() => testIntegration(provider)}>Test Connection</button>
+                  <button className="btn btn--secondary" onClick={() => testIntegration(provider)}>Verbindung testen</button>
                   {connected && (
-                    <button className="btn btn--danger" onClick={() => deleteIntegration(provider)}>Disconnect</button>
+                    <button className="btn btn--danger" onClick={() => deleteIntegration(provider)}>Trennen</button>
                   )}
                 </div>
               </div>

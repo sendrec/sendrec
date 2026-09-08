@@ -17,16 +17,16 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("Uncaught error:", error, info.componentStack);
+    console.error("Unbehandelter Fehler:", error, info.componentStack);
   }
 
   render() {
     if (this.state.hasError) {
       return (
         <div style={{ padding: "2rem", textAlign: "center" }}>
-          <h1>Something went wrong</h1>
+          <h1>Etwas ist schiefgelaufen</h1>
           <p style={{ color: "var(--color-text-secondary)", marginTop: "0.5rem" }}>
-            Please try refreshing the page.
+            Bitte lade die Seite neu und versuche es erneut.
           </p>
           <button
             onClick={() => window.location.reload()}
@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
               cursor: "pointer",
             }}
           >
-            Refresh
+            Neu laden
           </button>
         </div>
       );

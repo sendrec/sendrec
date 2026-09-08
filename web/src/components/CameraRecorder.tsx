@@ -6,6 +6,7 @@ import {
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
 import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
+import { useI18n } from "../i18n/I18nContext";
 
 interface CameraRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
@@ -14,6 +15,7 @@ interface CameraRecorderProps {
 }
 
 export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurationSeconds = 0 }: CameraRecorderProps) {
+  const { t } = useI18n();
   const countdownEnabled = useRef(localStorage.getItem("recording-countdown") !== "false");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
           videoRef.current.play().catch(() => {});
         }
       } catch {
-        setCameraError("Could not access your camera. Please allow camera access and try again.");
+        setCameraError("Auf die Kamera konnte nicht zugegriffen werden. Bitte erlaube den Kamerazugriff und versuche es erneut.");
       }
     }
     startPreview();
@@ -102,7 +104,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
       const elapsed = recording.elapsedSeconds();
 
       if (elapsed < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES) {
-        onRecordingError?.("Recording too short. Please record for at least 1 second.");
+        onRecordingError?.("Die Aufnahme ist zu kurz. Bitte nimm mindestens 1 Sekunde auf.");
         return;
       }
 
@@ -169,7 +171,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
         <button
           onClick={flipCamera}
           disabled={isActive}
-          aria-label="Flip camera"
+          aria-label="Kamera spiegeln"
           style={{
             position: "absolute",
             top: 8,
@@ -198,7 +200,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
             onClick={() => recording.dispatch({ type: "start-now" })}
           >
             <div className="countdown-number">{countdownValue}</div>
-            <div className="countdown-hint">Click to start now</div>
+            <div className="countdown-hint">Klicken, um sofort zu starten</div>
           </div>
         )}
       </div>
@@ -207,12 +209,12 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
         <>
           {maxDurationSeconds > 0 && (
             <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: 0 }}>
-              Maximum recording length: {formatDuration(maxDurationSeconds)}
+              {t("record.maxDuration", { duration: formatDuration(maxDurationSeconds) })}
             </p>
           )}
           <button
             onClick={startRecording}
-            aria-label="Start recording"
+            aria-label={t("record.start")}
             style={{
               background: "var(--color-accent)",
               color: "var(--color-text)",
@@ -223,7 +225,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
               minHeight: 44,
             }}
           >
-            Start Recording
+            {t("record.start")}
           </button>
         </>
       )}
@@ -252,12 +254,12 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
             {formatDuration(duration)}
             {isPaused && (
               <span style={{ fontWeight: 400 }}>
-                (Paused)
+                ({t("record.paused")})
               </span>
             )}
             {!isPaused && remaining !== null && (
               <span style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}>
-                ({formatDuration(remaining)} remaining)
+                ({t("record.remaining", { duration: formatDuration(remaining) })})
               </span>
             )}
           </div>
@@ -265,7 +267,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
           {isPaused ? (
             <button
               onClick={resumeRecording}
-              aria-label="Resume recording"
+              aria-label="Aufnahme fortsetzen"
               style={{
                 background: "var(--color-accent)",
                 color: "var(--color-text)",
@@ -276,12 +278,12 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
                 minHeight: 44,
               }}
             >
-              Resume
+              {t("record.resume")}
             </button>
           ) : (
             <button
               onClick={pauseRecording}
-              aria-label="Pause recording"
+              aria-label="Aufnahme pausieren"
               style={{
                 background: "transparent",
                 color: "var(--color-text)",
@@ -293,13 +295,13 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
                 minHeight: 44,
               }}
             >
-              Pause
+              {t("record.pause")}
             </button>
           )}
 
           <button
             onClick={stopRecording}
-            aria-label="Stop recording"
+            aria-label="Aufnahme stoppen"
             style={{
               background: "var(--color-error)",
               color: "var(--color-text)",
@@ -310,7 +312,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
               minHeight: 44,
             }}
           >
-            Stop Recording
+            {t("record.stop")}
           </button>
         </div>
       )}

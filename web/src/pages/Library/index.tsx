@@ -166,8 +166,8 @@ export function Library() {
 
   function deleteVideo(id: string) {
     setConfirmDialog({
-      message: "Delete this recording? This cannot be undone.",
-      confirmLabel: "Delete",
+      message: "Diese Aufnahme löschen? Dies kann nicht rückgängig gemacht werden.",
+      confirmLabel: "Löschen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -185,7 +185,7 @@ export function Library() {
 
   async function copyLink(shareUrl: string) {
     await copyToClipboard(shareUrl);
-    toast.show("Link copied");
+    toast.show("Link kopiert");
   }
 
   async function togglePin(id: string) {
@@ -193,10 +193,10 @@ export function Library() {
       const resp = await apiFetch<{ pinned: boolean }>(`/api/videos/${id}/pin`, { method: "PUT" });
       if (resp) {
         setVideos((prev) => prev.map((v) => v.id === id ? { ...v, pinned: resp.pinned } : v));
-        toast.show(resp.pinned ? "Video pinned" : "Video unpinned");
+        toast.show(resp.pinned ? "Video angeheftet" : "Video nicht mehr angeheftet");
       }
     } catch {
-      toast.show("Failed to update pin");
+      toast.show("Anheften konnte nicht aktualisiert werden");
     }
   }
 
@@ -237,10 +237,10 @@ export function Library() {
   }
 
   function deleteSidebarItem(type: "folder" | "tag", id: string) {
-    const msg = type === "folder" ? "Delete this folder? Videos will become unfiled." : "Delete this tag? It will be removed from all videos.";
+    const msg = type === "folder" ? "Diesen Ordner löschen? Die Videos werden keinem Ordner mehr zugeordnet." : "Diesen Tag löschen? Er wird von allen Videos entfernt.";
     setConfirmDialog({
       message: msg,
-      confirmLabel: "Delete",
+      confirmLabel: "Löschen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -273,8 +273,8 @@ export function Library() {
   function batchDelete() {
     const count = selectedIds.size;
     setConfirmDialog({
-      message: `Delete ${count} video(s)? This cannot be undone.`,
-      confirmLabel: "Delete",
+      message: `${count} Video(s) löschen? Dies kann nicht rückgängig gemacht werden.`,
+      confirmLabel: "Löschen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -284,11 +284,11 @@ export function Library() {
             method: "POST",
             body: JSON.stringify({ videoIds: Array.from(selectedIds) }),
           });
-          toast.show(`Deleted ${count} video(s)`);
+          toast.show(`${count} Video(s) gelöscht`);
           setSelectedIds(new Set());
           fetchVideosAndLimits(searchQuery, activeFilter);
         } catch {
-          toast.show("Failed to delete videos");
+          toast.show("Videos konnten nicht gelöscht werden");
         } finally {
           setBatchLoading(false);
         }
@@ -303,12 +303,12 @@ export function Library() {
         method: "POST",
         body: JSON.stringify({ videoIds: Array.from(selectedIds), folderId }),
       });
-      toast.show("Moved videos");
+      toast.show("Videos verschoben");
       setSelectedIds(new Set());
       fetchVideosAndLimits(searchQuery, activeFilter);
       fetchFoldersAndTags();
     } catch {
-      toast.show("Failed to move videos");
+      toast.show("Videos konnten nicht verschoben werden");
     } finally {
       setBatchLoading(false);
     }
@@ -319,7 +319,7 @@ export function Library() {
       <div className="page-container page-container--wide">
         <div className="library-header">
           <div>
-            <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>Library</h1>
+            <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>Bibliothek</h1>
           </div>
         </div>
         <div className="video-grid">
@@ -341,7 +341,7 @@ export function Library() {
   if (videos.length === 0) {
     return (
       <div className="page-container page-container--centered">
-        <p style={{ color: "var(--color-text-secondary)", fontSize: 16, marginBottom: 20 }}>No recordings yet.</p>
+        <p style={{ color: "var(--color-text-secondary)", fontSize: 16, marginBottom: 20 }}>Noch keine Aufnahmen vorhanden.</p>
         <div style={{
           maxWidth: 400,
           margin: "0 auto 24px",
@@ -356,15 +356,15 @@ export function Library() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>1.</span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Record your screen or upload a video</span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Nimm deinen Bildschirm auf oder lade ein Video hoch</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>2.</span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Share the link with anyone</span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Teile den Link mit anderen</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ color: "var(--color-accent)", fontWeight: 700, fontSize: 16 }}>3.</span>
-              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Track views and get feedback</span>
+              <span style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Sieh Aufrufe und Feedback</span>
             </div>
           </div>
         </div>
@@ -383,7 +383,7 @@ export function Library() {
                   textDecoration: "none",
                 }}
               >
-                Record
+                Aufnehmen
               </Link>
               <Link
                 to="/?tab=upload"
@@ -494,7 +494,7 @@ export function Library() {
           videoTitle={videos.find((v) => v.id === transferVideoId)?.title ?? "Untitled"}
           onTransferred={() => {
             setTransferVideoId(null);
-            toast.show("Video moved");
+            toast.show("Video verschoben");
             fetchVideosAndLimits(searchQuery, activeFilter);
           }}
           onCancel={() => setTransferVideoId(null)}

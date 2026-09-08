@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
+import { useI18n } from "../i18n/I18nContext";
 
 export function Register() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const [ready, setReady] = useState(false);
 
@@ -57,14 +59,14 @@ export function Register() {
 
   return (
     <AuthForm
-      title="Create account"
-      submitLabel="Create account"
+      title={t("auth.createAccount")}
+      submitLabel={t("auth.createAccount")}
       showName
       showPasswordConfirm
       onSubmit={handleRegister}
       footer={
         <>
-          Already have an account? <Link to={loginPath}>Sign in</Link>
+          {t("auth.alreadyAccount")} <Link to={loginPath}>{t("auth.signIn")}</Link>
         </>
       }
     />

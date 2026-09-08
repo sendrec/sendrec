@@ -37,13 +37,13 @@ export function CheckEmail() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Something went wrong");
+        throw new Error(data.error || "Etwas ist schiefgelaufen");
       }
 
       setSent(true);
       setCooldown(60);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : "Etwas ist schiefgelaufen");
     }
   }
 
@@ -51,20 +51,20 @@ export function CheckEmail() {
     <main className="auth-container">
       <div className="auth-brand">
         <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
+          <span className="auth-logo-send">99tools</span>
+          <span className="auth-logo-rec"> Record</span>
         </span>
       </div>
       <div className="auth-card auth-centered">
-        <h1>Check your email</h1>
+        <h1>Prüfe dein E-Mail-Postfach</h1>
         <p className="auth-subtitle">
-          We&apos;ve sent a confirmation link to <strong>{email}</strong>. Click
-          the link to activate your account. The link expires in 24 hours.
+          Wir haben einen Bestätigungslink an <strong>{email}</strong> gesendet. Klicke
+          auf den Link, um dein Konto zu aktivieren. Der Link ist 24 Stunden gültig.
         </p>
 
         {sent && (
           <p className="auth-success-text">
-            Confirmation email resent.
+            Bestätigungs-E-Mail erneut gesendet.
           </p>
         )}
 
@@ -75,11 +75,11 @@ export function CheckEmail() {
         )}
 
         <button onClick={handleResend} disabled={cooldown > 0}>
-          {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend confirmation email"}
+          {cooldown > 0 ? `Erneut senden in ${cooldown}s` : "Bestätigungs-E-Mail erneut senden"}
         </button>
 
         <div className="auth-footer">
-          <Link to="/login">Back to sign in</Link>
+          <Link to="/login">Zurück zur Anmeldung</Link>
         </div>
       </div>
     </main>

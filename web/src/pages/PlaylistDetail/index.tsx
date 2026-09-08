@@ -106,8 +106,8 @@ export function PlaylistDetail() {
   function deletePlaylist() {
     if (!playlist) return;
     setConfirmDialog({
-      message: "Delete this playlist? Videos will not be deleted.",
-      confirmLabel: "Delete",
+      message: "Diese Playlist löschen? Die Videos selbst werden nicht gelöscht.",
+      confirmLabel: "Löschen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -121,7 +121,7 @@ export function PlaylistDetail() {
     return (
       <div className="page-container page-container--centered">
         <p style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>
-          Loading...
+          Wird geladen...
         </p>
       </div>
     );
@@ -142,7 +142,7 @@ export function PlaylistDetail() {
             marginTop: 8,
           }}
         >
-          Back to Playlists
+          Zurück zu Playlists
         </Link>
       </div>
     );
@@ -179,7 +179,7 @@ export function PlaylistDetail() {
               fontSize: 14,
             }}
           >
-            View as viewer &rarr;
+            Als Betrachter ansehen &rarr;
           </a>
         )}
       </div>
@@ -197,7 +197,7 @@ export function PlaylistDetail() {
               }}
               onBlur={() => saveTitle()}
               autoFocus
-              aria-label="Edit title"
+              aria-label="Titel bearbeiten"
               style={{
                 color: "var(--color-text)",
                 fontSize: 24,
@@ -230,7 +230,7 @@ export function PlaylistDetail() {
                   setEditingTitle(true);
                   setEditTitle(playlist.title);
                 }}
-                aria-label="Edit title"
+                aria-label="Titel bearbeiten"
                 style={{
                   background: "none",
                   border: "none",
@@ -258,8 +258,8 @@ export function PlaylistDetail() {
                 if (e.key === "Escape") setEditingDescription(false);
               }}
               autoFocus
-              placeholder="Add a description"
-              aria-label="Edit description"
+              placeholder="Beschreibung hinzufügen"
+              aria-label="Beschreibung bearbeiten"
               style={{
                 flex: 1,
                 padding: "6px 10px",
@@ -272,7 +272,7 @@ export function PlaylistDetail() {
               }}
             />
             <button onClick={saveDescription} className="detail-btn">
-              Save
+              Speichern
             </button>
           </div>
         ) : (
@@ -288,7 +288,7 @@ export function PlaylistDetail() {
               setEditDescription(playlist.description ?? "");
             }}
           >
-            {playlist.description || "Add a description..."}
+            {playlist.description || "Beschreibung hinzufügen..."}
           </p>
         )}
 
@@ -313,7 +313,7 @@ export function PlaylistDetail() {
                 color: "var(--color-on-accent)",
               }}
             >
-              Shared
+              Geteilt
             </span>
           )}
         </p>
@@ -354,7 +354,7 @@ export function PlaylistDetail() {
           className="detail-btn detail-btn--danger"
           style={{ padding: "8px 20px" }}
         >
-          Delete playlist
+          Playlist löschen
         </button>
       </div>
 

@@ -130,7 +130,7 @@ const playerCSS = `
             flex-shrink: 0;
         }
         .ctrl-btn:hover { opacity: 1; }
-        .ctrl-btn:focus-visible { outline: 2px solid var(--player-accent, #00b67a); outline-offset: 2px; }
+        .ctrl-btn:focus-visible { outline: 2px solid var(--player-accent, #E6467A); outline-offset: 2px; }
         .time-display {
             font-size: 12px;
             color: #fff;
@@ -170,7 +170,7 @@ const playerCSS = `
             top: 0;
             left: 0;
             height: 100%;
-            background: var(--player-accent, #00b67a);
+            background: var(--player-accent, #E6467A);
             pointer-events: none;
         }
         .seek-chapters {
@@ -224,7 +224,7 @@ const playerCSS = `
             position: absolute;
             width: 6px;
             height: 100%;
-            background: var(--player-accent, #00b67a);
+            background: var(--player-accent, #E6467A);
             border-radius: 1px;
             transform: translateX(-50%);
             opacity: 0.8;
@@ -254,7 +254,7 @@ const playerCSS = `
             position: absolute;
             width: 14px;
             height: 14px;
-            background: var(--player-accent, #00b67a);
+            background: var(--player-accent, #E6467A);
             border-radius: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
@@ -324,7 +324,7 @@ const playerCSS = `
             text-align: center;
         }
         .speed-menu button:hover { background: rgba(255, 255, 255, 0.1); }
-        .speed-menu button.active { color: var(--player-accent, #00b67a); font-weight: 600; }
+        .speed-menu button.active { color: var(--player-accent, #E6467A); font-weight: 600; }
         .shortcuts-wrapper {
             position: relative;
         }

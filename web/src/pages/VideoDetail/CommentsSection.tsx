@@ -23,12 +23,12 @@ function getInitials(name: string): string {
 function relativeTime(isoDate: string): string {
   const diff = Date.now() - new Date(isoDate).getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return "gerade eben";
+  if (minutes < 60) return `vor ${minutes} Min.`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `vor ${hours} Std.`;
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return `vor ${days} Tagen`;
   return new Date(isoDate).toLocaleDateString("en-GB");
 }
 
@@ -61,7 +61,7 @@ export function CommentsSection({
             <div className="comment-content">
               <div className="comment-header">
                 <span className="comment-author">
-                  {comment.authorName || "Anonymous"}
+                  {comment.authorName || "Anonym"}
                 </span>
                 <span className="comment-date">
                   {relativeTime(comment.createdAt)}
@@ -72,7 +72,7 @@ export function CommentsSection({
                   </span>
                 )}
                 {comment.isPrivate && (
-                  <span className="comment-private">Private</span>
+                  <span className="comment-private">Privat</span>
                 )}
               </div>
               <div className="comment-body">{comment.body}</div>
@@ -81,9 +81,9 @@ export function CommentsSection({
               <button
                 className="comment-delete"
                 onClick={() => onDeleteComment(comment.id)}
-                aria-label="Delete comment"
+                aria-label="Kommentar löschen"
               >
-                Delete
+                Löschen
               </button>
             )}
           </div>

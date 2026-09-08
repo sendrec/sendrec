@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiFetch, setAccessToken } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import { useOrganization } from "../hooks/useOrganization";
+import { useI18n } from "../i18n/I18nContext";
+import { LanguageSelect } from "./LanguageSelect";
 
 interface BillingResponse {
   plan: string;
@@ -19,6 +21,7 @@ export function Layout({ children }: LayoutProps) {
   const [plan, setPlan] = useState<string | null>(null);
   const [planBadgeEnabled, setPlanBadgeEnabled] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
+  const { t } = useI18n();
   const { orgs, selectedOrg, selectedOrgId, switchOrg, createOrg } = useOrganization();
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
@@ -71,7 +74,7 @@ export function Layout({ children }: LayoutProps) {
       setCreateError(null);
       setOrgDropdownOpen(false);
     } catch {
-      setCreateError("Failed to create workspace. Free plan allows 1 workspace.");
+      setCreateError(t("workspace.createError"));
     }
   }
 
@@ -135,11 +138,11 @@ export function Layout({ children }: LayoutProps) {
     <>
       <nav className="nav-bar">
         <Link to="/" className="nav-logo" onClick={handleNavClick}>
-          <img src="/images/logo.png" alt="" width="48" height="48" />
-          <span className="logo-send">Send</span><span className="logo-rec">Rec</span>
+          <img src="/images/logo-99tools.png" alt="" width="48" height="48" />
+          <span className="logo-send">99tools</span><span className="logo-rec"> Record</span>
           {plan && planBadgeEnabled && (
             <span className={`plan-badge${plan !== "free" ? " plan-badge--pro" : ""}`}>
-              {plan === "business" ? "Business" : plan === "pro" ? "Pro" : "Free"}
+              {plan === "business" ? "Business" : plan === "pro" ? "Pro" : t("common.free")}
             </span>
           )}
         </Link>
@@ -156,12 +159,12 @@ export function Layout({ children }: LayoutProps) {
             }}
             aria-haspopup="listbox"
             aria-expanded={orgDropdownOpen}
-            aria-label="Switch workspace"
+            aria-label={t("workspace.switch")}
           >
             <span className="org-switcher-label">
               {selectedOrgId
-                ? orgs.find((o) => o.id === selectedOrgId)?.name ?? "Personal"
-                : "Personal"}
+                ? orgs.find((o) => o.id === selectedOrgId)?.name ?? t("workspace.personal")
+                : t("workspace.personal")}
             </span>
             <svg className="org-switcher-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 6l4 4 4-4" />
@@ -171,7 +174,7 @@ export function Layout({ children }: LayoutProps) {
           {orgDropdownOpen && (
             <>
               <div className="org-switcher-backdrop" onClick={() => setOrgDropdownOpen(false)} />
-              <div className="org-switcher-menu" role="listbox" aria-label="Workspaces">
+              <div className="org-switcher-menu" role="listbox" aria-label={t("workspace.list")}>
                 {/* Personal */}
                 <button
                   className={`org-switcher-item${!selectedOrgId ? " org-switcher-item--active" : ""}${activeIndex === 0 ? " org-switcher-item--focused" : ""}`}
@@ -183,7 +186,7 @@ export function Layout({ children }: LayoutProps) {
                     <circle cx="8" cy="5" r="3" />
                     <path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" />
                   </svg>
-                  <span className="org-switcher-item-name">Personal</span>
+                  <span className="org-switcher-item-name">{t("workspace.personal")}</span>
                 </button>
 
                 {/* Orgs */}
@@ -215,7 +218,7 @@ export function Layout({ children }: LayoutProps) {
                       <line x1="8" y1="3" x2="8" y2="13" />
                       <line x1="3" y1="8" x2="13" y2="8" />
                     </svg>
-                    <span className="org-switcher-item-name">New Workspace</span>
+                    <span className="org-switcher-item-name">{t("workspace.new")}</span>
                   </button>
                 ) : (
                   <div className="org-switcher-create">
@@ -223,7 +226,7 @@ export function Layout({ children }: LayoutProps) {
                       ref={createInputRef}
                       className="org-switcher-create-input"
                       type="text"
-                      placeholder="Workspace name"
+                      placeholder={t("workspace.namePlaceholder")}
                       value={newWorkspaceName}
                       onChange={(e) => { setNewWorkspaceName(e.target.value); setCreateError(null); }}
                       onKeyDown={(e) => {
@@ -249,7 +252,7 @@ export function Layout({ children }: LayoutProps) {
               className={`nav-link${isActive("/") ? " nav-link--active" : ""}`}
               onClick={handleNavClick}
             >
-              Record
+              {t("nav.record")}
             </Link>
           )}
 
@@ -258,7 +261,7 @@ export function Layout({ children }: LayoutProps) {
             className={`nav-link${isActive("/library") ? " nav-link--active" : ""}`}
             onClick={handleNavClick}
           >
-            Library
+            {t("nav.library")}
           </Link>
 
           <Link
@@ -266,7 +269,7 @@ export function Layout({ children }: LayoutProps) {
             className={`nav-link${isActive("/playlists") ? " nav-link--active" : ""}`}
             onClick={handleNavClick}
           >
-            Playlists
+            {t("nav.playlists")}
           </Link>
 
           <Link
@@ -274,7 +277,7 @@ export function Layout({ children }: LayoutProps) {
             className={`nav-link${isActive("/analytics") ? " nav-link--active" : ""}`}
             onClick={handleNavClick}
           >
-            Analytics
+            {t("nav.analytics")}
           </Link>
 
           <Link
@@ -282,7 +285,7 @@ export function Layout({ children }: LayoutProps) {
             className={`nav-link${isActive("/settings") ? " nav-link--active" : ""}`}
             onClick={handleNavClick}
           >
-            Settings
+            {t("nav.settings")}
           </Link>
 
           {selectedOrg && (selectedOrg.role === "owner" || selectedOrg.role === "admin") && (
@@ -291,14 +294,14 @@ export function Layout({ children }: LayoutProps) {
               className="nav-link"
               onClick={handleNavClick}
             >
-              Workspace Settings
+              {t("nav.workspaceSettings")}
             </Link>
           )}
 
           <button
             className="nav-theme-toggle"
             onClick={toggleTheme}
-            aria-label="Toggle theme"
+            aria-label={t("nav.theme")}
           >
             {resolvedTheme === "dark" ? (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -315,15 +318,17 @@ export function Layout({ children }: LayoutProps) {
             )}
           </button>
 
+          <LanguageSelect compact />
+
           <button className="nav-signout" onClick={signOut}>
-            Sign out
+            {t("nav.signOut")}
           </button>
         </div>
 
         <button
           className="nav-hamburger"
           onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Toggle menu"
+          aria-label={t("nav.menu")}
         >
           <span />
           <span />

@@ -15,7 +15,7 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
     const params = new URLSearchParams(window.location.search);
     if (params.get("billing") === "success") {
       window.history.replaceState({}, "", window.location.pathname);
-      return "Subscription activated successfully!";
+      return "Abonnement erfolgreich aktiviert!";
     }
     return "";
   });
@@ -35,7 +35,7 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
         window.location.href = resp.checkoutUrl;
       }
     } catch (err: unknown) {
-      setBillingMessage(err instanceof Error ? err.message : "Failed to start checkout");
+      setBillingMessage(err instanceof Error ? err.message : "Checkout konnte nicht gestartet werden");
     } finally {
       setUpgrading(false);
     }
@@ -45,8 +45,8 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
     if (billing.subscriptionId) {
       const label = plan === "business" ? "Business" : "Pro";
       setConfirmDialog({
-        message: `Upgrade to ${label}? Your remaining credit will be prorated.`,
-        confirmLabel: `Upgrade to ${label}`,
+        message: `Auf ${label} upgraden? Dein verbleibendes Guthaben wird anteilig verrechnet.`,
+        confirmLabel: `Auf ${label} upgraden`,
         onConfirm: () => {
           setConfirmDialog(null);
           doUpgrade(plan);
@@ -59,7 +59,7 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
 
   function handleCancelSubscription() {
     setConfirmDialog({
-      message: "Cancel your Pro subscription? You'll keep access until the end of your billing period.",
+      message: "Pro-Abonnement kündigen? Der Zugriff bleibt bis zum Ende des Abrechnungszeitraums bestehen.",
       onConfirm: async () => {
         setConfirmDialog(null);
         handleCancelSubscriptionConfirmed();
@@ -72,10 +72,10 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
     setBillingMessage("");
     try {
       await apiFetch("/api/settings/billing/cancel", { method: "POST" });
-      setBillingMessage("Subscription canceled. Access continues until end of billing period.");
+      setBillingMessage("Abonnement gekündigt. Der Zugriff bleibt bis zum Ende des Abrechnungszeitraums bestehen.");
       setBilling((b) => ({ ...b, subscriptionStatus: "canceled" }));
     } catch (err: unknown) {
-      setBillingMessage(err instanceof Error ? err.message : "Failed to cancel");
+      setBillingMessage(err instanceof Error ? err.message : "Kündigung fehlgeschlagen");
     } finally {
       setCanceling(false);
     }
@@ -85,21 +85,21 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
     <>
       <div className="card settings-section">
         <div className="card-header">
-          <h2>Subscription</h2>
+          <h2>Abonnement</h2>
           <span className={`plan-badge ${billing.plan !== "free" ? "plan-badge--pro" : ""}`}>
-            {billing.plan === "business" ? "Business" : billing.plan === "pro" ? "Pro" : "Free"}
+            {billing.plan === "business" ? "Business" : billing.plan === "pro" ? "Pro" : "Kostenlos"}
           </span>
         </div>
 
         {billing.plan === "free" && !billing.subscriptionStatus && (
           <>
             <p className="card-description">
-              Upgrade for unlimited videos and recording duration.
+              Upgrade für unbegrenzte Videos und Aufnahmedauer.
             </p>
             <div className="upgrade-card">
               <div className="upgrade-card-info">
                 <span className="upgrade-card-plan">Pro</span>
-                <span className="upgrade-card-desc">Unlimited videos and duration</span>
+                <span className="upgrade-card-desc">Unbegrenzte Videos und Videolänge</span>
               </div>
               <div className="upgrade-card-actions">
                 <span className="upgrade-card-price">&euro;8/mo</span>
@@ -109,14 +109,14 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
                   onClick={() => handleUpgrade("pro")}
                   disabled={upgrading}
                 >
-                  {upgrading ? "Redirecting..." : "Upgrade to Pro"}
+                  {upgrading ? "Weiterleitung..." : "Auf Pro upgraden"}
                 </button>
               </div>
             </div>
             <div className="upgrade-card">
               <div className="upgrade-card-info">
                 <span className="upgrade-card-plan">Business</span>
-                <span className="upgrade-card-desc">Everything in Pro, plus SSO and workspace access controls</span>
+                <span className="upgrade-card-desc">Alles aus Pro plus SSO und Zugriffskontrollen für Arbeitsbereiche</span>
               </div>
               <div className="upgrade-card-actions">
                 <span className="upgrade-card-price">&euro;12/mo</span>
@@ -126,7 +126,7 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
                   onClick={() => handleUpgrade("business")}
                   disabled={upgrading}
                 >
-                  {upgrading ? "Redirecting..." : "Upgrade to Business"}
+                  {upgrading ? "Weiterleitung..." : "Auf Business upgraden"}
                 </button>
               </div>
             </div>
@@ -137,7 +137,7 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
           <div className="upgrade-card">
             <div className="upgrade-card-info">
               <span className="upgrade-card-plan">Business</span>
-              <span className="upgrade-card-desc">Everything in Pro, plus SSO and workspace access controls</span>
+              <span className="upgrade-card-desc">Alles aus Pro plus SSO und Zugriffskontrollen für Arbeitsbereiche</span>
             </div>
             <div className="upgrade-card-actions">
               <span className="upgrade-card-price">&euro;12/mo</span>
@@ -147,7 +147,7 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
                 onClick={() => handleUpgrade("business")}
                 disabled={upgrading}
               >
-                {upgrading ? "Redirecting..." : "Upgrade to Business"}
+                {upgrading ? "Weiterleitung..." : "Auf Business upgraden"}
               </button>
             </div>
           </div>
@@ -155,7 +155,7 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
 
         {billing.subscriptionStatus === "canceled" && (
           <p className="card-description">
-            Your subscription has been canceled. You have access to Pro features until the end of your billing period.
+            Dein Abonnement wurde gekündigt. Die Pro-Funktionen bleiben bis zum Ende des Abrechnungszeitraums verfügbar.
           </p>
         )}
 
@@ -168,7 +168,7 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
                 rel="noopener noreferrer"
                 className="billing-portal-link"
               >
-                Manage subscription
+                Abonnement verwalten
               </a>
             )}
             <button
@@ -177,7 +177,7 @@ export function BillingSection({ billing: initialBilling }: BillingSectionProps)
               onClick={handleCancelSubscription}
               disabled={canceling}
             >
-              {canceling ? "Canceling..." : "Cancel subscription"}
+              {canceling ? "Wird gekündigt..." : "Abonnement kündigen"}
             </button>
           </div>
         )}

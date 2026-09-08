@@ -31,7 +31,7 @@ async function refreshToken(): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, "Token refresh failed");
+    throw new ApiError(response.status, "Token-Aktualisierung fehlgeschlagen");
   }
 
   const data = (await response.json()) as { accessToken: string };

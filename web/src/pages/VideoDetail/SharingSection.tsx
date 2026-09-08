@@ -62,12 +62,12 @@ export function SharingSection({
 
   async function copyLink() {
     await copyToClipboard(video.shareUrl);
-    toast.show("Link copied");
+    toast.show("Link kopiert");
   }
 
   async function copyEmbed() {
     await copyToClipboard(embedSnippet);
-    toast.show("Embed code copied");
+    toast.show("Einbettungscode kopiert");
   }
 
   async function toggleDownload() {
@@ -104,14 +104,14 @@ export function SharingSection({
   async function extendVideo() {
     await apiFetch(`/api/videos/${video.id}/extend`, { method: "POST" });
     await onRefetchVideo();
-    toast.show("Link extended");
+    toast.show("Link verlängert");
   }
 
   function addPassword() {
     setPromptDialog({
-      title: "Enter a password for this video:",
-      placeholder: "Password",
-      submitLabel: "Set password",
+      title: "Passwort für dieses Video eingeben:",
+      placeholder: "Passwort",
+      submitLabel: "Passwort setzen",
       onSubmit: async (password) => {
         setPromptDialog(null);
         await apiFetch(`/api/videos/${video.id}/password`, {
@@ -127,8 +127,8 @@ export function SharingSection({
 
   function removePassword() {
     setConfirmDialog({
-      message: "Remove the password from this video?",
-      confirmLabel: "Remove",
+      message: "Passwort von diesem Video entfernen?",
+      confirmLabel: "Entfernen",
       danger: true,
       onConfirm: async () => {
         setConfirmDialog(null);
@@ -181,7 +181,7 @@ export function SharingSection({
       });
       if (!uploadResp.ok) return;
       await onRefetchVideo();
-      toast.show("Thumbnail updated");
+      toast.show("Vorschaubild aktualisiert");
     } finally {
       setUploadingThumbnail(false);
     }
@@ -194,7 +194,7 @@ export function SharingSection({
         method: "DELETE",
       });
       await onRefetchVideo();
-      toast.show("Thumbnail reset");
+      toast.show("Vorschaubild zurückgesetzt");
     } finally {
       setUploadingThumbnail(false);
     }
@@ -261,11 +261,11 @@ export function SharingSection({
           footerText: videoBranding.footerText || null,
         }),
       });
-      setBrandingMessage("Saved");
+      setBrandingMessage("Gespeichert");
       setTimeout(() => setBrandingOpen(false), 1000);
     } catch (err) {
       setBrandingMessage(
-        err instanceof Error ? err.message : "Failed to save",
+        err instanceof Error ? err.message : "Speichern fehlgeschlagen",
       );
     } finally {
       setSavingBranding(false);
@@ -275,10 +275,10 @@ export function SharingSection({
   return (
     <>
       <div className="video-detail-section">
-        <h2 className="video-detail-section-title">Share Settings</h2>
+        <h2 className="video-detail-section-title">Freigabe-Einstellungen</h2>
 
         <div className="detail-setting-row">
-          <span className="detail-setting-label">Share link</span>
+          <span className="detail-setting-label">Freigabelink</span>
           {video.status === "processing" ? (
             <span
               style={{
@@ -286,7 +286,7 @@ export function SharingSection({
                 fontSize: 13,
               }}
             >
-              Available once processing completes
+              Verfügbar, sobald die Verarbeitung abgeschlossen ist
             </span>
           ) : (
             <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}>
@@ -294,7 +294,7 @@ export function SharingSection({
                 type="text"
                 readOnly
                 value={video.shareUrl}
-                aria-label="Share link"
+                aria-label="Freigabelink"
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -307,20 +307,20 @@ export function SharingSection({
                 }}
               />
               <button onClick={copyLink} className="detail-btn">
-                Copy link
+                Link kopieren
               </button>
             </div>
           )}
         </div>
 
         <div className="detail-setting-row">
-          <span className="detail-setting-label">Embed</span>
+          <span className="detail-setting-label">Einbetten</span>
           <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 0 }}>
             <input
               type="text"
               readOnly
               value={embedSnippet}
-              aria-label="Embed code"
+              aria-label="Einbettungscode"
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -333,7 +333,7 @@ export function SharingSection({
               }}
             />
             <button onClick={copyEmbed} className="detail-btn">
-              Copy embed
+              Einbettung kopieren
             </button>
           </div>
         </div>
@@ -341,31 +341,31 @@ export function SharingSection({
         {!isViewer && (
           <>
             <div className="detail-setting-row">
-              <span className="detail-setting-label">Password</span>
+              <span className="detail-setting-label">Passwort</span>
               <div className="detail-setting-value">
                 <span>
-                  {video.hasPassword ? "Password set" : "No password"}
+                  {video.hasPassword ? "Passwort gesetzt" : "Kein Passwort"}
                 </span>
                 {video.hasPassword ? (
                   <button onClick={removePassword} className="detail-btn">
-                    Remove password
+                    Passwort entfernen
                   </button>
                 ) : (
                   <button onClick={addPassword} className="detail-btn">
-                    Set password
+                    Passwort setzen
                   </button>
                 )}
               </div>
             </div>
 
             <div className="detail-setting-row">
-              <span className="detail-setting-label">Expiry</span>
+              <span className="detail-setting-label">Ablauf</span>
               <div className="detail-setting-value">
                 <span>{expiry.text}</span>
                 <button onClick={toggleLinkExpiry} className="detail-btn">
                   {video.shareExpiresAt === null
-                    ? "Set expiry"
-                    : "Remove expiry"}
+                    ? "Ablauf festlegen"
+                    : "Ablauf entfernen"}
                 </button>
                 {video.shareExpiresAt !== null && (
                   <button onClick={extendVideo} className="detail-btn">
@@ -381,24 +381,24 @@ export function SharingSection({
                 onClick={toggleDownload}
                 className={`detail-toggle${video.downloadEnabled ? " detail-toggle--active" : ""}`}
               >
-                {video.downloadEnabled ? "Enabled" : "Disabled"}
+                {video.downloadEnabled ? "Enabled" : "Deaktiviert"}
               </button>
             </div>
 
             <div className="detail-setting-row">
-              <span className="detail-setting-label">Email gate</span>
+              <span className="detail-setting-label">E-Mail-Abfrage</span>
               <button
                 onClick={toggleEmailGate}
                 className={`detail-toggle${video.emailGateEnabled ? " detail-toggle--active" : ""}`}
               >
-                {video.emailGateEnabled ? "Enabled" : "Disabled"}
+                {video.emailGateEnabled ? "Enabled" : "Deaktiviert"}
               </button>
             </div>
 
             <div className="detail-setting-row">
-              <span className="detail-setting-label">Comments</span>
+              <span className="detail-setting-label">Kommentare</span>
               <select
-                aria-label="Comment mode"
+                aria-label="Kommentarmodus"
                 value={video.commentMode}
                 onChange={(e) => changeCommentMode(e.target.value)}
                 style={{
@@ -414,15 +414,15 @@ export function SharingSection({
                   cursor: "pointer",
                 }}
               >
-                <option value="disabled">Off</option>
-                <option value="anonymous">Anonymous</option>
-                <option value="name_required">Name required</option>
-                <option value="name_email_required">Name + email</option>
+                <option value="disabled">Aus</option>
+                <option value="anonymous">Anonym</option>
+                <option value="name_required">Name erforderlich</option>
+                <option value="name_email_required">Name + E-Mail</option>
               </select>
             </div>
 
             <div className="detail-setting-row">
-              <span className="detail-setting-label">Thumbnail</span>
+              <span className="detail-setting-label">Vorschaubild</span>
               <div className="detail-setting-value">
                 <label
                   style={{
@@ -430,7 +430,7 @@ export function SharingSection({
                   }}
                 >
                   <span className="detail-btn" role="button" tabIndex={0}>
-                    {uploadingThumbnail ? "Uploading..." : "Upload"}
+                    {uploadingThumbnail ? "Wird hochgeladen..." : "Upload"}
                   </span>
                   <input
                     type="file"
@@ -450,16 +450,16 @@ export function SharingSection({
                     disabled={uploadingThumbnail}
                     className="detail-btn"
                   >
-                    Reset thumbnail
+                    Vorschaubild zurücksetzen
                   </button>
                 )}
               </div>
             </div>
 
             <div className="detail-setting-row">
-              <span className="detail-setting-label">Notifications</span>
+              <span className="detail-setting-label">Benachrichtigungen</span>
               <select
-                aria-label="View notifications"
+                aria-label="Aufruf-Benachrichtigungen"
                 value={video.viewNotification ?? ""}
                 onChange={(e) => changeNotification(e.target.value)}
                 style={{
@@ -472,10 +472,10 @@ export function SharingSection({
                   cursor: "pointer",
                 }}
               >
-                <option value="">Account default</option>
-                <option value="off">Off</option>
-                <option value="every">Every view</option>
-                <option value="digest">Daily digest</option>
+                <option value="">Kontostandard</option>
+                <option value="off">Aus</option>
+                <option value="every">Jeder Aufruf</option>
+                <option value="digest">Tägliche Zusammenfassung</option>
               </select>
             </div>
 
@@ -483,7 +483,7 @@ export function SharingSection({
               <div className="detail-setting-row">
                 <span className="detail-setting-label">Branding</span>
                 <button onClick={openBranding} className="detail-btn">
-                  Customize
+                  Anpassen
                 </button>
               </div>
             )}
@@ -525,7 +525,7 @@ export function SharingSection({
                 margin: "0 0 16px",
               }}
             >
-              Video Branding
+              Video-Branding
             </h3>
             <p
               style={{
@@ -534,8 +534,8 @@ export function SharingSection({
                 margin: "0 0 16px",
               }}
             >
-              Override your account branding for this video. Leave empty to
-              inherit.
+              Überschreibe das Konto-Branding für dieses Video. Leer lassen, um
+              die Konto-Einstellungen zu übernehmen.
             </p>
 
             <label
@@ -552,7 +552,7 @@ export function SharingSection({
                   fontSize: 13,
                 }}
               >
-                Company name
+                Firmenname
               </span>
               <input
                 type="text"
@@ -563,7 +563,7 @@ export function SharingSection({
                     companyName: e.target.value || null,
                   })
                 }
-                placeholder="Inherit from account"
+                placeholder="Vom Konto übernehmen"
                 maxLength={limits?.fieldLimits?.companyName ?? 200}
                 style={{
                   background: "var(--color-bg)",
@@ -625,7 +625,7 @@ export function SharingSection({
                           [key]: e.target.value || null,
                         })
                       }
-                      placeholder="Inherit"
+                      placeholder="Vom Konto übernehmen"
                       style={{
                         background: "var(--color-bg)",
                         border: "1px solid var(--color-border)",
@@ -655,7 +655,7 @@ export function SharingSection({
                   fontSize: 13,
                 }}
               >
-                Footer text
+                Footer-Text
               </span>
               <input
                 type="text"
@@ -666,7 +666,7 @@ export function SharingSection({
                     footerText: e.target.value || null,
                   })
                 }
-                placeholder="Inherit from account"
+                placeholder="Vom Konto übernehmen"
                 maxLength={limits?.fieldLimits?.footerText ?? 500}
                 style={{
                   background: "var(--color-bg)",
@@ -684,7 +684,7 @@ export function SharingSection({
               <p
                 style={{
                   color:
-                    brandingMessage === "Saved"
+                    brandingMessage === "Gespeichert"
                       ? "var(--color-accent)"
                       : "var(--color-error)",
                   fontSize: 13,
@@ -701,13 +701,13 @@ export function SharingSection({
                 disabled={savingBranding}
                 className="detail-btn detail-btn--accent"
               >
-                {savingBranding ? "Saving..." : "Save"}
+                {savingBranding ? "Wird gespeichert..." : "Speichern"}
               </button>
               <button
                 onClick={() => setBrandingOpen(false)}
                 className="detail-btn"
               >
-                Cancel
+                Abbrechen
               </button>
             </div>
           </div>

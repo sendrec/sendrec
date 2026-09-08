@@ -1,5 +1,5 @@
 :root {
-  --color-bg: #0a1628;
+  --color-bg: #0F172A;
   --color-surface: #111d32;
   --color-surface-raised: #162540;
   --color-border: #1e2d45;
@@ -7,9 +7,9 @@
   --color-text: #ffffff;
   --color-text-secondary: #8892a4;
   --color-text-tertiary: #5a6478;
-  --color-accent: #00b67a;
-  --color-accent-hover: #00a06b;
-  --color-accent-subtle: rgba(0, 182, 122, 0.12);
+  --color-accent: #E6467A;
+  --color-accent-hover: #D63869;
+  --color-accent-subtle: rgba(230, 70, 122, 0.12);
   --color-error: #ef4444;
   --color-error-subtle: rgba(239, 68, 68, 0.12);
   --color-warning: #f59e0b;
@@ -18,7 +18,7 @@
   --color-on-accent: #ffffff;
   --color-chart-label: #94a3b8;
   --color-chart-grid: rgba(148, 163, 184, 0.1);
-  --color-drag-highlight: rgba(0, 182, 122, 0.05);
+  --color-drag-highlight: rgba(230, 70, 122, 0.05);
   --color-bg-tertiary: #1a2740;
 
   /* Spacing scale (4px base) */
@@ -54,9 +54,9 @@
   --color-text: #0f172a;
   --color-text-secondary: #64748b;
   --color-text-tertiary: #94a3b8;
-  --color-accent: #00915f;
-  --color-accent-hover: #007a50;
-  --color-accent-subtle: rgba(0, 145, 95, 0.08);
+  --color-accent: #E6467A;
+  --color-accent-hover: #D63869;
+  --color-accent-subtle: rgba(230, 70, 122, 0.08);
   --color-error: #dc2626;
   --color-error-subtle: rgba(220, 38, 38, 0.08);
   --color-warning: #d97706;
@@ -65,7 +65,7 @@
   --color-on-accent: #ffffff;
   --color-chart-label: #64748b;
   --color-chart-grid: rgba(100, 116, 139, 0.1);
-  --color-drag-highlight: rgba(0, 145, 95, 0.05);
+  --color-drag-highlight: rgba(230, 70, 122, 0.05);
   --color-bg-tertiary: #f1f5f9;
 }
 
@@ -4095,9 +4095,9 @@ textarea.form-input {
   border-radius: 3px;
   font-size: 11px;
   font-weight: 600;
-  background: rgba(0, 182, 122, 0.12);
+  background: rgba(230, 70, 122, 0.12);
   color: var(--color-accent);
-  border: 1px solid rgba(0, 182, 122, 0.25);
+  border: 1px solid rgba(230, 70, 122, 0.25);
 }
 
 .status-badge--processing {
@@ -4617,4 +4617,44 @@ textarea.form-input {
     background: var(--color-overlay);
     z-index: 299;
   }
+}
+
+/* 99tools Record UI language selector */
+.language-select {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.language-select--compact {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.language-select-control--compact {
+  min-width: 58px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.language-select-control--compact:hover,
+.language-select-control--compact:focus {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.auth-language-select {
+  position: absolute;
+  top: 20px;
+  right: 64px;
+  z-index: 2;
 }

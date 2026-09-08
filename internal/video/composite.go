@@ -15,8 +15,7 @@ func probeVideoInfo(path string) (frames int, info string, err error) {
 	cmd := exec.Command("ffprobe",
 		"-v", "error",
 		"-select_streams", "v:0",
-		"-count_frames",
-		"-show_entries", "stream=nb_read_frames,start_time,codec_name,width,height",
+		"-show_entries", "stream=index,start_time,codec_name,width,height",
 		"-of", "default=noprint_wrappers=1",
 		path,
 	)
@@ -25,15 +24,32 @@ func probeVideoInfo(path string) (frames int, info string, err error) {
 		return 0, "", fmt.Errorf("ffprobe: %w: %s", cmdErr, string(output))
 	}
 	info = strings.TrimSpace(string(output))
-	for _, line := range strings.Split(info, "\n") {
-		if strings.HasPrefix(line, "nb_read_frames=") {
-			_, _ = fmt.Sscanf(strings.TrimPrefix(line, "nb_read_frames="), "%d", &frames)
-		}
+
+	// Wir brauchen nur die Information, ob ein Videostream vorhanden ist.
+	// Vollständiges Frame-Zählen ist hier unnötig und bei 4K-Aufnahmen sehr langsam.
+	if strings.Contains(info, "index=") {
+		frames = 1
 	}
+
 	return frames, info, nil
 }
 
-func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (string, error) {
+func cameraOverlayPosition(cameraPosition string) string {
+	switch cameraPosition {
+	case "top-left":
+		return "20:20"
+	case "top-right":
+		return "W-w-20:20"
+	case "bottom-left":
+		return "20:H-h-20"
+	case "bottom-right":
+		return "W-w-20:H-h-20"
+	default:
+		return "W-w-20:H-h-20"
+	}
+}
+
+func compositeOverlay(screenPath, webcamPath, outputPath, contentType, cameraPosition string) (string, error) {
 	// PiP filter: scale webcam, add border, normalize timestamps.
 	// setpts=PTS-STARTPTS normalizes webcam timestamps to start at 0.
 	pipSetup := "[1:v]setpts=PTS-STARTPTS,scale=240:-1,pad=iw+8:ih+8:(ow-iw)/2:(oh-ih)/2:color=black@0.3[pip]"
@@ -44,7 +60,7 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (s
 		// This ensures the PiP is sized relative to the output resolution,
 		// not the original (which may be high-DPI, e.g. 3242x2626).
 		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
-			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
+			pipSetup + ";[screen][pip]overlay=" + cameraOverlayPosition(cameraPosition) + "[vout]"
 		args = []string{
 			"-i", screenPath,
 			"-i", webcamPath,
@@ -64,8 +80,8 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (s
 		}
 	} else {
 		// For WebM, also scale down high-DPI screens before overlay
-		filterComplex := "[0:v]scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
-			pipSetup + ";[screen][pip]overlay=W-w-20:H-h-20[vout]"
+		filterComplex := "[0:v]scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2[screen];" +
+			pipSetup + ";[screen][pip]overlay=" + cameraOverlayPosition(cameraPosition) + "[vout]"
 		args = []string{
 			"-i", screenPath,
 			"-i", webcamPath,
@@ -74,6 +90,10 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (s
 			"-map", "0:a?",
 			"-c:a", "copy",
 			"-c:v", "libvpx-vp9",
+			"-deadline", "realtime",
+			"-cpu-used", "8",
+			"-row-mt", "1",
+			"-threads", "2",
 			"-y",
 			outputPath,
 		}
@@ -87,7 +107,7 @@ func compositeOverlay(screenPath, webcamPath, outputPath, contentType string) (s
 	return string(output), nil
 }
 
-func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey, contentType string) {
+func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, screenKey, webcamKey, thumbnailKey, contentType, cameraPosition string) {
 	slog.Info("composite: starting webcam overlay", "video_id", videoID)
 
 	setReadyFallback := func() {
@@ -177,7 +197,7 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	_ = tmpOutput.Close()
 	defer func() { _ = os.Remove(tmpOutputPath) }()
 
-	ffmpegOutput, err := compositeOverlay(tmpScreenPath, tmpWebcamPath, tmpOutputPath, contentType)
+	ffmpegOutput, err := compositeOverlay(tmpScreenPath, tmpWebcamPath, tmpOutputPath, contentType, cameraPosition)
 	if err != nil {
 		slog.Error("composite: ffmpeg failed", "video_id", videoID, "error", err, "ffmpeg_output", ffmpegOutput)
 		setReadyFallback()

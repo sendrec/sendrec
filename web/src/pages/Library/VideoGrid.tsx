@@ -70,7 +70,7 @@ export function VideoGrid({
       <div className="library-header">
         <div>
           <h1 style={{ color: "var(--color-text)", fontSize: 24, margin: 0 }}>
-            Library
+            Bibliothek
           </h1>
           {limits && limits.maxVideosPerMonth > 0 && (
             <p style={{ color: "var(--color-text-secondary)", fontSize: 13, margin: "4px 0 0" }}>
@@ -80,7 +80,7 @@ export function VideoGrid({
         </div>
         <input
           type="text"
-          placeholder="Search videos..."
+          placeholder="Videos durchsuchen..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="library-search"
@@ -91,7 +91,7 @@ export function VideoGrid({
             className="detail-btn detail-btn--accent"
             style={{ textDecoration: "none", whiteSpace: "nowrap" }}
           >
-            New Recording
+            Neue Aufnahme
           </Link>
         )}
       </div>
@@ -101,25 +101,25 @@ export function VideoGrid({
           className="sort-select"
           value={sortBy}
           onChange={(e) => onSortByChange(e.target.value as typeof sortBy)}
-          aria-label="Sort videos"
+          aria-label="Videos sortieren"
         >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="most-viewed">Most viewed</option>
-          <option value="title">Title A-Z</option>
+          <option value="newest">Neueste zuerst</option>
+          <option value="oldest">Älteste zuerst</option>
+          <option value="most-viewed">Meistgesehen</option>
+          <option value="title">Titel A–Z</option>
         </select>
         <div className="view-toggle">
           <button
             className={`view-toggle-btn${viewMode === "grid" ? " view-toggle-btn--active" : ""}`}
             onClick={() => onSetViewMode("grid")}
-            aria-label="Grid view"
+            aria-label="Kachelansicht"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/></svg>
           </button>
           <button
             className={`view-toggle-btn${viewMode === "list" ? " view-toggle-btn--active" : ""}`}
             onClick={() => onSetViewMode("list")}
-            aria-label="List view"
+            aria-label="Listenansicht"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="3" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="1" y="7" width="14" height="3" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="1" y="12" width="14" height="3" rx="1" stroke="currentColor" strokeWidth="1.5"/></svg>
           </button>
@@ -131,8 +131,8 @@ export function VideoGrid({
           <span style={{ fontWeight: 600, fontSize: 14 }}>
             {selectedIds.size} selected
           </span>
-          <button onClick={onSelectAll} className="detail-btn">Select all</button>
-          <button onClick={onDeselectAll} className="detail-btn">Deselect all</button>
+          <button onClick={onSelectAll} className="detail-btn">Alle auswählen</button>
+          <button onClick={onDeselectAll} className="detail-btn">Auswahl aufheben</button>
           <select
             onChange={(e) => {
               const val = e.target.value;
@@ -143,12 +143,12 @@ export function VideoGrid({
             className="detail-btn"
             style={{ cursor: "pointer" }}
           >
-            <option value="" disabled>Move to folder...</option>
-            <option value="__none__">No folder</option>
+            <option value="" disabled>In Ordner verschieben...</option>
+            <option value="__none__">Kein Ordner</option>
             {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
           <button onClick={onBatchDelete} className="detail-btn detail-btn--danger" disabled={batchLoading}>
-            Delete
+            Löschen
           </button>
         </div>
       )}
@@ -168,13 +168,13 @@ export function VideoGrid({
                 {(video.status === "uploading" || video.status === "processing") && (
                   <span className="video-card-status">
                     <span className="status-dot" />
-                    {video.status === "uploading" ? "uploading..." : "processing..."}
+                    {video.status === "uploading" ? "wird hochgeladen..." : "wird verarbeitet..."}
                   </span>
                 )}
                 {video.pinned && (
                   <span
                     className="video-card-pin"
-                    title="Pinned"
+                    title="Angeheftet"
                     style={{
                       position: "absolute",
                       top: 6,
@@ -196,7 +196,7 @@ export function VideoGrid({
               checked={selectedIds.has(video.id)}
               onChange={() => onToggleSelect(video.id)}
               className={`video-select-checkbox${selectedIds.size > 0 ? " video-select-checkbox--visible" : ""}`}
-              aria-label={`Select ${video.title}`}
+              aria-label={`${video.title} auswählen`}
               onClick={(e) => e.stopPropagation()}
             />
             <div className="video-card-body">
@@ -214,21 +214,21 @@ export function VideoGrid({
                     <span className="video-card-meta-dot" />
                     <span>
                       {video.viewCount === video.uniqueViewCount
-                        ? `${video.viewCount} view${video.viewCount !== 1 ? "s" : ""}`
-                        : `${video.viewCount} views (${video.uniqueViewCount} unique)`}
+                        ? `${video.viewCount} Aufruf${video.viewCount !== 1 ? "e" : ""}`
+                        : `${video.viewCount} Aufrufe (${video.uniqueViewCount} eindeutig)`}
                     </span>
                   </>
                 )}
                 {video.status === "ready" && video.viewCount === 0 && (
                   <>
                     <span className="video-card-meta-dot" />
-                    <span style={{ opacity: 0.6 }}>No views yet</span>
+                    <span style={{ opacity: 0.6 }}>Noch keine Aufrufe</span>
                   </>
                 )}
                 {video.transcriptStatus === "no_audio" && (
                   <>
                     <span className="video-card-meta-dot" />
-                    <span style={{ opacity: 0.7 }}>No audio</span>
+                    <span style={{ opacity: 0.7 }}>Kein Audio</span>
                   </>
                 )}
                 {video.status === "ready" && (() => {
@@ -260,14 +260,14 @@ export function VideoGrid({
                   onClick={() => onCopyLink(video.shareUrl)}
                   className="card-action-btn"
                 >
-                  Copy link
+                  Link kopieren
                 </button>
                 <span className="card-action-spacer" />
                 <div style={{ position: "relative" }} ref={openMenuId === video.id ? menuRef : undefined}>
                   <button
                     onClick={() => onSetOpenMenuId(openMenuId === video.id ? null : video.id)}
                     className="card-action-btn"
-                    aria-label="More actions"
+                    aria-label="Weitere Aktionen"
                     aria-expanded={openMenuId === video.id}
                   >
                     &middot;&middot;&middot;
@@ -304,7 +304,7 @@ export function VideoGrid({
                         style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", textDecoration: "none" }}
                         onClick={() => onSetOpenMenuId(null)}
                       >
-                        Analytics
+                        Analysen
                       </Link>
                       <button
                         onClick={() => { onDownloadVideo(video.id); onSetOpenMenuId(null); }}
@@ -312,7 +312,7 @@ export function VideoGrid({
                         className="action-link"
                         style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", opacity: downloadingId === video.id ? 0.5 : undefined }}
                       >
-                        {downloadingId === video.id ? "Downloading..." : "Download"}
+                        {downloadingId === video.id ? "Wird heruntergeladen..." : "Herunterladen"}
                       </button>
                       {!isViewer && (
                         <button
@@ -320,7 +320,7 @@ export function VideoGrid({
                           className="action-link"
                           style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px" }}
                         >
-                          Move to...
+                          Verschieben nach...
                         </button>
                       )}
                       {!isViewer && (
@@ -332,7 +332,7 @@ export function VideoGrid({
                             className="action-link"
                             style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 12px", color: "var(--color-error)", opacity: deletingId === video.id ? 0.5 : undefined }}
                           >
-                            {deletingId === video.id ? "Deleting..." : "Delete"}
+                            {deletingId === video.id ? "Wird gelöscht..." : "Löschen"}
                           </button>
                         </>
                       )}

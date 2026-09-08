@@ -30,10 +30,10 @@ export function NotificationSection({
         method: "PUT",
         body: JSON.stringify({ notificationMode: value }),
       });
-      setNotificationMessage("Preference saved");
+      setNotificationMessage("Einstellung gespeichert");
     } catch {
       setNotificationMode(previous);
-      setNotificationMessage("Failed to save");
+      setNotificationMessage("Speichern fehlgeschlagen");
     }
   }
 
@@ -47,9 +47,9 @@ export function NotificationSection({
         body: JSON.stringify({ notificationMode, slackWebhookUrl }),
       });
       setSavedSlackUrl(slackWebhookUrl);
-      setSlackMessage("Webhook URL saved");
+      setSlackMessage("Webhook-URL gespeichert");
     } catch (err) {
-      setSlackError(err instanceof Error ? err.message : "Failed to save webhook URL");
+      setSlackError(err instanceof Error ? err.message : "Webhook-URL konnte nicht gespeichert werden");
     } finally {
       setSavingSlack(false);
     }
@@ -63,9 +63,9 @@ export function NotificationSection({
       await apiFetch("/api/settings/notifications/test-slack", {
         method: "POST",
       });
-      setSlackMessage("Test message sent");
+      setSlackMessage("Testnachricht gesendet");
     } catch (err) {
-      setSlackError(err instanceof Error ? err.message : "Failed to send test message");
+      setSlackError(err instanceof Error ? err.message : "Testnachricht konnte nicht gesendet werden");
     } finally {
       setTestingSlack(false);
     }
@@ -74,40 +74,40 @@ export function NotificationSection({
   return (
     <>
       <div className="card settings-section">
-        <h2>Email Notifications</h2>
+        <h2>E-Mail-Benachrichtigungen</h2>
         <p className="card-description">
-          Choose when to get email notifications for views and comments.
+          Lege fest, wann du E-Mail-Benachrichtigungen zu Aufrufen und Kommentaren erhältst.
         </p>
 
         <div className="form-field">
-          <label className="form-label" htmlFor="notification-mode">Notifications</label>
+          <label className="form-label" htmlFor="notification-mode">Benachrichtigungen</label>
           <select
             id="notification-mode"
             className="form-input"
             value={notificationMode}
             onChange={(e) => handleNotificationChange(e.target.value)}
           >
-            <option value="off">Off</option>
-            <option value="views_only">Views only</option>
-            <option value="comments_only">Comments only</option>
-            <option value="views_and_comments">Views + comments</option>
-            <option value="digest">Daily digest (views + comments)</option>
+            <option value="off">Aus</option>
+            <option value="views_only">Nur Aufrufe</option>
+            <option value="comments_only">Nur Kommentare</option>
+            <option value="views_and_comments">Aufrufe + Kommentare</option>
+            <option value="digest">Tägliche Zusammenfassung (Aufrufe + Kommentare)</option>
           </select>
         </div>
 
         {notificationMessage && (
-          <p className={`status-message ${notificationMessage === "Failed to save" ? "status-message--error" : "status-message--success"}`}>{notificationMessage}</p>
+          <p className={`status-message ${notificationMessage === "Speichern fehlgeschlagen" ? "status-message--error" : "status-message--success"}`}>{notificationMessage}</p>
         )}
       </div>
 
       <div className="card settings-section">
-        <h2>Slack Notifications</h2>
+        <h2>Slack-Benachrichtigungen</h2>
         <p className="card-description">
-          Send video view and comment notifications to a Slack channel.
+          Sende Benachrichtigungen zu Videoaufrufen und Kommentaren an einen Slack-Kanal.
         </p>
 
         <div className="form-field">
-          <label className="form-label">Slack webhook URL</label>
+          <label className="form-label">Slack-Webhook-URL</label>
           <input
             type="url"
             className="form-input"
@@ -124,7 +124,7 @@ export function NotificationSection({
             onClick={handleSlackSave}
             disabled={savingSlack}
           >
-            {savingSlack ? "Saving..." : "Save"}
+            {savingSlack ? "Wird gespeichert..." : "Speichern"}
           </button>
           <button
             type="button"
@@ -132,7 +132,7 @@ export function NotificationSection({
             onClick={handleSlackTest}
             disabled={testingSlack || !savedSlackUrl}
           >
-            {testingSlack ? "Sending..." : "Send test message"}
+            {testingSlack ? "Wird gesendet..." : "Testnachricht senden"}
           </button>
         </div>
 
@@ -144,13 +144,13 @@ export function NotificationSection({
         )}
 
         <details className="settings-details">
-          <summary>How to get a webhook URL</summary>
+          <summary>So erhältst du eine Webhook-URL</summary>
           <ol>
-            <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer">api.slack.com/apps</a></li>
-            <li>Click <strong>Create New App</strong> and choose <strong>From scratch</strong></li>
-            <li>Under <strong>Features</strong>, select <strong>Incoming Webhooks</strong></li>
-            <li>Activate webhooks and click <strong>Add New Webhook to Workspace</strong></li>
-            <li>Choose a channel and copy the webhook URL</li>
+            <li>Gehe zu <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer">api.slack.com/apps</a></li>
+            <li>Klicke auf <strong>Create New App</strong> und wähle <strong>From scratch</strong></li>
+            <li>Unter <strong>Features</strong>, wähle <strong>Incoming Webhooks</strong></li>
+            <li>Aktiviere Webhooks und klicke auf <strong>Add New Webhook to Workspace</strong></li>
+            <li>Wähle einen Kanal und kopiere die Webhook-URL</li>
           </ol>
         </details>
       </div>

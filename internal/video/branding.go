@@ -20,12 +20,12 @@ import (
 var hexColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 const (
-	defaultColorBackground = "#0a1628"
-	defaultColorSurface    = "#1e293b"
-	defaultColorText       = "#ffffff"
-	defaultColorAccent     = "#00b67a"
-	defaultCompanyName     = "SendRec"
-	defaultLogoPath        = "/images/logo.png"
+	defaultColorBackground = "#0F172A"
+	defaultColorSurface    = "#1E293B"
+	defaultColorText       = "#F8FAFC"
+	defaultColorAccent     = "#E6467A"
+	defaultCompanyName     = "99tools Record"
+	defaultLogoPath        = "/images/logo-99tools.png"
 	defaultFooterText      = ""
 
 	maxLogoUploadBytes = 512 * 1024

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError, apiFetch, setAccessToken } from "../api/client";
 import { AuthForm } from "../components/AuthForm";
 import { providerLabel } from "../utils/sso";
+import { useI18n } from "../i18n/I18nContext";
 
 interface SsoEnforcement {
   email: string;
@@ -12,6 +13,7 @@ interface SsoEnforcement {
 
 export function Login() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [ssoProviders, setSsoProviders] = useState<string[]>([]);
@@ -89,9 +91,9 @@ export function Login() {
       }
       if (err instanceof ApiError && err.status === 403 && err.message === "sso_required") {
         const orgId = (err.data.orgId as string) ?? "";
-        const orgName = (err.data.orgName as string) ?? "your workspace";
+        const orgName = (err.data.orgName as string) ?? t("workspace.personal");
         setSsoEnforcement({ email: data.email, orgId, orgName });
-        throw new Error(`"${orgName}" requires SSO sign-in`);
+        throw new Error(t("auth.ssoFor", { name: orgName }));
       }
       throw err;
     }
@@ -107,14 +109,14 @@ export function Login() {
       )}
       {(ssoProviders.length > 0 || ssoEnforcement) && (
         <>
-          <div className="auth-divider">or</div>
+          <div className="auth-divider">{t("auth.or")}</div>
           <div className="sso-buttons">
             {ssoEnforcement && (
               <a
                 href={`/api/auth/sso/org?email=${encodeURIComponent(ssoEnforcement.email)}&org=${encodeURIComponent(ssoEnforcement.orgId)}`}
                 className="btn btn--secondary btn--sso"
               >
-                Sign in with SSO for {ssoEnforcement.orgName}
+                {t("auth.ssoFor", { name: ssoEnforcement.orgName })}
               </a>
             )}
             {ssoProviders.map((provider) => (
@@ -123,7 +125,7 @@ export function Login() {
                 href={`/api/auth/sso/${provider}`}
                 className="btn btn--secondary btn--sso"
               >
-                Continue with {providerLabel(provider)}
+                {t("auth.continueWith", { provider: providerLabel(provider) })}
               </a>
             ))}
           </div>
@@ -134,18 +136,18 @@ export function Login() {
 
   return (
     <AuthForm
-      title="Sign in"
-      submitLabel="Sign in"
+      title={t("auth.signIn")}
+      submitLabel={t("auth.signIn")}
       onSubmit={handleLogin}
       afterSubmit={ssoSection}
       footer={
         <>
           <Link to="/forgot-password" className="auth-footer-link-block">
-            Forgot password?
+            {t("auth.forgotPassword")}
           </Link>
           {registrationEnabled && (
             <>
-              Don&apos;t have an account? <Link to={registerPath}>Sign up</Link>
+              {t("auth.noAccount")} <Link to={registerPath}>{t("auth.signUp")}</Link>
             </>
           )}
         </>

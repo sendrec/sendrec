@@ -1,5 +1,7 @@
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useTheme } from "../hooks/useTheme";
+import { useI18n } from "../i18n/I18nContext";
+import { LanguageSelect } from "./LanguageSelect";
 
 interface AuthFormProps {
   title: string;
@@ -31,6 +33,7 @@ export function AuthForm({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
+  const { t } = useI18n();
 
   function toggleTheme() {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
@@ -41,7 +44,7 @@ export function AuthForm({
     setError("");
 
     if (showPasswordConfirm && password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("auth.passwordMismatch"));
       return;
     }
 
@@ -50,7 +53,7 @@ export function AuthForm({
     try {
       await onSubmit({ email, password, name });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : t("auth.genericError"));
     } finally {
       setLoading(false);
     }
@@ -61,7 +64,7 @@ export function AuthForm({
       <button
         className="auth-theme-toggle"
         onClick={toggleTheme}
-        aria-label="Toggle theme"
+        aria-label={t("nav.theme")}
       >
         {resolvedTheme === "dark" ? (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -77,11 +80,12 @@ export function AuthForm({
           </svg>
         )}
       </button>
+      <div className="auth-language-select"><LanguageSelect compact /></div>
       <div className="auth-brand">
-        <img src="/images/logo.png" alt="" width="48" height="48" className="auth-logo-img" />
+        <img src="/images/logo-99tools.png" alt="" width="48" height="48" className="auth-logo-img" />
         <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
+          <span className="auth-logo-send">99tools</span>
+          <span className="auth-logo-rec"> Record</span>
         </span>
       </div>
 
@@ -90,7 +94,7 @@ export function AuthForm({
 
         {showName && (
           <label>
-            <span>Name</span>
+            <span>{t("auth.name")}</span>
             <input
               type="text"
               value={name}
@@ -101,7 +105,7 @@ export function AuthForm({
         )}
 
         <label>
-          <span>Email</span>
+          <span>{t("auth.email")}</span>
           <input
             type="email"
             value={email}
@@ -111,7 +115,7 @@ export function AuthForm({
         </label>
 
         <label>
-          <span>Password</span>
+          <span>{t("auth.password")}</span>
           <input
             type="password"
             value={password}
@@ -121,14 +125,14 @@ export function AuthForm({
           />
           {showPasswordConfirm && (
             <span className="form-hint">
-              Must be at least 8 characters
+              {t("auth.passwordHint")}
             </span>
           )}
         </label>
 
         {showPasswordConfirm && (
           <label>
-            <span>Confirm password</span>
+            <span>{t("auth.confirmPassword")}</span>
             <input
               type="password"
               value={confirmPassword}
@@ -146,7 +150,7 @@ export function AuthForm({
         )}
 
         <button type="submit" disabled={loading}>
-          {loading ? "Loading..." : submitLabel}
+          {loading ? t("common.loading") : submitLabel}
         </button>
 
         {afterSubmit}

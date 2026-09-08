@@ -16,7 +16,7 @@ export function ConfirmDialog({
   message,
   onConfirm,
   onCancel,
-  confirmLabel = "Confirm",
+  confirmLabel = "Bestätigen",
   danger = false,
 }: ConfirmDialogProps) {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -84,7 +84,7 @@ export function ConfirmDialog({
               cursor: "pointer",
             }}
           >
-            Cancel
+            Abbrechen
           </button>
           <button
             onClick={onConfirm}

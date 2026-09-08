@@ -64,7 +64,7 @@ export function WebhookSection({
       const prefs = await apiFetch<{ webhookSecret: string | null }>("/api/settings/notifications");
       if (prefs?.webhookSecret) setWebhookSecret(prefs.webhookSecret);
     } catch (err) {
-      setWebhookError(err instanceof Error ? err.message : "Failed to save");
+      setWebhookError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
     } finally {
       setSavingWebhook(false);
     }
@@ -76,11 +76,11 @@ export function WebhookSection({
     setWebhookMessage("");
     try {
       await apiFetch("/api/settings/notifications/test-webhook", { method: "POST" });
-      setWebhookMessage("Test event sent");
+      setWebhookMessage("Testereignis gesendet");
       const data = await apiFetch<WebhookDelivery[]>("/api/settings/notifications/webhook-deliveries");
       setWebhookDeliveries(data ?? []);
     } catch (err) {
-      setWebhookError(err instanceof Error ? err.message : "Failed to send test");
+      setWebhookError(err instanceof Error ? err.message : "Test konnte nicht gesendet werden");
     } finally {
       setTestingWebhook(false);
     }
@@ -92,9 +92,9 @@ export function WebhookSection({
     try {
       const resp = await apiFetch<{ webhookSecret: string }>("/api/settings/notifications/regenerate-webhook-secret", { method: "POST" });
       if (resp?.webhookSecret) setWebhookSecret(resp.webhookSecret);
-      setWebhookMessage("Secret regenerated");
+      setWebhookMessage("Secret neu erzeugt");
     } catch (err) {
-      setWebhookError(err instanceof Error ? err.message : "Failed to regenerate");
+      setWebhookError(err instanceof Error ? err.message : "Neuerzeugung fehlgeschlagen");
     } finally {
       setRegeneratingSecret(false);
     }
@@ -104,11 +104,11 @@ export function WebhookSection({
     <div className="card settings-section">
       <h2>Webhooks</h2>
       <p className="card-description">
-        Receive HTTP POST notifications for video events. Use with n8n, Zapier, or custom integrations.
+        Empfange HTTP-POST-Benachrichtigungen zu Video-Ereignissen. Nutzbar mit n8n, Zapier oder eigenen Integrationen.
       </p>
 
       <div className="form-field">
-        <label className="form-label">Webhook URL</label>
+        <label className="form-label">Webhook-URL</label>
         <input
           type="url"
           className="form-input"
@@ -116,12 +116,12 @@ export function WebhookSection({
           onChange={(e) => setWebhookUrl(e.target.value)}
           placeholder="https://example.com/webhook"
         />
-        <span className="form-hint">Receive HTTP POST notifications for video events (n8n, Zapier, custom).</span>
+        <span className="form-hint">HTTP-POST-Benachrichtigungen für Video-Ereignisse empfangen (n8n, Zapier, eigene Systeme).</span>
       </div>
 
       {webhookSecret && (
         <div className="form-field">
-          <span className="form-label">Signing secret</span>
+          <span className="form-label">Signatur-Secret</span>
           <div className="secret-row">
             <code className="secret-code">
               {webhookSecret}
@@ -135,7 +135,7 @@ export function WebhookSection({
                 setTimeout(() => setCopiedSecret(false), 2000);
               }}
             >
-              {copiedSecret ? "Copied" : "Copy"}
+              {copiedSecret ? "Copied" : "Kopieren"}
             </button>
             <button
               type="button"
@@ -143,7 +143,7 @@ export function WebhookSection({
               onClick={handleRegenerateSecret}
               disabled={regeneratingSecret}
             >
-              {regeneratingSecret ? "Regenerating..." : "Regenerate"}
+              {regeneratingSecret ? "Wird neu erzeugt..." : "Neu erstellen"}
             </button>
           </div>
         </div>
@@ -156,7 +156,7 @@ export function WebhookSection({
           onClick={handleWebhookSave}
           disabled={savingWebhook}
         >
-          {savingWebhook ? "Saving..." : "Save webhook"}
+          {savingWebhook ? "Wird gespeichert..." : "Webhook speichern"}
         </button>
         <button
           type="button"
@@ -164,7 +164,7 @@ export function WebhookSection({
           onClick={handleWebhookTest}
           disabled={testingWebhook || !savedWebhookUrl}
         >
-          {testingWebhook ? "Sending..." : "Send test event"}
+          {testingWebhook ? "Wird gesendet..." : "Testereignis senden"}
         </button>
       </div>
 
@@ -184,12 +184,12 @@ export function WebhookSection({
         });
         return (
           <div className="delivery-list">
-            <h3 className="delivery-list-title">Recent deliveries</h3>
+            <h3 className="delivery-list-title">Letzte Zustellungen</h3>
             <div className="delivery-toolbar">
               <input
                 type="text"
                 className="delivery-search"
-                placeholder="Filter by event..."
+                placeholder="Nach Ereignis filtern..."
                 value={deliverySearch}
                 onChange={(e) => setDeliverySearch(e.target.value)}
               />
@@ -201,14 +201,14 @@ export function WebhookSection({
                     className={`delivery-filter-btn${deliveryFilter === f ? " delivery-filter-btn--active" : ""}`}
                     onClick={() => setDeliveryFilter(f)}
                   >
-                    {f === "all" ? "All" : f === "success" ? "Success" : "Errors"}
+                    {f === "all" ? "Alle" : f === "success" ? "Erfolgreich" : "Fehler"}
                   </button>
                 ))}
               </div>
             </div>
             <div className="delivery-scroll">
               {filtered.length === 0 ? (
-                <p className="delivery-empty">No matching deliveries</p>
+                <p className="delivery-empty">Keine passenden Zustellungen</p>
               ) : (
                 filtered.map((delivery) => {
                   const isSuccess = delivery.statusCode >= 200 && delivery.statusCode < 300;
@@ -234,14 +234,14 @@ export function WebhookSection({
                       {isExpanded && (
                         <div className="delivery-detail">
                           <div>
-                            <span className="delivery-detail-label">Payload</span>
+                            <span className="delivery-detail-label">Nutzdaten</span>
                             <pre className="delivery-detail-pre">
                               {formatJson(delivery.payload)}
                             </pre>
                           </div>
                           {delivery.responseBody && (
                             <div>
-                              <span className="delivery-detail-label">Response</span>
+                              <span className="delivery-detail-label">Antwort</span>
                               <pre className="delivery-detail-pre">
                                 {delivery.responseBody}
                               </pre>
@@ -259,15 +259,15 @@ export function WebhookSection({
       })()}
 
       <details className="settings-details">
-        <summary>Supported events</summary>
+        <summary>Unterstützte Ereignisse</summary>
         <ul>
-          <li><code>video.viewed</code> — A viewer watched a video</li>
-          <li><code>video.comment.created</code> — A new comment was posted</li>
-          <li><code>video.reaction.created</code> — An emoji reaction was added</li>
-          <li><code>video.transcription.ready</code> — Transcription completed</li>
-          <li><code>video.summary.ready</code> — AI summary completed</li>
-          <li><code>video.cta.clicked</code> — A CTA button was clicked</li>
-          <li><code>test</code> — Test event from Settings</li>
+          <li><code>video.viewed</code> — Ein Zuschauer hat ein Video angesehen</li>
+          <li><code>video.comment.created</code> — Ein neuer Kommentar wurde veröffentlicht</li>
+          <li><code>video.reaction.created</code> — Eine Emoji-Reaktion wurde hinzugefügt</li>
+          <li><code>video.transcription.ready</code> — Transkription abgeschlossen</li>
+          <li><code>video.summary.ready</code> — KI-Zusammenfassung abgeschlossen</li>
+          <li><code>video.cta.clicked</code> — Ein CTA-Button wurde angeklickt</li>
+          <li><code>test</code> — Testereignis aus den Einstellungen</li>
         </ul>
       </details>
     </div>

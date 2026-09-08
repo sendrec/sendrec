@@ -19,7 +19,7 @@ export function expiryLabel(shareExpiresAt: string | null): {
   expired: boolean;
 } {
   if (shareExpiresAt === null) {
-    return { text: "Never expires", expired: false };
+    return { text: "Läuft nie ab", expired: false };
   }
   const expiry = new Date(shareExpiresAt);
   const now = new Date();
@@ -29,7 +29,7 @@ export function expiryLabel(shareExpiresAt: string | null): {
   const diffMs = expiry.getTime() - now.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   if (diffDays === 1) {
-    return { text: "Expires tomorrow", expired: false };
+    return { text: "Läuft morgen ab", expired: false };
   }
-  return { text: `Expires in ${diffDays} days`, expired: false };
+  return { text: `Läuft in ${diffDays} Tagen ab`, expired: false };
 }
