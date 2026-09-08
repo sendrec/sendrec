@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../api/client";
 import { formatDuration } from "../utils/format";
 
+interface EditorClip {
+  id: string;
+  sourceVideoId: string;
+  start: number;
+  end: number;
+}
+
 interface VideoEditorModalProps {
   videoId: string;
   duration: number;
@@ -20,9 +27,18 @@ export function VideoEditorModal({
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(duration);
   const [trimming, setTrimming] = useState(false);
+  const [clips, setClips] = useState<EditorClip[]>([
+    {
+      id: "clip-1",
+      sourceVideoId: videoId,
+      start: 0,
+      end: duration,
+    },
+  ]);
   const [error, setError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const nextClipIdRef = useRef(2);
   const timelineRef = useRef<HTMLDivElement>(null);
   const draggingTrimRef = useRef<"start" | "end" | null>(null);
 
@@ -40,7 +56,16 @@ export function VideoEditorModal({
 
   useEffect(() => {
     setTrimEnd(duration);
-  }, [duration]);
+    setClips([
+      {
+        id: "clip-1",
+        sourceVideoId: videoId,
+        start: 0,
+        end: duration,
+      },
+    ]);
+    nextClipIdRef.current = 2;
+  }, [duration, videoId]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -126,6 +151,56 @@ export function VideoEditorModal({
     if (videoRef.current) {
       videoRef.current.currentTime = nextTime;
     }
+  }
+
+  function handleSplit() {
+    const minimumDistance = 0.1;
+
+    const clipIndex = clips.findIndex(
+      (clip) =>
+        currentTime > clip.start + minimumDistance &&
+        currentTime < clip.end - minimumDistance,
+    );
+
+    if (clipIndex === -1) {
+      setError(
+        "Zum Teilen muss der Abspielkopf innerhalb eines Clips stehen.",
+      );
+      return;
+    }
+
+    setClips((previousClips) => {
+      const index = previousClips.findIndex(
+        (clip) =>
+          currentTime > clip.start + minimumDistance &&
+          currentTime < clip.end - minimumDistance,
+      );
+
+      if (index === -1) return previousClips;
+
+      const clip = previousClips[index];
+
+      const leftClip: EditorClip = {
+        ...clip,
+        id: `clip-${nextClipIdRef.current++}`,
+        end: currentTime,
+      };
+
+      const rightClip: EditorClip = {
+        ...clip,
+        id: `clip-${nextClipIdRef.current++}`,
+        start: currentTime,
+      };
+
+      return [
+        ...previousClips.slice(0, index),
+        leftClip,
+        rightClip,
+        ...previousClips.slice(index + 1),
+      ];
+    });
+
+    setError(null);
   }
 
   function handleResetTrim() {
@@ -302,13 +377,29 @@ export function VideoEditorModal({
             ✂ Trimmen
           </button>
 
+          <button
+            type="button"
+            onClick={handleSplit}
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "8px 14px",
+              background: "var(--color-surface)",
+              color: "var(--color-text)",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Teilen
+          </button>
+
           <span
             style={{
               fontSize: 13,
               color: "var(--color-text-secondary)",
             }}
           >
-            Bereich mit den beiden Griffen auswählen – noch nicht gespeichert
+            Abspielkopf setzen und mit „Teilen“ einen neuen Clip erzeugen
           </span>
         </div>
 
@@ -338,30 +429,41 @@ export function VideoEditorModal({
             userSelect: "none",
           }}
         >
-          <div
-            style={{
-              position: "absolute",
-              inset: "10px 0",
-              background: "var(--color-accent)",
-              opacity: 0.8,
-              borderRadius: 6,
-            }}
-          />
+          {clips.map((clip, index) => {
+            const left =
+              duration > 0 ? (clip.start / duration) * 100 : 0;
+            const width =
+              duration > 0
+                ? ((clip.end - clip.start) / duration) * 100
+                : 0;
 
-          <div
-            style={{
-              position: "absolute",
-              inset: "10px 12px",
-              display: "flex",
-              alignItems: "center",
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              pointerEvents: "none",
-            }}
-          >
-            Clip 1
-          </div>
+            return (
+              <div
+                key={clip.id}
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  bottom: 10,
+                  left: `${left}%`,
+                  width: `${width}%`,
+                  background: "var(--color-accent)",
+                  border: "1px solid rgba(255,255,255,0.9)",
+                  boxSizing: "border-box",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0 12px",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  pointerEvents: "none",
+                }}
+              >
+                Clip {index + 1}
+              </div>
+            );
+          })}
 
           <div
             style={{
