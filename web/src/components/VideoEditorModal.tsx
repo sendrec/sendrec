@@ -94,6 +94,27 @@ export function VideoEditorModal({
     0,
   );
 
+  const timelineTickSteps = [0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+  const visibleTimelineDuration =
+    timelineDuration / Math.max(1, timelineZoom);
+  const desiredTimelineTickStep = visibleTimelineDuration / 10;
+  const timelineTickStep =
+    timelineTickSteps.find((step) => step >= desiredTimelineTickStep) ?? 600;
+
+  function formatTimelineTick(seconds: number) {
+    const minutes = Math.floor(seconds / 60);
+    const secondsInMinute = seconds % 60;
+
+    if (timelineTickStep >= 1) {
+      return `${minutes}:${String(Math.floor(secondsInMinute)).padStart(2, "0")}`;
+    }
+
+    const decimals = timelineTickStep <= 0.25 ? 2 : 1;
+    const formattedSeconds = secondsInMinute.toFixed(decimals);
+    return `${minutes}:${formattedSeconds.padStart(3 + decimals, "0")}`;
+  }
+
+
   function sourceTimeToTimelineTime(
     sourceVideoId: string,
     sourceTime: number,
@@ -995,6 +1016,59 @@ export function VideoEditorModal({
             paddingBottom: 6,
           }}
         >
+        <div
+          style={{
+            position: "relative",
+            height: 28,
+            width: `${timelineZoom * 100}%`,
+            minWidth: "100%",
+            borderBottom: "1px solid var(--color-border)",
+            marginBottom: 4,
+          }}
+        >
+          {Array.from(
+            { length: Math.floor(timelineDuration / timelineTickStep) + 1 },
+            (_, index) => {
+              const tickTime = index * timelineTickStep;
+              const left =
+                timelineDuration > 0 ? (tickTime / timelineDuration) * 100 : 0;
+
+              return (
+                <div
+                  key={`timeline-tick-${index}`}
+                  style={{
+                    position: "absolute",
+                    left: `${left}%`,
+                    top: 0,
+                    pointerEvents: "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 1,
+                      height: 8,
+                      background: "var(--color-text-secondary)",
+                      opacity: 0.6,
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 9,
+                      left: index === 0 ? 0 : "50%",
+                      transform: index === 0 ? "none" : "translateX(-50%)",
+                      fontSize: 10,
+                      color: "var(--color-text-secondary)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {formatTimelineTick(tickTime)}
+                  </span>
+                </div>
+              );
+            },
+          )}
+        </div>
           <div
             ref={timelineRef}
             onClick={handleTimelineClick}
