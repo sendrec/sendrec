@@ -51,18 +51,138 @@ export function VideoEditorModal({
   const nextClipIdRef = useRef(2);
   const timelineRef = useRef<HTMLDivElement>(null);
   const draggingTrimRef = useRef<"start" | "end" | null>(null);
+  const videoUrlsRef = useRef<Record<string, string>>({});
+  const activeSourceVideoIdRef = useRef(videoId);
+  const activeClipIdRef = useRef("clip-1");
+  const sourceSwitchGenerationRef = useRef(0);
+  const sourceTransitionPendingRef = useRef(false);
+  const cancelPendingSourceLoadRef = useRef<(() => void) | null>(null);
+
+  async function loadVideoUrl(sourceVideoId: string) {
+    if (videoUrlsRef.current[sourceVideoId]) {
+      return videoUrlsRef.current[sourceVideoId];
+    }
+
+    const res = await apiFetch<{ downloadUrl: string }>(`/api/videos/${sourceVideoId}/download`);
+    if (!res?.downloadUrl) {
+      throw new Error("Video konnte nicht geladen werden.");
+    }
+
+    videoUrlsRef.current[sourceVideoId] = res.downloadUrl;
+    return res.downloadUrl;
+  }
+
+  async function switchPreviewSource(
+    sourceVideoId: string,
+    sourceTime: number,
+    clipId?: string,
+    resumePlayback?: boolean,
+  ) {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const generation = ++sourceSwitchGenerationRef.current;
+    cancelPendingSourceLoadRef.current?.();
+    cancelPendingSourceLoadRef.current = null;
+    const shouldResume = resumePlayback ?? !video.paused;
+
+    try {
+      const url = await loadVideoUrl(sourceVideoId);
+      if (generation !== sourceSwitchGenerationRef.current) return;
+
+      if (clipId) activeClipIdRef.current = clipId;
+
+      if (activeSourceVideoIdRef.current === sourceVideoId && video.src === url) {
+        video.currentTime = sourceTime;
+        if (shouldResume) await video.play();
+        sourceTransitionPendingRef.current = false;
+        return;
+      }
+
+      video.pause();
+      activeSourceVideoIdRef.current = sourceVideoId;
+      setVideoUrl(url);
+
+      await new Promise<void>((resolve, reject) => {
+        let settled = false;
+        const handleLoadedMetadata = () => {
+          settled = true;
+          cleanup();
+          if (generation !== sourceSwitchGenerationRef.current) {
+            resolve();
+            return;
+          }
+          video.currentTime = Math.max(0, Math.min(sourceTime, video.duration || sourceTime));
+          resolve();
+        };
+        const handleError = () => {
+          settled = true;
+          cleanup();
+          reject(new Error("Video konnte nicht geladen werden."));
+        };
+        const cleanup = () => {
+          video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+          video.removeEventListener("error", handleError);
+          if (cancelPendingSourceLoadRef.current === cancel) {
+            cancelPendingSourceLoadRef.current = null;
+          }
+        };
+        const cancel = () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(new Error("Quellenwechsel wurde ersetzt."));
+        };
+
+        cancelPendingSourceLoadRef.current = cancel;
+
+        video.addEventListener("loadedmetadata", handleLoadedMetadata);
+        video.addEventListener("error", handleError);
+        video.src = url;
+        video.load();
+      });
+
+      if (generation !== sourceSwitchGenerationRef.current) return;
+      if (shouldResume) await video.play();
+      sourceTransitionPendingRef.current = false;
+      setError(null);
+    } catch (err) {
+      if (generation !== sourceSwitchGenerationRef.current) return;
+      sourceTransitionPendingRef.current = false;
+      setError(
+        err instanceof Error ? err.message : "Video konnte nicht geladen werden.",
+      );
+    }
+  }
+
+
 
   useEffect(() => {
+    let cancelled = false;
     apiFetch<{ downloadUrl: string }>(`/api/videos/${videoId}/download`)
       .then((res) => {
+        if (cancelled) return;
         if (res?.downloadUrl) {
           setVideoUrl(res.downloadUrl);
+          videoUrlsRef.current[videoId] = res.downloadUrl;
         } else {
           setError("Video konnte nicht geladen werden.");
         }
       })
-      .catch(() => setError("Video konnte nicht geladen werden."));
+      .catch(() => {
+        if (!cancelled) setError("Video konnte nicht geladen werden.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [videoId]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl || video.src === videoUrl) return;
+    video.src = videoUrl;
+    video.load();
+  }, [videoUrl]);
 
   useEffect(() => {
     setTrimEnd(duration);
@@ -78,7 +198,16 @@ export function VideoEditorModal({
     setSelectedClipId(null);
     setClipHistory([]);
     setTimelinePlayheadTime(0);
+    activeSourceVideoIdRef.current = videoId;
+    activeClipIdRef.current = "clip-1";
+    sourceSwitchGenerationRef.current += 1;
+    sourceTransitionPendingRef.current = false;
   }, [duration, videoId]);
+
+  useEffect(() => () => {
+    sourceSwitchGenerationRef.current += 1;
+    cancelPendingSourceLoadRef.current?.();
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -114,31 +243,6 @@ export function VideoEditorModal({
     return `${minutes}:${formattedSeconds.padStart(3 + decimals, "0")}`;
   }
 
-
-  function sourceTimeToTimelineTime(
-    sourceVideoId: string,
-    sourceTime: number,
-  ) {
-    let offset = 0;
-
-    for (const clip of clips) {
-      const clipDuration = clip.end - clip.start;
-
-      if (clip.sourceVideoId === sourceVideoId) {
-        if (sourceTime < clip.start) {
-          return offset;
-        }
-
-        if (sourceTime <= clip.end) {
-          return offset + (sourceTime - clip.start);
-        }
-      }
-
-      offset += clipDuration;
-    }
-
-    return offset;
-  }
 
   function timelineTimeToClipPosition(timelineTime: number) {
     if (clips.length === 0) return null;
@@ -176,6 +280,50 @@ export function VideoEditorModal({
     }
 
     return null;
+  }
+
+  function timelineStartForClip(clipId: string) {
+    let offset = 0;
+    for (const clip of clips) {
+      if (clip.id === clipId) return offset;
+      offset += clip.end - clip.start;
+    }
+    return null;
+  }
+
+  function sourceClipAtTime(sourceVideoId: string, sourceTime: number) {
+    return clips.find(
+      (clip) =>
+        clip.sourceVideoId === sourceVideoId &&
+        sourceTime >= clip.start - 0.001 &&
+        sourceTime <= clip.end + 0.001,
+    );
+  }
+
+  function advancePreviewToNextClip() {
+    if (sourceTransitionPendingRef.current) return;
+    const currentIndex = clips.findIndex((clip) => clip.id === activeClipIdRef.current);
+    if (currentIndex < 0) return;
+    if (currentIndex >= clips.length - 1) {
+      videoRef.current?.pause();
+      setTimelinePlayheadTime(timelineDuration);
+      return;
+    }
+
+    const nextClip = clips[currentIndex + 1];
+    const nextTimelineStart = timelineStartForClip(nextClip.id);
+    if (nextTimelineStart === null) return;
+
+    sourceTransitionPendingRef.current = true;
+    setTimelinePlayheadTime(nextTimelineStart);
+    setCurrentTime(nextClip.start);
+    setSelectedClipId(nextClip.id);
+    void switchPreviewSource(
+      nextClip.sourceVideoId,
+      nextClip.start,
+      nextClip.id,
+      true,
+    );
   }
 
   function timeFromClientX(clientX: number) {
@@ -221,8 +369,14 @@ export function VideoEditorModal({
 
         setCurrentTime(nextTime);
 
-        if (videoRef.current) {
+        if (videoRef.current && activeSourceVideoIdRef.current === videoId) {
           videoRef.current.currentTime = nextTime;
+        } else {
+          void switchPreviewSource(
+            videoId,
+            nextTime,
+            sourceClipAtTime(videoId, nextTime)?.id,
+          );
         }
       }
 
@@ -258,17 +412,12 @@ export function VideoEditorModal({
     setTimelinePlayheadTime(timelineTime);
     setSelectedClipId(position.clip.id);
     setError(null);
-
-    // Der Player zeigt momentan noch das Ausgangsvideo.
-    // Fremde Videoquellen werden im nächsten Schritt
-    // auch in der Vorschau umgeschaltet.
-    if (position.clip.sourceVideoId === videoId) {
-      setCurrentTime(position.sourceTime);
-
-      if (videoRef.current) {
-        videoRef.current.currentTime = position.sourceTime;
-      }
-    }
+    setCurrentTime(position.sourceTime);
+    void switchPreviewSource(
+      position.clip.sourceVideoId,
+      position.sourceTime,
+      position.clip.id,
+    );
   }
 
   async function handleOpenInsertPicker() {
@@ -384,6 +533,12 @@ export function VideoEditorModal({
       insertAt + selectedInsertVideo.duration,
     );
     setSelectedClipId(insertedId);
+    void switchPreviewSource(
+      insertedClip.sourceVideoId,
+      insertedClip.end,
+      insertedId,
+      false,
+    );
     setSelectedInsertVideo(null);
     setError(null);
   }
@@ -404,6 +559,17 @@ export function VideoEditorModal({
     setClips(previousClips);
     setClipHistory((history) => history.slice(0, -1));
     setSelectedClipId(null);
+    const firstClip = previousClips[0];
+    if (firstClip) {
+      setTimelinePlayheadTime(0);
+      setCurrentTime(firstClip.start);
+      void switchPreviewSource(
+        firstClip.sourceVideoId,
+        firstClip.start,
+        firstClip.id,
+        false,
+      );
+    }
     setError(null);
   }
 
@@ -451,6 +617,10 @@ export function VideoEditorModal({
       ...previousClips.slice(index + 1),
     ]);
 
+    if (activeClipIdRef.current === clip.id) {
+      activeClipIdRef.current = rightClip.id;
+    }
+
     setSelectedClipId(null);
     setError(null);
   }
@@ -480,6 +650,21 @@ export function VideoEditorModal({
       ),
     );
 
+    if (activeClipIdRef.current === selectedClipId) {
+      const remainingClips = clips.filter((clip) => clip.id !== selectedClipId);
+      const nextClip = remainingClips[0];
+      if (nextClip) {
+        setTimelinePlayheadTime(0);
+        setCurrentTime(nextClip.start);
+        void switchPreviewSource(
+          nextClip.sourceVideoId,
+          nextClip.start,
+          nextClip.id,
+          false,
+        );
+      }
+    }
+
     setSelectedClipId(null);
     setError(null);
   }
@@ -490,9 +675,12 @@ export function VideoEditorModal({
     setCurrentTime(0);
     setTimelinePlayheadTime(0);
 
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-    }
+    void switchPreviewSource(
+      videoId,
+      0,
+      sourceClipAtTime(videoId, 0)?.id,
+      false,
+    );
   }
 
   async function handleApplyTrim() {
@@ -656,20 +844,38 @@ export function VideoEditorModal({
         {videoUrl && (
           <video
             ref={videoRef}
-            src={videoUrl}
             controls
             onTimeUpdate={(e) => {
-              const sourceTime =
-                e.currentTarget.currentTime;
+              const sourceTime = e.currentTarget.currentTime;
+              const activeClip = clips.find(
+                (clip) => clip.id === activeClipIdRef.current,
+              );
+
+              if (!activeClip) return;
+              if (activeClip.sourceVideoId !== activeSourceVideoIdRef.current) return;
+
+              const clipTimelineStart = timelineStartForClip(activeClip.id);
+              if (clipTimelineStart === null) return;
 
               setCurrentTime(sourceTime);
               setTimelinePlayheadTime(
-                sourceTimeToTimelineTime(
-                  videoId,
-                  sourceTime,
+                Math.max(
+                  clipTimelineStart,
+                  Math.min(
+                    clipTimelineStart + (activeClip.end - activeClip.start),
+                    clipTimelineStart + (sourceTime - activeClip.start),
+                  ),
                 ),
               );
+
+              if (
+                !e.currentTarget.paused &&
+                sourceTime >= activeClip.end - 0.05
+              ) {
+                advancePreviewToNextClip();
+              }
             }}
+            onEnded={advancePreviewToNextClip}
             style={{
               width: "100%",
               maxHeight: 480,
@@ -1071,6 +1277,7 @@ export function VideoEditorModal({
         </div>
           <div
             ref={timelineRef}
+            data-testid="video-editor-timeline"
             onClick={handleTimelineClick}
             style={{
               position: "relative",
@@ -1099,10 +1306,7 @@ export function VideoEditorModal({
             return (
               <div
                 key={clip.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedClipId(clip.id);
-                }}
+                data-testid={`video-editor-clip-${clip.id}`}
                 style={{
                   position: "absolute",
                   top: 10,
