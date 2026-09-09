@@ -397,6 +397,7 @@ func (s *Server) routes() {
 				r.Get("/{id}/analytics", s.videoHandler.Analytics)
 				r.Get("/{id}/analytics/export", s.videoHandler.AnalyticsExport)
 				r.Get("/{id}/branding", s.videoHandler.GetVideoBranding)
+				r.Get("/{id}/editor", s.videoHandler.GetEditorState)
 
 				// Write routes (viewer blocked)
 				r.Group(func(r chi.Router) {
@@ -427,6 +428,7 @@ func (s *Server) routes() {
 					r.Put("/{id}/folder", s.videoHandler.SetVideoFolder)
 					r.Put("/{id}/tags", s.videoHandler.SetVideoTags)
 					r.Post("/{id}/remove-segments", s.videoHandler.RemoveSegments)
+					r.Post("/{id}/editor/render", s.videoHandler.RenderEditorTimeline)
 					r.Post("/{id}/detect-silence", s.videoHandler.DetectSilence)
 					r.Put("/{id}/dismiss-title", s.videoHandler.DismissTitle)
 					r.Put("/{id}/pin", s.videoHandler.TogglePin)

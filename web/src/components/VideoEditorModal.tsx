@@ -11,6 +11,22 @@ interface EditorClip {
   end: number;
 }
 
+interface StoredEditorState {
+  timeline: {
+    version: number;
+    clips: Array<{
+      id: string;
+      sourceId: string;
+      sourceStart: number;
+      sourceEnd: number;
+      duration: number;
+    }>;
+  };
+  renderStatus: "none" | "processing" | "ready" | "failed";
+  renderError: string | null;
+  renderedVideoId: string | null;
+}
+
 interface VideoEditorModalProps {
   videoId: string;
   duration: number;
@@ -35,6 +51,9 @@ export function VideoEditorModal({
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(duration);
   const [trimming, setTrimming] = useState(false);
+  const [rendering, setRendering] = useState(false);
+  const [renderStatus, setRenderStatus] = useState<StoredEditorState["renderStatus"]>("none");
+  const [renderedVideoId, setRenderedVideoId] = useState<string | null>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [clipHistory, setClipHistory] = useState<EditorClip[][]>([]);
   const [clips, setClips] = useState<EditorClip[]>([
@@ -57,6 +76,7 @@ export function VideoEditorModal({
   const sourceSwitchGenerationRef = useRef(0);
   const sourceTransitionPendingRef = useRef(false);
   const cancelPendingSourceLoadRef = useRef<(() => void) | null>(null);
+  const pendingRestoredPreviewRef = useRef<EditorClip | null>(null);
 
   async function loadVideoUrl(sourceVideoId: string) {
     if (videoUrlsRef.current[sourceVideoId]) {
@@ -182,6 +202,16 @@ export function VideoEditorModal({
     if (!video || !videoUrl || video.src === videoUrl) return;
     video.src = videoUrl;
     video.load();
+    const restoredClip = pendingRestoredPreviewRef.current;
+    if (restoredClip) {
+      pendingRestoredPreviewRef.current = null;
+      void switchPreviewSource(
+        restoredClip.sourceVideoId,
+        restoredClip.start,
+        restoredClip.id,
+        false,
+      );
+    }
   }, [videoUrl]);
 
   useEffect(() => {
@@ -203,6 +233,84 @@ export function VideoEditorModal({
     sourceSwitchGenerationRef.current += 1;
     sourceTransitionPendingRef.current = false;
   }, [duration, videoId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadEditorState() {
+      try {
+        const state = await apiFetch<StoredEditorState>(`/api/videos/${videoId}/editor`);
+        if (cancelled || !state) return;
+
+        setRenderStatus(state.renderStatus);
+        setRendering(state.renderStatus === "processing");
+        setRenderedVideoId(state.renderedVideoId);
+        if (state.renderStatus === "failed" && state.renderError) {
+          setError(state.renderError);
+        }
+
+        if (state.timeline?.version === 1 && state.timeline.clips.length > 0) {
+          const restoredClips = state.timeline.clips.map((clip) => ({
+            id: clip.id,
+            sourceVideoId: clip.sourceId,
+            start: clip.sourceStart,
+            end: clip.sourceEnd,
+          }));
+          setClips(restoredClips);
+          activeClipIdRef.current = restoredClips[0].id;
+          activeSourceVideoIdRef.current = restoredClips[0].sourceVideoId;
+          const maxClipNumber = restoredClips.reduce((max, clip) => {
+            const match = /^clip-(\d+)$/.exec(clip.id);
+            return match ? Math.max(max, Number(match[1])) : max;
+          }, 0);
+          nextClipIdRef.current = maxClipNumber + 1;
+          setTimelinePlayheadTime(0);
+          setCurrentTime(restoredClips[0].start);
+          if (videoRef.current) {
+            void switchPreviewSource(
+              restoredClips[0].sourceVideoId,
+              restoredClips[0].start,
+              restoredClips[0].id,
+              false,
+            );
+          } else {
+            pendingRestoredPreviewRef.current = restoredClips[0];
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Editorstand konnte nicht geladen werden.");
+        }
+      }
+    }
+
+    void loadEditorState();
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId]);
+
+  useEffect(() => {
+    if (!rendering) return;
+    const interval = window.setInterval(async () => {
+      try {
+        const state = await apiFetch<StoredEditorState>(`/api/videos/${videoId}/editor`);
+        if (!state) return;
+        setRenderStatus(state.renderStatus);
+        setRenderedVideoId(state.renderedVideoId);
+        if (state.renderStatus !== "processing") {
+          setRendering(false);
+          if (state.renderStatus === "failed") {
+            setError(state.renderError || "Rendern fehlgeschlagen.");
+          }
+        }
+      } catch (err) {
+        setRendering(false);
+        setError(err instanceof Error ? err.message : "Renderstatus konnte nicht geladen werden.");
+      }
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, [rendering, videoId]);
 
   useEffect(() => () => {
     sourceSwitchGenerationRef.current += 1;
@@ -716,6 +824,37 @@ export function VideoEditorModal({
           : "Trimmen fehlgeschlagen."
       );
       setTrimming(false);
+    }
+  }
+
+  async function handleRenderTimeline() {
+    if (clips.length === 0 || timelineDuration < 1) {
+      setError("Die Timeline muss mindestens eine Sekunde lang sein.");
+      return;
+    }
+
+    setRendering(true);
+    setRenderStatus("processing");
+    setRenderedVideoId(null);
+    setError(null);
+    try {
+      await apiFetch(`/api/videos/${videoId}/editor/render`, {
+        method: "POST",
+        body: JSON.stringify({
+          version: 1,
+          clips: clips.map((clip) => ({
+            id: clip.id,
+            sourceId: clip.sourceVideoId,
+            sourceStart: clip.start,
+            sourceEnd: clip.end,
+            duration: clip.end - clip.start,
+          })),
+        }),
+      });
+    } catch (err) {
+      setRendering(false);
+      setRenderStatus("failed");
+      setError(err instanceof Error ? err.message : "Rendern konnte nicht gestartet werden.");
     }
   }
 
@@ -1504,7 +1643,30 @@ export function VideoEditorModal({
           >
             {trimming ? "Wird getrimmt..." : "Trimmen anwenden"}
           </button>
+
+          <button
+            type="button"
+            onClick={handleRenderTimeline}
+            disabled={rendering || clips.length === 0 || timelineDuration < 1}
+            style={{
+              background: "#E6467A",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: 8,
+              padding: "9px 18px",
+              fontWeight: 600,
+              cursor: rendering ? "default" : "pointer",
+              opacity: rendering ? 0.6 : 1,
+            }}
+          >
+            {rendering ? "Video wird gerendert..." : "Als neues Video rendern"}
+          </button>
         </div>
+        {renderStatus === "ready" && renderedVideoId && (
+          <div style={{ marginTop: 12, textAlign: "center", color: "var(--color-text)" }}>
+            Render abgeschlossen. <a href={`/videos/${renderedVideoId}`}>Bearbeitetes Video öffnen</a>
+          </div>
+        )}
       <div
         style={{
           position: "absolute",
