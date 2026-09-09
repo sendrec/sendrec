@@ -34,6 +34,9 @@ interface VideoEditorModalProps {
   onTrimStarted?: () => void;
 }
 
+const TIMELINE_ZOOM_LEVELS = [1, 2, 5, 10] as const;
+const TIMELINE_TICK_STEPS = [0.1, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+
 export function VideoEditorModal({
   videoId,
   duration,
@@ -331,12 +334,11 @@ export function VideoEditorModal({
     0,
   );
 
-  const timelineTickSteps = [0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
   const visibleTimelineDuration =
     timelineDuration / Math.max(1, timelineZoom);
   const desiredTimelineTickStep = visibleTimelineDuration / 10;
   const timelineTickStep =
-    timelineTickSteps.find((step) => step >= desiredTimelineTickStep) ?? 600;
+    TIMELINE_TICK_STEPS.find((step) => step >= desiredTimelineTickStep) ?? 600;
 
   function formatTimelineTick(seconds: number) {
     const minutes = Math.floor(seconds / 60);
@@ -346,7 +348,7 @@ export function VideoEditorModal({
       return `${minutes}:${String(Math.floor(secondsInMinute)).padStart(2, "0")}`;
     }
 
-    const decimals = timelineTickStep <= 0.25 ? 2 : 1;
+    const decimals = 1;
     const formattedSeconds = secondsInMinute.toFixed(decimals);
     return `${minutes}:${formattedSeconds.padStart(3 + decimals, "0")}`;
   }
@@ -907,7 +909,7 @@ export function VideoEditorModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 24,
+        padding: 16,
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -918,12 +920,12 @@ export function VideoEditorModal({
         aria-modal="true"
         aria-labelledby="video-editor-title"
         style={{
-        width: "calc(100vw - 48px)",
-        height: "calc(100vh - 48px)",
+        width: "calc(100vw - 32px)",
+        height: "calc(100vh - 32px)",
         minWidth: 720,
         minHeight: 520,
-        maxWidth: "calc(100vw - 48px)",
-        maxHeight: "calc(100vh - 48px)",
+        maxWidth: "calc(100vw - 32px)",
+        maxHeight: "calc(100vh - 32px)",
         resize: "both",
         boxSizing: "border-box",
         position: "relative",
@@ -931,7 +933,7 @@ export function VideoEditorModal({
           background: "var(--color-surface)",
           border: "1px solid var(--color-border)",
           borderRadius: 12,
-          padding: 24,
+          padding: 20,
         }}
       >
         <div
@@ -1017,10 +1019,10 @@ export function VideoEditorModal({
             onEnded={advancePreviewToNextClip}
             style={{
               width: "100%",
-              maxHeight: 480,
+              maxHeight: "min(48vh, 560px)",
               background: "#000",
               borderRadius: 8,
-              marginBottom: 24,
+              marginBottom: 16,
             }}
           />
         )}
@@ -1030,7 +1032,7 @@ export function VideoEditorModal({
             display: "flex",
             alignItems: "center",
             gap: 12,
-            marginBottom: 16,
+            marginBottom: 12,
           }}
         >
           <button
@@ -1300,9 +1302,12 @@ export function VideoEditorModal({
 
           <button
             type="button"
-            onClick={() =>
-              setTimelineZoom((zoom) => Math.max(1, zoom - 0.5))
-            }
+            onClick={() => {
+              const index = TIMELINE_ZOOM_LEVELS.indexOf(
+                timelineZoom as (typeof TIMELINE_ZOOM_LEVELS)[number],
+              );
+              setTimelineZoom(TIMELINE_ZOOM_LEVELS[Math.max(0, index - 1)]);
+            }}
             disabled={timelineZoom <= 1}
           >
             −
@@ -1310,12 +1315,14 @@ export function VideoEditorModal({
 
           <input
             type="range"
-            min="1"
-            max="12"
-            step="0.5"
-            value={timelineZoom}
+            min="0"
+            max={TIMELINE_ZOOM_LEVELS.length - 1}
+            step="1"
+            value={TIMELINE_ZOOM_LEVELS.indexOf(
+              timelineZoom as (typeof TIMELINE_ZOOM_LEVELS)[number],
+            )}
             onChange={(e) =>
-              setTimelineZoom(Number(e.currentTarget.value))
+              setTimelineZoom(TIMELINE_ZOOM_LEVELS[Number(e.currentTarget.value)])
             }
             aria-label="Timeline-Zoom"
             style={{ width: 190 }}
@@ -1323,10 +1330,17 @@ export function VideoEditorModal({
 
           <button
             type="button"
-            onClick={() =>
-              setTimelineZoom((zoom) => Math.min(12, zoom + 0.5))
+            onClick={() => {
+              const index = TIMELINE_ZOOM_LEVELS.indexOf(
+                timelineZoom as (typeof TIMELINE_ZOOM_LEVELS)[number],
+              );
+              setTimelineZoom(
+                TIMELINE_ZOOM_LEVELS[Math.min(TIMELINE_ZOOM_LEVELS.length - 1, index + 1)],
+              );
+            }}
+            disabled={
+              timelineZoom >= TIMELINE_ZOOM_LEVELS[TIMELINE_ZOOM_LEVELS.length - 1]
             }
-            disabled={timelineZoom >= 12}
           >
             +
           </button>
@@ -1337,7 +1351,7 @@ export function VideoEditorModal({
               color: "var(--color-text-secondary)",
             }}
           >
-            {timelineZoom.toFixed(1)}×
+            {timelineZoom === 1 ? "1.0" : timelineZoom}×
           </span>
         </div>
 
@@ -1355,6 +1369,7 @@ export function VideoEditorModal({
         </div>
 
         <div
+          data-testid="video-editor-timeline-scroll"
           style={{
             overflowX: "auto",
             overflowY: "hidden",
@@ -1362,6 +1377,8 @@ export function VideoEditorModal({
           }}
         >
         <div
+          data-testid="video-editor-timeline-ruler"
+          data-tick-step={timelineTickStep}
           style={{
             position: "relative",
             height: 28,
@@ -1417,6 +1434,7 @@ export function VideoEditorModal({
           <div
             ref={timelineRef}
             data-testid="video-editor-timeline"
+            data-zoom={timelineZoom}
             onClick={handleTimelineClick}
             style={{
               position: "relative",

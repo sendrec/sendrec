@@ -220,4 +220,103 @@ describe("VideoEditorModal multi-source preview", () => {
     });
     expect(screen.getByRole("button", { name: "Video wird gerendert..." })).toBeDisabled();
   });
+
+  it("offers Fit, 2x, 5x and 10x zoom without changing timeline data", async () => {
+    const user = userEvent.setup();
+    render(<VideoEditorModal videoId="original" duration={120} onClose={vi.fn()} />);
+
+    const timeline = await screen.findByTestId("video-editor-timeline");
+    const slider = screen.getByRole("slider", { name: "Timeline-Zoom" });
+
+    expect(timeline).toHaveAttribute("data-zoom", "1");
+    await user.click(screen.getByRole("button", { name: "+" }));
+    expect(timeline).toHaveAttribute("data-zoom", "2");
+    await user.click(screen.getByRole("button", { name: "+" }));
+    expect(timeline).toHaveAttribute("data-zoom", "5");
+    await user.click(screen.getByRole("button", { name: "+" }));
+    expect(timeline).toHaveAttribute("data-zoom", "10");
+    expect(slider).toHaveValue("3");
+
+    await user.click(screen.getByRole("button", { name: "Fit" }));
+    expect(timeline).toHaveAttribute("data-zoom", "1");
+    expect(screen.getAllByText("2:00")).not.toHaveLength(0);
+  });
+
+  it("uses finer time markers as the timeline is zoomed", async () => {
+    const user = userEvent.setup();
+    render(<VideoEditorModal videoId="original" duration={8} onClose={vi.fn()} />);
+
+    const ruler = await screen.findByTestId("video-editor-timeline-ruler");
+    expect(ruler).toHaveAttribute("data-tick-step", "1");
+
+    await user.click(screen.getByRole("button", { name: "+" }));
+    expect(ruler).toHaveAttribute("data-tick-step", "0.5");
+    await user.click(screen.getByRole("button", { name: "+" }));
+    expect(ruler).toHaveAttribute("data-tick-step", "0.5");
+    await user.click(screen.getByRole("button", { name: "+" }));
+    expect(ruler).toHaveAttribute("data-tick-step", "0.1");
+  });
+
+  it("maps clicks against the zoomed timeline width", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <VideoEditorModal videoId="original" duration={120} onClose={vi.fn()} />,
+    );
+    const timeline = await screen.findByTestId("video-editor-timeline");
+    await user.click(screen.getByRole("button", { name: "+" }));
+    vi.spyOn(timeline, "getBoundingClientRect").mockReturnValue({
+      x: -250,
+      y: 0,
+      left: -250,
+      top: 0,
+      right: 1750,
+      bottom: 64,
+      width: 2000,
+      height: 64,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.click(timeline, { clientX: 750 });
+    await waitFor(() => {
+      expect(container.querySelector("video")?.currentTime).toBeCloseTo(60, 3);
+    });
+  });
+
+  it("splits precisely at the playhead while zoomed to 10x", async () => {
+    const user = userEvent.setup();
+    render(<VideoEditorModal videoId="original" duration={120} onClose={vi.fn()} />);
+    const timeline = await screen.findByTestId("video-editor-timeline");
+    for (let index = 0; index < 3; index += 1) {
+      await user.click(screen.getByRole("button", { name: "+" }));
+    }
+    vi.spyOn(timeline, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 10000, bottom: 64,
+      width: 10000, height: 64, toJSON: () => ({}),
+    });
+
+    fireEvent.click(timeline, { clientX: 3333.333 });
+    await user.click(screen.getByRole("button", { name: "Teilen" }));
+
+    expect(screen.getByText("Clip 1")).toHaveStyle({ width: "33.33333%" });
+    expect(screen.getByText("Clip 2")).toHaveStyle({ width: "66.66667%" });
+  });
+
+  it("keeps trim dragging precise while zoomed to 10x", async () => {
+    const user = userEvent.setup();
+    render(<VideoEditorModal videoId="original" duration={120} onClose={vi.fn()} />);
+    const timeline = await screen.findByTestId("video-editor-timeline");
+    for (let index = 0; index < 3; index += 1) {
+      await user.click(screen.getByRole("button", { name: "+" }));
+    }
+    vi.spyOn(timeline, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 10000, bottom: 64,
+      width: 10000, height: 64, toJSON: () => ({}),
+    });
+
+    fireEvent.mouseDown(screen.getByTitle("Trim-Anfang"));
+    fireEvent.mouseMove(document, { clientX: 1000 });
+    fireEvent.mouseUp(document);
+
+    expect(screen.getByText("Anfang: 0:12")).toBeInTheDocument();
+  });
 });
