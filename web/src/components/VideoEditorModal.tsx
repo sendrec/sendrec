@@ -570,8 +570,15 @@ export function VideoEditorModal({
         aria-modal="true"
         aria-labelledby="video-editor-title"
         style={{
-          width: "min(1000px, 96vw)",
-          maxHeight: "94vh",
+        width: "calc(100vw - 48px)",
+        height: "calc(100vh - 48px)",
+        minWidth: 720,
+        minHeight: 520,
+        maxWidth: "calc(100vw - 48px)",
+        maxHeight: "calc(100vh - 48px)",
+        resize: "both",
+        boxSizing: "border-box",
+        position: "relative",
           overflowY: "auto",
           background: "var(--color-surface)",
           border: "1px solid var(--color-border)",
@@ -1171,7 +1178,7 @@ export function VideoEditorModal({
         <div
           style={{
             display: "flex",
-            justifyContent: "flex-end",
+            justifyContent: "center",
             gap: 10,
             marginTop: 18,
           }}
@@ -1220,6 +1227,19 @@ export function VideoEditorModal({
             {trimming ? "Wird getrimmt..." : "Trimmen anwenden"}
           </button>
         </div>
+      <div
+        style={{
+          position: "absolute",
+          right: 18,
+          bottom: 8,
+          fontSize: 11,
+          color: "var(--color-text-secondary)",
+          pointerEvents: "none",
+          userSelect: "none",
+        }}
+      >
+        ↘ Größe ändern
+      </div>
       </div>
     </div>
   );
