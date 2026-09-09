@@ -25,3 +25,28 @@ docs/plans/
 # Playwright
 web/playwright-report/
 web/test-results/
+
+# Local package caches
+.pnpm-store/
+
+# Manual backups and snapshots
+*.bak
+*.bak-*
+*.orig
+*.rej
+*~
+web-vor-*/
+web.bak-*/
+
+# Generated release/compliance archives
+web/public/source/*.tar.gz
+web/public/*.zip
+
+# Local logs
+*.log
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
