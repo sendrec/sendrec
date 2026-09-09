@@ -1,0 +1,28 @@
+{
+  "name": "99tools Record",
+  "short_name": "99tools Record",
+  "description": "Bildschirm, Kamera und Ton aufnehmen, teilen und transkribieren.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F172A",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
