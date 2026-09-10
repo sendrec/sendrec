@@ -11,6 +11,16 @@ interface EditorClip {
   end: number;
 }
 
+interface EditorCoverOverlay {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  start: number;
+  end: number;
+}
+
 interface StoredEditorState {
   timeline: {
     version: number;
@@ -59,6 +69,9 @@ export function VideoEditorModal({
   const [renderedVideoId, setRenderedVideoId] = useState<string | null>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [clipHistory, setClipHistory] = useState<EditorClip[][]>([]);
+  const [coverOverlays, setCoverOverlays] = useState<EditorCoverOverlay[]>([]);
+  const [selectedCoverOverlayId, setSelectedCoverOverlayId] = useState<string | null>(null);
+  const [copiedCoverOverlay, setCopiedCoverOverlay] = useState<EditorCoverOverlay | null>(null);
   const [clips, setClips] = useState<EditorClip[]>([
     {
       id: "clip-1",
@@ -333,6 +346,9 @@ export function VideoEditorModal({
     (sum, clip) => sum + Math.max(0, clip.end - clip.start),
     0,
   );
+
+  const selectedCoverOverlay =
+    coverOverlays.find((overlay) => overlay.id === selectedCoverOverlayId) ?? null;
 
   const visibleTimelineDuration =
     timelineDuration / Math.max(1, timelineZoom);
@@ -786,6 +802,312 @@ export function VideoEditorModal({
     setError(null);
   }
 
+  function handleCoverOverlayPointerDown(
+    e: React.PointerEvent<HTMLDivElement>,
+    overlayId: string,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedCoverOverlayId(overlayId);
+
+    const overlay = coverOverlays.find((item) => item.id === overlayId);
+    const container = e.currentTarget.parentElement;
+
+    if (!overlay || !container) return;
+
+    const rect = container.getBoundingClientRect();
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    const startX = overlay.x;
+    const startY = overlay.y;
+    const overlayWidth = overlay.width;
+    const overlayHeight = overlay.height;
+
+    function onMove(ev: PointerEvent) {
+      const deltaX = ((ev.clientX - startClientX) / rect.width) * 100;
+      const deltaY = ((ev.clientY - startClientY) / rect.height) * 100;
+
+      const nextX = Math.max(
+        0,
+        Math.min(100 - overlayWidth, startX + deltaX),
+      );
+      const nextY = Math.max(
+        0,
+        Math.min(100 - overlayHeight, startY + deltaY),
+      );
+
+      setCoverOverlays((previous) =>
+        previous.map((item) =>
+          item.id === overlayId
+            ? { ...item, x: nextX, y: nextY }
+            : item,
+        ),
+      );
+    }
+
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  function handleCoverOverlayResizePointerDown(
+    e: React.PointerEvent<HTMLDivElement>,
+    overlayId: string,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const overlay = coverOverlays.find((item) => item.id === overlayId);
+    const container = e.currentTarget.parentElement?.parentElement;
+
+    if (!overlay || !container) return;
+
+    const rect = container.getBoundingClientRect();
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    const startWidth = overlay.width;
+    const startHeight = overlay.height;
+    const overlayX = overlay.x;
+    const overlayY = overlay.y;
+
+    function onMove(ev: PointerEvent) {
+      const deltaX = ((ev.clientX - startClientX) / rect.width) * 100;
+      const deltaY = ((ev.clientY - startClientY) / rect.height) * 100;
+
+      const nextWidth = Math.max(
+        5,
+        Math.min(100 - overlayX, startWidth + deltaX),
+      );
+      const nextHeight = Math.max(
+        5,
+        Math.min(100 - overlayY, startHeight + deltaY),
+      );
+
+      setCoverOverlays((previous) =>
+        previous.map((item) =>
+          item.id === overlayId
+            ? { ...item, width: nextWidth, height: nextHeight }
+            : item,
+        ),
+      );
+    }
+
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  function handleCoverOverlayTimelineMovePointerDown(
+    e: React.PointerEvent<HTMLDivElement>,
+    overlayId: string,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedCoverOverlayId(overlayId);
+
+    const overlay = coverOverlays.find((item) => item.id === overlayId);
+    const track = e.currentTarget.parentElement;
+
+    if (!overlay || !track || timelineDuration <= 0) return;
+
+    const rect = track.getBoundingClientRect();
+    const startClientX = e.clientX;
+    const originalStart = overlay.start;
+    const overlayDuration = overlay.end - overlay.start;
+
+    function onMove(ev: PointerEvent) {
+      const deltaTime =
+        ((ev.clientX - startClientX) / rect.width) * timelineDuration;
+
+      const start = Math.max(
+        0,
+        Math.min(
+          timelineDuration - overlayDuration,
+          originalStart + deltaTime,
+        ),
+      );
+
+      const end = start + overlayDuration;
+
+      setCoverOverlays((previous) =>
+        previous.map((item) =>
+          item.id === overlayId
+            ? { ...item, start, end }
+            : item,
+        ),
+      );
+    }
+
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  function handleCoverOverlayTimelineStartPointerDown(
+    e: React.PointerEvent<HTMLDivElement>,
+    overlayId: string,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedCoverOverlayId(overlayId);
+
+    const overlay = coverOverlays.find((item) => item.id === overlayId);
+    const track = e.currentTarget.parentElement?.parentElement;
+
+    if (!overlay || !track || timelineDuration <= 0) return;
+
+    const rect = track.getBoundingClientRect();
+    const minimumGap = 0.1;
+    const overlayEnd = overlay.end;
+
+    function onMove(ev: PointerEvent) {
+      const x = Math.max(
+        0,
+        Math.min(ev.clientX - rect.left, rect.width),
+      );
+
+      const rawTime = (x / rect.width) * timelineDuration;
+      const start = Math.max(
+        0,
+        Math.min(rawTime, overlayEnd - minimumGap),
+      );
+
+      setCoverOverlays((previous) =>
+        previous.map((item) =>
+          item.id === overlayId
+            ? { ...item, start }
+            : item,
+        ),
+      );
+    }
+
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  function handleCoverOverlayTimelineEndPointerDown(
+    e: React.PointerEvent<HTMLDivElement>,
+    overlayId: string,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedCoverOverlayId(overlayId);
+
+    const overlay = coverOverlays.find((item) => item.id === overlayId);
+    const track = e.currentTarget.parentElement?.parentElement;
+
+    if (!overlay || !track || timelineDuration <= 0) return;
+
+    const rect = track.getBoundingClientRect();
+    const minimumGap = 0.1;
+    const overlayStart = overlay.start;
+
+    function onMove(ev: PointerEvent) {
+      const x = Math.max(
+        0,
+        Math.min(ev.clientX - rect.left, rect.width),
+      );
+
+      const rawTime = (x / rect.width) * timelineDuration;
+      const end = Math.min(
+        timelineDuration,
+        Math.max(rawTime, overlayStart + minimumGap),
+      );
+
+      setCoverOverlays((previous) =>
+        previous.map((item) =>
+          item.id === overlayId
+            ? { ...item, end }
+            : item,
+        ),
+      );
+    }
+
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  function handleCopyCoverOverlay() {
+    if (!selectedCoverOverlay) {
+      setError("Bitte zuerst eine Abdeckung auswählen.");
+      return;
+    }
+
+    setCopiedCoverOverlay({ ...selectedCoverOverlay });
+    setError(null);
+  }
+
+  function handlePasteCoverOverlay() {
+    if (!copiedCoverOverlay || timelineDuration <= 0) {
+      setError("Es ist keine Abdeckung zum Einfügen kopiert.");
+      return;
+    }
+
+    const duration = copiedCoverOverlay.end - copiedCoverOverlay.start;
+    const start = Math.min(
+      timelinePlayheadTime,
+      Math.max(0, timelineDuration - 0.1),
+    );
+    const end = Math.min(timelineDuration, start + duration);
+
+    const pastedOverlay: EditorCoverOverlay = {
+      ...copiedCoverOverlay,
+      id: `cover-${Date.now()}`,
+      start,
+      end,
+    };
+
+    setCoverOverlays((previous) => [...previous, pastedOverlay]);
+    setSelectedCoverOverlayId(pastedOverlay.id);
+    setError(null);
+  }
+
+  function handleAddCoverOverlay() {
+    if (timelineDuration <= 0) return;
+
+    const start = Math.min(
+      timelinePlayheadTime,
+      Math.max(0, timelineDuration - 0.1),
+    );
+    const end = Math.min(timelineDuration, start + 5);
+
+    const overlay: EditorCoverOverlay = {
+      id: `cover-${Date.now()}`,
+      x: 30,
+      y: 30,
+      width: 40,
+      height: 20,
+      start,
+      end,
+    };
+
+    setCoverOverlays((previous) => [...previous, overlay]);
+    setSelectedCoverOverlayId(overlay.id);
+    setError(null);
+  }
+
   function handleDeleteSelectedClip() {
     if (!selectedClipId) {
       setError("Bitte zuerst einen Clip auswählen.");
@@ -901,6 +1223,15 @@ export function VideoEditorModal({
             sourceStart: clip.start,
             sourceEnd: clip.end,
             duration: clip.end - clip.start,
+          })),
+          overlays: coverOverlays.map((overlay) => ({
+            id: overlay.id,
+            x: overlay.x,
+            y: overlay.y,
+            width: overlay.width,
+            height: overlay.height,
+            start: overlay.start,
+            end: overlay.end,
           })),
         }),
       });
@@ -1034,48 +1365,96 @@ export function VideoEditorModal({
         )}
 
         {videoUrl && (
-          <video
-            ref={videoRef}
-            controls
-            onTimeUpdate={(e) => {
-              const sourceTime = e.currentTarget.currentTime;
-              const activeClip = clips.find(
-                (clip) => clip.id === activeClipIdRef.current,
-              );
+          <div style={{ position: "relative", width: "100%" }}>
+            <video
+              ref={videoRef}
+              controls
+              onTimeUpdate={(e) => {
+                const sourceTime = e.currentTarget.currentTime;
+                const activeClip = clips.find(
+                  (clip) => clip.id === activeClipIdRef.current,
+                );
 
-              if (!activeClip) return;
-              if (activeClip.sourceVideoId !== activeSourceVideoIdRef.current) return;
+                if (!activeClip) return;
+                if (activeClip.sourceVideoId !== activeSourceVideoIdRef.current) return;
 
-              const clipTimelineStart = timelineStartForClip(activeClip.id);
-              if (clipTimelineStart === null) return;
+                const clipTimelineStart = timelineStartForClip(activeClip.id);
+                if (clipTimelineStart === null) return;
 
-              setCurrentTime(sourceTime);
-              setTimelinePlayheadTime(
-                Math.max(
-                  clipTimelineStart,
-                  Math.min(
-                    clipTimelineStart + (activeClip.end - activeClip.start),
-                    clipTimelineStart + (sourceTime - activeClip.start),
+                setCurrentTime(sourceTime);
+                setTimelinePlayheadTime(
+                  Math.max(
+                    clipTimelineStart,
+                    Math.min(
+                      clipTimelineStart + (activeClip.end - activeClip.start),
+                      clipTimelineStart + (sourceTime - activeClip.start),
+                    ),
                   ),
-                ),
-              );
+                );
 
-              if (
-                !e.currentTarget.paused &&
-                sourceTime >= activeClip.end - 0.05
-              ) {
-                advancePreviewToNextClip();
-              }
-            }}
-            onEnded={advancePreviewToNextClip}
-            style={{
-              width: "100%",
-              maxHeight: "min(48vh, 560px)",
-              background: "#000",
-              borderRadius: 8,
-              marginBottom: 16,
-            }}
-          />
+                if (
+                  !e.currentTarget.paused &&
+                  sourceTime >= activeClip.end - 0.05
+                ) {
+                  advancePreviewToNextClip();
+                }
+              }}
+              onEnded={advancePreviewToNextClip}
+              style={{
+                width: "100%",
+                maxHeight: "min(48vh, 560px)",
+                background: "#000",
+                borderRadius: 8,
+                marginBottom: 16,
+              }}
+            />
+
+            {coverOverlays
+              .filter(
+                (overlay) =>
+                  timelinePlayheadTime >= overlay.start &&
+                  timelinePlayheadTime <= overlay.end,
+              )
+              .map((overlay) => (
+                <div
+                  key={overlay.id}
+                  onPointerDown={(e) =>
+                    handleCoverOverlayPointerDown(e, overlay.id)
+                  }
+                  style={{
+                    position: "absolute",
+                    left: `${overlay.x}%`,
+                    top: `${overlay.y}%`,
+                    width: `${overlay.width}%`,
+                    height: `${overlay.height}%`,
+                    background: "#000",
+                    zIndex: 2,
+                    pointerEvents: "auto",
+                    cursor: "move",
+                    touchAction: "none",
+                  }}
+                >
+                  <div
+                    onPointerDown={(e) =>
+                      handleCoverOverlayResizePointerDown(e, overlay.id)
+                    }
+                    style={{
+                      position: "absolute",
+                      right: -7,
+                      bottom: -7,
+                      width: 14,
+                      height: 14,
+                      borderRadius: 3,
+                      background: "#FC2667",
+                      border: "2px solid #FFFFFF",
+                      boxSizing: "border-box",
+                      cursor: "nwse-resize",
+                      touchAction: "none",
+                    }}
+                  />
+                </div>
+              ))}
+          </div>
         )}
 
         <div
@@ -1115,6 +1494,22 @@ export function VideoEditorModal({
             }}
           >
             Teilen
+          </button>
+
+          <button
+            type="button"
+            onClick={handleAddCoverOverlay}
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              padding: "8px 14px",
+              background: "#0F172A",
+              color: "#FFFFFF",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            + Abdeckung
           </button>
 
           {selectedClipId && (
@@ -1186,6 +1581,116 @@ export function VideoEditorModal({
           </span>
         </div>
 
+      {selectedCoverOverlay && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 12,
+            padding: "10px 12px",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+          }}
+        >
+          <strong>Abdeckung:</strong>
+
+          <label>
+            Start{" "}
+            <input
+              type="number"
+              min={0}
+              max={Math.max(0, selectedCoverOverlay.end - 0.1)}
+              step={0.1}
+              value={selectedCoverOverlay.start}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (!Number.isFinite(value)) return;
+
+                const start = Math.max(
+                  0,
+                  Math.min(value, selectedCoverOverlay.end - 0.1),
+                );
+
+                setCoverOverlays((previous) =>
+                  previous.map((overlay) =>
+                    overlay.id === selectedCoverOverlay.id
+                      ? { ...overlay, start }
+                      : overlay,
+                  ),
+                );
+              }}
+              style={{ width: 80, marginLeft: 6 }}
+            />
+            {" s"}
+          </label>
+
+          <label>
+            Ende{" "}
+            <input
+              type="number"
+              min={selectedCoverOverlay.start + 0.1}
+              max={timelineDuration}
+              step={0.1}
+              value={selectedCoverOverlay.end}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (!Number.isFinite(value)) return;
+
+                const end = Math.min(
+                  timelineDuration,
+                  Math.max(value, selectedCoverOverlay.start + 0.1),
+                );
+
+                setCoverOverlays((previous) =>
+                  previous.map((overlay) =>
+                    overlay.id === selectedCoverOverlay.id
+                      ? { ...overlay, end }
+                      : overlay,
+                  ),
+                );
+              }}
+              style={{ width: 80, marginLeft: 6 }}
+            />
+            {" s"}
+          </label>
+
+          <button
+            type="button"
+            onClick={handleCopyCoverOverlay}
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 7,
+              padding: "6px 10px",
+              background: "#FFFFFF",
+              color: "#0F172A",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Kopieren
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePasteCoverOverlay}
+            disabled={!copiedCoverOverlay}
+            style={{
+              border: "1px solid var(--color-border)",
+              borderRadius: 7,
+              padding: "6px 10px",
+              background: "#FFFFFF",
+              color: "#0F172A",
+              fontWeight: 600,
+              cursor: copiedCoverOverlay ? "pointer" : "default",
+              opacity: copiedCoverOverlay ? 1 : 0.45,
+            }}
+          >
+            Einfügen
+          </button>
+        </div>
+      )}
+
         {showInsertPicker && (
           <div
             style={{
@@ -1215,7 +1720,8 @@ export function VideoEditorModal({
                   border: "none",
                   background: "transparent",
                   color: "var(--color-text-secondary)",
-                  cursor: "pointer",
+                  cursor: "grab",
+                  touchAction: "none",
                   fontSize: 18,
                 }}
               >
@@ -1482,6 +1988,119 @@ export function VideoEditorModal({
             },
           )}
         </div>
+        <div
+          data-testid="video-editor-overlay-track"
+          style={{
+            position: "relative",
+            height: 38,
+            width: `${timelineZoom * 100}%`,
+            minWidth: "100%",
+            marginBottom: 4,
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            background: "#F8FAFC",
+            overflow: "hidden",
+          }}
+        >
+          {coverOverlays.length === 0 && (
+            <span
+              style={{
+                position: "absolute",
+                left: 10,
+                top: 9,
+                fontSize: 12,
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              Abdeckungen
+            </span>
+          )}
+
+          {coverOverlays.map((overlay, index) => {
+            const left =
+              timelineDuration > 0
+                ? (overlay.start / timelineDuration) * 100
+                : 0;
+
+            const width =
+              timelineDuration > 0
+                ? ((overlay.end - overlay.start) / timelineDuration) * 100
+                : 0;
+
+            const selected = overlay.id === selectedCoverOverlayId;
+
+            return (
+              <div
+                key={overlay.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedCoverOverlayId(overlay.id);
+                }}
+                onPointerDown={(e) =>
+                  handleCoverOverlayTimelineMovePointerDown(e, overlay.id)
+                }
+                style={{
+                  position: "absolute",
+                  top: 4,
+                  bottom: 4,
+                  left: `${left}%`,
+                  width: `${width}%`,
+                  minWidth: 4,
+                  borderRadius: 5,
+                  background: selected ? "#FC2667" : "#F7C2D2",
+                  border: "1px solid #FC2667",
+                  color: selected ? "#FFFFFF" : "#0F172A",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "5px 7px",
+                  boxSizing: "border-box",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  cursor: "pointer",
+                }}
+              >
+                Abdeckung {index + 1}
+
+                <div
+                  onPointerDown={(e) =>
+                    handleCoverOverlayTimelineStartPointerDown(e, overlay.id)
+                  }
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    width: 12,
+                    borderRight: "2px solid #FFFFFF",
+                    background: "rgba(255,255,255,0.22)",
+                    cursor: "ew-resize",
+                    touchAction: "none",
+                  }}
+                  title="Start der Abdeckung ziehen"
+                />
+
+                <div
+                  onPointerDown={(e) =>
+                    handleCoverOverlayTimelineEndPointerDown(e, overlay.id)
+                  }
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: 12,
+                    borderLeft: "2px solid #FFFFFF",
+                    background: "rgba(255,255,255,0.22)",
+                    cursor: "ew-resize",
+                    touchAction: "none",
+                  }}
+                  title="Ende der Abdeckung ziehen"
+                />
+              </div>
+            );
+          })}
+        </div>
+
           <div
             ref={timelineRef}
             data-testid="video-editor-timeline"

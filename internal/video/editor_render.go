@@ -26,9 +26,20 @@ type editClip struct {
 	Duration    float64 `json:"duration"`
 }
 
+type editorCoverOverlay struct {
+	ID     string  `json:"id"`
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
+	Start  float64 `json:"start"`
+	End    float64 `json:"end"`
+}
+
 type editTimeline struct {
-	Version int        `json:"version"`
-	Clips   []editClip `json:"clips"`
+	Version  int                  `json:"version"`
+	Clips    []editClip           `json:"clips"`
+	Overlays []editorCoverOverlay `json:"overlays,omitempty"`
 }
 
 type editorStateResponse struct {
@@ -96,6 +107,42 @@ func validateEditTimeline(timeline *editTimeline) error {
 	if totalDuration < 1 {
 		return fmt.Errorf("timeline must be at least one second long")
 	}
+
+	if len(timeline.Overlays) > 500 {
+		return fmt.Errorf("timeline contains too many overlays")
+	}
+
+	overlayIDs := make(map[string]struct{}, len(timeline.Overlays))
+	for i := range timeline.Overlays {
+		overlay := &timeline.Overlays[i]
+
+		if strings.TrimSpace(overlay.ID) == "" {
+			return fmt.Errorf("overlay id is required")
+		}
+		if _, exists := overlayIDs[overlay.ID]; exists {
+			return fmt.Errorf("overlay ids must be unique")
+		}
+		overlayIDs[overlay.ID] = struct{}{}
+
+		if overlay.X < 0 || overlay.Y < 0 ||
+			overlay.Width <= 0 || overlay.Height <= 0 {
+			return fmt.Errorf("overlay position and size are invalid")
+		}
+
+		if overlay.X+overlay.Width > 100.001 ||
+			overlay.Y+overlay.Height > 100.001 {
+			return fmt.Errorf("overlay must stay inside video bounds")
+		}
+
+		if overlay.Start < 0 || overlay.End <= overlay.Start {
+			return fmt.Errorf("overlay end must be greater than start")
+		}
+
+		if overlay.End > totalDuration+0.001 {
+			return fmt.Errorf("overlay exceeds timeline duration")
+		}
+	}
+
 	return nil
 }
 
@@ -191,7 +238,7 @@ func (h *Handler) RenderEditorTimeline(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func buildTimelineRenderArgs(inputs []string, clips []editClip, sourceIndexes map[string]int, sources map[string]sourceVideo, output string) []string {
+func buildTimelineRenderArgs(inputs []string, clips []editClip, overlays []editorCoverOverlay, sourceIndexes map[string]int, sources map[string]sourceVideo, output string) []string {
 	args := make([]string, 0, len(inputs)*2+len(clips)*2+16)
 	for _, input := range inputs {
 		args = append(args, "-i", input)
@@ -210,7 +257,33 @@ func buildTimelineRenderArgs(inputs []string, clips []editClip, sourceIndexes ma
 		}
 		fmt.Fprintf(&concatInputs, "[v%d][a%d]", i, i)
 	}
-	filters = append(filters, fmt.Sprintf("%sconcat=n=%d:v=1:a=1[vout][aout]", concatInputs.String(), len(clips)))
+	if len(overlays) == 0 {
+		filters = append(filters, fmt.Sprintf("%sconcat=n=%d:v=1:a=1[vout][aout]", concatInputs.String(), len(clips)))
+	} else {
+		filters = append(filters, fmt.Sprintf("%sconcat=n=%d:v=1:a=1[vbase][aout]", concatInputs.String(), len(clips)))
+
+		previousLabel := "vbase"
+		for i, overlay := range overlays {
+			nextLabel := fmt.Sprintf("voverlay%d", i)
+			if i == len(overlays)-1 {
+				nextLabel = "vout"
+			}
+
+			filters = append(filters, fmt.Sprintf(
+				"[%s]drawbox=x=iw*%.6f:y=ih*%.6f:w=iw*%.6f:h=ih*%.6f:color=black:t=fill:enable='between(t,%.3f,%.3f)'[%s]",
+				previousLabel,
+				overlay.X/100,
+				overlay.Y/100,
+				overlay.Width/100,
+				overlay.Height/100,
+				overlay.Start,
+				overlay.End,
+				nextLabel,
+			))
+
+			previousLabel = nextLabel
+		}
+	}
 	args = append(args, "-filter_complex", strings.Join(filters, ";"), "-map", "[vout]", "-map", "[aout]",
 		"-c:v", "libx264", "-profile:v", "high", "-level:v", "5.1", "-preset", "fast", "-crf", "23",
 		"-c:a", "aac", "-movflags", "+faststart", "-y", output)
@@ -261,7 +334,7 @@ func (h *Handler) renderTimelineAsync(ctx context.Context, job renderJob) {
 	}
 
 	output := filepath.Join(tmpDir, "rendered.mp4")
-	cmd := exec.CommandContext(ctx, "ffmpeg", buildTimelineRenderArgs(inputs, job.Timeline.Clips, indexes, job.Sources, output)...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", buildTimelineRenderArgs(inputs, job.Timeline.Clips, job.Timeline.Overlays, indexes, job.Sources, output)...)
 	if combined, err := cmd.CombinedOutput(); err != nil {
 		fail(fmt.Errorf("ffmpeg render: %w: %s", err, string(combined)))
 		return
