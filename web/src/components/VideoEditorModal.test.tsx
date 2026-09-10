@@ -119,6 +119,27 @@ describe("VideoEditorModal multi-source preview", () => {
     });
   });
 
+  it("steps across a clip boundary with ArrowRight", async () => {
+    const { container } = await renderWithInsertedVideo();
+
+    fireEvent.click(screen.getByText("Eingefügt: Inserted source"), { clientX: 100 });
+
+    const video = container.querySelector("video")!;
+    await waitFor(() =>
+      expect(video.src).toBe("https://media.example/inserted.mp4"),
+    );
+
+    video.currentTime = 29.95;
+    fireEvent.timeUpdate(video);
+
+    fireEvent.keyDown(document, { key: "ArrowRight" });
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/videos/original/download");
+      expect(video.src).toBe("https://media.example/original.mp4");
+    });
+  });
+
   it("continues with the next clip when the active clip ends", async () => {
     const { container } = await renderWithInsertedVideo();
 

@@ -530,6 +530,57 @@ export function VideoEditorModal({
     );
   }
 
+  useEffect(() => {
+    function handleTimelineArrowKeys(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (!timelineDuration) return;
+
+      e.preventDefault();
+
+      const delta = e.key === "ArrowLeft" ? -0.1 : 0.1;
+      const nextTimelineTime = Math.max(
+        0,
+        Math.min(timelinePlayheadTime + delta, timelineDuration),
+      );
+
+      const position = timelineTimeToClipPosition(nextTimelineTime);
+      if (!position) return;
+
+      videoRef.current?.pause();
+      setTimelinePlayheadTime(nextTimelineTime);
+      setSelectedClipId(position.clip.id);
+      setError(null);
+      setCurrentTime(position.sourceTime);
+
+      void switchPreviewSource(
+        position.clip.sourceVideoId,
+        position.sourceTime,
+        position.clip.id,
+      );
+    }
+
+    document.addEventListener("keydown", handleTimelineArrowKeys);
+    return () =>
+      document.removeEventListener("keydown", handleTimelineArrowKeys);
+  }, [
+    timelinePlayheadTime,
+    timelineDuration,
+    clips,
+    timelineTimeToClipPosition,
+    switchPreviewSource,
+  ]);
+
   async function handleOpenInsertPicker() {
     setShowInsertPicker(true);
     setLoadingLibrary(true);
