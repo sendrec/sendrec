@@ -238,7 +238,11 @@ func (h *Handler) RenderEditorTimeline(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func buildTimelineRenderArgs(inputs []string, clips []editClip, overlays []editorCoverOverlay, sourceIndexes map[string]int, sources map[string]sourceVideo, output string) []string {
+func buildTimelineRenderArgs(inputs []string, clips []editClip, sourceIndexes map[string]int, sources map[string]sourceVideo, output string, overlaySets ...[]editorCoverOverlay) []string {
+	var overlays []editorCoverOverlay
+	if len(overlaySets) > 0 {
+		overlays = overlaySets[0]
+	}
 	args := make([]string, 0, len(inputs)*2+len(clips)*2+16)
 	for _, input := range inputs {
 		args = append(args, "-i", input)
@@ -334,7 +338,7 @@ func (h *Handler) renderTimelineAsync(ctx context.Context, job renderJob) {
 	}
 
 	output := filepath.Join(tmpDir, "rendered.mp4")
-	cmd := exec.CommandContext(ctx, "ffmpeg", buildTimelineRenderArgs(inputs, job.Timeline.Clips, job.Timeline.Overlays, indexes, job.Sources, output)...)
+	cmd := exec.CommandContext(ctx, "ffmpeg", buildTimelineRenderArgs(inputs, job.Timeline.Clips, indexes, job.Sources, output, job.Timeline.Overlays)...)
 	if combined, err := cmd.CombinedOutput(); err != nil {
 		fail(fmt.Errorf("ffmpeg render: %w: %s", err, string(combined)))
 		return

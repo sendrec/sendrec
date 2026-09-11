@@ -103,6 +103,42 @@ func TestBuildTimelineRenderArgsPreservesClipOrderAndRanges(t *testing.T) {
 	}
 }
 
+func TestBuildTimelineRenderArgsIncludesTimedCoverOverlay(t *testing.T) {
+	clips := []editClip{
+		{ID: "clip-1", SourceID: "original", SourceStart: 0, SourceEnd: 12, Duration: 12},
+	}
+	sources := map[string]sourceVideo{
+		"original": {ID: "original", HasAudio: true},
+	}
+	overlays := []editorCoverOverlay{
+		{
+			ID:     "cover-1",
+			X:      25,
+			Y:      10,
+			Width:  40,
+			Height: 20,
+			Start:  3.5,
+			End:    8.25,
+		},
+	}
+
+	args := buildTimelineRenderArgs(
+		[]string{"original.mp4"},
+		clips,
+		map[string]int{"original": 0},
+		sources,
+		"output.mp4",
+		overlays,
+	)
+
+	joined := strings.Join(args, " ")
+
+	expected := "drawbox=x=iw*0.250000:y=ih*0.100000:w=iw*0.400000:h=ih*0.200000:color=black:t=fill:enable='between(t,3.500,8.250)'"
+	if !strings.Contains(joined, expected) {
+		t.Fatalf("render args missing timed cover overlay; expected %q in %s", expected, joined)
+	}
+}
+
 func TestRenderEditorTimelineSavesTimelineAndQueuesResolvedSources(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
