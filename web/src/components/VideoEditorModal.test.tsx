@@ -263,6 +263,38 @@ describe("VideoEditorModal multi-source preview", () => {
     expect(screen.getAllByText("2:00")).not.toHaveLength(0);
   });
 
+  it("deletes only the selected cover overlay", async () => {
+    const user = userEvent.setup();
+    render(<VideoEditorModal videoId="original" duration={120} onClose={vi.fn()} />);
+
+    const timeline = await screen.findByTestId("video-editor-timeline");
+    vi.spyOn(timeline, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 1000, bottom: 64,
+      width: 1000, height: 64, toJSON: () => ({}),
+    });
+
+    await user.click(screen.getByRole("button", { name: "+ Abdeckung" }));
+    fireEvent.click(timeline, { clientX: 500 });
+    await user.click(screen.getByRole("button", { name: "+ Abdeckung" }));
+
+    fireEvent.click(screen.getByText("Abdeckung 1"));
+    await user.click(screen.getByRole("button", { name: "Löschen" }));
+
+    expect(screen.queryByText("Abdeckung 2")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Abdeckung 1")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Löschen" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Als neues Video rendern" }));
+    await waitFor(() => {
+      const renderCall = mockApiFetch.mock.calls.find(
+        ([path]) => path === "/api/videos/original/editor/render",
+      );
+      const payload = JSON.parse((renderCall?.[1] as RequestInit).body as string);
+      expect(payload.overlays).toHaveLength(1);
+      expect(payload.overlays[0].start).toBeCloseTo(60, 3);
+    });
+  });
+
   it("uses finer time markers as the timeline is zoomed", async () => {
     const user = userEvent.setup();
     render(<VideoEditorModal videoId="original" duration={8} onClose={vi.fn()} />);

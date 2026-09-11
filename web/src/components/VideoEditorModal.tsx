@@ -1059,6 +1059,16 @@ export function VideoEditorModal({
     setError(null);
   }
 
+  function handleDeleteSelectedCoverOverlay() {
+    if (!selectedCoverOverlayId) return;
+
+    setCoverOverlays((previous) =>
+      previous.filter((overlay) => overlay.id !== selectedCoverOverlayId),
+    );
+    setSelectedCoverOverlayId(null);
+    setError(null);
+  }
+
   function handlePasteCoverOverlay() {
     if (!copiedCoverOverlay || timelineDuration <= 0) {
       setError("Es ist keine Abdeckung zum Einfügen kopiert.");
@@ -1687,6 +1697,22 @@ export function VideoEditorModal({
             }}
           >
             Einfügen
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDeleteSelectedCoverOverlay}
+            style={{
+              border: "1px solid #DC2626",
+              borderRadius: 7,
+              padding: "6px 10px",
+              background: "#FFFFFF",
+              color: "#DC2626",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Löschen
           </button>
         </div>
       )}
