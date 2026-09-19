@@ -3,9 +3,9 @@ package server_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"mime/multipart"
 	"net/http"
@@ -946,5 +946,172 @@ func TestWatchAnalyticsBeaconsRejectOversizedBodies(t *testing.T) {
 				t.Errorf("expected oversized body to be rejected, got %d", rec.Code)
 			}
 		})
+	}
+}
+
+// --- Settings routes carry workspace context ---
+
+// The branding handler picks its scope from the org context, and only
+// organization.Middleware puts it there. Injecting that context in a handler
+// test proves nothing about whether a real request ever arrives with it, so
+// these drive the router the way the browser does: a bearer token plus the
+// X-Organization-Id header the web client sends when a workspace is selected.
+// The middleware validates the header as a uuid before querying, so these
+// carry a real one.
+const testRouteOrgID = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+
+func newBrandingServer(t *testing.T) (*server.Server, pgxmock.PgxPoolIface, string) {
+	t.Helper()
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("failed to create pgxmock pool: %v", err)
+	}
+	t.Cleanup(func() { mock.Close() })
+
+	srv := server.New(server.Config{
+		DB:              mock,
+		Pinger:          &mockPinger{err: nil},
+		Storage:         &mockStorage{},
+		JWTSecret:       "test-secret",
+		BaseURL:         "https://localhost:8080",
+		BrandingEnabled: true,
+	})
+
+	token, err := auth.GenerateAccessToken("test-secret", "user-1")
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+	return srv, mock, token
+}
+
+func expectOrgMembership(mock pgxmock.PgxPoolIface, orgID, userID, role string) {
+	mock.ExpectQuery(`SELECT om.role FROM organization_members om`).
+		WithArgs(orgID, userID).
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow(role))
+}
+
+func TestPutBrandingSettings_WithWorkspaceHeader_WritesOrgScopedRow(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	expectOrgMembership(mock, testRouteOrgID, "user-1", "owner")
+	mock.ExpectExec(`INSERT INTO user_branding \(organization_id`).
+		WithArgs(testRouteOrgID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
+			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/branding",
+		strings.NewReader(`{"companyName":"Acme Inc"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Organization-Id", testRouteOrgID)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("workspace branding did not reach the org-scoped write: %v", err)
+	}
+}
+
+func TestGetBrandingSettings_WithWorkspaceHeader_ReadsOrgScopedRow(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	expectOrgMembership(mock, testRouteOrgID, "user-1", "owner")
+	mock.ExpectQuery(`FROM user_branding WHERE organization_id = \$1`).
+		WithArgs(testRouteOrgID).
+		WillReturnError(pgx.ErrNoRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/settings/branding", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Organization-Id", testRouteOrgID)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("workspace branding did not reach the org-scoped read: %v", err)
+	}
+}
+
+// Without the header the same route stays personal, so existing installs are
+// untouched by mounting the middleware.
+func TestPutBrandingSettings_WithoutWorkspaceHeader_StaysPersonal(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	mock.ExpectExec(`INSERT INTO user_branding \(user_id`).
+		WithArgs("user-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
+			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/branding",
+		strings.NewReader(`{"companyName":"Personal Co"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("personal branding write changed: %v", err)
+	}
+}
+
+// Playlists scope through orgScope and orgRowFilter exactly like videos, and
+// RequireWriter only bites when the org context carries a role — so the same
+// middleware gap leaves workspace playlists in personal scope and lets a viewer
+// write. Same shape of test as branding, for the same reason.
+func TestCreatePlaylist_WithWorkspaceHeader_WritesOrgScopedRow(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	expectOrgMembership(mock, testRouteOrgID, "user-1", "owner")
+	orgScoped := testRouteOrgID
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
+		WithArgs(&orgScoped, "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectQuery(`SELECT plan FROM users|SELECT subscription_plan`).
+		WithArgs(pgxmock.AnyArg()).
+		WillReturnRows(pgxmock.NewRows([]string{"plan"}).AddRow("pro"))
+	mock.ExpectQuery(`INSERT INTO playlists`).
+		WithArgs("user-1", "My List", (*string)(nil), &orgScoped).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "position", "created_at", "updated_at"}).
+			AddRow("playlist-1", 0, time.Now(), time.Now()))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/playlists", strings.NewReader(`{"title":"My List"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Organization-Id", testRouteOrgID)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("playlist creation did not reach the workspace scope: %v", err)
+	}
+}
+
+// RequireWriter is mounted on the playlist write routes but reads its role from
+// the org context, so without the middleware it never fires.
+func TestCreatePlaylist_AsViewer_IsRefused(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	expectOrgMembership(mock, testRouteOrgID, "user-1", "viewer")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/playlists", strings.NewReader(`{"title":"Viewer List"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Organization-Id", testRouteOrgID)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("a workspace viewer created a playlist: status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }

@@ -355,6 +355,11 @@ func (s *Server) routes() {
 	if s.videoHandler != nil {
 		s.router.Route("/api/settings", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
+			// Branding is scoped per workspace, and this is the only reader of
+			// the X-Organization-Id header the web client sends. Without it the
+			// branding handlers always resolve to personal scope, whatever
+			// workspace the user has selected.
+			r.Use(organization.Middleware(s.db))
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/notifications", s.videoHandler.GetNotificationPreferences)
 			r.Put("/notifications", s.videoHandler.PutNotificationPreferences)
@@ -494,6 +499,10 @@ func (s *Server) routes() {
 
 		s.router.Route("/api/playlists", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
+			// Playlist handlers scope through orgScope and orgRowFilter, and
+			// RequireWriter below reads its role from this context — without it
+			// workspace playlists land in personal scope and viewers can write.
+			r.Use(organization.Middleware(s.db))
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/", s.videoHandler.ListPlaylists)
 			r.Get("/{id}", s.videoHandler.GetPlaylist)

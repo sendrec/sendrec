@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
@@ -19,6 +20,15 @@ func Middleware(db database.DBTX) func(http.Handler) http.Handler {
 			orgID := r.Header.Get("X-Organization-Id")
 			if orgID == "" {
 				next.ServeHTTP(w, r)
+				return
+			}
+
+			// organization_id is a uuid column, so a header that cannot be one
+			// matches no workspace. Asking the database anyway turns
+			// user-controlled input into a scan error and a 500.
+			var parsed pgtype.UUID
+			if err := parsed.Scan(orgID); err != nil {
+				httputil.WriteError(w, http.StatusForbidden, "not a member of this organization")
 				return
 			}
 

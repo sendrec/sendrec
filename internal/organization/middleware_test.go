@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 )
+
+// organization_id is a uuid column, so header-driven tests carry a real one.
+const testOrgID = "8f14e45f-ceea-4f7c-9a1b-2d3c4e5f6a7b"
 
 func TestMiddleware_NoHeader(t *testing.T) {
 	mock, err := pgxmock.NewPool()
@@ -57,7 +61,7 @@ func TestMiddleware_ValidMember(t *testing.T) {
 	}
 	defer mock.Close()
 
-	orgID := "org-1"
+	orgID := testOrgID
 
 	mock.ExpectQuery(`SELECT om\.role FROM organization_members om`).
 		WithArgs(orgID, testUserID).
@@ -103,7 +107,7 @@ func TestMiddleware_NonMember(t *testing.T) {
 	}
 	defer mock.Close()
 
-	orgID := "org-1"
+	orgID := testOrgID
 
 	mock.ExpectQuery(`SELECT om\.role FROM organization_members om`).
 		WithArgs(orgID, testUserID).
@@ -147,7 +151,7 @@ func TestMiddleware_NoAuth(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/videos", nil)
-	req.Header.Set("X-Organization-Id", "org-1")
+	req.Header.Set("X-Organization-Id", testOrgID)
 
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -268,5 +272,49 @@ func TestRequireWriter_AllowsPersonal(t *testing.T) {
 	}
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+}
+
+// Organization ids are uuid columns, so a header that cannot be one belongs to
+// no workspace. Answering that with the membership query turns user-controlled
+// input into a database error and a 500.
+func TestMiddleware_MalformedHeaderIsRefusedWithoutQuerying(t *testing.T) {
+	for _, orgID := range []string{
+		"not-a-uuid",
+		"   ",
+		"' OR 1=1 --",
+		"üñî",
+		"%00",
+		"../../etc/passwd",
+		strings.Repeat("a", 5000),
+		"11111111-2222-3333-4444-55555555555",
+	} {
+		t.Run(orgID[:min(len(orgID), 16)], func(t *testing.T) {
+			mock, err := pgxmock.NewPool()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer mock.Close()
+
+			handler := Middleware(mock)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Fatal("next handler should not be called")
+			}))
+
+			req := httptest.NewRequest(http.MethodGet, "/api/videos", nil)
+			req = req.WithContext(auth.ContextWithUserID(req.Context(), testUserID))
+			req.Header.Set("X-Organization-Id", orgID)
+
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("expected %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
+			}
+			// No query expectations were registered, so reaching the database
+			// here would fail the run.
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unmet expectations: %v", err)
+			}
+		})
 	}
 }
