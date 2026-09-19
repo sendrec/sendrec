@@ -956,6 +956,10 @@ func TestWatchAnalyticsBeaconsRejectOversizedBodies(t *testing.T) {
 // test proves nothing about whether a real request ever arrives with it, so
 // these drive the router the way the browser does: a bearer token plus the
 // X-Organization-Id header the web client sends when a workspace is selected.
+// The middleware validates the header as a uuid before querying, so these
+// carry a real one.
+const testRouteOrgID = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+
 func newBrandingServer(t *testing.T) (*server.Server, pgxmock.PgxPoolIface, string) {
 	t.Helper()
 	mock, err := pgxmock.NewPool()
@@ -989,16 +993,16 @@ func expectOrgMembership(mock pgxmock.PgxPoolIface, orgID, userID, role string) 
 func TestPutBrandingSettings_WithWorkspaceHeader_WritesOrgScopedRow(t *testing.T) {
 	srv, mock, token := newBrandingServer(t)
 
-	expectOrgMembership(mock, "org-1", "user-1", "owner")
+	expectOrgMembership(mock, testRouteOrgID, "user-1", "owner")
 	mock.ExpectExec(`INSERT INTO user_branding \(organization_id`).
-		WithArgs("org-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
+		WithArgs(testRouteOrgID, pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
 			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
 		WillReturnResult(pgxmock.NewResult("INSERT", 1))
 
 	req := httptest.NewRequest(http.MethodPut, "/api/settings/branding",
 		strings.NewReader(`{"companyName":"Acme Inc"}`))
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-Organization-Id", "org-1")
+	req.Header.Set("X-Organization-Id", testRouteOrgID)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
@@ -1014,14 +1018,14 @@ func TestPutBrandingSettings_WithWorkspaceHeader_WritesOrgScopedRow(t *testing.T
 func TestGetBrandingSettings_WithWorkspaceHeader_ReadsOrgScopedRow(t *testing.T) {
 	srv, mock, token := newBrandingServer(t)
 
-	expectOrgMembership(mock, "org-1", "user-1", "owner")
+	expectOrgMembership(mock, testRouteOrgID, "user-1", "owner")
 	mock.ExpectQuery(`FROM user_branding WHERE organization_id = \$1`).
-		WithArgs("org-1").
+		WithArgs(testRouteOrgID).
 		WillReturnError(pgx.ErrNoRows)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/settings/branding", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-Organization-Id", "org-1")
+	req.Header.Set("X-Organization-Id", testRouteOrgID)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
 
@@ -1065,8 +1069,8 @@ func TestPutBrandingSettings_WithoutWorkspaceHeader_StaysPersonal(t *testing.T) 
 func TestCreatePlaylist_WithWorkspaceHeader_WritesOrgScopedRow(t *testing.T) {
 	srv, mock, token := newBrandingServer(t)
 
-	expectOrgMembership(mock, "org-1", "user-1", "owner")
-	orgScoped := "org-1"
+	expectOrgMembership(mock, testRouteOrgID, "user-1", "owner")
+	orgScoped := testRouteOrgID
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM playlists`).
 		WithArgs(&orgScoped, "user-1").
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(0))
@@ -1080,7 +1084,7 @@ func TestCreatePlaylist_WithWorkspaceHeader_WritesOrgScopedRow(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/playlists", strings.NewReader(`{"title":"My List"}`))
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-Organization-Id", "org-1")
+	req.Header.Set("X-Organization-Id", testRouteOrgID)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
@@ -1098,11 +1102,11 @@ func TestCreatePlaylist_WithWorkspaceHeader_WritesOrgScopedRow(t *testing.T) {
 func TestCreatePlaylist_AsViewer_IsRefused(t *testing.T) {
 	srv, mock, token := newBrandingServer(t)
 
-	expectOrgMembership(mock, "org-1", "user-1", "viewer")
+	expectOrgMembership(mock, testRouteOrgID, "user-1", "viewer")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/playlists", strings.NewReader(`{"title":"Viewer List"}`))
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-Organization-Id", "org-1")
+	req.Header.Set("X-Organization-Id", testRouteOrgID)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
