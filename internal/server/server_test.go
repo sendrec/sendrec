@@ -3,9 +3,9 @@ package server_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"mime/multipart"
 	"net/http"
@@ -946,5 +946,114 @@ func TestWatchAnalyticsBeaconsRejectOversizedBodies(t *testing.T) {
 				t.Errorf("expected oversized body to be rejected, got %d", rec.Code)
 			}
 		})
+	}
+}
+
+// --- Settings routes carry workspace context ---
+
+// The branding handler picks its scope from the org context, and only
+// organization.Middleware puts it there. Injecting that context in a handler
+// test proves nothing about whether a real request ever arrives with it, so
+// these drive the router the way the browser does: a bearer token plus the
+// X-Organization-Id header the web client sends when a workspace is selected.
+func newBrandingServer(t *testing.T) (*server.Server, pgxmock.PgxPoolIface, string) {
+	t.Helper()
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("failed to create pgxmock pool: %v", err)
+	}
+	t.Cleanup(func() { mock.Close() })
+
+	srv := server.New(server.Config{
+		DB:              mock,
+		Pinger:          &mockPinger{err: nil},
+		Storage:         &mockStorage{},
+		JWTSecret:       "test-secret",
+		BaseURL:         "https://localhost:8080",
+		BrandingEnabled: true,
+	})
+
+	token, err := auth.GenerateAccessToken("test-secret", "user-1")
+	if err != nil {
+		t.Fatalf("generate token: %v", err)
+	}
+	return srv, mock, token
+}
+
+func expectOrgMembership(mock pgxmock.PgxPoolIface, orgID, userID, role string) {
+	mock.ExpectQuery(`SELECT om.role FROM organization_members om`).
+		WithArgs(orgID, userID).
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow(role))
+}
+
+func TestPutBrandingSettings_WithWorkspaceHeader_WritesOrgScopedRow(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	expectOrgMembership(mock, "org-1", "user-1", "owner")
+	mock.ExpectExec(`INSERT INTO user_branding \(organization_id`).
+		WithArgs("org-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
+			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/branding",
+		strings.NewReader(`{"companyName":"Acme Inc"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Organization-Id", "org-1")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("workspace branding did not reach the org-scoped write: %v", err)
+	}
+}
+
+func TestGetBrandingSettings_WithWorkspaceHeader_ReadsOrgScopedRow(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	expectOrgMembership(mock, "org-1", "user-1", "owner")
+	mock.ExpectQuery(`FROM user_branding WHERE organization_id = \$1`).
+		WithArgs("org-1").
+		WillReturnError(pgx.ErrNoRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/settings/branding", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Organization-Id", "org-1")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("workspace branding did not reach the org-scoped read: %v", err)
+	}
+}
+
+// Without the header the same route stays personal, so existing installs are
+// untouched by mounting the middleware.
+func TestPutBrandingSettings_WithoutWorkspaceHeader_StaysPersonal(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	mock.ExpectExec(`INSERT INTO user_branding \(user_id`).
+		WithArgs("user-1", pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
+			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/branding",
+		strings.NewReader(`{"companyName":"Personal Co"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("personal branding write changed: %v", err)
 	}
 }
