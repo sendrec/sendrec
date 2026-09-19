@@ -11,18 +11,20 @@ import (
 )
 
 type playlistEmbedData struct {
-	Title      string
-	Nonce      string
-	BaseURL    string
-	ShareToken string
-	Videos     []playlistWatchVideoItem
-	VideosJSON template.JS
+	Title       string
+	Nonce       string
+	BaseURL     string
+	ShareToken  string
+	Videos      []playlistWatchVideoItem
+	VideosJSON  template.JS
+	AccentColor string
 }
 
 type playlistEmbedGateData struct {
-	Title      string
-	ShareToken string
-	Nonce      string
+	Title       string
+	ShareToken  string
+	Nonce       string
+	AccentColor string
 }
 
 var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(template.FuncMap{
@@ -38,13 +40,16 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
     <title>{{.Title}}</title>
     <style nonce="{{.Nonce}}">
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :focus-visible { outline: 2px solid #00b67a; outline-offset: 2px; }
+        :focus-visible { outline: 2px solid var(--player-accent); outline-offset: 2px; }
         html, body { width: 100%; height: 100%; overflow: hidden; }
         body {
             background: #0a1628;
             color: #ffffff;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             -webkit-font-smoothing: antialiased;
+        }
+        :root {
+            --player-accent: {{.AccentColor}};
         }
         .hidden { display: none !important; }
 ` + playerCSS + safariWarningCSS + `
@@ -105,7 +110,7 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
             transition: background 0.2s;
         }
         .aa-toggle-track.active {
-            background: #00b67a;
+            background: var(--player-accent);
         }
         .aa-toggle-knob {
             width: 10px;
@@ -143,7 +148,7 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
         }
         .video-list-item.active {
             background: #1e3a5f;
-            border-left: 3px solid #00b67a;
+            border-left: 3px solid var(--player-accent);
             padding-left: 9px;
         }
         .video-list-item .position {
@@ -155,13 +160,13 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
             font-family: monospace;
         }
         .video-list-item.active .position {
-            color: #00b67a;
+            color: var(--player-accent);
             font-weight: 600;
         }
         .now-playing-tag {
             font-size: 9px;
             font-weight: 600;
-            color: #00b67a;
+            color: var(--player-accent);
             text-transform: uppercase;
             letter-spacing: 0.3px;
             display: none;
@@ -228,7 +233,7 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
             margin-top: 1px;
         }
         .video-list-item .watched-badge {
-            color: #00b67a;
+            color: var(--player-accent);
             font-size: 12px;
             flex-shrink: 0;
         }
@@ -296,7 +301,7 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
         }
         .next-progress-fill {
             height: 100%;
-            background: #00b67a;
+            background: var(--player-accent);
             border-radius: 2px;
             width: 100%;
             transition: width 0.1s linear;
@@ -315,10 +320,10 @@ var playlistEmbedTemplate = template.Must(template.New("playlist-embed").Funcs(t
             transition: all 0.15s;
         }
         .btn-play-now {
-            background: #00b67a;
+            background: var(--player-accent);
             color: #fff;
         }
-        .btn-play-now:hover { background: #00a06b; }
+        .btn-play-now:hover { filter: brightness(0.9); }
         .btn-cancel {
             background: transparent;
             color: #94a3b8;
@@ -490,8 +495,9 @@ var playlistEmbedPasswordTemplate = template.Must(template.New("playlist-embed-p
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{.Title}}</title>
     <style nonce="{{.Nonce}}">
+        :root { --player-accent: {{.AccentColor}}; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :focus-visible { outline: 2px solid #00b67a; outline-offset: 2px; }
+        :focus-visible { outline: 2px solid var(--player-accent); outline-offset: 2px; }
         html, body { width: 100%; height: 100%; background: #0a1628; }
         body {
             color: #ffffff;
@@ -502,7 +508,7 @@ var playlistEmbedPasswordTemplate = template.Must(template.New("playlist-embed-p
             -webkit-font-smoothing: antialiased;
         }
         .container { text-align: center; padding: 2rem; max-width: 360px; width: 100%; }
-        .gate-icon { width: 48px; height: 48px; border-radius: 10px; background: rgba(0,182,122,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 20px; }
+        .gate-icon { width: 48px; height: 48px; border-radius: 10px; background: color-mix(in srgb, var(--player-accent) 10%, transparent); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 20px; }
         h1 { font-size: 1.25rem; margin-bottom: 0.5rem; font-weight: 700; }
         p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.875rem; }
         .error { color: #ef4444; font-size: 0.8rem; margin-bottom: 0.75rem; display: none; }
@@ -511,14 +517,14 @@ var playlistEmbedPasswordTemplate = template.Must(template.New("playlist-embed-p
             border: 1px solid #334155; background: #1e293b; color: #fff;
             font-size: 0.875rem; margin-bottom: 0.75rem; outline: none;
         }
-        input[type="password"]:focus { border-color: #00b67a; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
+        input[type="password"]:focus { border-color: var(--player-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--player-accent) 10%, transparent); }
         input[type="password"]::placeholder { color: #94a3b8; opacity: 0.5; }
         button {
-            width: 100%; background: #00b67a; color: #fff; padding: 0.625rem 1rem;
+            width: 100%; background: var(--player-accent); color: #fff; padding: 0.625rem 1rem;
             border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 600;
             cursor: pointer; transition: background 0.15s;
         }
-        button:hover { background: #00a06b; }
+        button:hover { filter: brightness(0.9); }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
@@ -563,8 +569,9 @@ var playlistEmbedEmailGateTemplate = template.Must(template.New("playlist-embed-
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{.Title}}</title>
     <style nonce="{{.Nonce}}">
+        :root { --player-accent: {{.AccentColor}}; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :focus-visible { outline: 2px solid #00b67a; outline-offset: 2px; }
+        :focus-visible { outline: 2px solid var(--player-accent); outline-offset: 2px; }
         html, body { width: 100%; height: 100%; background: #0a1628; }
         body {
             color: #ffffff;
@@ -575,7 +582,7 @@ var playlistEmbedEmailGateTemplate = template.Must(template.New("playlist-embed-
             -webkit-font-smoothing: antialiased;
         }
         .container { text-align: center; padding: 2rem; max-width: 360px; width: 100%; }
-        .gate-icon { width: 48px; height: 48px; border-radius: 10px; background: rgba(0,182,122,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 20px; }
+        .gate-icon { width: 48px; height: 48px; border-radius: 10px; background: color-mix(in srgb, var(--player-accent) 10%, transparent); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 20px; }
         h1 { font-size: 1.25rem; margin-bottom: 0.5rem; font-weight: 700; }
         p { color: #94a3b8; margin-bottom: 1rem; font-size: 0.875rem; }
         .error { color: #ef4444; font-size: 0.8rem; margin-bottom: 0.75rem; display: none; }
@@ -584,14 +591,14 @@ var playlistEmbedEmailGateTemplate = template.Must(template.New("playlist-embed-
             border: 1px solid #334155; background: #1e293b; color: #fff;
             font-size: 0.875rem; margin-bottom: 0.75rem; outline: none;
         }
-        input[type="email"]:focus { border-color: #00b67a; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
+        input[type="email"]:focus { border-color: var(--player-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--player-accent) 10%, transparent); }
         input[type="email"]::placeholder { color: #94a3b8; opacity: 0.5; }
         button {
-            width: 100%; background: #00b67a; color: #fff; padding: 0.625rem 1rem;
+            width: 100%; background: var(--player-accent); color: #fff; padding: 0.625rem 1rem;
             border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 600;
             cursor: pointer; transition: background 0.15s;
         }
-        button:hover { background: #00a06b; }
+        button:hover { filter: brightness(0.9); }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
@@ -636,25 +643,57 @@ func (h *Handler) PlaylistEmbedPage(w http.ResponseWriter, r *http.Request) {
 	var playlistID, title string
 	var sharePassword *string
 	var requireEmail bool
+	var playlistOrgID *string
+	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
+	var obCompanyName, obLogoKey, obColorBg, obColorSurface, obColorText, obColorAccent, obFooterText, obCustomCSS *string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT p.id, p.title, p.share_password, p.require_email
+		`SELECT p.id, p.title, p.share_password, p.require_email,
+		        p.organization_id,
+		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
+		        ob.company_name, ob.logo_key, ob.color_background, ob.color_surface, ob.color_text, ob.color_accent, ob.footer_text, ob.custom_css
 		 FROM playlists p
+		 LEFT JOIN user_branding ub ON ub.user_id = p.user_id AND ub.organization_id IS NULL
+		 LEFT JOIN user_branding ob ON ob.organization_id = p.organization_id
 		 WHERE p.share_token = $1 AND p.is_shared = true`,
 		shareToken,
-	).Scan(&playlistID, &title, &sharePassword, &requireEmail)
+	).Scan(&playlistID, &title, &sharePassword, &requireEmail,
+		&playlistOrgID,
+		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
+		&obCompanyName, &obLogoKey, &obColorBg, &obColorSurface, &obColorText, &obColorAccent, &obFooterText, &obCustomCSS)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 
+	// The embed page only consumes the accent color, so nil out the logo keys
+	// to avoid generating unused signed logo URLs.
+	ubLogoKey, obLogoKey = nil, nil
+
+	baseBranding := brandingSettingsResponse{
+		CompanyName: ubCompanyName, LogoKey: ubLogoKey,
+		ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
+		ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
+		CustomCSS: ubCustomCSS,
+	}
+	if playlistOrgID != nil {
+		baseBranding = brandingSettingsResponse{
+			CompanyName: obCompanyName, LogoKey: obLogoKey,
+			ColorBackground: obColorBg, ColorSurface: obColorSurface,
+			ColorText: obColorText, ColorAccent: obColorAccent, FooterText: obFooterText,
+			CustomCSS: obCustomCSS,
+		}
+	}
+	branding := resolveBranding(r.Context(), h.storage, baseBranding, brandingSettingsResponse{})
+
 	if sharePassword != nil {
 		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			if err := playlistEmbedPasswordTemplate.Execute(w, playlistEmbedGateData{
-				Title:      title,
-				ShareToken: shareToken,
-				Nonce:      nonce,
+				Title:       title,
+				ShareToken:  shareToken,
+				Nonce:       nonce,
+				AccentColor: branding.ColorAccent,
 			}); err != nil {
 				slog.Error("playlist-embed: failed to render password page", "error", err)
 			}
@@ -666,9 +705,10 @@ func (h *Handler) PlaylistEmbedPage(w http.ResponseWriter, r *http.Request) {
 		if _, ok := hasValidEmailGateCookie(r, h.hmacSecret, shareToken); !ok {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			if err := playlistEmbedEmailGateTemplate.Execute(w, playlistEmbedGateData{
-				Title:      title,
-				ShareToken: shareToken,
-				Nonce:      nonce,
+				Title:       title,
+				ShareToken:  shareToken,
+				Nonce:       nonce,
+				AccentColor: branding.ColorAccent,
 			}); err != nil {
 				slog.Error("playlist-embed: failed to render email gate page", "error", err)
 			}
@@ -686,12 +726,13 @@ func (h *Handler) PlaylistEmbedPage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := playlistEmbedTemplate.Execute(w, playlistEmbedData{
-		Title:      title,
-		Nonce:      nonce,
-		BaseURL:    h.baseURL,
-		ShareToken: shareToken,
-		Videos:     videoItems,
-		VideosJSON: template.JS(videosJSONBytes),
+		Title:       title,
+		Nonce:       nonce,
+		BaseURL:     h.baseURL,
+		ShareToken:  shareToken,
+		Videos:      videoItems,
+		VideosJSON:  template.JS(videosJSONBytes),
+		AccentColor: branding.ColorAccent,
 	}); err != nil {
 		slog.Error("playlist-embed: failed to render playlist embed page", "error", err)
 	}

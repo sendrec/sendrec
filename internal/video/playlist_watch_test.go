@@ -16,6 +16,11 @@ import (
 
 var playlistWatchColumns = []string{
 	"id", "title", "description", "share_password", "require_email",
+	"organization_id",
+	"ub_company_name", "ub_logo_key", "ub_color_background", "ub_color_surface",
+	"ub_color_text", "ub_color_accent", "ub_footer_text", "ub_custom_css",
+	"ob_company_name", "ob_logo_key", "ob_color_background", "ob_color_surface",
+	"ob_color_text", "ob_color_accent", "ob_footer_text", "ob_custom_css",
 }
 
 var playlistVideosColumns = []string{
@@ -50,7 +55,28 @@ func TestPlaylistWatchPage_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
-			"playlist-1", "My Playlist", (*string)(nil), (*string)(nil), false,
+			"playlist-1",
+			"My Playlist",
+			(*string)(nil),
+			(*string)(nil),
+			false,
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
 		))
 
 	thumbKey := "recordings/user-1/vtoken2abcde.jpg"
@@ -158,7 +184,28 @@ func TestPlaylistWatchPage_PasswordProtected(t *testing.T) {
 	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
 		WithArgs(shareToken).
 		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
-			"playlist-2", "Protected Playlist", (*string)(nil), &passwordHash, false,
+			"playlist-2",
+			"Protected Playlist",
+			(*string)(nil),
+			&passwordHash,
+			false,
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
+			(*string)(nil),
 		))
 
 	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
@@ -295,6 +342,368 @@ func TestIdentifyPlaylistViewer_Success(t *testing.T) {
 		t.Error("expected email gate cookie to be set")
 	}
 
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestPlaylistWatchPage_RendersWorkspaceBranding(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	storage := &mockStorage{downloadURL: "https://storage.example.com/logo.png"}
+	handler := NewHandler(mock, storage, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "plbrand1234"
+
+	orgID := "42"
+	companyName := "ACME Inc"
+	logoKey := "branding/org42/logo.png"
+	orgAccent := "#ff0000"
+	footerText := "Powered by ACME"
+
+	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
+			"playlist-1", "Branded Playlist", (*string)(nil), (*string)(nil), false,
+			&orgID,
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			&companyName, &logoKey,
+			(*string)(nil), (*string)(nil), (*string)(nil), &orgAccent, &footerText, (*string)(nil),
+		))
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id`).
+		WithArgs("playlist-1").
+		WillReturnRows(pgxmock.NewRows(playlistVideosColumns).
+			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", (*string)(nil)))
+
+	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "<title>Branded Playlist — ACME Inc</title>") {
+		t.Error("expected workspace company name in page title")
+	}
+	if !strings.Contains(body, "--brand-accent: #ff0000") {
+		t.Error("expected workspace accent color")
+	}
+	if !strings.Contains(body, `src="https://storage.example.com/logo.png"`) {
+		t.Error("expected workspace logo URL in sidebar")
+	}
+	if !strings.Contains(body, "Powered by ACME") {
+		t.Error("expected custom footer text")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestPlaylistWatchPage_UsesPersonalBrandingWithoutWorkspace(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "plbrand1256"
+
+	personalAccent := "#00ccff"
+	personalCompany := "Solo Creator"
+
+	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
+			"playlist-1", "My Playlist", (*string)(nil), (*string)(nil), false,
+			(*string)(nil),
+			&personalCompany, (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), &personalAccent, (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+		))
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id`).
+		WithArgs("playlist-1").
+		WillReturnRows(pgxmock.NewRows(playlistVideosColumns).
+			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", (*string)(nil)))
+
+	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "--brand-accent: #00ccff") {
+		t.Error("expected personal accent color for workspace-less playlist")
+	}
+	if !strings.Contains(body, "Solo Creator") {
+		t.Error("expected personal company name")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestPlaylistWatchPage_DefaultSurfaceWithoutBranding(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "plsurf1234"
+
+	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
+			"playlist-1", "Unbranded Playlist", (*string)(nil), (*string)(nil), false,
+			(*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+		))
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id`).
+		WithArgs("playlist-1").
+		WillReturnRows(pgxmock.NewRows(playlistVideosColumns).
+			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", (*string)(nil)))
+
+	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "--brand-surface: #111d32") {
+		t.Error("expected original navy panel shade as default brand surface")
+	}
+	if strings.Contains(body, "--brand-surface: #1e293b") {
+		t.Error("default brand surface must not change to the shared slate surface")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestPlaylistWatchPage_CustomSurfaceOverridesDefault(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "plsurf1256"
+
+	customSurface := "#222233"
+
+	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
+			"playlist-1", "Custom Surface Playlist", (*string)(nil), (*string)(nil), false,
+			(*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), &customSurface,
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+		))
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id`).
+		WithArgs("playlist-1").
+		WillReturnRows(pgxmock.NewRows(playlistVideosColumns).
+			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", (*string)(nil)))
+
+	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "--brand-surface: #222233") {
+		t.Error("expected custom branded surface color to override the navy default")
+	}
+	if strings.Contains(body, "--brand-surface: #111d32") {
+		t.Error("navy default must not appear when a custom surface is configured")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestPlaylistWatchPage_LightThemeGateInputUsesBrandText(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	passwordHash, _ := hashSharePassword("secret123")
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "lightgate12"
+
+	lightCo := "Light Co"
+	lightBg := "#f5f5f5"
+	lightSurface := "#ffffff"
+	lightText := "#000000"
+	lightAccent := "#1d4ed8"
+
+	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
+			"playlist-1", "Light Gate Playlist", (*string)(nil), &passwordHash, false,
+			(*string)(nil),
+			&lightCo, (*string)(nil), &lightBg, &lightSurface,
+			&lightText, &lightAccent, (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+		))
+
+	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "--brand-surface: #ffffff") {
+		t.Error("expected light brand surface to reach the gate page")
+	}
+	if !strings.Contains(body, "--brand-text: #000000") {
+		t.Error("expected light brand text color to reach the gate page")
+	}
+	if !strings.Contains(body, "background: var(--brand-surface); color: var(--brand-text);") {
+		t.Error("gate input must use the brand text color for its foreground")
+	}
+	if strings.Contains(body, "background: var(--brand-surface); color: #fff;") {
+		t.Error("gate input must not hardcode a white foreground (unreadable on light surfaces)")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestPlaylistWatchPage_LightThemeActiveRowForeground(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "lightrow123"
+
+	lightCo := "Light Co"
+	lightSurface := "#ffffff"
+	lightText := "#000000"
+	lightAccent := "#1d4ed8"
+
+	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
+			"playlist-1", "Light Playlist", (*string)(nil), (*string)(nil), false,
+			(*string)(nil),
+			&lightCo, (*string)(nil), (*string)(nil), &lightSurface,
+			&lightText, &lightAccent, (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+		))
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id`).
+		WithArgs("playlist-1").
+		WillReturnRows(pgxmock.NewRows(playlistVideosColumns).
+			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", (*string)(nil)))
+
+	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "--brand-text: #000000") {
+		t.Error("expected light brand text color to reach the playlist page")
+	}
+	if !strings.Contains(body, "background: #1e3a5f;") {
+		t.Error("active row must keep its fixed dark background")
+	}
+	activeTitleRule := ".video-list-item.active .video-title {\n            font-weight: 600;\n            color: #fff;"
+	if !strings.Contains(body, activeTitleRule) {
+		t.Error("active row title must override the brand text color (black on the fixed navy background is unreadable)")
+	}
+	activePositionRule := ".video-list-item.active .position {\n            color: #fff;"
+	if !strings.Contains(body, activePositionRule) {
+		t.Error("active row position must override the brand accent color")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestPlaylistWatchPage_LightThemeNextOverlayForeground(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
+	shareToken := "lightnext123"
+
+	lightCo := "Light Co"
+	lightSurface := "#ffffff"
+	lightText := "#000000"
+	lightAccent := "#1d4ed8"
+
+	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
+			"playlist-1", "Light Playlist", (*string)(nil), (*string)(nil), false,
+			(*string)(nil),
+			&lightCo, (*string)(nil), (*string)(nil), &lightSurface,
+			&lightText, &lightAccent, (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+		))
+
+	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id`).
+		WithArgs("playlist-1").
+		WillReturnRows(pgxmock.NewRows(playlistVideosColumns).
+			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", (*string)(nil)))
+
+	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+
+	if !strings.Contains(body, "--brand-text: #000000") {
+		t.Error("expected light brand text color to reach the playlist page")
+	}
+	if !strings.Contains(body, "background: rgba(0, 0, 0, 0.85);") {
+		t.Error("next overlay must keep its fixed dark background")
+	}
+	overlayRule := ".next-overlay {\n            position: absolute;\n            top: 0; left: 0; right: 0; bottom: 0;\n            background: rgba(0, 0, 0, 0.85);\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            justify-content: center;\n            color: #fff;"
+	if !strings.Contains(body, overlayRule) {
+		t.Error("next overlay must use white text (brand text on the dark overlay is unreadable in a light theme)")
+	}
+	if !strings.Contains(body, ".next-overlay .next-title {\n            font-size: 20px;\n            font-weight: 600;\n            color: #fff;") {
+		t.Error("next overlay title must override the brand text color")
+	}
+	if strings.Contains(body, ".next-overlay {\n            position: absolute;\n            top: 0; left: 0; right: 0; bottom: 0;\n            background: rgba(0, 0, 0, 0.85);\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            justify-content: center;\n            color: var(--brand-text);") {
+		t.Error("next overlay must not inherit brand text (black on the dark overlay is unreadable)")
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}

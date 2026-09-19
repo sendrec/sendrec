@@ -25,18 +25,21 @@ type embedPageData struct {
 	Chapters      []Chapter
 	ChaptersJSON  template.JS
 	VideoStatus   string
+	AccentColor   string
 }
 
 type embedPasswordPageData struct {
-	Title      string
-	ShareToken string
-	Nonce      string
+	Title       string
+	ShareToken  string
+	Nonce       string
+	AccentColor string
 }
 
 type embedEmailGatePageData struct {
-	Title      string
-	ShareToken string
-	Nonce      string
+	Title       string
+	ShareToken  string
+	Nonce       string
+	AccentColor string
 }
 
 var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE html>
@@ -71,6 +74,9 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             object-fit: contain;
             display: block;
         }
+        :root {
+            --player-accent: {{.AccentColor}};
+        }
         .player-container {
             position: relative;
             width: 100%;
@@ -88,7 +94,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
             color: #e2e8f0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-        .embed-processing-icon { margin-bottom: 16px; }
+        .embed-processing-icon { margin-bottom: 16px; color: var(--player-accent); }
         .embed-processing-spinner {
             animation: spin 1s linear infinite;
             transform-origin: center;
@@ -117,7 +123,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .embed-processing-bar-fill {
             width: 40%;
             height: 100%;
-            background: #00b67a;
+            background: var(--player-accent);
             border-radius: 2px;
             animation: indeterminate 1.5s ease-in-out infinite;
         }
@@ -154,7 +160,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
         .footer a:hover { color: #e2e8f0; }
         .cta-overlay { display: none; position: absolute; bottom: 48px; left: 0; right: 0; padding: 12px; text-align: center; background: rgba(15, 23, 42, 0.9); }
         .cta-overlay.visible { display: block; }
-        .cta-overlay a { display: inline-block; padding: 8px 24px; background: #00b67a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
+        .cta-overlay a { display: inline-block; padding: 8px 24px; background: var(--player-accent); color: #fff; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
         .cta-overlay a:hover { opacity: 0.9; color: #fff; }
 ` + safariWarningCSS + `
         .browser-warning {
@@ -173,7 +179,7 @@ var embedPageTemplate = template.Must(template.New("embed").Parse(`<!DOCTYPE htm
 {{if eq .VideoStatus "processing"}}
             <div class="embed-processing">
                 <div class="embed-processing-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00b67a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="10" opacity="0.2"/>
                         <path d="M12 2a10 10 0 0 1 10 10" class="embed-processing-spinner"/>
                     </svg>
@@ -411,10 +417,11 @@ var embedPasswordPageTemplate = template.Must(template.New("embed-password").Par
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="password"]:focus { border-color: #00b67a; }
+        :root { --player-accent: {{.AccentColor}}; }
+        input[type="password"]:focus { border-color: var(--player-accent); }
         button {
             width: 100%;
-            background: #00b67a;
+            background: var(--player-accent);
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;
@@ -491,10 +498,11 @@ var embedEmailGatePageTemplate = template.Must(template.New("embed-emailgate").P
             margin-bottom: 0.75rem;
             outline: none;
         }
-        input[type="email"]:focus { border-color: #00b67a; }
+        :root { --player-accent: {{.AccentColor}}; }
+        input[type="email"]:focus { border-color: var(--player-accent); }
         button {
             width: 100%;
-            background: #00b67a;
+            background: var(--player-accent);
             color: #fff;
             padding: 0.625rem 1rem;
             border: none;
@@ -560,22 +568,36 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	var emailGateEnabled bool
 	var chaptersJSON *string
 	var status string
+	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
+	var obCompanyName, obLogoKey, obColorBg, obColorSurface, obColorText, obColorAccent, obFooterText, obCustomCSS *string
+	var vbCompanyName, vbLogoKey, vbColorBg, vbColorSurface, vbColorText, vbColorAccent, vbFooterText *string
+	var videoOrgID *string
 
 	err := h.db.QueryRow(r.Context(),
 		`SELECT v.id, v.title, v.file_key, u.name, v.created_at, v.share_expires_at,
 		        v.thumbnail_key, v.share_password, v.content_type,
 		        v.user_id, u.email, v.view_notification,
 		        v.cta_text, v.cta_url, v.transcript_key,
-		        v.email_gate_enabled, v.chapters, v.status
+		        v.email_gate_enabled, v.chapters, v.status,
+		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
+		        ob.company_name, ob.logo_key, ob.color_background, ob.color_surface, ob.color_text, ob.color_accent, ob.footer_text, ob.custom_css,
+		        v.branding_company_name, v.branding_logo_key, v.branding_color_background, v.branding_color_surface, v.branding_color_text, v.branding_color_accent, v.branding_footer_text,
+		        v.organization_id
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
+		 LEFT JOIN user_branding ub ON ub.user_id = v.user_id AND ub.organization_id IS NULL
+		 LEFT JOIN user_branding ob ON ob.organization_id = v.organization_id
 		 WHERE v.share_token = $1 AND v.status IN ('ready', 'processing')`,
 		shareToken,
 	).Scan(&videoID, &title, &fileKey, &creator, &createdAt, &shareExpiresAt,
 		&thumbnailKey, &sharePassword, &contentType,
 		&ownerID, &ownerEmail, &viewNotification,
 		&ctaText, &ctaUrl, &transcriptKey,
-		&emailGateEnabled, &chaptersJSON, &status)
+		&emailGateEnabled, &chaptersJSON, &status,
+		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
+		&obCompanyName, &obLogoKey, &obColorBg, &obColorSurface, &obColorText, &obColorAccent, &obFooterText, &obCustomCSS,
+		&vbCompanyName, &vbLogoKey, &vbColorBg, &vbColorSurface, &vbColorText, &vbColorAccent, &vbFooterText,
+		&videoOrgID)
 	if err != nil {
 		nonce := httputil.NonceFromContext(r.Context())
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -587,6 +609,33 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nonce := httputil.NonceFromContext(r.Context())
+
+	// The embed page only consumes the accent color, so nil out the logo keys
+	// to avoid generating unused signed logo URLs.
+	ubLogoKey, obLogoKey, vbLogoKey = nil, nil, nil
+
+	baseBranding := brandingSettingsResponse{
+		CompanyName: ubCompanyName, LogoKey: ubLogoKey,
+		ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
+		ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
+		CustomCSS: ubCustomCSS,
+	}
+	if videoOrgID != nil {
+		baseBranding = brandingSettingsResponse{
+			CompanyName: obCompanyName, LogoKey: obLogoKey,
+			ColorBackground: obColorBg, ColorSurface: obColorSurface,
+			ColorText: obColorText, ColorAccent: obColorAccent, FooterText: obFooterText,
+			CustomCSS: obCustomCSS,
+		}
+	}
+	branding := resolveBranding(r.Context(), h.storage,
+		baseBranding,
+		brandingSettingsResponse{
+			CompanyName: vbCompanyName, LogoKey: vbLogoKey,
+			ColorBackground: vbColorBg, ColorSurface: vbColorSurface,
+			ColorText: vbColorText, ColorAccent: vbColorAccent, FooterText: vbFooterText,
+		},
+	)
 
 	if shareExpiresAt != nil && time.Now().After(*shareExpiresAt) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -601,9 +650,10 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			if err := embedPasswordPageTemplate.Execute(w, embedPasswordPageData{
-				Title:      title,
-				ShareToken: shareToken,
-				Nonce:      nonce,
+				Title:       title,
+				ShareToken:  shareToken,
+				Nonce:       nonce,
+				AccentColor: branding.ColorAccent,
 			}); err != nil {
 				slog.Error("embed-page: failed to render password page", "error", err)
 			}
@@ -615,9 +665,10 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		if _, ok := hasValidEmailGateCookie(r, h.hmacSecret, shareToken); !ok {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			if err := embedEmailGatePageTemplate.Execute(w, embedEmailGatePageData{
-				Title:      title,
-				ShareToken: shareToken,
-				Nonce:      nonce,
+				Title:       title,
+				ShareToken:  shareToken,
+				Nonce:       nonce,
+				AccentColor: branding.ColorAccent,
 			}); err != nil {
 				slog.Error("embed-page: failed to render email gate page", "error", err)
 			}
@@ -647,6 +698,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 			Nonce:       nonce,
 			BaseURL:     h.baseURL,
 			Chapters:    make([]Chapter, 0),
+			AccentColor: branding.ColorAccent,
 		}); err != nil {
 			slog.Error("embed-page: failed to render processing page", "error", err)
 		}
@@ -694,6 +746,7 @@ func (h *Handler) EmbedPage(w http.ResponseWriter, r *http.Request) {
 		Chapters:      chapterList,
 		ChaptersJSON:  template.JS(chaptersJSONBytes),
 		VideoStatus:   status,
+		AccentColor:   branding.ColorAccent,
 	}); err != nil {
 		slog.Error("embed-page: failed to render embed page", "error", err)
 	}

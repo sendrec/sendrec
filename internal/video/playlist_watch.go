@@ -21,6 +21,8 @@ type playlistWatchData struct {
 	VideosJSON    template.JS
 	NeedsPassword bool
 	NeedsEmail    bool
+	Branding      brandingConfig
+	CustomCSS     template.CSS
 }
 
 type playlistWatchVideoItem struct {
@@ -43,13 +45,19 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{.Title}} — SendRec</title>
+    <title>{{.Title}} — {{.Branding.CompanyName}}</title>
     <style nonce="{{.Nonce}}">
+        :root {
+            --brand-bg: {{.Branding.ColorBackground}};
+            --brand-surface: {{.Branding.ColorSurface}};
+            --brand-text: {{.Branding.ColorText}};
+            --brand-accent: {{.Branding.ColorAccent}};
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :focus-visible { outline: 2px solid #00b67a; outline-offset: 2px; }
+        :focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
         body {
-            background: #0a1628;
-            color: #ffffff;
+            background: var(--brand-bg);
+            color: var(--brand-text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             min-height: 100vh;
             -webkit-font-smoothing: antialiased;
@@ -58,52 +66,52 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         {{if .NeedsPassword}}
         body { display: flex; align-items: center; justify-content: center; }
         .gate-container { text-align: center; padding: 2rem; max-width: 400px; width: 100%; }
-        .gate-icon { width: 56px; height: 56px; border-radius: 12px; background: rgba(0,182,122,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 24px; }
+        .gate-icon { width: 56px; height: 56px; border-radius: 12px; background: color-mix(in srgb, var(--brand-accent) 10%, transparent); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 24px; }
         .gate-container h1 { font-size: 24px; font-weight: 700; margin-bottom: 0.75rem; }
         .gate-container p { color: #94a3b8; margin-bottom: 1.5rem; }
         .gate-error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
         .gate-error.visible { display: block; }
         .gate-container input[type="password"] {
             width: 100%; padding: 0.75rem 1rem; border-radius: 8px;
-            border: 1px solid #334155; background: #1e293b; color: #fff;
+            border: 1px solid #334155; background: var(--brand-surface); color: var(--brand-text);
             font-size: 1rem; margin-bottom: 1rem; outline: none;
         }
-        .gate-container input[type="password"]:focus { border-color: #00b67a; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
+        .gate-container input[type="password"]:focus { border-color: var(--brand-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 10%, transparent); }
         .gate-container input[type="password"]::placeholder { color: #94a3b8; opacity: 0.5; }
         .gate-container button {
-            width: 100%; background: #00b67a; color: #fff; padding: 0.75rem 1.5rem;
+            width: 100%; background: var(--brand-accent); color: #fff; padding: 0.75rem 1.5rem;
             border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
             transition: background 0.15s;
         }
-        .gate-container button:hover { background: #00a06b; }
+        .gate-container button:hover { filter: brightness(0.9); }
         .gate-container button:disabled { opacity: 0.5; cursor: not-allowed; }
         .gate-branding { margin-top: 24px; font-size: 12px; color: #8892a4; }
-        .gate-branding a { color: #00b67a; text-decoration: none; }
+        .gate-branding a { color: var(--brand-accent); text-decoration: none; }
         .gate-branding a:hover { text-decoration: underline; }
         {{else if .NeedsEmail}}
         body { display: flex; align-items: center; justify-content: center; }
         .gate-container { text-align: center; padding: 2rem; max-width: 400px; width: 100%; }
-        .gate-icon { width: 56px; height: 56px; border-radius: 12px; background: rgba(0,182,122,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 24px; }
+        .gate-icon { width: 56px; height: 56px; border-radius: 12px; background: color-mix(in srgb, var(--brand-accent) 10%, transparent); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 24px; }
         .gate-container h1 { font-size: 24px; font-weight: 700; margin-bottom: 0.75rem; }
         .gate-container p { color: #94a3b8; margin-bottom: 1.5rem; }
         .gate-error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
         .gate-error.visible { display: block; }
         .gate-container input[type="email"] {
             width: 100%; padding: 0.75rem 1rem; border-radius: 8px;
-            border: 1px solid #334155; background: #1e293b; color: #fff;
+            border: 1px solid #334155; background: var(--brand-surface); color: var(--brand-text);
             font-size: 1rem; margin-bottom: 1rem; outline: none;
         }
-        .gate-container input[type="email"]:focus { border-color: #00b67a; box-shadow: 0 0 0 3px rgba(0,182,122,0.1); }
+        .gate-container input[type="email"]:focus { border-color: var(--brand-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 10%, transparent); }
         .gate-container input[type="email"]::placeholder { color: #94a3b8; opacity: 0.5; }
         .gate-container button {
-            width: 100%; background: #00b67a; color: #fff; padding: 0.75rem 1.5rem;
+            width: 100%; background: var(--brand-accent); color: #fff; padding: 0.75rem 1.5rem;
             border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
             transition: background 0.15s;
         }
-        .gate-container button:hover { background: #00a06b; }
+        .gate-container button:hover { filter: brightness(0.9); }
         .gate-container button:disabled { opacity: 0.5; cursor: not-allowed; }
         .gate-branding { margin-top: 24px; font-size: 12px; color: #8892a4; }
-        .gate-branding a { color: #00b67a; text-decoration: none; }
+        .gate-branding a { color: var(--brand-accent); text-decoration: none; }
         .gate-branding a:hover { text-decoration: underline; }
         {{else}}
 ` + playerCSS + safariWarningCSS + `
@@ -114,7 +122,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         .playlist-sidebar {
             width: 300px;
             min-width: 300px;
-            background: #111d32;
+            background: var(--brand-surface);
             border-right: 1px solid #1e2d45;
             display: flex;
             flex-direction: column;
@@ -125,10 +133,24 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             border-bottom: 1px solid #1e2d45;
             flex-shrink: 0;
         }
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .sidebar-brand img {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
         .sidebar-header h2 {
             font-size: 18px;
             font-weight: 600;
-            color: #ffffff;
+            color: var(--brand-text);
             margin-bottom: 8px;
             word-break: break-word;
             line-height: 1.3;
@@ -144,7 +166,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             color: #8892a4;
         }
         .now-playing-label strong {
-            color: #00b67a;
+            color: var(--brand-accent);
             font-weight: 600;
         }
         .auto-advance-toggle {
@@ -166,8 +188,8 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             border: 1px solid #1e2d45;
         }
         .aa-toggle-track.active {
-            background: #00b67a;
-            border-color: #00b67a;
+            background: var(--brand-accent);
+            border-color: var(--brand-accent);
         }
         .aa-toggle-knob {
             position: absolute;
@@ -221,11 +243,11 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             position: relative;
         }
         .video-list-item:hover {
-            background: #1e293b;
+            background: color-mix(in srgb, var(--brand-text) 8%, var(--brand-surface));
         }
         .video-list-item.active {
             background: #1e3a5f;
-            border-left: 3px solid #00b67a;
+            border-left: 3px solid var(--brand-accent);
             padding-left: 13px;
         }
         .video-list-item .position {
@@ -237,18 +259,18 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             font-family: monospace;
         }
         .video-list-item.active .position {
-            color: #00b67a;
+            color: #fff;
             font-weight: 600;
         }
         .now-playing-tag {
             font-size: 10px;
             font-weight: 600;
-            color: #00b67a;
+            color: var(--brand-accent);
             text-transform: uppercase;
             letter-spacing: 0.3px;
             display: none;
         }
-        .video-list-item.active .now-playing-tag { display: block; }
+        .video-list-item.active .now-playing-tag { display: block; color: #fff; }
         .video-thumb {
             width: 80px;
             height: 45px;
@@ -295,7 +317,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         .video-info .video-title {
             font-size: 13px;
             font-weight: 500;
-            color: #ffffff;
+            color: var(--brand-text);
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -303,6 +325,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .video-list-item.active .video-title {
             font-weight: 600;
+            color: #fff;
         }
         .video-info .video-duration {
             font-size: 11px;
@@ -310,7 +333,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             margin-top: 2px;
         }
         .video-list-item .watched-badge {
-            color: #00b67a;
+            color: var(--brand-accent);
             font-size: 14px;
             flex-shrink: 0;
         }
@@ -319,18 +342,18 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             display: flex;
             flex-direction: column;
             min-width: 0;
-            background: #0a1628;
+            background: var(--brand-bg);
         }
         .player-header {
             padding: 16px 24px;
             border-bottom: 1px solid #1e2d45;
-            background: #111d32;
+            background: var(--brand-surface);
             flex-shrink: 0;
         }
         .player-header h1 {
             font-size: 24px;
             font-weight: 700;
-            color: #ffffff;
+            color: var(--brand-text);
             line-height: 1.3;
         }
         .player-meta {
@@ -356,6 +379,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             position: relative;
             overflow: hidden;
             min-height: 300px;
+            --player-accent: var(--brand-accent);
         }
         .player-container video {
             width: 100%;
@@ -371,7 +395,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: #ffffff;
+            color: #fff;
             z-index: 10;
         }
         .next-overlay .next-label {
@@ -385,6 +409,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         .next-overlay .next-title {
             font-size: 20px;
             font-weight: 600;
+            color: #fff;
             margin-bottom: 8px;
             text-align: center;
             padding: 0 2rem;
@@ -405,7 +430,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .next-progress-fill {
             height: 100%;
-            background: #00b67a;
+            background: var(--brand-accent);
             border-radius: 2px;
             width: 100%;
             transition: width 0.1s linear;
@@ -424,10 +449,10 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             transition: all 0.15s;
         }
         .btn-play-now {
-            background: #00b67a;
+            background: var(--brand-accent);
             color: #fff;
         }
-        .btn-play-now:hover { background: #00a06b; }
+        .btn-play-now:hover { filter: brightness(0.9); }
         .btn-cancel {
             background: transparent;
             color: #94a3b8;
@@ -440,7 +465,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             font-size: 12px;
             color: #8892a4;
             border-top: 1px solid #1e2d45;
-            background: #111d32;
+            background: var(--brand-surface);
             flex-shrink: 0;
         }
         .branding-footer a {
@@ -448,13 +473,14 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             text-decoration: none;
             transition: color 0.15s;
         }
-        .branding-footer a:hover { color: #ffffff; }
+        .branding-footer a:hover { color: var(--brand-text); }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
                 transition-duration: 0.01ms !important;
             }
         }
+        {{if .CustomCSS}}{{.CustomCSS}}{{end}}
         @media (max-width: 640px) {
             .playlist-layout {
                 flex-direction: column;
@@ -551,6 +577,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
     <div class="playlist-layout">
         <aside class="playlist-sidebar">
             <div class="sidebar-header">
+                <div class="sidebar-brand">{{if .Branding.LogoURL}}<img src="{{.Branding.LogoURL}}" alt="{{.Branding.CompanyName}}">{{end}}{{.Branding.CompanyName}}</div>
                 <h2>{{.Title}}</h2>
                 <div class="sidebar-meta">
                     <span class="now-playing-label">Now playing <strong id="now-playing-num">1</strong> of {{len .Videos}}</span>
@@ -610,7 +637,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                 </div>
             </div>
             <div class="branding-footer">
-                Shared via <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a>
+                {{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Shared via <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a>
             </div>
 ` + safariWarningHTML + `
         </main>
@@ -769,17 +796,51 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 	var description *string
 	var sharePassword *string
 	var requireEmail bool
+	var playlistOrgID *string
+	var ubCompanyName, ubLogoKey, ubColorBg, ubColorSurface, ubColorText, ubColorAccent, ubFooterText, ubCustomCSS *string
+	var obCompanyName, obLogoKey, obColorBg, obColorSurface, obColorText, obColorAccent, obFooterText, obCustomCSS *string
 
 	err := h.db.QueryRow(r.Context(),
-		`SELECT p.id, p.title, p.description, p.share_password, p.require_email
+		`SELECT p.id, p.title, p.description, p.share_password, p.require_email,
+		        p.organization_id,
+		        ub.company_name, ub.logo_key, ub.color_background, ub.color_surface, ub.color_text, ub.color_accent, ub.footer_text, ub.custom_css,
+		        ob.company_name, ob.logo_key, ob.color_background, ob.color_surface, ob.color_text, ob.color_accent, ob.footer_text, ob.custom_css
 		 FROM playlists p
+		 LEFT JOIN user_branding ub ON ub.user_id = p.user_id AND ub.organization_id IS NULL
+		 LEFT JOIN user_branding ob ON ob.organization_id = p.organization_id
 		 WHERE p.share_token = $1 AND p.is_shared = true`,
 		shareToken,
-	).Scan(&playlistID, &title, &description, &sharePassword, &requireEmail)
+	).Scan(&playlistID, &title, &description, &sharePassword, &requireEmail,
+		&playlistOrgID,
+		&ubCompanyName, &ubLogoKey, &ubColorBg, &ubColorSurface, &ubColorText, &ubColorAccent, &ubFooterText, &ubCustomCSS,
+		&obCompanyName, &obLogoKey, &obColorBg, &obColorSurface, &obColorText, &obColorAccent, &obFooterText, &obCustomCSS)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+
+	baseBranding := brandingSettingsResponse{
+		CompanyName: ubCompanyName, LogoKey: ubLogoKey,
+		ColorBackground: ubColorBg, ColorSurface: ubColorSurface,
+		ColorText: ubColorText, ColorAccent: ubColorAccent, FooterText: ubFooterText,
+		CustomCSS: ubCustomCSS,
+	}
+	if playlistOrgID != nil {
+		baseBranding = brandingSettingsResponse{
+			CompanyName: obCompanyName, LogoKey: obLogoKey,
+			ColorBackground: obColorBg, ColorSurface: obColorSurface,
+			ColorText: obColorText, ColorAccent: obColorAccent, FooterText: obFooterText,
+			CustomCSS: obCustomCSS,
+		}
+	}
+	branding := resolveBranding(r.Context(), h.storage, baseBranding, brandingSettingsResponse{})
+
+	// Keep the page's original panel shade unless custom branding overrides it.
+	if baseBranding.ColorSurface == nil || *baseBranding.ColorSurface == "" {
+		branding.ColorSurface = "#111d32"
+	}
+
+	brandingCfg, customCSS := branding, template.CSS(branding.CustomCSS)
 
 	if sharePassword != nil {
 		if !hasValidWatchCookie(r, h.hmacSecret, shareToken, *sharePassword) {
@@ -790,6 +851,8 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 				BaseURL:       h.baseURL,
 				ShareToken:    shareToken,
 				NeedsPassword: true,
+				Branding:      brandingCfg,
+				CustomCSS:     customCSS,
 			}); err != nil {
 				slog.Error("playlist-watch: failed to render password page", "error", err)
 			}
@@ -806,6 +869,8 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 				BaseURL:    h.baseURL,
 				ShareToken: shareToken,
 				NeedsEmail: true,
+				Branding:   brandingCfg,
+				CustomCSS:  customCSS,
 			}); err != nil {
 				slog.Error("playlist-watch: failed to render email gate page", "error", err)
 			}
@@ -832,6 +897,8 @@ func (h *Handler) PlaylistWatchPage(w http.ResponseWriter, r *http.Request) {
 		ShareToken:  shareToken,
 		Videos:      videoItems,
 		VideosJSON:  template.JS(videosJSONBytes),
+		Branding:    brandingCfg,
+		CustomCSS:   customCSS,
 	}); err != nil {
 		slog.Error("playlist-watch: failed to render playlist watch page", "error", err)
 	}
