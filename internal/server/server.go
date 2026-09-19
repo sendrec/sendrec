@@ -499,6 +499,10 @@ func (s *Server) routes() {
 
 		s.router.Route("/api/playlists", func(r chi.Router) {
 			r.Use(s.authHandler.Middleware)
+			// Playlist handlers scope through orgScope and orgRowFilter, and
+			// RequireWriter below reads its role from this context — without it
+			// workspace playlists land in personal scope and viewers can write.
+			r.Use(organization.Middleware(s.db))
 			r.Use(maxBodySize(64 * 1024))
 			r.Get("/", s.videoHandler.ListPlaylists)
 			r.Get("/{id}", s.videoHandler.GetPlaylist)
