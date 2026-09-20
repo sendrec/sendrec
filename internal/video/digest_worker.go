@@ -45,20 +45,26 @@ func processDigest(ctx context.Context, db database.DBTX, notifier ViewNotifier,
 		          WHEN COALESCE(v.view_notification, 'digest') = 'digest' THEN COALESCE(rv.view_count, 0)
 		          ELSE 0
 		        END AS view_count,
-		        COALESCE(rc.comment_count, 0) AS comment_count
+		        CASE
+		          WHEN COALESCE(np.view_notification, 'off') = 'digest' THEN COALESCE(rc.comment_count, 0)
+		          ELSE 0
+		        END AS comment_count
 		 FROM videos v
 		 JOIN users u ON u.id = v.user_id
 		 LEFT JOIN notification_preferences np ON np.user_id = v.user_id
 		 LEFT JOIN recent_views rv ON rv.video_id = v.id
 		 LEFT JOIN recent_comments rc ON rc.video_id = v.id
 		 WHERE v.status != 'deleted'
-		   AND COALESCE(np.view_notification, 'off') = 'digest'
+		   -- A video set to digest collects its views even when the account asks
+		   -- for something else. Comments have no per-video setting, so they stay
+		   -- with the account mode.
+		   AND (COALESCE(np.view_notification, 'off') = 'digest' OR v.view_notification = 'digest')
 		   AND (
 		     CASE
 		       WHEN COALESCE(v.view_notification, 'digest') = 'digest' THEN COALESCE(rv.view_count, 0)
 		       ELSE 0
 		     END > 0
-		     OR COALESCE(rc.comment_count, 0) > 0
+		     OR (COALESCE(np.view_notification, 'off') = 'digest' AND COALESCE(rc.comment_count, 0) > 0)
 		   )
 		 ORDER BY v.user_id, view_count DESC, comment_count DESC`)
 	if err != nil {

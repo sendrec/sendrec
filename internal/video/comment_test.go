@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v5"
+
+	"github.com/sendrec/sendrec/internal/webhook"
 )
 
 // --- SetCommentMode Tests ---
@@ -1542,5 +1545,72 @@ func TestDeleteComment_NotFound(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// waitExpectations polls until every pgxmock expectation is met or d elapses.
+// The comment webhook fires from the same goroutine as the notifiers, so a test
+// cannot assert straight after ServeHTTP.
+func waitExpectations(mock pgxmock.PgxPoolIface, d time.Duration) error {
+	deadline := time.Now().Add(d)
+	var err error
+	for {
+		err = mock.ExpectationsWereMet()
+		if err == nil || time.Now().After(deadline) {
+			return err
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func TestPostWatchComment_DispatchesWebhookWithoutEmailOrSlack(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	handler.SetWebhookClient(webhook.New(mock))
+
+	shareToken := "abc123defghi"
+	videoID := "video-123"
+	ownerID := "owner-user-1"
+
+	mock.ExpectQuery(`SELECT v\.id, v\.user_id, v\.comment_mode, v\.share_expires_at, v\.share_password FROM videos v WHERE v\.share_token = \$1`).
+		WithArgs(shareToken).
+		WillReturnRows(commentVideoRows().AddRow(videoID, ownerID, "anonymous", (*time.Time)(nil), (*string)(nil)))
+
+	mock.ExpectQuery(`INSERT INTO video_comments`).
+		WithArgs(videoID, (*string)(nil), "Someone", "", "Great video!", false, (*float64)(nil)).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).AddRow("comment-1", time.Now()))
+
+	mock.ExpectQuery(`SELECT u\.email, u\.name, v\.title FROM users u JOIN videos v`).
+		WithArgs(videoID).
+		WillReturnRows(pgxmock.NewRows([]string{"email", "name", "title"}).
+			AddRow("owner@test.com", "Owner", "My Video"))
+
+	// No webhook configured stops the dispatch before any HTTP attempt. Reaching
+	// this lookup at all is the point: it is what the notification guard skipped.
+	mock.ExpectQuery(`SELECT webhook_url, webhook_secret`).
+		WithArgs(ownerID).
+		WillReturnError(pgx.ErrNoRows)
+
+	body, _ := json.Marshal(postCommentRequest{AuthorName: "Someone", Body: "Great video!"})
+
+	r := chi.NewRouter()
+	r.Post("/api/watch/{shareToken}/comments", handler.PostWatchComment)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/watch/"+shareToken+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if err := waitExpectations(mock, 2*time.Second); err != nil {
+		t.Errorf("expected video.comment to be dispatched with notifications off: %v", err)
 	}
 }
