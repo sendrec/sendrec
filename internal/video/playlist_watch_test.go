@@ -617,12 +617,13 @@ func TestPlaylistWatchPage_LightThemeActiveRowDerivesBrandColors(t *testing.T) {
 
 	// The active row's background is mixed from the brand palette, so anything
 	// sitting on it has to come from that palette too. The title inherits
-	// --brand-text; the position and the tag have their own base colours — a
-	// fixed grey and the accent — that were picked for the plain surface and
-	// fall below AA once the row is tinted, so they restate it.
+	// --brand-text; the position, the tag and the watched badge have their own
+	// base colours — a fixed grey and the accent — that were picked for the
+	// plain surface and fall below AA once the row is tinted, so they restate it.
 	for _, selector := range []string{
 		".video-list-item.active .position",
 		".video-list-item.active .now-playing-tag",
+		".video-list-item.active .watched-badge",
 	} {
 		rule := cssRuleBody(body, selector)
 		if !strings.Contains(rule, "color: var(--brand-text)") {

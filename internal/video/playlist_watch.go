@@ -336,6 +336,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             font-size: 14px;
             flex-shrink: 0;
         }
+        .video-list-item.active .watched-badge { color: var(--brand-text); }
         .playlist-player {
             flex: 1;
             display: flex;
