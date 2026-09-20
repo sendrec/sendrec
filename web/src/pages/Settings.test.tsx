@@ -496,6 +496,168 @@ describe("Settings", () => {
     });
   });
 
+  it("previews the branding currently in the form", async () => {
+    const user = userEvent.setup();
+    // Mocked by path: the preview posts the same payload the save does, and
+    // asserting on call order would break the moment a request is added.
+    mockApiFetch.mockImplementation((path: string, init?: { method?: string; body?: string }) => {
+      switch (path) {
+        case "/api/user":
+          return Promise.resolve({ name: "Alice", email: "alice@example.com" });
+        case "/api/settings/notifications":
+          return Promise.resolve({ notificationMode: "off" });
+        case "/api/videos/limits":
+          return Promise.resolve({ brandingEnabled: true });
+        case "/api/settings/branding":
+          return Promise.resolve({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
+        case "/api/settings/branding/preview":
+          expect(init?.method).toBe("POST");
+          expect(JSON.parse(init?.body ?? "{}")).toMatchObject({ companyName: "Preview Co" });
+          return Promise.resolve({ previewUrl: "/branding/preview/abc123" });
+        case "/api/settings/billing":
+          return Promise.reject(new Error("Not Found"));
+        case "/api/user/identities":
+          return Promise.resolve({ identities: [], hasPassword: false });
+        default:
+          return Promise.resolve([]);
+      }
+    });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding")).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText("SendRec"), "Preview Co");
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+
+    const frame = await screen.findByTitle("Preview of a shared video page");
+    expect(frame).toHaveAttribute("src", "/branding/preview/abc123");
+  });
+
+  // A preview stands for the values in the form right now. Anything that says
+  // otherwise beside it — a success banner from an earlier save, a frame built
+  // from branding the form no longer holds — is telling the operator something
+  // untrue about the page they are looking at.
+  it("drops the saved banner when previewing unsaved edits", async () => {
+    const user = userEvent.setup();
+    mockApiFetch.mockImplementation((path: string) => {
+      switch (path) {
+        case "/api/user":
+          return Promise.resolve({ name: "Alice", email: "alice@example.com" });
+        case "/api/settings/notifications":
+          return Promise.resolve({ notificationMode: "off" });
+        case "/api/videos/limits":
+          return Promise.resolve({ brandingEnabled: true });
+        case "/api/settings/branding":
+          return Promise.resolve({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
+        case "/api/settings/branding/preview":
+          return Promise.resolve({ previewUrl: "/branding/preview/abc123" });
+        case "/api/settings/billing":
+          return Promise.reject(new Error("Not Found"));
+        case "/api/user/identities":
+          return Promise.resolve({ identities: [], hasPassword: false });
+        default:
+          return Promise.resolve([]);
+      }
+    });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Save branding" }));
+    await waitFor(() => {
+      expect(screen.getByText("Branding saved")).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText("SendRec"), "Edited Co");
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+
+    await screen.findByTitle("Preview of a shared video page");
+    expect(screen.queryByText("Branding saved")).not.toBeInTheDocument();
+  });
+
+  it("drops the frame when a refresh fails", async () => {
+    const user = userEvent.setup();
+    let previewCalls = 0;
+    mockApiFetch.mockImplementation((path: string) => {
+      switch (path) {
+        case "/api/user":
+          return Promise.resolve({ name: "Alice", email: "alice@example.com" });
+        case "/api/settings/notifications":
+          return Promise.resolve({ notificationMode: "off" });
+        case "/api/videos/limits":
+          return Promise.resolve({ brandingEnabled: true });
+        case "/api/settings/branding":
+          return Promise.resolve({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
+        case "/api/settings/branding/preview":
+          previewCalls += 1;
+          return previewCalls === 1
+            ? Promise.resolve({ previewUrl: "/branding/preview/abc123" })
+            : Promise.reject(new Error("Service unavailable"));
+        case "/api/settings/billing":
+          return Promise.reject(new Error("Not Found"));
+        case "/api/user/identities":
+          return Promise.resolve({ identities: [], hasPassword: false });
+        default:
+          return Promise.resolve([]);
+      }
+    });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    await screen.findByTitle("Preview of a shared video page");
+
+    await user.click(screen.getByRole("button", { name: "Refresh preview" }));
+
+    // The error belongs to the frame below it, which no longer stands for
+    // anything the server agreed to render.
+    await screen.findByText("Service unavailable");
+    expect(screen.queryByTitle("Preview of a shared video page")).not.toBeInTheDocument();
+  });
+
+  it("drops a preview the form has moved on from", async () => {
+    const user = userEvent.setup();
+    mockApiFetch.mockImplementation((path: string) => {
+      switch (path) {
+        case "/api/user":
+          return Promise.resolve({ name: "Alice", email: "alice@example.com" });
+        case "/api/settings/notifications":
+          return Promise.resolve({ notificationMode: "off" });
+        case "/api/videos/limits":
+          return Promise.resolve({ brandingEnabled: true });
+        case "/api/settings/branding":
+          return Promise.resolve({ companyName: "Acme Corp", colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
+        case "/api/settings/branding/preview":
+          return Promise.resolve({ previewUrl: "/branding/preview/abc123" });
+        case "/api/settings/billing":
+          return Promise.reject(new Error("Not Found"));
+        case "/api/user/identities":
+          return Promise.resolve({ identities: [], hasPassword: false });
+        default:
+          return Promise.resolve([]);
+      }
+    });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    await screen.findByTitle("Preview of a shared video page");
+
+    await user.click(screen.getByRole("button", { name: "Reset to defaults" }));
+
+    expect(screen.queryByTitle("Preview of a shared video page")).not.toBeInTheDocument();
+  });
+
   it("resets branding to defaults", async () => {
     const user = userEvent.setup();
     mockApiFetch

@@ -21,7 +21,47 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
   const [brandingMessage, setBrandingMessage] = useState("");
   const [brandingError, setBrandingError] = useState("");
   const [savingBranding, setSavingBranding] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  function brandingPayload() {
+    return {
+      companyName: branding.companyName || null,
+      logoKey: branding.logoKey === "none" ? "none" : branding.logoKey || null,
+      colorBackground: branding.colorBackground || null,
+      colorSurface: branding.colorSurface || null,
+      colorText: branding.colorText || null,
+      colorAccent: branding.colorAccent || null,
+      footerText: branding.footerText || null,
+      customCss: branding.customCss || null,
+    };
+  }
+
+  // The server renders the real watch page from these values and hands back a
+  // short-lived URL, so the preview cannot drift from the page it stands for.
+  async function handlePreview() {
+    setBrandingError("");
+    // A banner from an earlier save would sit beside a frame built from edits
+    // that are not saved, each claiming the other is out of date.
+    setBrandingMessage("");
+    setLoadingPreview(true);
+    try {
+      const res = await apiFetch<{ previewUrl: string }>("/api/settings/branding/preview", {
+        method: "POST",
+        body: JSON.stringify(brandingPayload()),
+      });
+      setPreviewUrl(res?.previewUrl ?? null);
+    } catch (err) {
+      // The error would otherwise sit above a frame built from an earlier
+      // attempt, which no longer stands for anything the server agreed to
+      // render.
+      setPreviewUrl(null);
+      setBrandingError(err instanceof Error ? err.message : "Failed to build preview");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
 
   async function handleBrandingSave(event: FormEvent) {
     event.preventDefault();
@@ -39,16 +79,7 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
     try {
       await apiFetch("/api/settings/branding", {
         method: "PUT",
-        body: JSON.stringify({
-          companyName: branding.companyName || null,
-          logoKey: branding.logoKey === "none" ? "none" : branding.logoKey || null,
-          colorBackground: branding.colorBackground || null,
-          colorSurface: branding.colorSurface || null,
-          colorText: branding.colorText || null,
-          colorAccent: branding.colorAccent || null,
-          footerText: branding.footerText || null,
-          customCss: branding.customCss || null,
-        }),
+        body: JSON.stringify(brandingPayload()),
       });
       setBrandingMessage("Branding saved");
     } catch (err) {
@@ -58,7 +89,11 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
     }
   }
 
+  // A preview is only worth showing while the form still holds the values it was
+  // built from. Reset and the logo controls move those values without the
+  // operator touching a field, so they take the frame with them.
   function handleBrandingReset() {
+    setPreviewUrl(null);
     setBranding({
       companyName: null, logoKey: null,
       colorBackground: null, colorSurface: null, colorText: null, colorAccent: null,
@@ -92,6 +127,7 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
       });
       if (!uploadResp.ok) throw new Error("Failed to upload logo");
 
+      setPreviewUrl(null);
       setBranding((prev) => ({ ...prev, logoKey: result.logoKey }));
       setBrandingMessage("Logo uploaded");
     } catch (err) {
@@ -105,6 +141,7 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
     setBrandingError("");
     try {
       await apiFetch("/api/settings/branding/logo", { method: "DELETE" });
+      setPreviewUrl(null);
       setBranding((prev) => ({ ...prev, logoKey: null }));
       setBrandingMessage("Logo removed");
     } catch (err) {
@@ -244,19 +281,6 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
         })}
       </div>
 
-      <div
-        className="branding-preview"
-        style={{ background: branding.colorBackground ?? "#0a1628" }}
-      >
-        <p className="branding-preview-label">Preview</p>
-        <div className="branding-preview-title" style={{ color: branding.colorAccent ?? "#00b67a" }}>
-          {branding.companyName || "SendRec"}
-        </div>
-        <div className="branding-preview-card" style={{ background: branding.colorSurface ?? "#1e293b" }}>
-          <span style={{ color: branding.colorText ?? "#ffffff", fontSize: 14 }}>Sample video title</span>
-        </div>
-      </div>
-
       <div className="form-field">
         <label className="form-label">Custom CSS</label>
         <textarea
@@ -387,6 +411,17 @@ body                /* Background, font, text color */
         <p className="status-message status-message--success">{brandingMessage}</p>
       )}
 
+      {previewUrl && (
+        <div className="branding-preview">
+          <iframe
+            key={previewUrl}
+            src={previewUrl}
+            title="Preview of a shared video page"
+            className="branding-preview-frame"
+          />
+        </div>
+      )}
+
       <div className="btn-row">
         <button
           type="submit"
@@ -394,6 +429,14 @@ body                /* Background, font, text color */
           disabled={savingBranding}
         >
           {savingBranding ? "Saving..." : "Save branding"}
+        </button>
+        <button
+          type="button"
+          className="btn btn--secondary"
+          onClick={handlePreview}
+          disabled={loadingPreview}
+        >
+          {loadingPreview ? "Building preview..." : previewUrl ? "Refresh preview" : "Preview"}
         </button>
         <button
           type="button"

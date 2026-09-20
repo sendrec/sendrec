@@ -28,6 +28,10 @@ const (
 	defaultLogoPath        = "/images/logo.png"
 	defaultFooterText      = ""
 
+	// The form sends this instead of a key to mean "show no logo at all",
+	// which is a different thing from having uploaded none.
+	hiddenLogoKey = "none"
+
 	maxLogoUploadBytes = 512 * 1024
 )
 
@@ -97,6 +101,67 @@ func isValidHexColor(s string) bool {
 	return hexColorPattern.MatchString(s)
 }
 
+// validateBrandingRequest holds every rule a branding payload must satisfy, so
+// saving and previewing accept exactly the same input. A preview that tolerated
+// more than the save would be showing the operator a page they cannot keep.
+//
+// The context carries the scope the values are being written to, which the logo
+// key is judged against.
+func validateBrandingRequest(ctx context.Context, req setBrandingRequest) string {
+	if msg := validateBrandingLogoKey(ctx, req.LogoKey); msg != "" {
+		return msg
+	}
+	if req.CompanyName != nil {
+		if msg := validate.CompanyName(*req.CompanyName); msg != "" {
+			return msg
+		}
+	}
+	if req.FooterText != nil {
+		if msg := validate.FooterText(*req.FooterText); msg != "" {
+			return msg
+		}
+	}
+	if msg := validateBrandingColors(req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent); msg != "" {
+		return msg
+	}
+	if req.CustomCSS != nil {
+		if _, msg := sanitizeCustomCSS(*req.CustomCSS); msg != "" {
+			return msg
+		}
+	}
+	return ""
+}
+
+// validateBrandingLogoKey refuses a key this scope could not have uploaded.
+// Resolving branding presigns a download URL for whatever the key names, so a
+// payload naming someone else's object would otherwise be answered with a
+// readable URL for it — no write, no trace. The keys a scope can hold are
+// exactly the ones brandingLogoKey mints for it.
+func validateBrandingLogoKey(ctx context.Context, logoKey *string) string {
+	if logoKey == nil || *logoKey == "" || *logoKey == hiddenLogoKey {
+		return ""
+	}
+	for _, contentType := range []string{"image/png", "image/svg+xml"} {
+		if *logoKey == brandingLogoKey(ctx, contentType) {
+			return ""
+		}
+	}
+	return "invalid logoKey: not a logo uploaded by this account"
+}
+
+// brandingLogoKey names the one object a scope stores its logo under. Minting
+// and validating read it from the same place so the two cannot drift.
+func brandingLogoKey(ctx context.Context, contentType string) string {
+	ext := ".png"
+	if contentType == "image/svg+xml" {
+		ext = ".svg"
+	}
+	if orgID := auth.OrgIDFromContext(ctx); orgID != "" {
+		return "branding/org-" + orgID + "/logo" + ext
+	}
+	return "branding/" + auth.UserIDFromContext(ctx) + "/logo" + ext
+}
+
 func validateBrandingColors(bg, surface, text, accent *string) string {
 	for _, pair := range []struct {
 		val  *string
@@ -133,7 +198,7 @@ func resolveBranding(ctx context.Context, storage ObjectStorage, userBranding br
 	}
 
 	logoKey := resolveLogoKey(userBranding.LogoKey, videoBranding.LogoKey)
-	if logoKey == "none" {
+	if logoKey == hiddenLogoKey {
 		cfg.LogoURL = ""
 		cfg.HasCustomLogo = true
 	} else if logoKey != "" {
@@ -232,27 +297,9 @@ func (h *Handler) PutBrandingSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.CompanyName != nil {
-		if msg := validate.CompanyName(*req.CompanyName); msg != "" {
-			httputil.WriteError(w, http.StatusBadRequest, msg)
-			return
-		}
-	}
-	if req.FooterText != nil {
-		if msg := validate.FooterText(*req.FooterText); msg != "" {
-			httputil.WriteError(w, http.StatusBadRequest, msg)
-			return
-		}
-	}
-	if errMsg := validateBrandingColors(req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent); errMsg != "" {
-		httputil.WriteError(w, http.StatusBadRequest, errMsg)
+	if msg := validateBrandingRequest(r.Context(), req); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
-	}
-	if req.CustomCSS != nil {
-		if _, errMsg := sanitizeCustomCSS(*req.CustomCSS); errMsg != "" {
-			httputil.WriteError(w, http.StatusBadRequest, errMsg)
-			return
-		}
 	}
 
 	orgID := auth.OrgIDFromContext(r.Context())
@@ -317,17 +364,12 @@ func (h *Handler) UploadBrandingLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ext := ".png"
-	if req.ContentType == "image/svg+xml" {
-		ext = ".svg"
-	}
-
 	orgID := auth.OrgIDFromContext(r.Context())
 	if orgID != "" {
 		if organization.RequireRole(w, r, "owner", "admin") == "" {
 			return
 		}
-		logoKey := "branding/org-" + orgID + "/logo" + ext
+		logoKey := brandingLogoKey(r.Context(), req.ContentType)
 
 		uploadURL, err := h.storage.GenerateUploadURL(r.Context(), logoKey, req.ContentType, req.ContentLength, 15*time.Minute)
 		if err != nil {
@@ -348,7 +390,7 @@ func (h *Handler) UploadBrandingLogo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := auth.UserIDFromContext(r.Context())
-	logoKey := "branding/" + userID + "/logo" + ext
+	logoKey := brandingLogoKey(r.Context(), req.ContentType)
 
 	uploadURL, err := h.storage.GenerateUploadURL(r.Context(), logoKey, req.ContentType, req.ContentLength, 15*time.Minute)
 	if err != nil {

@@ -807,7 +807,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{else}}
         <div class="player-container" id="player-container">
             <video id="player" playsinline webkit-playsinline{{if .TranscriptURL}} crossorigin="anonymous"{{end}}{{if not .DownloadEnabled}} controlsList="nodownload" oncontextmenu="return false;"{{end}}{{if .ThumbnailURL}} poster="{{.ThumbnailURL}}"{{end}}>
-                <source src="{{.VideoURL}}" type="{{.ContentType}}">
+                {{if .VideoURL}}<source src="{{.VideoURL}}" type="{{.ContentType}}">{{end}}
                 {{if .TranscriptURL}}<track kind="subtitles" src="{{.TranscriptURL}}" srclang="en" label="Subtitles" default>{{end}}
                 Your browser does not support video playback.
             </video>
@@ -967,6 +967,16 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         (function() {
             var shareToken = '{{.ShareToken}}';
             var commentMode = '{{.CommentMode}}';
+            var isPreview = {{if .Preview}}true{{else}}false{{end}};
+            // Seek markers are placed against the video's duration, and a
+            // preview has no video to read one from. The length the page
+            // declares stands in, so markers land where they would on a real
+            // one instead of collapsing onto the end of the bar.
+            var previewDuration = {{.Duration}};
+            var previewComments = [
+                { id: 'preview-1', authorName: 'Sam Rivera', body: 'Great walkthrough — this is how a viewer comment looks.', createdAt: new Date(Date.now() - 5400000).toISOString(), videoTimestamp: 42, isOwner: false, isPrivate: false },
+                { id: 'preview-2', authorName: 'You', body: 'And this is a reply of yours.', createdAt: new Date(Date.now() - 900000).toISOString(), videoTimestamp: null, isOwner: true, isPrivate: false }
+            ];
             var listEl = document.getElementById('comments-list');
             var headerEl = document.getElementById('comments-header');
             var errorEl = document.getElementById('comment-error');
@@ -1021,6 +1031,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             }
 
             function getFiniteDuration() {
+                if (isPreview) return previewDuration;
                 if (!player.duration || player.duration === Infinity || isNaN(player.duration)) return 0;
                 return player.duration;
             }
@@ -1164,6 +1175,15 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             });
 
             function loadComments() {
+                // A preview has no share token to ask with. Sample comments show
+                // how the thread is branded without a request that would 404.
+                if (isPreview) {
+                    headerEl.textContent = 'Comments (' + previewComments.length + ')';
+                    listEl.innerHTML = previewComments.map(renderComment).join('');
+                    lastComments = previewComments;
+                    renderMarkers(previewComments);
+                    return;
+                }
                 var headers = {};
                 if (token) headers['Authorization'] = 'Bearer ' + token;
                 fetch('/api/watch/' + shareToken + '/comments', { headers: headers })
@@ -1188,7 +1208,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             if (reactionBar) {
                 reactionBar.addEventListener('click', function(e) {
                     var btn = e.target.closest('.reaction-btn');
-                    if (!btn || btn.disabled) return;
+                    if (!btn || btn.disabled || isPreview) return;
                     var emoji = btn.getAttribute('data-emoji');
                     var timestamp = clampReactionTimestamp(player.currentTime);
                     if (reactionErrorEl) reactionErrorEl.style.display = 'none';
@@ -1367,6 +1387,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             });
 
             submitBtn.addEventListener('click', function() {
+                if (isPreview) return;
                 var body = bodyEl.value.trim();
                 if (!body) { errorEl.textContent = 'Please write a comment.'; errorEl.style.display = 'block'; return; }
                 var authorName = nameEl ? nameEl.value.trim() : '';
@@ -1789,6 +1810,10 @@ type watchPageData struct {
 	JSONLD             template.JS
 	SubscriptionPlan   string
 	VideoStatus        string
+	// Preview marks a page rendered for the branding settings iframe. It has no
+	// video, share token or comment thread behind it, so the parts that would
+	// reach for those stand in for them instead.
+	Preview bool
 }
 
 type expiredPageData struct {
