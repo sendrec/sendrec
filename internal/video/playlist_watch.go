@@ -260,6 +260,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .video-list-item.active .position {
             font-weight: 600;
+            color: var(--brand-text);
         }
         .now-playing-tag {
             font-size: 10px;
@@ -269,7 +270,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             letter-spacing: 0.3px;
             display: none;
         }
-        .video-list-item.active .now-playing-tag { display: block; }
+        .video-list-item.active .now-playing-tag { display: block; color: var(--brand-text); }
         .video-thumb {
             width: 80px;
             height: 45px;

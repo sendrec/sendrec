@@ -613,8 +613,20 @@ func TestPlaylistWatchPage_LightThemeActiveRowDerivesBrandColors(t *testing.T) {
 		if !strings.Contains(rule, want) {
 			t.Errorf("%s must declare %q", selector, want)
 		}
-		if strings.Contains(rule, "color:") {
-			t.Errorf("%s must not set a foreground color (it must follow the brand palette, readable on a derived light background)", selector)
+	}
+
+	// The active row's background is mixed from the brand palette, so anything
+	// sitting on it has to come from that palette too. The title inherits
+	// --brand-text; the position and the tag have their own base colours — a
+	// fixed grey and the accent — that were picked for the plain surface and
+	// fall below AA once the row is tinted, so they restate it.
+	for _, selector := range []string{
+		".video-list-item.active .position",
+		".video-list-item.active .now-playing-tag",
+	} {
+		rule := cssRuleBody(body, selector)
+		if !strings.Contains(rule, "color: var(--brand-text)") {
+			t.Errorf("%s must take its foreground from the brand palette, got %q", selector, rule)
 		}
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
