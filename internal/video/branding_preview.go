@@ -138,12 +138,21 @@ func (h *Handler) CreateBrandingPreview(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// The render is unauthenticated, so whatever it needs to know about this
-	// account has to be settled here, while there still is one.
+	// account has to be settled here, while there still is one. Both helpers
+	// answer "free" when the query fails, and storing that answer would show a
+	// paid account attribution it does not carry for as long as the row lives.
+	// A preview that did not build is easier to understand than one that lies.
 	var plan string
+	var planErr error
 	if orgID := auth.OrgIDFromContext(r.Context()); orgID != "" {
-		plan, _ = h.getOrgPlan(r.Context(), orgID)
+		plan, planErr = h.getOrgPlan(r.Context(), orgID)
 	} else {
-		plan, _ = h.getUserPlan(r.Context(), auth.UserIDFromContext(r.Context()))
+		plan, planErr = h.getUserPlan(r.Context(), auth.UserIDFromContext(r.Context()))
+	}
+	if planErr != nil {
+		slog.Error("branding-preview: failed to read the account plan", "error", planErr)
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to create preview")
+		return
 	}
 
 	id, err := h.storeBrandingPreview(r.Context(), brandingPreviewPayload{

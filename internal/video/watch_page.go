@@ -968,6 +968,11 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             var shareToken = '{{.ShareToken}}';
             var commentMode = '{{.CommentMode}}';
             var isPreview = {{if .Preview}}true{{else}}false{{end}};
+            // Seek markers are placed against the video's duration, and a
+            // preview has no video to read one from. The length the page
+            // declares stands in, so markers land where they would on a real
+            // one instead of collapsing onto the end of the bar.
+            var previewDuration = {{.Duration}};
             var previewComments = [
                 { id: 'preview-1', authorName: 'Sam Rivera', body: 'Great walkthrough — this is how a viewer comment looks.', createdAt: new Date(Date.now() - 5400000).toISOString(), videoTimestamp: 42, isOwner: false, isPrivate: false },
                 { id: 'preview-2', authorName: 'You', body: 'And this is a reply of yours.', createdAt: new Date(Date.now() - 900000).toISOString(), videoTimestamp: null, isOwner: true, isPrivate: false }
@@ -1026,6 +1031,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
             }
 
             function getFiniteDuration() {
+                if (isPreview) return previewDuration;
                 if (!player.duration || player.duration === Infinity || isNaN(player.duration)) return 0;
                 return player.duration;
             }
@@ -1175,6 +1181,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
                     headerEl.textContent = 'Comments (' + previewComments.length + ')';
                     listEl.innerHTML = previewComments.map(renderComment).join('');
                     lastComments = previewComments;
+                    renderMarkers(previewComments);
                     return;
                 }
                 var headers = {};

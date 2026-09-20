@@ -1476,6 +1476,54 @@ func TestBrandingPreview_ShowsTheWholeCommentForm(t *testing.T) {
 	}
 }
 
+// The plan decides whether the page carries attribution the operator cannot
+// style away. Both plan helpers answer "free" when the query fails, so taking
+// that answer would bake the wrong footer into a row that then renders for
+// minutes. A preview nobody can trust is worse than one that did not build.
+func TestBrandingPreview_PlanLookupFailureDoesNotBecomeAFreePlan(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+	mock.ExpectQuery(`SELECT subscription_plan FROM users`).
+		WithArgs("user-1").
+		WillReturnError(errors.New("connection refused"))
+	// Offered, and expected to go unused: reaching it means a row was written
+	// from a plan nobody could read.
+	row := &brandingPreviewRow{}
+	expectPreviewInsert(mock, row)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/branding/preview",
+		strings.NewReader(`{"footerText":"Acme Inc"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("a failed plan lookup was answered with a preview: got %d: %s", rec.Code, rec.Body.String())
+	}
+	if row.id != "" {
+		t.Error("a preview row was written from a guessed plan")
+	}
+}
+
+// Seek markers are placed against the video's duration, and a preview has no
+// video to read one from. Without a stand-in every marker collapses onto the
+// end of the bar, so the accent colour the operator is choosing never shows
+// where it will actually sit.
+func TestBrandingPreview_PlacesSeekMarkersAgainstADuration(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	url, row := createBrandingPreview(t, srv, mock, token, `{"companyName":"Marker Co"}`)
+	expectPreviewSelect(mock, row)
+
+	body := getPreviewPage(srv, url).Body.String()
+	if strings.Contains(body, "var previewDuration = 0") {
+		t.Error("the preview has no duration to place markers against")
+	}
+	if !strings.Contains(body, "renderMarkers(previewComments)") {
+		t.Error("the preview never draws the seek markers its sample thread would produce")
+	}
+}
+
 func TestBrandingPreview_RequiresAuthentication(t *testing.T) {
 	srv, _, _ := newBrandingServer(t)
 

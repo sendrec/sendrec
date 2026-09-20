@@ -53,6 +53,10 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
       });
       setPreviewUrl(res?.previewUrl ?? null);
     } catch (err) {
+      // The error would otherwise sit above a frame built from an earlier
+      // attempt, which no longer stands for anything the server agreed to
+      // render.
+      setPreviewUrl(null);
       setBrandingError(err instanceof Error ? err.message : "Failed to build preview");
     } finally {
       setLoadingPreview(false);

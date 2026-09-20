@@ -579,6 +579,49 @@ describe("Settings", () => {
     expect(screen.queryByText("Branding saved")).not.toBeInTheDocument();
   });
 
+  it("drops the frame when a refresh fails", async () => {
+    const user = userEvent.setup();
+    let previewCalls = 0;
+    mockApiFetch.mockImplementation((path: string) => {
+      switch (path) {
+        case "/api/user":
+          return Promise.resolve({ name: "Alice", email: "alice@example.com" });
+        case "/api/settings/notifications":
+          return Promise.resolve({ notificationMode: "off" });
+        case "/api/videos/limits":
+          return Promise.resolve({ brandingEnabled: true });
+        case "/api/settings/branding":
+          return Promise.resolve({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
+        case "/api/settings/branding/preview":
+          previewCalls += 1;
+          return previewCalls === 1
+            ? Promise.resolve({ previewUrl: "/branding/preview/abc123" })
+            : Promise.reject(new Error("Service unavailable"));
+        case "/api/settings/billing":
+          return Promise.reject(new Error("Not Found"));
+        case "/api/user/identities":
+          return Promise.resolve({ identities: [], hasPassword: false });
+        default:
+          return Promise.resolve([]);
+      }
+    });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    await screen.findByTitle("Preview of a shared video page");
+
+    await user.click(screen.getByRole("button", { name: "Refresh preview" }));
+
+    // The error belongs to the frame below it, which no longer stands for
+    // anything the server agreed to render.
+    await screen.findByText("Service unavailable");
+    expect(screen.queryByTitle("Preview of a shared video page")).not.toBeInTheDocument();
+  });
+
   it("drops a preview the form has moved on from", async () => {
     const user = userEvent.setup();
     mockApiFetch.mockImplementation((path: string) => {
