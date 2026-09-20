@@ -246,7 +246,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             background: color-mix(in srgb, var(--brand-text) 8%, var(--brand-surface));
         }
         .video-list-item.active {
-            background: #1e3a5f;
+            background: color-mix(in srgb, var(--brand-text) 20%, var(--brand-surface));
             border-left: 3px solid var(--brand-accent);
             padding-left: 13px;
         }
@@ -259,8 +259,8 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             font-family: monospace;
         }
         .video-list-item.active .position {
-            color: #fff;
             font-weight: 600;
+            color: var(--brand-text);
         }
         .now-playing-tag {
             font-size: 10px;
@@ -270,7 +270,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             letter-spacing: 0.3px;
             display: none;
         }
-        .video-list-item.active .now-playing-tag { display: block; color: #fff; }
+        .video-list-item.active .now-playing-tag { display: block; color: var(--brand-text); }
         .video-thumb {
             width: 80px;
             height: 45px;
@@ -325,7 +325,6 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
         }
         .video-list-item.active .video-title {
             font-weight: 600;
-            color: #fff;
         }
         .video-info .video-duration {
             font-size: 11px;
@@ -337,6 +336,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             font-size: 14px;
             flex-shrink: 0;
         }
+        .video-list-item.active .watched-badge { color: var(--brand-text); }
         .playlist-player {
             flex: 1;
             display: flex;
