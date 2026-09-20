@@ -552,22 +552,11 @@ func TestPlaylistWatchPage_LightThemeGateInputUsesBrandText(t *testing.T) {
 	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 	shareToken := "lightgate12"
 
-	lightCo := "Light Co"
 	lightBg := "#f5f5f5"
-	lightSurface := "#ffffff"
-	lightText := "#000000"
-	lightAccent := "#1d4ed8"
-
 	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
 		WithArgs(shareToken).
-		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
-			"playlist-1", "Light Gate Playlist", (*string)(nil), &passwordHash, false,
-			(*string)(nil),
-			&lightCo, (*string)(nil), &lightBg, &lightSurface,
-			&lightText, &lightAccent, (*string)(nil), (*string)(nil),
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
-		))
+		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).
+			AddRow(lightBrandPlaylistRow("Light Gate Playlist", &passwordHash, &lightBg)...))
 
 	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
 
@@ -582,10 +571,14 @@ func TestPlaylistWatchPage_LightThemeGateInputUsesBrandText(t *testing.T) {
 	if !strings.Contains(body, "--brand-text: #000000") {
 		t.Error("expected light brand text color to reach the gate page")
 	}
-	if !strings.Contains(body, "background: var(--brand-surface); color: var(--brand-text);") {
+	rule := cssRuleBody(body, `.gate-container input[type="password"]`)
+	if !strings.Contains(rule, "background: var(--brand-surface)") {
+		t.Error("gate input must use the brand surface for its background")
+	}
+	if !strings.Contains(rule, "color: var(--brand-text)") {
 		t.Error("gate input must use the brand text color for its foreground")
 	}
-	if strings.Contains(body, "background: var(--brand-surface); color: #fff;") {
+	if strings.Contains(rule, "color: #fff") {
 		t.Error("gate input must not hardcode a white foreground (unreadable on light surfaces)")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -593,57 +586,36 @@ func TestPlaylistWatchPage_LightThemeGateInputUsesBrandText(t *testing.T) {
 	}
 }
 
-func TestPlaylistWatchPage_LightThemeActiveRowForeground(t *testing.T) {
-	mock, err := pgxmock.NewPool()
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestPlaylistWatchPage_LightThemeActiveRowDerivesBrandColors(t *testing.T) {
+	mock, body := renderLightPlaylistWatchPage(t, "lightrow123")
 	defer mock.Close()
-
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
-	shareToken := "lightrow123"
-
-	lightCo := "Light Co"
-	lightSurface := "#ffffff"
-	lightText := "#000000"
-	lightAccent := "#1d4ed8"
-
-	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
-		WithArgs(shareToken).
-		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
-			"playlist-1", "Light Playlist", (*string)(nil), (*string)(nil), false,
-			(*string)(nil),
-			&lightCo, (*string)(nil), (*string)(nil), &lightSurface,
-			&lightText, &lightAccent, (*string)(nil), (*string)(nil),
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
-		))
-
-	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id`).
-		WithArgs("playlist-1").
-		WillReturnRows(pgxmock.NewRows(playlistVideosColumns).
-			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", (*string)(nil)))
-
-	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-	body := rec.Body.String()
 
 	if !strings.Contains(body, "--brand-text: #000000") {
 		t.Error("expected light brand text color to reach the playlist page")
 	}
-	if !strings.Contains(body, "background: #1e3a5f;") {
-		t.Error("active row must keep its fixed dark background")
+	hoverRule := cssRuleBody(body, ".video-list-item:hover")
+	if !strings.Contains(hoverRule, "background: color-mix(in srgb, var(--brand-text) 8%, var(--brand-surface))") {
+		t.Error("hover row must derive its background from the brand palette")
 	}
-	activeTitleRule := ".video-list-item.active .video-title {\n            font-weight: 600;\n            color: #fff;"
-	if !strings.Contains(body, activeTitleRule) {
-		t.Error("active row title must override the brand text color (black on the fixed navy background is unreadable)")
+	activeRule := cssRuleBody(body, ".video-list-item.active")
+	if !strings.Contains(activeRule, "background: color-mix(in srgb, var(--brand-text) 20%, var(--brand-surface))") {
+		t.Error("active row must derive from the brand palette with a stronger tint than the hover row (identical colours make two rows look active, and the default navy row becomes too subtle)")
 	}
-	activePositionRule := ".video-list-item.active .position {\n            color: #fff;"
-	if !strings.Contains(body, activePositionRule) {
-		t.Error("active row position must override the brand accent color")
+	if strings.Contains(activeRule, "background: #1e3a5f") {
+		t.Error("active row must not keep a fixed dark background")
+	}
+	for selector, want := range map[string]string{
+		".video-list-item.active .video-title":     "font-weight: 600",
+		".video-list-item.active .position":        "font-weight: 600",
+		".video-list-item.active .now-playing-tag": "display: block",
+	} {
+		rule := cssRuleBody(body, selector)
+		if !strings.Contains(rule, want) {
+			t.Errorf("%s must declare %q", selector, want)
+		}
+		if strings.Contains(rule, "color:") {
+			t.Errorf("%s must not set a foreground color (it must follow the brand palette, readable on a derived light background)", selector)
+		}
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
@@ -651,60 +623,90 @@ func TestPlaylistWatchPage_LightThemeActiveRowForeground(t *testing.T) {
 }
 
 func TestPlaylistWatchPage_LightThemeNextOverlayForeground(t *testing.T) {
-	mock, err := pgxmock.NewPool()
-	if err != nil {
-		t.Fatal(err)
-	}
+	mock, body := renderLightPlaylistWatchPage(t, "lightnext123")
 	defer mock.Close()
 
-	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
-	shareToken := "lightnext123"
+	if !strings.Contains(body, "--brand-text: #000000") {
+		t.Error("expected light brand text color to reach the playlist page")
+	}
+	overlayRule := cssRuleBody(body, ".next-overlay")
+	if !strings.Contains(overlayRule, "background: rgba(0, 0, 0, 0.85)") {
+		t.Error("next overlay must keep its fixed dark background")
+	}
+	if !strings.Contains(overlayRule, "color: #fff") {
+		t.Error("next overlay must use white text (brand text on the dark overlay is unreadable in a light theme)")
+	}
+	if strings.Contains(overlayRule, "color: var(--brand-text)") {
+		t.Error("next overlay must not inherit brand text (black on the dark overlay is unreadable)")
+	}
+	titleRule := cssRuleBody(body, ".next-overlay .next-title")
+	if !strings.Contains(titleRule, "color: #fff") {
+		t.Error("next overlay title must override the brand text color")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
 
+// lightBrandPlaylistRow returns the watch-page query row values for a
+// workspace-branded light-theme playlist (white surface, black text, blue accent).
+func lightBrandPlaylistRow(title string, sharePassword, colorBackground *string) []any {
 	lightCo := "Light Co"
 	lightSurface := "#ffffff"
 	lightText := "#000000"
 	lightAccent := "#1d4ed8"
+	return []any{
+		"playlist-1", title, (*string)(nil), sharePassword, false,
+		(*string)(nil),
+		&lightCo, (*string)(nil), colorBackground, &lightSurface,
+		&lightText, &lightAccent, (*string)(nil), (*string)(nil),
+		(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+		(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+	}
+}
+
+// renderLightPlaylistWatchPage renders the watch page for an ungated
+// light-themed workspace playlist and returns the mock pool and response body.
+func renderLightPlaylistWatchPage(t *testing.T, shareToken string) (pgxmock.PgxPoolIface, string) {
+	t.Helper()
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testHMACSecret, false)
 
 	mock.ExpectQuery(`SELECT p.id, p.title, p.description, p.share_password, p.require_email`).
 		WithArgs(shareToken).
-		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).AddRow(
-			"playlist-1", "Light Playlist", (*string)(nil), (*string)(nil), false,
-			(*string)(nil),
-			&lightCo, (*string)(nil), (*string)(nil), &lightSurface,
-			&lightText, &lightAccent, (*string)(nil), (*string)(nil),
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
-			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
-		))
-
+		WillReturnRows(pgxmock.NewRows(playlistWatchColumns).
+			AddRow(lightBrandPlaylistRow("Light Playlist", nil, nil)...))
 	mock.ExpectQuery(`SELECT v.id, v.title, v.duration, v.share_token, v.content_type, v.user_id`).
 		WithArgs("playlist-1").
 		WillReturnRows(pgxmock.NewRows(playlistVideosColumns).
 			AddRow("vid-1", "First Video", 120, "vtoken1abcde", "video/webm", "user-1", (*string)(nil)))
 
 	rec := servePlaylistWatchPage(handler, playlistWatchRequest(shareToken))
-
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	body := rec.Body.String()
+	return mock, rec.Body.String()
+}
 
-	if !strings.Contains(body, "--brand-text: #000000") {
-		t.Error("expected light brand text color to reach the playlist page")
+// cssRuleBody returns the declarations of the first CSS rule with the given
+// selector, whitespace collapsed, so assertions are not sensitive to CSS
+// reformatting. It returns "" when the rule does not exist.
+func cssRuleBody(body, selector string) string {
+	idx := strings.Index(body, selector)
+	if idx == -1 {
+		return ""
 	}
-	if !strings.Contains(body, "background: rgba(0, 0, 0, 0.85);") {
-		t.Error("next overlay must keep its fixed dark background")
+	open := strings.IndexByte(body[idx:], '{')
+	if open == -1 {
+		return ""
 	}
-	overlayRule := ".next-overlay {\n            position: absolute;\n            top: 0; left: 0; right: 0; bottom: 0;\n            background: rgba(0, 0, 0, 0.85);\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            justify-content: center;\n            color: #fff;"
-	if !strings.Contains(body, overlayRule) {
-		t.Error("next overlay must use white text (brand text on the dark overlay is unreadable in a light theme)")
+	open += idx
+	closeIdx := strings.IndexByte(body[open+1:], '}')
+	if closeIdx == -1 {
+		return ""
 	}
-	if !strings.Contains(body, ".next-overlay .next-title {\n            font-size: 20px;\n            font-weight: 600;\n            color: #fff;") {
-		t.Error("next overlay title must override the brand text color")
-	}
-	if strings.Contains(body, ".next-overlay {\n            position: absolute;\n            top: 0; left: 0; right: 0; bottom: 0;\n            background: rgba(0, 0, 0, 0.85);\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            justify-content: center;\n            color: var(--brand-text);") {
-		t.Error("next overlay must not inherit brand text (black on the dark overlay is unreadable)")
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+	return strings.Join(strings.Fields(body[open+1:open+1+closeIdx]), " ")
 }
