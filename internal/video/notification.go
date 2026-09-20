@@ -405,8 +405,16 @@ func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerE
 
 	watchURL := h.baseURL + "/watch/" + shareToken
 
-	// Slack: always send (Slack client gates on webhook URL presence in DB)
-	if h.slackNotifier != nil {
+	// A video carrying its own Notifications setting decides for every channel: the
+	// select that writes it is labelled "Notifications", not "email notifications".
+	// Without one, Slack stays on, because its switch is the presence of a webhook
+	// URL, while the account-level select governs email only.
+	videoMode := ""
+	if videoViewNotification != nil {
+		videoMode = normalizeViewNotificationMode(*videoViewNotification)
+	}
+
+	if h.slackNotifier != nil && (videoMode == "" || videoMode == viewNotificationEvery) {
 		if err := h.slackNotifier.SendViewNotification(ctx, ownerEmail, ownerName, videoTitle, watchURL, 1); err != nil {
 			slog.Error("notification: failed to send Slack view notification", "video_id", videoID, "error", err)
 		}
@@ -429,12 +437,10 @@ func (h *Handler) resolveAndNotify(ctx context.Context, videoID, ownerID, ownerE
 	}
 
 	mode := viewNotificationOff
-	if videoViewNotification != nil {
-		mode = normalizeViewNotificationMode(*videoViewNotification)
-	} else {
-		if sendsImmediateViewNotification(h.accountNotificationMode(ctx, ownerID)) {
-			mode = viewNotificationEvery
-		}
+	if videoMode != "" {
+		mode = videoMode
+	} else if sendsImmediateViewNotification(h.accountNotificationMode(ctx, ownerID)) {
+		mode = viewNotificationEvery
 	}
 
 	if mode != viewNotificationEvery {

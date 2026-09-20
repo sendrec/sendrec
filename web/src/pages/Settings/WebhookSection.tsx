@@ -261,13 +261,14 @@ export function WebhookSection({
       <details className="settings-details">
         <summary>Supported events</summary>
         <ul>
+          <li><code>video.created</code> — A recording was created</li>
+          <li><code>video.ready</code> — Processing finished and the video is watchable</li>
+          <li><code>video.deleted</code> — A video was deleted, one at a time or in a batch</li>
           <li><code>video.viewed</code> — A viewer watched a video</li>
-          <li><code>video.comment.created</code> — A new comment was posted</li>
-          <li><code>video.reaction.created</code> — An emoji reaction was added</li>
-          <li><code>video.transcription.ready</code> — Transcription completed</li>
-          <li><code>video.summary.ready</code> — AI summary completed</li>
-          <li><code>video.cta.clicked</code> — A CTA button was clicked</li>
-          <li><code>test</code> — Test event from Settings</li>
+          <li><code>video.comment</code> — A public comment was posted by someone other than you</li>
+          <li><code>video.cta_click</code> — A CTA button was clicked</li>
+          <li><code>video.milestone</code> — A viewer reached 25, 50, 75 or 100% of a video</li>
+          <li><code>webhook.test</code> — Test event from Settings</li>
         </ul>
       </details>
     </div>
