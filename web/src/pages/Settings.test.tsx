@@ -496,6 +496,45 @@ describe("Settings", () => {
     });
   });
 
+  it("previews the branding currently in the form", async () => {
+    const user = userEvent.setup();
+    // Mocked by path: the preview posts the same payload the save does, and
+    // asserting on call order would break the moment a request is added.
+    mockApiFetch.mockImplementation((path: string, init?: { method?: string; body?: string }) => {
+      switch (path) {
+        case "/api/user":
+          return Promise.resolve({ name: "Alice", email: "alice@example.com" });
+        case "/api/settings/notifications":
+          return Promise.resolve({ notificationMode: "off" });
+        case "/api/videos/limits":
+          return Promise.resolve({ brandingEnabled: true });
+        case "/api/settings/branding":
+          return Promise.resolve({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
+        case "/api/settings/branding/preview":
+          expect(init?.method).toBe("POST");
+          expect(JSON.parse(init?.body ?? "{}")).toMatchObject({ companyName: "Preview Co" });
+          return Promise.resolve({ previewUrl: "/branding/preview/abc123" });
+        case "/api/settings/billing":
+          return Promise.reject(new Error("Not Found"));
+        case "/api/user/identities":
+          return Promise.resolve({ identities: [], hasPassword: false });
+        default:
+          return Promise.resolve([]);
+      }
+    });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding")).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText("SendRec"), "Preview Co");
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+
+    const frame = await screen.findByTitle("Preview of a shared video page");
+    expect(frame).toHaveAttribute("src", "/branding/preview/abc123");
+  });
+
   it("resets branding to defaults", async () => {
     const user = userEvent.setup();
     mockApiFetch

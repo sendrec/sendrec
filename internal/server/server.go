@@ -369,6 +369,7 @@ func (s *Server) routes() {
 			r.Get("/notifications/webhook-deliveries", s.videoHandler.ListWebhookDeliveries)
 			r.Get("/branding", s.videoHandler.GetBrandingSettings)
 			r.Put("/branding", s.videoHandler.PutBrandingSettings)
+			r.Post("/branding/preview", s.videoHandler.CreateBrandingPreview)
 			r.Post("/branding/logo", s.videoHandler.UploadBrandingLogo)
 			r.Delete("/branding/logo", s.videoHandler.DeleteBrandingLogo)
 			r.Post("/api-keys", auth.GenerateAPIKey(s.db))
@@ -535,6 +536,10 @@ func (s *Server) routes() {
 		s.router.With(watchLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/segments", s.videoHandler.RecordSegments)
 		s.router.With(watchLimiter.Middleware).Get("/api/watch/{shareToken}/thumbnail", s.videoHandler.WatchThumbnail)
 		s.router.With(watchLimiter.Middleware).Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
+		// The id is minted only by an authenticated settings request, renders
+		// once and expires, so this needs no auth of its own — which is what
+		// lets the settings iframe load it and get its own CSP nonce.
+		s.router.Get("/branding/preview/{id}", s.videoHandler.BrandingPreviewPage)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 		s.router.Get("/embed/{shareToken}", s.videoHandler.EmbedPage)
 

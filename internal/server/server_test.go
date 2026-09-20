@@ -1115,3 +1115,118 @@ func TestCreatePlaylist_AsViewer_IsRefused(t *testing.T) {
 		t.Fatalf("a workspace viewer created a playlist: status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+// --- Branding preview ---
+
+// The preview exists so the settings form stops being a guess, which only holds
+// if the page it renders carries the values just typed. These drive the real
+// router: an authenticated POST, then the GET the iframe would make.
+func createBrandingPreview(t *testing.T, srv *server.Server, token, body string) string {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/branding/preview", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create preview: expected %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		PreviewURL string `json:"previewUrl"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode preview response: %v", err)
+	}
+	if !strings.HasPrefix(resp.PreviewURL, "/branding/preview/") {
+		t.Fatalf("unexpected preview url: %q", resp.PreviewURL)
+	}
+	return resp.PreviewURL
+}
+
+func getPreviewPage(srv *server.Server, url string) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, url, nil))
+	return rec
+}
+
+func TestBrandingPreview_RendersTheSubmittedValues(t *testing.T) {
+	srv, _, token := newBrandingServer(t)
+
+	url := createBrandingPreview(t, srv, token,
+		`{"companyName":"Unsaved Co","colorAccent":"#ff0000","footerText":"Unsaved footer"}`)
+
+	rec := getPreviewPage(srv, url)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview page: expected 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{"Unsaved Co", "#ff0000", "Unsaved footer"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("preview is missing the submitted value %q", want)
+		}
+	}
+}
+
+// One id, one render — a preview URL that leaks is worth nothing afterwards.
+func TestBrandingPreview_IdRendersOnce(t *testing.T) {
+	srv, _, token := newBrandingServer(t)
+
+	url := createBrandingPreview(t, srv, token, `{"companyName":"Once Co"}`)
+
+	if rec := getPreviewPage(srv, url); rec.Code != http.StatusOK {
+		t.Fatalf("first render: expected 200, got %d", rec.Code)
+	}
+	if rec := getPreviewPage(srv, url); rec.Code != http.StatusNotFound {
+		t.Errorf("second render: expected 404, got %d", rec.Code)
+	}
+}
+
+func TestBrandingPreview_UnknownIdIsNotFound(t *testing.T) {
+	srv, _, _ := newBrandingServer(t)
+
+	rec := getPreviewPage(srv, "/branding/preview/"+strings.Repeat("a", 64))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for an id nobody minted, got %d", rec.Code)
+	}
+}
+
+// The preview must refuse exactly what saving refuses, or it would show a page
+// the operator cannot keep.
+func TestBrandingPreview_RejectsWhatSavingRejects(t *testing.T) {
+	srv, _, token := newBrandingServer(t)
+
+	for name, body := range map[string]string{
+		"bad colour":       `{"colorAccent":"red"}`,
+		"closing style":    `{"customCss":"</style><script>alert(1)</script>"}`,
+		"css import":       `{"customCss":"@import url('//evil.example.com/x.css');"}`,
+		"oversized name":   `{"companyName":"` + strings.Repeat("x", 500) + `"}`,
+		"oversized footer": `{"footerText":"` + strings.Repeat("x", 5000) + `"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/settings/branding/preview", strings.NewReader(body))
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestBrandingPreview_RequiresAuthentication(t *testing.T) {
+	srv, _, _ := newBrandingServer(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/branding/preview",
+		strings.NewReader(`{"companyName":"Anon Co"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 without a token, got %d", rec.Code)
+	}
+}

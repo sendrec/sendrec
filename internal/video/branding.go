@@ -97,6 +97,31 @@ func isValidHexColor(s string) bool {
 	return hexColorPattern.MatchString(s)
 }
 
+// validateBrandingRequest holds every rule a branding payload must satisfy, so
+// saving and previewing accept exactly the same input. A preview that tolerated
+// more than the save would be showing the operator a page they cannot keep.
+func validateBrandingRequest(req setBrandingRequest) string {
+	if req.CompanyName != nil {
+		if msg := validate.CompanyName(*req.CompanyName); msg != "" {
+			return msg
+		}
+	}
+	if req.FooterText != nil {
+		if msg := validate.FooterText(*req.FooterText); msg != "" {
+			return msg
+		}
+	}
+	if msg := validateBrandingColors(req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent); msg != "" {
+		return msg
+	}
+	if req.CustomCSS != nil {
+		if _, msg := sanitizeCustomCSS(*req.CustomCSS); msg != "" {
+			return msg
+		}
+	}
+	return ""
+}
+
 func validateBrandingColors(bg, surface, text, accent *string) string {
 	for _, pair := range []struct {
 		val  *string
@@ -232,27 +257,9 @@ func (h *Handler) PutBrandingSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.CompanyName != nil {
-		if msg := validate.CompanyName(*req.CompanyName); msg != "" {
-			httputil.WriteError(w, http.StatusBadRequest, msg)
-			return
-		}
-	}
-	if req.FooterText != nil {
-		if msg := validate.FooterText(*req.FooterText); msg != "" {
-			httputil.WriteError(w, http.StatusBadRequest, msg)
-			return
-		}
-	}
-	if errMsg := validateBrandingColors(req.ColorBackground, req.ColorSurface, req.ColorText, req.ColorAccent); errMsg != "" {
-		httputil.WriteError(w, http.StatusBadRequest, errMsg)
+	if msg := validateBrandingRequest(req); msg != "" {
+		httputil.WriteError(w, http.StatusBadRequest, msg)
 		return
-	}
-	if req.CustomCSS != nil {
-		if _, errMsg := sanitizeCustomCSS(*req.CustomCSS); errMsg != "" {
-			httputil.WriteError(w, http.StatusBadRequest, errMsg)
-			return
-		}
 	}
 
 	orgID := auth.OrgIDFromContext(r.Context())
