@@ -1212,3 +1212,77 @@ func TestIsValidWebhookURL_RejectsInternalHTTPSTargets(t *testing.T) {
 		t.Error("expected a public https endpoint to remain valid")
 	}
 }
+
+func TestResolveAndNotify_SlackSkippedWhenVideoOverrideIsOff(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	emailNotifier := &mockViewNotifier{}
+	slackNotifier := &mockSlackNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	handler.SetViewNotifier(emailNotifier)
+	handler.SetSlackNotifier(slackNotifier)
+
+	off := viewNotificationOff
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", &off)
+
+	if emailNotifier.called {
+		t.Error("expected email notification to be skipped when the video is set to off")
+	}
+	if slackNotifier.viewCalled {
+		t.Error("expected Slack notification to be skipped when the video is set to off")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestResolveAndNotify_SlackSkippedWhenVideoOverrideIsDigest(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	slackNotifier := &mockSlackNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	handler.SetSlackNotifier(slackNotifier)
+
+	digest := viewNotificationDigest
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", &digest)
+
+	if slackNotifier.viewCalled {
+		t.Error("expected Slack to stay quiet when the video collects views into a digest")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestResolveAndNotify_SlackFiresWhenVideoOverrideIsEvery(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	slackNotifier := &mockSlackNotifier{}
+	handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+	handler.SetSlackNotifier(slackNotifier)
+
+	every := viewNotificationEvery
+	handler.resolveAndNotify(context.Background(), "vid-1", testUserID, "owner@test.com", "Owner", "My Video", "token123", "", &every)
+
+	if !slackNotifier.viewCalled {
+		t.Error("expected Slack notification when the video asks for every view")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}

@@ -226,8 +226,12 @@ func (h *Handler) PostWatchComment(w http.ResponseWriter, r *http.Request) {
 
 	shouldEmailComment := h.commentNotifier != nil && h.shouldSendImmediateCommentNotification(r.Context(), ownerID)
 	shouldSlackComment := h.slackNotifier != nil
+	// video.comment is an event feed, not a notification. Leaving it inside the
+	// notifier guard meant a subscriber received nothing until the owner also
+	// turned on comment emails or connected Slack.
+	shouldWebhookComment := h.webhookClient != nil
 
-	if !req.IsPrivate && !quickReaction && callerUserID != ownerID && (shouldEmailComment || shouldSlackComment) {
+	if !req.IsPrivate && !quickReaction && callerUserID != ownerID && (shouldEmailComment || shouldSlackComment || shouldWebhookComment) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()

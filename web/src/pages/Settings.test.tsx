@@ -1307,6 +1307,47 @@ describe("Settings", () => {
         expect(screen.getByText("Supported events")).toBeInTheDocument();
       });
     });
+
+    it("lists only event names the server actually sends", async () => {
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({ notificationMode: "off", slackWebhookUrl: null, webhookUrl: null, webhookSecret: null })
+        .mockResolvedValueOnce({ brandingEnabled: false })
+        .mockResolvedValueOnce([])
+        .mockRejectedValueOnce(new Error("Not Found")) // billing
+        .mockResolvedValueOnce([]) // integrations
+        .mockResolvedValueOnce({ identities: [], hasPassword: false }); // identities
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByText("Supported events")).toBeInTheDocument();
+      });
+
+      const dispatched = [
+        "video.created",
+        "video.ready",
+        "video.deleted",
+        "video.viewed",
+        "video.comment",
+        "video.cta_click",
+        "video.milestone",
+        "webhook.test",
+      ];
+      for (const name of dispatched) {
+        expect(screen.getAllByText(name).length).toBeGreaterThanOrEqual(1);
+      }
+
+      const invented = [
+        "video.comment.created",
+        "video.reaction.created",
+        "video.transcription.ready",
+        "video.summary.ready",
+        "video.cta.clicked",
+      ];
+      for (const name of invented) {
+        expect(screen.queryByText(name)).not.toBeInTheDocument();
+      }
+    });
   });
 
   describe("Billing", () => {
