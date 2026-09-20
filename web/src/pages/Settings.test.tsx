@@ -535,6 +535,86 @@ describe("Settings", () => {
     expect(frame).toHaveAttribute("src", "/branding/preview/abc123");
   });
 
+  // A preview stands for the values in the form right now. Anything that says
+  // otherwise beside it — a success banner from an earlier save, a frame built
+  // from branding the form no longer holds — is telling the operator something
+  // untrue about the page they are looking at.
+  it("drops the saved banner when previewing unsaved edits", async () => {
+    const user = userEvent.setup();
+    mockApiFetch.mockImplementation((path: string) => {
+      switch (path) {
+        case "/api/user":
+          return Promise.resolve({ name: "Alice", email: "alice@example.com" });
+        case "/api/settings/notifications":
+          return Promise.resolve({ notificationMode: "off" });
+        case "/api/videos/limits":
+          return Promise.resolve({ brandingEnabled: true });
+        case "/api/settings/branding":
+          return Promise.resolve({ companyName: null, colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
+        case "/api/settings/branding/preview":
+          return Promise.resolve({ previewUrl: "/branding/preview/abc123" });
+        case "/api/settings/billing":
+          return Promise.reject(new Error("Not Found"));
+        case "/api/user/identities":
+          return Promise.resolve({ identities: [], hasPassword: false });
+        default:
+          return Promise.resolve([]);
+      }
+    });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Branding")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Save branding" }));
+    await waitFor(() => {
+      expect(screen.getByText("Branding saved")).toBeInTheDocument();
+    });
+
+    await user.type(screen.getByPlaceholderText("SendRec"), "Edited Co");
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+
+    await screen.findByTitle("Preview of a shared video page");
+    expect(screen.queryByText("Branding saved")).not.toBeInTheDocument();
+  });
+
+  it("drops a preview the form has moved on from", async () => {
+    const user = userEvent.setup();
+    mockApiFetch.mockImplementation((path: string) => {
+      switch (path) {
+        case "/api/user":
+          return Promise.resolve({ name: "Alice", email: "alice@example.com" });
+        case "/api/settings/notifications":
+          return Promise.resolve({ notificationMode: "off" });
+        case "/api/videos/limits":
+          return Promise.resolve({ brandingEnabled: true });
+        case "/api/settings/branding":
+          return Promise.resolve({ companyName: "Acme Corp", colorBackground: null, colorSurface: null, colorText: null, colorAccent: null, footerText: null, logoKey: null, customCss: null });
+        case "/api/settings/branding/preview":
+          return Promise.resolve({ previewUrl: "/branding/preview/abc123" });
+        case "/api/settings/billing":
+          return Promise.reject(new Error("Not Found"));
+        case "/api/user/identities":
+          return Promise.resolve({ identities: [], hasPassword: false });
+        default:
+          return Promise.resolve([]);
+      }
+    });
+    renderSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    await screen.findByTitle("Preview of a shared video page");
+
+    await user.click(screen.getByRole("button", { name: "Reset to defaults" }));
+
+    expect(screen.queryByTitle("Preview of a shared video page")).not.toBeInTheDocument();
+  });
+
   it("resets branding to defaults", async () => {
     const user = userEvent.setup();
     mockApiFetch

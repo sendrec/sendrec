@@ -412,6 +412,9 @@ func TestWatchPage_CommentsEnabled_RendersCommentForm(t *testing.T) {
 		"Post comment",
 		"seek-markers",
 		"emoji-trigger",
+		// A real page loads its own thread. Only the branding preview stands in
+		// for one, having no share token to ask with.
+		"var isPreview = false",
 	}
 	for _, check := range checks {
 		if !strings.Contains(body, check) {

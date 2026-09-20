@@ -48,7 +48,6 @@ type Handler struct {
 	maxVideoDurationSeconds int
 	maxPlaylists            int
 	hmacSecret              string
-	brandingPreviews        *brandingPreviewStore
 	secureCookies           bool
 	commentNotifier         CommentNotifier
 	viewNotifier            ViewNotifier
@@ -72,7 +71,6 @@ func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadByte
 		maxVideoDurationSeconds: maxVideoDurationSeconds,
 		maxPlaylists:            maxPlaylists,
 		hmacSecret:              hmacSecret,
-		brandingPreviews:        newBrandingPreviewStore(),
 		secureCookies:           secureCookies,
 	}
 }

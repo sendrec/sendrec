@@ -1121,8 +1121,48 @@ func TestCreatePlaylist_AsViewer_IsRefused(t *testing.T) {
 // The preview exists so the settings form stops being a guess, which only holds
 // if the page it renders carries the values just typed. These drive the real
 // router: an authenticated POST, then the GET the iframe would make.
-func createBrandingPreview(t *testing.T, srv *server.Server, token, body string) string {
+
+// A preview is minted by one request and rendered by another, so the row has to
+// outlive the process that wrote it. These helpers carry it between the two the
+// way Postgres does.
+type brandingPreviewRow struct {
+	id       string
+	branding string
+}
+
+func expectPreviewInsert(mock pgxmock.PgxPoolIface, row *brandingPreviewRow) {
+	mock.ExpectExec(`INSERT INTO branding_previews`).
+		WithArgs(
+			pgxmock.ArgumentFunc(func(v any) bool {
+				id, ok := v.(string)
+				row.id = id
+				return ok
+			}),
+			pgxmock.ArgumentFunc(func(v any) bool {
+				branding, ok := v.(string)
+				row.branding = branding
+				return ok
+			}),
+			pgxmock.AnyArg(),
+		).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+}
+
+func expectPreviewSelect(mock pgxmock.PgxPoolIface, row *brandingPreviewRow) {
+	mock.ExpectQuery(`SELECT branding FROM branding_previews`).
+		WithArgs(pgxmock.ArgumentFunc(func(v any) bool { return v == row.id })).
+		WillReturnRows(pgxmock.NewRows([]string{"branding"}).AddRow([]byte(row.branding)))
+}
+
+func expectPreviewGone(mock pgxmock.PgxPoolIface) {
+	mock.ExpectQuery(`SELECT branding FROM branding_previews`).WillReturnError(pgx.ErrNoRows)
+}
+
+func createBrandingPreview(t *testing.T, srv *server.Server, mock pgxmock.PgxPoolIface, token, body string) (string, *brandingPreviewRow) {
 	t.Helper()
+	row := &brandingPreviewRow{}
+	expectPreviewInsert(mock, row)
+
 	req := httptest.NewRequest(http.MethodPost, "/api/settings/branding/preview", strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
@@ -1141,7 +1181,7 @@ func createBrandingPreview(t *testing.T, srv *server.Server, token, body string)
 	if !strings.HasPrefix(resp.PreviewURL, "/branding/preview/") {
 		t.Fatalf("unexpected preview url: %q", resp.PreviewURL)
 	}
-	return resp.PreviewURL
+	return resp.PreviewURL, row
 }
 
 func getPreviewPage(srv *server.Server, url string) *httptest.ResponseRecorder {
@@ -1151,10 +1191,11 @@ func getPreviewPage(srv *server.Server, url string) *httptest.ResponseRecorder {
 }
 
 func TestBrandingPreview_RendersTheSubmittedValues(t *testing.T) {
-	srv, _, token := newBrandingServer(t)
+	srv, mock, token := newBrandingServer(t)
 
-	url := createBrandingPreview(t, srv, token,
+	url, row := createBrandingPreview(t, srv, mock, token,
 		`{"companyName":"Unsaved Co","colorAccent":"#ff0000","footerText":"Unsaved footer"}`)
+	expectPreviewSelect(mock, row)
 
 	rec := getPreviewPage(srv, url)
 	if rec.Code != http.StatusOK {
@@ -1168,26 +1209,80 @@ func TestBrandingPreview_RendersTheSubmittedValues(t *testing.T) {
 	}
 }
 
-// One id, one render — a preview URL that leaks is worth nothing afterwards.
-func TestBrandingPreview_IdRendersOnce(t *testing.T) {
-	srv, _, token := newBrandingServer(t)
+// The POST and the GET are separate requests, and nothing routes them to the
+// same replica. A preview held in one process's memory would be gone by the
+// time the iframe asked for it.
+func TestBrandingPreview_RendersOnAnotherInstance(t *testing.T) {
+	minting, mock, token := newBrandingServer(t)
+	rendering := server.New(server.Config{
+		DB:              mock,
+		Pinger:          &mockPinger{err: nil},
+		Storage:         &mockStorage{},
+		JWTSecret:       "test-secret",
+		BaseURL:         "https://localhost:8080",
+		BrandingEnabled: true,
+	})
 
-	url := createBrandingPreview(t, srv, token, `{"companyName":"Once Co"}`)
+	url, row := createBrandingPreview(t, minting, mock, token, `{"companyName":"Shared Co"}`)
+	expectPreviewSelect(mock, row)
 
-	if rec := getPreviewPage(srv, url); rec.Code != http.StatusOK {
-		t.Fatalf("first render: expected 200, got %d", rec.Code)
+	rec := getPreviewPage(rendering, url)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview page on a second instance: expected 200, got %d", rec.Code)
 	}
-	if rec := getPreviewPage(srv, url); rec.Code != http.StatusNotFound {
-		t.Errorf("second render: expected 404, got %d", rec.Code)
+	if !strings.Contains(rec.Body.String(), "Shared Co") {
+		t.Error("a preview minted by one instance did not render on another")
 	}
 }
 
-func TestBrandingPreview_UnknownIdIsNotFound(t *testing.T) {
-	srv, _, _ := newBrandingServer(t)
+// The iframe can ask for the same id more than once — a reload, a Back, a
+// remount — and each one must show the page rather than an error.
+func TestBrandingPreview_RendersWhileItIsLive(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	url, row := createBrandingPreview(t, srv, mock, token, `{"companyName":"Twice Co"}`)
+
+	for i := 1; i <= 2; i++ {
+		expectPreviewSelect(mock, row)
+		if rec := getPreviewPage(srv, url); rec.Code != http.StatusOK {
+			t.Fatalf("render %d: expected 200, got %d", i, rec.Code)
+		}
+	}
+}
+
+// An id that has expired or never existed lands in an iframe, where a bare
+// "404 page not found" reads as a broken product rather than a lapsed preview.
+func TestBrandingPreview_ExpiredIdSaysSo(t *testing.T) {
+	srv, mock, _ := newBrandingServer(t)
+	expectPreviewGone(mock)
 
 	rec := getPreviewPage(srv, "/branding/preview/"+strings.Repeat("a", 64))
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404 for an id nobody minted, got %d", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("expected an HTML explanation, got Content-Type %q", ct)
+	}
+	if !strings.Contains(rec.Body.String(), "Refresh preview") {
+		t.Errorf("the expired page does not say how to get a new one: %s", rec.Body.String())
+	}
+}
+
+// The preview stands in for a page with a video, a share token and a comment
+// thread behind it, and has none of them. It has to hold together anyway rather
+// than calling the watch API with an empty token or pointing <video> at nothing.
+func TestBrandingPreview_StandsAloneWithoutAVideo(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	url, row := createBrandingPreview(t, srv, mock, token, `{"companyName":"Standalone Co"}`)
+	expectPreviewSelect(mock, row)
+
+	body := getPreviewPage(srv, url).Body.String()
+	if strings.Contains(body, `<source src=""`) {
+		t.Error("the preview points the player at an empty source, which fails to load")
+	}
+	if !strings.Contains(body, "Great walkthrough") {
+		t.Error("the preview does not show sample comments, so it either asks the watch API for a token it lacks or shows nothing")
 	}
 }
 
@@ -1214,6 +1309,67 @@ func TestBrandingPreview_RejectsWhatSavingRejects(t *testing.T) {
 				t.Errorf("expected 400, got %d: %s", rec.Code, rec.Body.String())
 			}
 		})
+	}
+}
+
+// Resolving branding presigns a download URL for whatever the logo key names,
+// so a key is only acceptable if this account could have uploaded it. Saving
+// and previewing both hand the key to the same resolution and both refuse.
+func TestBranding_RejectsALogoKeyFromAnotherAccount(t *testing.T) {
+	for name, path := range map[string]string{
+		"preview": "/api/settings/branding/preview",
+		"save":    "/api/settings/branding",
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv, _, token := newBrandingServer(t)
+			method := http.MethodPost
+			if name == "save" {
+				method = http.MethodPut
+			}
+
+			for _, key := range []string{
+				"branding/00000000-0000-0000-0000-000000000000/logo.png",
+				"videos/00000000-0000-0000-0000-000000000000/private.webm",
+			} {
+				req := httptest.NewRequest(method, path, strings.NewReader(`{"logoKey":"`+key+`"}`))
+				req.Header.Set("Authorization", "Bearer "+token)
+				req.Header.Set("Content-Type", "application/json")
+				rec := httptest.NewRecorder()
+				srv.ServeHTTP(rec, req)
+
+				if rec.Code != http.StatusBadRequest {
+					t.Errorf("%s with key %q: expected 400, got %d: %s", name, key, rec.Code, rec.Body.String())
+				}
+			}
+		})
+	}
+}
+
+// The key this account did upload still has to work, or the logo would be
+// unsavable.
+func TestBrandingPreview_AcceptsThisAccountsOwnLogoKey(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+
+	createBrandingPreview(t, srv, mock, token, `{"logoKey":"branding/user-1/logo.png"}`)
+}
+
+// Previewing workspace branding is editing it: the same values, the same
+// resolution, the same presigned logo. A viewer the save refuses must not get a
+// rendered page instead.
+func TestBrandingPreview_AsViewer_IsRefused(t *testing.T) {
+	srv, mock, token := newBrandingServer(t)
+	expectOrgMembership(mock, testRouteOrgID, "user-1", "viewer")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/branding/preview",
+		strings.NewReader(`{"companyName":"Not Yours"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Organization-Id", testRouteOrgID)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("a workspace viewer previewed workspace branding: status=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

@@ -39,9 +39,12 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
   }
 
   // The server renders the real watch page from these values and hands back a
-  // one-shot URL, so the preview cannot drift from the page it stands for.
+  // short-lived URL, so the preview cannot drift from the page it stands for.
   async function handlePreview() {
     setBrandingError("");
+    // A banner from an earlier save would sit beside a frame built from edits
+    // that are not saved, each claiming the other is out of date.
+    setBrandingMessage("");
     setLoadingPreview(true);
     try {
       const res = await apiFetch<{ previewUrl: string }>("/api/settings/branding/preview", {
@@ -82,7 +85,11 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
     }
   }
 
+  // A preview is only worth showing while the form still holds the values it was
+  // built from. Reset and the logo controls move those values without the
+  // operator touching a field, so they take the frame with them.
   function handleBrandingReset() {
+    setPreviewUrl(null);
     setBranding({
       companyName: null, logoKey: null,
       colorBackground: null, colorSurface: null, colorText: null, colorAccent: null,
@@ -116,6 +123,7 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
       });
       if (!uploadResp.ok) throw new Error("Failed to upload logo");
 
+      setPreviewUrl(null);
       setBranding((prev) => ({ ...prev, logoKey: result.logoKey }));
       setBrandingMessage("Logo uploaded");
     } catch (err) {
@@ -129,6 +137,7 @@ export function BrandingSection({ initialBranding, limits }: BrandingSectionProp
     setBrandingError("");
     try {
       await apiFetch("/api/settings/branding/logo", { method: "DELETE" });
+      setPreviewUrl(null);
       setBranding((prev) => ({ ...prev, logoKey: null }));
       setBrandingMessage("Logo removed");
     } catch (err) {
