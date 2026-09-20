@@ -536,10 +536,13 @@ func (s *Server) routes() {
 		s.router.With(watchLimiter.Middleware, maxBodySize(64*1024)).Post("/api/watch/{shareToken}/segments", s.videoHandler.RecordSegments)
 		s.router.With(watchLimiter.Middleware).Get("/api/watch/{shareToken}/thumbnail", s.videoHandler.WatchThumbnail)
 		s.router.With(watchLimiter.Middleware).Get("/api/videos/{shareToken}/oembed", s.videoHandler.OEmbed)
-		// The id is minted only by an authenticated settings request, renders
-		// once and expires, so this needs no auth of its own — which is what
-		// lets the settings iframe load it and get its own CSP nonce.
-		s.router.Get("/branding/preview/{id}", s.videoHandler.BrandingPreviewPage)
+		// The id is minted only by an authenticated settings request and expires
+		// in minutes, so this needs no auth of its own — which is what lets the
+		// settings iframe load it and get its own CSP nonce. It renders as often
+		// as the frame asks in that window, since a reload is not an attack.
+		// Unauthenticated and backed by a query, it takes the same throttle as
+		// the rest of the surface a stranger can reach.
+		s.router.With(watchLimiter.Middleware).Get("/branding/preview/{id}", s.videoHandler.BrandingPreviewPage)
 		s.router.Get("/watch/{shareToken}", s.videoHandler.WatchPage)
 		s.router.Get("/embed/{shareToken}", s.videoHandler.EmbedPage)
 

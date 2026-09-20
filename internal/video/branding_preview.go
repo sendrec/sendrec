@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -29,8 +30,26 @@ import (
 // quickly, so a leaked URL is worth little and not for long.
 const brandingPreviewTTL = 10 * time.Minute
 
+// An id is 32 random bytes in hex and nothing else, so anything of another
+// shape could not have been minted here. The route is unauthenticated, and
+// checking the shape first keeps a stranger from turning it into a query.
+var brandingPreviewIDPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// errBrandingPreviewGone separates an id that has lapsed from a database that
+// cannot answer. Both end the render, but only one is the operator's to fix.
+var errBrandingPreviewGone = errors.New("branding preview not found or expired")
+
 type brandingPreviewResponse struct {
 	PreviewURL string `json:"previewUrl"`
+}
+
+// brandingPreviewPayload is what a preview row holds: the values the operator
+// typed, and the plan of the account that typed them. The render is
+// unauthenticated and cannot look the plan up for itself, but the page it
+// stands for shows attribution below a free plan and hides it above one.
+type brandingPreviewPayload struct {
+	Branding         setBrandingRequest `json:"branding"`
+	SubscriptionPlan string             `json:"subscriptionPlan"`
 }
 
 // storeBrandingPreview returns the id the iframe will ask for. The row goes to
@@ -38,22 +57,26 @@ type brandingPreviewResponse struct {
 // behind more than one replica, or across a restart, an id held in memory would
 // be gone by the time the iframe asked for it. Expired rows are swept on the way
 // in, which is enough housekeeping for a table this short-lived.
-func (h *Handler) storeBrandingPreview(ctx context.Context, req setBrandingRequest, now time.Time) (string, error) {
+func (h *Handler) storeBrandingPreview(ctx context.Context, payload brandingPreviewPayload) (string, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return "", err
 	}
 	id := hex.EncodeToString(raw)
 
-	branding, err := json.Marshal(req)
+	branding, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
 
+	// Written and judged by the same clock. Taking the expiry from the app host
+	// instead would let a few minutes of drift between it and the database mint
+	// previews that are already expired, or ones that outlive the window.
 	if _, err := h.db.Exec(ctx,
 		`WITH swept AS (DELETE FROM branding_previews WHERE expires_at < now())
-		 INSERT INTO branding_previews (id, branding, expires_at) VALUES ($1, $2, $3)`,
-		id, string(branding), now.Add(brandingPreviewTTL),
+		 INSERT INTO branding_previews (id, branding, expires_at)
+		 VALUES ($1, $2, now() + make_interval(secs => $3))`,
+		id, string(branding), brandingPreviewTTL.Seconds(),
 	); err != nil {
 		return "", err
 	}
@@ -64,25 +87,28 @@ func (h *Handler) storeBrandingPreview(ctx context.Context, req setBrandingReque
 // id renders as often as the operator reloads the frame in that window: a reload
 // or a Back is not an attack, and refusing the second render only turned a
 // working preview into an error page.
-func (h *Handler) loadBrandingPreview(ctx context.Context, id string) (setBrandingRequest, bool) {
+func (h *Handler) loadBrandingPreview(ctx context.Context, id string) (brandingPreviewPayload, error) {
+	if !brandingPreviewIDPattern.MatchString(id) {
+		return brandingPreviewPayload{}, errBrandingPreviewGone
+	}
+
 	var branding []byte
 	err := h.db.QueryRow(ctx,
 		`SELECT branding FROM branding_previews WHERE id = $1 AND expires_at > now()`,
 		id,
 	).Scan(&branding)
 	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			slog.Error("branding-preview: failed to load preview", "error", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return brandingPreviewPayload{}, errBrandingPreviewGone
 		}
-		return setBrandingRequest{}, false
+		return brandingPreviewPayload{}, err
 	}
 
-	var req setBrandingRequest
-	if err := json.Unmarshal(branding, &req); err != nil {
-		slog.Error("branding-preview: stored preview is not readable", "error", err)
-		return setBrandingRequest{}, false
+	var payload brandingPreviewPayload
+	if err := json.Unmarshal(branding, &payload); err != nil {
+		return brandingPreviewPayload{}, err
 	}
-	return req, true
+	return payload, nil
 }
 
 // CreateBrandingPreview accepts the values the settings form currently holds and
@@ -111,7 +137,19 @@ func (h *Handler) CreateBrandingPreview(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	id, err := h.storeBrandingPreview(r.Context(), req, time.Now())
+	// The render is unauthenticated, so whatever it needs to know about this
+	// account has to be settled here, while there still is one.
+	var plan string
+	if orgID := auth.OrgIDFromContext(r.Context()); orgID != "" {
+		plan, _ = h.getOrgPlan(r.Context(), orgID)
+	} else {
+		plan, _ = h.getUserPlan(r.Context(), auth.UserIDFromContext(r.Context()))
+	}
+
+	id, err := h.storeBrandingPreview(r.Context(), brandingPreviewPayload{
+		Branding:         req,
+		SubscriptionPlan: plan,
+	})
 	if err != nil {
 		slog.Error("branding-preview: failed to store preview", "error", err)
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to create preview")
@@ -125,9 +163,14 @@ func (h *Handler) CreateBrandingPreview(w http.ResponseWriter, r *http.Request) 
 
 // BrandingPreviewPage renders the watch page for one previously created preview.
 func (h *Handler) BrandingPreviewPage(w http.ResponseWriter, r *http.Request) {
-	req, ok := h.loadBrandingPreview(r.Context(), chi.URLParam(r, "id"))
-	if !ok {
+	payload, err := h.loadBrandingPreview(r.Context(), chi.URLParam(r, "id"))
+	if errors.Is(err, errBrandingPreviewGone) {
 		h.renderBrandingPreviewExpired(w, r)
+		return
+	}
+	if err != nil {
+		slog.Error("branding-preview: failed to load preview", "error", err)
+		http.Error(w, "failed to load preview", http.StatusInternalServerError)
 		return
 	}
 
@@ -136,7 +179,7 @@ func (h *Handler) BrandingPreviewPage(w http.ResponseWriter, r *http.Request) {
 	// no per-video override in play. The logo key was checked against the
 	// account that submitted it before the row was written, so presigning it
 	// here hands back nothing that account could not already read.
-	cfg := resolveBranding(r.Context(), h.storage, brandingSettingsResponse(req), brandingSettingsResponse{})
+	cfg := resolveBranding(r.Context(), h.storage, brandingSettingsResponse(payload.Branding), brandingSettingsResponse{})
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := watchPageTemplate.Execute(w, watchPageData{
@@ -157,8 +200,15 @@ func (h *Handler) BrandingPreviewPage(w http.ResponseWriter, r *http.Request) {
 		JSONLD:             template.JS("{}"),
 		Chapters:           []Chapter{},
 		Segments:           []TranscriptSegment{},
-		SubscriptionPlan:   "business",
-		VideoStatus:        "ready",
+		// Below a paid plan the page carries attribution the operator cannot
+		// style away, and a preview that assumed otherwise would be standing
+		// for somebody else's page.
+		SubscriptionPlan: payload.SubscriptionPlan,
+		VideoStatus:      "ready",
+		// Comment mode belongs to a video, and this stands for no video in
+		// particular. The fullest thread puts every part an operator can style
+		// on screen; a narrower one would hide fields their videos may ask for.
+		CommentMode: "name_email_required",
 		// There is no video, share token or comment thread behind this page.
 		// Preview tells the template to stand in for them rather than ask the
 		// watch API for a token it does not have.
