@@ -12,7 +12,7 @@ import (
 )
 
 func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey string) {
-	slog.Info("probe: starting duration probe", "video_id", videoID)
+	slog.Info("probe: starting probe", "video_id", videoID)
 
 	tmpFile, err := os.CreateTemp("", "sendrec-probe-*")
 	if err != nil {
@@ -53,13 +53,23 @@ func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage,
 		return
 	}
 
+	var warning *string
+	if captureLooksStalled(ctx, tmpPath, durationFloat) {
+		warning = &captureStalledWarning
+		slog.Warn("probe: capture looks stalled", "video_id", videoID, "duration", duration)
+	}
+
 	if _, err := db.Exec(ctx,
-		`UPDATE videos SET duration = $1, updated_at = now() WHERE id = $2`,
-		duration, videoID,
+		`UPDATE videos SET duration = $1, capture_warning = $3, updated_at = now() WHERE id = $2`,
+		duration, videoID, warning,
 	); err != nil {
-		slog.Error("probe: failed to update duration", "video_id", videoID, "error", err)
+		slog.Error("probe: failed to update video", "video_id", videoID, "error", err)
 		return
 	}
 
-	slog.Info("probe: video duration detected", "video_id", videoID, "duration", duration)
+	slog.Info("probe: video probed", "video_id", videoID, "duration", duration, "stalled", warning != nil)
 }
+
+// What the owner is told when the recording's picture never arrives. Kept short
+// and about what they can do, since it reaches them on the video page.
+var captureStalledWarning = "This recording has sound but no moving picture — the browser stopped capturing partway through. Safari does this whenever its window is not in front; recording again in Chrome or Edge usually fixes it."

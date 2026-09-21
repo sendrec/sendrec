@@ -415,9 +415,10 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			})
 			h.EnqueueJob(r.Context(), JobTypeTranscribe, videoID, nil)
 
-			if duration == 0 {
-				h.EnqueueJob(r.Context(), JobTypeProbe, videoID, map[string]any{"fileKey": fileKey})
-			}
+			// Every upload, not just the ones missing a duration: the probe is also
+			// where a recording whose capture died is caught, and those arrive with a
+			// duration like any other.
+			h.EnqueueJob(r.Context(), JobTypeProbe, videoID, map[string]any{"fileKey": fileKey})
 			if expectedContentType == "video/webm" {
 				h.EnqueueJob(r.Context(), JobTypeTranscode, videoID, map[string]any{
 					"fileKey":     fileKey,

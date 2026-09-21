@@ -4,6 +4,7 @@ import { apiFetch } from "../../api/client";
 import { useOrganization } from "../../hooks/useOrganization";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import { useToast } from "../../hooks/useToast";
+import { CaptureWarning } from "./CaptureWarning";
 import { TrimModal } from "../../components/TrimModal";
 import { FillerRemovalModal } from "../../components/FillerRemovalModal";
 import { SilenceRemovalModal } from "../../components/SilenceRemovalModal";
@@ -597,6 +598,8 @@ export function VideoDetail() {
               Processing
             </span>
           )}
+
+          <CaptureWarning warning={video.captureWarning} />
 
           {video.tags.length > 0 && (
             <div

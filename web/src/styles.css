@@ -1878,6 +1878,18 @@ textarea.form-input {
   color: var(--color-text-secondary);
 }
 
+.capture-warning {
+  max-width: 640px;
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--color-warning, var(--color-border));
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.1);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .capture-stalled-warning {
   position: absolute;
   left: 50%;
