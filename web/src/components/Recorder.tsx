@@ -5,6 +5,7 @@ import {
   type RecordingCommand,
 } from "../hooks/useRecordingLifecycle";
 import { overlayDrawingOnTrack, canRecordAnnotations } from "../utils/drawingOverlay";
+import { stallsScreenCaptureWhenHidden } from "../utils/browser";
 import { getSupportedMimeType, getSupportedWebMMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
 import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
@@ -495,6 +496,18 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       {/* Idle UI */}
       {isIdle && (
         <>
+          {stallsScreenCaptureWhenHidden() && (
+            <p
+              role="note"
+              data-testid="browser-capture-warning"
+              className="recorder-capture-warning"
+            >
+              Safari stops capturing your screen as soon as this window is no
+              longer in front, and the recording keeps its sound but freezes on
+              a single image. Use Chrome or Edge to record your screen.
+            </p>
+          )}
+
           {mediaError && (
             <div
               role="alert"

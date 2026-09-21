@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Recorder } from "./Recorder";
 import { expectNoA11yViolations } from "../test-utils/a11y";
 
@@ -883,5 +883,54 @@ describe("Recorder", () => {
     await user.click(screen.getByRole("button", { name: "Start recording" }));
 
     expect(mediaRecorderOptions.at(-1)?.mimeType).toBe("video/mp4");
+  });
+
+  describe("Safari screen capture warning", () => {
+    const realUserAgent = navigator.userAgent;
+
+    function setUserAgent(value: string) {
+      Object.defineProperty(navigator, "userAgent", {
+        value,
+        configurable: true,
+      });
+    }
+
+    afterEach(() => setUserAgent(realUserAgent));
+
+    it("warns before recording that Safari stops capturing a hidden window", () => {
+      setUserAgent(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15",
+      );
+      render(<Recorder onRecordingComplete={vi.fn()} />);
+
+      expect(screen.getByTestId("browser-capture-warning")).toHaveTextContent(
+        /Chrome or Edge/i,
+      );
+    });
+
+    it("stays quiet where screen capture survives a hidden window", () => {
+      setUserAgent(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+      );
+      render(<Recorder onRecordingComplete={vi.fn()} />);
+
+      expect(
+        screen.queryByTestId("browser-capture-warning"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the warning out of the way once recording starts", async () => {
+      setUserAgent(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15",
+      );
+      const user = userEvent.setup();
+      render(<Recorder onRecordingComplete={vi.fn()} />);
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+
+      expect(
+        screen.queryByTestId("browser-capture-warning"),
+      ).not.toBeInTheDocument();
+    });
   });
 });
