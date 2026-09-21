@@ -499,4 +499,65 @@ describe("CameraRecorder", () => {
     });
     await expectNoA11yViolations(container);
   });
+
+  describe("capture stalls", () => {
+    // WebKit mutes a capture track when the page loses visibility; a muted video
+    // track repeats its last frame while the microphone keeps recording.
+    function trackWithMuteCapture() {
+      const handlers: Record<string, () => void> = {};
+      mockStream.getVideoTracks.mockReturnValue([
+        {
+          addEventListener: vi.fn().mockImplementation(
+            (event: string, handler: () => void) => {
+              handlers[event] = handler;
+            },
+          ),
+          stop: vi.fn(),
+        },
+      ]);
+      return handlers;
+    }
+
+    it("says so on screen while the capture is stalled", async () => {
+      const handlers = trackWithMuteCapture();
+      const user = userEvent.setup();
+      render(<CameraRecorder onRecordingComplete={vi.fn()} />);
+
+      await vi.waitFor(() => {
+        expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+
+      act(() => handlers.mute());
+      expect(screen.getByTestId("capture-stalled-warning")).toBeInTheDocument();
+
+      act(() => handlers.unmute());
+      expect(screen.queryByTestId("capture-stalled-warning")).not.toBeInTheDocument();
+    });
+
+    it("refuses a recording whose capture stalled", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const handlers = trackWithMuteCapture();
+      const onComplete = vi.fn();
+      const onError = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<CameraRecorder onRecordingComplete={onComplete} onRecordingError={onError} />);
+
+      await vi.waitFor(() => {
+        expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+
+      act(() => handlers.mute());
+      await act(() => vi.advanceTimersByTime(4000));
+      await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+      await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+      expect(onError.mock.calls[0][0]).toMatch(/stopped capturing/i);
+      expect(onComplete).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+  });
 });

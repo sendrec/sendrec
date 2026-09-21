@@ -5,7 +5,8 @@ import {
 } from "../hooks/useRecordingLifecycle";
 import { getSupportedMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
-import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
+import { MAX_CAPTURE_STALL_MS, MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
+import { useCaptureStallWatch } from "../hooks/useCaptureStallWatch";
 
 interface CameraRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
@@ -31,21 +32,31 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     }
   }, []);
 
+  const capture = useCaptureStallWatch();
+
   const performRecordingCommand = useCallback((command: RecordingCommand) => {
     const recorder = mediaRecorderRef.current;
     if (!recorder) return false;
 
-    if (command === "start") recorder.start(1000);
+    if (command === "start") {
+      capture.count(true);
+      recorder.start(1000);
+    }
     if (command === "pause") {
       if (recorder.state !== "recording") return false;
+      capture.count(false);
       recorder.pause();
     }
     if (command === "resume") {
       if (recorder.state !== "paused") return false;
+      capture.count(true);
       recorder.resume();
     }
-    if (command === "stop" && recorder.state !== "inactive") recorder.stop();
-  }, []);
+    if (command === "stop" && recorder.state !== "inactive") {
+      capture.count(false);
+      recorder.stop();
+    }
+  }, [capture]);
 
   const recording = useRecordingLifecycle({
     maxDurationSeconds,
@@ -87,6 +98,8 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     const mimeType = getSupportedMimeType();
     mimeTypeRef.current = mimeType;
 
+    capture.watch(streamRef.current.getVideoTracks()[0]);
+
     const recorder = new MediaRecorder(streamRef.current, { mimeType });
     mediaRecorderRef.current = recorder;
     chunksRef.current = [];
@@ -103,6 +116,13 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
 
       if (elapsed < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES) {
         onRecordingError?.("Recording too short. Please record for at least 1 second.");
+        return;
+      }
+
+      if (capture.stalledMs() >= MAX_CAPTURE_STALL_MS) {
+        onRecordingError?.(
+          "Your browser stopped capturing the camera partway through, so this recording would be sound over a frozen image. Please record again, keeping this window in front — or use Chrome or Edge.",
+        );
         return;
       }
 
@@ -166,6 +186,17 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
             transform: facingMode === "user" ? "scaleX(-1)" : "none",
           }}
         />
+        {capture.stalled && (
+          <div
+            role="alert"
+            data-testid="capture-stalled-warning"
+            className="capture-stalled-warning"
+          >
+            Camera capture has stopped — bring this window back in front to keep
+            recording.
+          </div>
+        )}
+
         <button
           onClick={flipCamera}
           disabled={isActive}
