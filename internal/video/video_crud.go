@@ -402,8 +402,6 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if webcamKey != nil {
-			// No probe job here: the composite job owns this file until it has
-			// rewritten it, and checks the screen recording itself along the way.
 			h.EnqueueJob(r.Context(), JobTypeComposite, videoID, map[string]any{
 				"fileKey":      fileKey,
 				"webcamKey":    *webcamKey,
@@ -417,10 +415,9 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 			})
 			h.EnqueueJob(r.Context(), JobTypeTranscribe, videoID, nil)
 
-			// Every upload, not just the ones missing a duration: the probe is also
-			// where a recording whose capture died is caught, and those arrive with a
-			// duration like any other.
-			h.EnqueueJob(r.Context(), JobTypeProbe, videoID, map[string]any{"fileKey": fileKey})
+			if duration == 0 {
+				h.EnqueueJob(r.Context(), JobTypeProbe, videoID, map[string]any{"fileKey": fileKey})
+			}
 			if expectedContentType == "video/webm" {
 				h.EnqueueJob(r.Context(), JobTypeTranscode, videoID, map[string]any{
 					"fileKey":     fileKey,

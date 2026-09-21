@@ -151,7 +151,8 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 	// Check if video is already normalized (another normalize may have completed)
 	var normalized bool
 	var attempts int
-	if err := db.QueryRow(ctx, "SELECT ios_normalized, transcode_attempts FROM videos WHERE id = $1", videoID).Scan(&normalized, &attempts); err != nil {
+	var duration int
+	if err := db.QueryRow(ctx, "SELECT ios_normalized, transcode_attempts, duration FROM videos WHERE id = $1", videoID).Scan(&normalized, &attempts, &duration); err != nil {
 		slog.Error("normalize: failed to check status", "video_id", videoID, "error", err)
 		return
 	}
@@ -181,6 +182,11 @@ func NormalizeVideoAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
+
+	// The file is already here and it is the recording as uploaded, so this is
+	// where a capture that died gets noticed — and where the warning clears if a
+	// later edit fixed it.
+	CheckCapture(ctx, db, videoID, tmpInputPath, duration)
 
 	props, err := probeVideoProperties(ctx, tmpInputPath)
 	if err != nil {

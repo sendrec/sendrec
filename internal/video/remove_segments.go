@@ -300,6 +300,8 @@ func RemoveSegmentsAsync(ctx context.Context, db database.DBTX, storage ObjectSt
 	}
 	newDuration := int(float64(originalDuration) - removedTime)
 
+	CheckCapture(ctx, db, videoID, tmpOutputPath, newDuration)
+
 	if _, err := db.Exec(ctx,
 		`UPDATE videos SET status = 'ready', duration = $1, processing_started_at = NULL, updated_at = now() WHERE id = $2`,
 		newDuration, videoID,

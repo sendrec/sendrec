@@ -174,19 +174,9 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	}
 	slog.Info("composite: screen validated", "video_id", videoID, "screen_frames", screenFrames, "screen_info", screenProbeInfo)
 
-	// The screen recording is checked here rather than by the probe job, which
-	// this path never reaches: the file is already local, and after compositing
-	// the webcam overlay spans the full length whatever the screen capture did.
-	if durations, err := probeStreamDurations(ctx, tmpScreenPath); err == nil && captureEndedEarly(durations) {
-		slog.Warn("composite: screen capture ended early", "video_id", videoID,
-			"video_seconds", durations.Video, "audio_seconds", durations.Audio)
-		if _, err := db.Exec(ctx,
-			`UPDATE videos SET capture_warning = $2, updated_at = now() WHERE id = $1`,
-			videoID, captureWarningFor(durations),
-		); err != nil {
-			slog.Error("composite: failed to record capture warning", "video_id", videoID, "error", err)
-		}
-	}
+	// The screen recording rather than the composited output: the webcam overlay
+	// spans the full length whatever the screen capture did.
+	CheckCapture(ctx, db, videoID, tmpScreenPath, 0)
 
 	webcamFrames, webcamProbeInfo, probeErr := probeVideoInfo(ctx, tmpWebcamPath)
 	if probeErr != nil {

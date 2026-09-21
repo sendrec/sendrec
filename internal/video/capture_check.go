@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strconv"
+
+	"github.com/sendrec/sendrec/internal/database"
 )
 
 // A capture can die while the recording carries on: the browser stops delivering
@@ -86,20 +89,58 @@ var probeStreamDurations = func(ctx context.Context, inputPath string) (streamDu
 // captureEndedEarly reports whether the video stopped well before the recording
 // did. Unknown durations are no verdict: accusing a good recording is worse than
 // missing a bad one.
-func captureEndedEarly(d streamDurations) bool {
-	if d.Audio < minCaptureCheckSeconds || d.Video <= 0 {
+func captureEndedEarly(videoSeconds, recordingSeconds float64) bool {
+	if recordingSeconds < minCaptureCheckSeconds || videoSeconds <= 0 {
 		return false
 	}
-	return d.Video < d.Audio*minVideoCoverage
+	return videoSeconds < recordingSeconds*minVideoCoverage
+}
+
+// recordingLength is what the video is measured against: the audio, or where a
+// recording has no audio track at all — the screen recorder only opens the
+// microphone when system audio is on — the length the client measured.
+func recordingLength(d streamDurations, clientSeconds int) float64 {
+	if d.Audio > 0 {
+		return d.Audio
+	}
+	return float64(clientSeconds)
+}
+
+// CheckCapture stores or clears a video's capture warning from a local copy of
+// the file. Every job that writes the file calls it with the copy it already
+// has: probing from here costs nothing extra, and re-checking after a trim or a
+// transcode is what clears a warning the edit fixed.
+func CheckCapture(ctx context.Context, db database.DBTX, videoID, path string, clientSeconds int) {
+	durations, err := probeStreamDurations(ctx, path)
+	if err != nil {
+		slog.Warn("capture-check: stream durations unavailable", "video_id", videoID, "error", err)
+		return
+	}
+
+	length := recordingLength(durations, clientSeconds)
+	var warning *string
+	if captureEndedEarly(durations.Video, length) {
+		message := captureWarningFor(durations.Video, length)
+		warning = &message
+		slog.Warn("capture-check: capture ended early", "video_id", videoID,
+			"video_seconds", durations.Video, "recording_seconds", length)
+	}
+
+	if _, err := db.Exec(ctx,
+		`UPDATE videos SET capture_warning = $2, updated_at = now() WHERE id = $1`,
+		videoID, warning,
+	); err != nil {
+		slog.Error("capture-check: failed to store verdict", "video_id", videoID, "error", err)
+	}
 }
 
 // captureWarningFor is what the owner is told, on the video page. It names the
-// numbers because they are the evidence, and it does not assume a browser: the
-// recorders catch the stalls their browser admits to, so what reaches here is
-// whatever failed silently.
-func captureWarningFor(d streamDurations) string {
+// numbers because they are the evidence, and it blames a browser only
+// conditionally: the same handler takes uploaded files, which no browser here
+// recorded.
+func captureWarningFor(videoSeconds, recordingSeconds float64) string {
 	return fmt.Sprintf(
-		"This recording has %.0fs of sound but its picture stops after %.0fs — the browser stopped capturing partway through. Please record it again. Safari does this whenever its window is not in front; Chrome and Edge keep capturing.",
-		d.Audio, d.Video,
+		"This video runs %.0fs but its picture stops after %.0fs. If you recorded it here, the browser stopped capturing partway through — Safari does that whenever its window is not in front, while Chrome and Edge keep going.",
+		recordingSeconds, videoSeconds,
 	)
 }

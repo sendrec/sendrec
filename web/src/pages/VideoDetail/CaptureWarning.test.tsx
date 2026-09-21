@@ -6,7 +6,7 @@ describe("CaptureWarning", () => {
   it("tells the owner what went wrong with the capture", () => {
     render(<CaptureWarning warning="This recording has sound but no moving picture." />);
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
+    expect(screen.getByRole("note")).toHaveTextContent(
       "This recording has sound but no moving picture.",
     );
   });

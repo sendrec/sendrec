@@ -12,7 +12,7 @@ import (
 )
 
 func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage, videoID, fileKey string) {
-	slog.Info("probe: starting probe", "video_id", videoID)
+	slog.Info("probe: starting duration probe", "video_id", videoID)
 
 	tmpFile, err := os.CreateTemp("", "sendrec-probe-*")
 	if err != nil {
@@ -28,41 +28,20 @@ func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage,
 		return
 	}
 
-	// Before the duration: a container can leave the format duration out — WebM
-	// from MediaRecorder does — and that must not cost the recording its check.
-	var warning *string
-	if durations, err := probeStreamDurations(ctx, tmpPath); err != nil {
-		slog.Warn("probe: stream durations unavailable", "video_id", videoID, "error", err)
-	} else if captureEndedEarly(durations) {
-		message := captureWarningFor(durations)
-		warning = &message
-		slog.Warn("probe: capture ended early", "video_id", videoID,
-			"video_seconds", durations.Video, "audio_seconds", durations.Audio)
-	}
-
 	duration := probeFormatDuration(ctx, videoID, tmpPath)
-	if duration <= 0 && warning == nil {
-		// Nothing learned and nothing to report.
+	if duration <= 0 {
 		return
 	}
 
-	// The client measures its own recording and is right about it; overwriting
-	// that here would only round it down to whole seconds. Fill it in when it is
-	// missing, and leave it alone otherwise — including when this probe could not
-	// read one, which arrives here as zero.
 	if _, err := db.Exec(ctx,
-		`UPDATE videos
-		 SET duration = CASE WHEN duration = 0 AND $1 > 0 THEN $1 ELSE duration END,
-		     capture_warning = $3,
-		     updated_at = now()
-		 WHERE id = $2`,
-		duration, videoID, warning,
+		`UPDATE videos SET duration = $1, updated_at = now() WHERE id = $2`,
+		duration, videoID,
 	); err != nil {
-		slog.Error("probe: failed to update video", "video_id", videoID, "error", err)
+		slog.Error("probe: failed to update duration", "video_id", videoID, "error", err)
 		return
 	}
 
-	slog.Info("probe: video probed", "video_id", videoID, "duration", duration, "capture_warning", warning != nil)
+	slog.Info("probe: video duration detected", "video_id", videoID, "duration", duration)
 }
 
 // probeFormatDuration returns the recording's length in whole seconds, or zero

@@ -134,7 +134,8 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 	// Check if video is still WebM (another transcode may have already completed)
 	var contentType string
 	var attempts int
-	if err := db.QueryRow(ctx, "SELECT content_type, transcode_attempts FROM videos WHERE id = $1", videoID).Scan(&contentType, &attempts); err != nil {
+	var duration int
+	if err := db.QueryRow(ctx, "SELECT content_type, transcode_attempts, duration FROM videos WHERE id = $1", videoID).Scan(&contentType, &attempts, &duration); err != nil {
 		slog.Error("transcode: failed to check content type", "video_id", videoID, "error", err)
 		return
 	}
@@ -179,6 +180,10 @@ func TranscodeWebMAsync(ctx context.Context, db database.DBTX, storage ObjectSto
 		recordTranscodeFailure(ctx, db, videoID, err)
 		return
 	}
+
+	// The MP4 rather than the WebM that produced it: MediaRecorder's WebM carries
+	// no stream durations to compare.
+	CheckCapture(ctx, db, videoID, tmpOutputPath, duration)
 
 	info, err := os.Stat(tmpOutputPath)
 	if err != nil {
