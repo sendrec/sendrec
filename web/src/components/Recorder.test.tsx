@@ -933,4 +933,114 @@ describe("Recorder", () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  describe("capture stalls", () => {
+    // The browser reports a stalled capture by muting the track; a muted video
+    // track repeats its last frame while the microphone keeps recording.
+    function trackWithMuteCapture() {
+      const handlers: Record<string, () => void> = {};
+      mockScreenStream.getVideoTracks.mockReturnValue([
+        {
+          getSettings: () => ({ width: 1920, height: 1080 }),
+          addEventListener: vi.fn().mockImplementation(
+            (event: string, handler: () => void) => {
+              handlers[event] = handler;
+            },
+          ),
+          stop: vi.fn(),
+        },
+      ]);
+      return handlers;
+    }
+
+    it("says so on screen while the capture is stalled", async () => {
+      const handlers = trackWithMuteCapture();
+      const user = userEvent.setup();
+      render(<Recorder onRecordingComplete={vi.fn()} />);
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+
+      act(() => handlers.mute());
+      expect(screen.getByTestId("capture-stalled-warning")).toBeInTheDocument();
+
+      act(() => handlers.unmute());
+      expect(
+        screen.queryByTestId("capture-stalled-warning"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("refuses a recording whose capture stalled", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const handlers = trackWithMuteCapture();
+      const onComplete = vi.fn();
+      const onError = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(
+        <Recorder onRecordingComplete={onComplete} onRecordingError={onError} />,
+      );
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+
+      act(() => handlers.mute());
+      await act(() => vi.advanceTimersByTime(4000));
+      await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+      await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+      expect(onError.mock.calls[0][0]).toMatch(/stopped capturing/i);
+      expect(onComplete).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it("keeps a recording that only blipped", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const handlers = trackWithMuteCapture();
+      const onComplete = vi.fn();
+      const onError = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(
+        <Recorder onRecordingComplete={onComplete} onRecordingError={onError} />,
+      );
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+
+      act(() => handlers.mute());
+      await act(() => vi.advanceTimersByTime(500));
+      act(() => handlers.unmute());
+      await act(() => vi.advanceTimersByTime(1500));
+      await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+      await vi.waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+      expect(onError).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it("does not count a capture muted while the recording is paused", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const handlers = trackWithMuteCapture();
+      const onComplete = vi.fn();
+      const onError = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(
+        <Recorder onRecordingComplete={onComplete} onRecordingError={onError} />,
+      );
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+      await act(() => vi.advanceTimersByTime(1500));
+
+      await user.click(screen.getByRole("button", { name: "Pause recording" }));
+      act(() => handlers.mute());
+      await act(() => vi.advanceTimersByTime(10_000));
+      act(() => handlers.unmute());
+      await user.click(screen.getByRole("button", { name: "Resume recording" }));
+      await act(() => vi.advanceTimersByTime(1500));
+      await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+      await vi.waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+      expect(onError).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+  });
 });

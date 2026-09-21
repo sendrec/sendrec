@@ -8,7 +8,8 @@ import { overlayDrawingOnTrack, canRecordAnnotations } from "../utils/drawingOve
 import { stallsScreenCaptureWhenHidden } from "../utils/browser";
 import { getSupportedMimeType, getSupportedWebMMimeType, blobTypeFromMimeType } from "../utils/mediaFormat";
 import { formatDuration } from "../utils/format";
-import { MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
+import { MAX_CAPTURE_STALL_MS, MIN_RECORDING_BYTES, MIN_RECORDING_SECONDS } from "../utils/recordingLimits";
+import { useCaptureStallWatch } from "../hooks/useCaptureStallWatch";
 
 interface RecorderProps {
   onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void;
@@ -60,6 +61,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     handlePointerLeave,
   } = useDrawingCanvas({ canvasRef: drawingCanvasRef, captureWidth, captureHeight });
 
+  const capture = useCaptureStallWatch();
+
   const stopWebcamStream = useCallback(() => {
     if (webcamStreamRef.current) {
       webcamStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -93,6 +96,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     if (command === "start") {
       // No timeslice: Chrome's MP4 MediaRecorder may produce empty fragments
       // with start(timeslice) on getDisplayMedia() streams.
+      capture.count(true);
       recorder?.start();
       webcamRecorderRef.current?.start(1000);
       return;
@@ -100,6 +104,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
     if (command === "pause") {
       if (recorder?.state !== "recording") return false;
+      capture.count(false);
       recorder.pause();
       if (webcamRecorderRef.current?.state === "recording") {
         webcamRecorderRef.current.pause();
@@ -109,12 +114,15 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
     if (command === "resume") {
       if (recorder?.state !== "paused") return false;
+      capture.count(true);
       recorder.resume();
       if (webcamRecorderRef.current?.state === "paused") {
         webcamRecorderRef.current.resume();
       }
       return;
     }
+
+    capture.count(false);
 
     const hasActiveRecorder = mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive";
 
@@ -137,7 +145,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     if (!hasActiveRecorder) {
       stopAllStreams();
     }
-  }, [stopAllStreams]);
+  }, [stopAllStreams, capture]);
 
   const recording = useRecordingLifecycle({
     maxDurationSeconds,
@@ -227,6 +235,9 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       // are burned into the track's frames instead, which is frame-driven and
       // survives a hidden tab.
       const sourceTrack = screenStream.getVideoTracks()[0];
+      // The source track is the one that mutes; the generated track below only
+      // relays whatever frames it is handed.
+      capture.watch(sourceTrack);
       let videoTrack = sourceTrack;
       if (videoTrack && drawingCanvasRef.current) {
         videoTrack = overlayDrawingOnTrack(
@@ -334,6 +345,13 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
 
         if (elapsed < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES) {
           onRecordingError?.("Recording too short. Please record for at least 1 second.");
+          return;
+        }
+
+        if (capture.stalledMs() >= MAX_CAPTURE_STALL_MS) {
+          onRecordingError?.(
+            "Your browser stopped capturing the screen partway through, so this recording would be sound over a frozen image. Please record again, keeping this window in front — or use Chrome or Edge.",
+          );
           return;
         }
 
@@ -481,6 +499,17 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
         >
           {previewExpanded ? "\u2199" : "\u2197"}
         </button>
+        {capture.stalled && (
+          <div
+            role="alert"
+            data-testid="capture-stalled-warning"
+            className="capture-stalled-warning"
+          >
+            Screen capture has stopped — bring this window back in front to keep
+            recording.
+          </div>
+        )}
+
         {isCountdown && (
           <div
             className="countdown-overlay"

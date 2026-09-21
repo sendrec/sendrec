@@ -1878,6 +1878,22 @@ textarea.form-input {
   color: var(--color-text-secondary);
 }
 
+.capture-stalled-warning {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 10;
+  max-width: 90%;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.92);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .recorder-capture-warning {
   max-width: 480px;
   margin: 0;
