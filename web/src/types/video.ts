@@ -33,6 +33,7 @@ export interface Video {
   transcriptionLanguage?: string | null;
   noiseReduction?: boolean;
   pinned: boolean;
+  captureWarning?: string | null;
   tags: VideoTag[];
   playlists?: { id: string; title: string }[];
 }

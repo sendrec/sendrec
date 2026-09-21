@@ -174,6 +174,10 @@ func CompositeWithWebcam(ctx context.Context, db database.DBTX, storage ObjectSt
 	}
 	slog.Info("composite: screen validated", "video_id", videoID, "screen_frames", screenFrames, "screen_info", screenProbeInfo)
 
+	// The screen recording rather than the composited output: the webcam overlay
+	// spans the full length whatever the screen capture did.
+	CheckCapture(ctx, db, videoID, tmpScreenPath, 0)
+
 	webcamFrames, webcamProbeInfo, probeErr := probeVideoInfo(ctx, tmpWebcamPath)
 	if probeErr != nil {
 		slog.Error("composite: webcam probe failed", "video_id", videoID, "error", probeErr)

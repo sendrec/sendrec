@@ -28,28 +28,8 @@ func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage,
 		return
 	}
 
-	cmd := exec.CommandContext(ctx, "ffprobe",
-		"-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1",
-		tmpPath,
-	)
-	output, err := cmd.Output()
-	if err != nil {
-		slog.Error("probe: ffprobe failed", "video_id", videoID, "error", err)
-		return
-	}
-
-	durationStr := strings.TrimSpace(string(output))
-	durationFloat, err := strconv.ParseFloat(durationStr, 64)
-	if err != nil {
-		slog.Error("probe: failed to parse duration", "video_id", videoID, "raw_duration", durationStr, "error", err)
-		return
-	}
-
-	duration := int(durationFloat)
+	duration := probeFormatDuration(ctx, videoID, tmpPath)
 	if duration <= 0 {
-		slog.Warn("probe: invalid duration", "video_id", videoID, "duration", duration)
 		return
 	}
 
@@ -62,4 +42,32 @@ func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage,
 	}
 
 	slog.Info("probe: video duration detected", "video_id", videoID, "duration", duration)
+}
+
+// probeFormatDuration returns the recording's length in whole seconds, or zero
+// where the container does not carry one.
+func probeFormatDuration(ctx context.Context, videoID, path string) int {
+	cmd := exec.CommandContext(ctx, "ffprobe",
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		path,
+	)
+	output, err := cmd.Output()
+	if err != nil {
+		slog.Error("probe: ffprobe failed", "video_id", videoID, "error", err)
+		return 0
+	}
+
+	raw := strings.TrimSpace(string(output))
+	seconds, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		slog.Warn("probe: no usable duration", "video_id", videoID, "raw_duration", raw)
+		return 0
+	}
+	if seconds <= 0 {
+		slog.Warn("probe: invalid duration", "video_id", videoID, "duration", seconds)
+		return 0
+	}
+	return int(seconds)
 }

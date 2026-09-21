@@ -129,6 +129,11 @@ func TrimVideoAsync(ctx context.Context, db database.DBTX, storage ObjectStorage
 	}
 
 	newDuration := int(endSeconds - startSeconds)
+
+	// Re-checked, not cleared: trimming off a dead tail fixes the recording, and
+	// trimming elsewhere leaves it as broken as it was.
+	CheckCapture(ctx, db, videoID, tmpOutputPath, newDuration)
+
 	if _, err := db.Exec(ctx,
 		`UPDATE videos SET status = 'ready', duration = $1, processing_started_at = NULL, updated_at = now() WHERE id = $2`,
 		newDuration, videoID,
