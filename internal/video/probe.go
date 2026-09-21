@@ -28,48 +28,67 @@ func probeDuration(ctx context.Context, db database.DBTX, storage ObjectStorage,
 		return
 	}
 
-	cmd := exec.CommandContext(ctx, "ffprobe",
-		"-v", "error",
-		"-show_entries", "format=duration",
-		"-of", "default=noprint_wrappers=1:nokey=1",
-		tmpPath,
-	)
-	output, err := cmd.Output()
-	if err != nil {
-		slog.Error("probe: ffprobe failed", "video_id", videoID, "error", err)
-		return
-	}
-
-	durationStr := strings.TrimSpace(string(output))
-	durationFloat, err := strconv.ParseFloat(durationStr, 64)
-	if err != nil {
-		slog.Error("probe: failed to parse duration", "video_id", videoID, "raw_duration", durationStr, "error", err)
-		return
-	}
-
-	duration := int(durationFloat)
-	if duration <= 0 {
-		slog.Warn("probe: invalid duration", "video_id", videoID, "duration", duration)
-		return
-	}
-
+	// Before the duration: a container can leave the format duration out — WebM
+	// from MediaRecorder does — and that must not cost the recording its check.
 	var warning *string
-	if captureLooksStalled(ctx, tmpPath, durationFloat) {
-		warning = &captureStalledWarning
-		slog.Warn("probe: capture looks stalled", "video_id", videoID, "duration", duration)
+	if durations, err := probeStreamDurations(ctx, tmpPath); err != nil {
+		slog.Warn("probe: stream durations unavailable", "video_id", videoID, "error", err)
+	} else if captureEndedEarly(durations) {
+		message := captureWarningFor(durations)
+		warning = &message
+		slog.Warn("probe: capture ended early", "video_id", videoID,
+			"video_seconds", durations.Video, "audio_seconds", durations.Audio)
 	}
 
+	duration := probeFormatDuration(ctx, videoID, tmpPath)
+	if duration <= 0 && warning == nil {
+		// Nothing learned and nothing to report.
+		return
+	}
+
+	// The client measures its own recording and is right about it; overwriting
+	// that here would only round it down to whole seconds. Fill it in when it is
+	// missing, and leave it alone otherwise — including when this probe could not
+	// read one, which arrives here as zero.
 	if _, err := db.Exec(ctx,
-		`UPDATE videos SET duration = $1, capture_warning = $3, updated_at = now() WHERE id = $2`,
+		`UPDATE videos
+		 SET duration = CASE WHEN duration = 0 AND $1 > 0 THEN $1 ELSE duration END,
+		     capture_warning = $3,
+		     updated_at = now()
+		 WHERE id = $2`,
 		duration, videoID, warning,
 	); err != nil {
 		slog.Error("probe: failed to update video", "video_id", videoID, "error", err)
 		return
 	}
 
-	slog.Info("probe: video probed", "video_id", videoID, "duration", duration, "stalled", warning != nil)
+	slog.Info("probe: video probed", "video_id", videoID, "duration", duration, "capture_warning", warning != nil)
 }
 
-// What the owner is told when the recording's picture never arrives. Kept short
-// and about what they can do, since it reaches them on the video page.
-var captureStalledWarning = "This recording has sound but no moving picture — the browser stopped capturing partway through. Safari does this whenever its window is not in front; recording again in Chrome or Edge usually fixes it."
+// probeFormatDuration returns the recording's length in whole seconds, or zero
+// where the container does not carry one.
+func probeFormatDuration(ctx context.Context, videoID, path string) int {
+	cmd := exec.CommandContext(ctx, "ffprobe",
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		path,
+	)
+	output, err := cmd.Output()
+	if err != nil {
+		slog.Error("probe: ffprobe failed", "video_id", videoID, "error", err)
+		return 0
+	}
+
+	raw := strings.TrimSpace(string(output))
+	seconds, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		slog.Warn("probe: no usable duration", "video_id", videoID, "raw_duration", raw)
+		return 0
+	}
+	if seconds <= 0 {
+		slog.Warn("probe: invalid duration", "video_id", videoID, "duration", seconds)
+		return 0
+	}
+	return int(seconds)
+}

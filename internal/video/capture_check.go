@@ -2,120 +2,104 @@ package video
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strconv"
 )
 
-// A capture can stall without the browser noticing: the frames keep arriving and
-// the picture inside them never changes. macOS does exactly this when a screen
-// capture freezes while Presenter Overlay keeps compositing the camera on top,
-// and the recording that reaches us is a full length video of one still image.
-// The recorder cannot see that case — no track is muted — so it is caught here.
+// A capture can die while the recording carries on: the browser stops delivering
+// frames and the microphone keeps going, so the file that arrives has a video
+// stream ending seconds in and an audio stream running for minutes. Two of the
+// recordings that prompted this carried 15.5s and 12.5s of video against 141.1s
+// and 132.8s of audio, and were published as ready.
 //
-// Three samples across the recording are enough to tell, and cost three seeks
-// rather than a full decode.
-var frameSamplePoints = []float64{0.1, 0.5, 0.9}
-
+// Comparing the picture itself was tried and dropped. A recording of a static
+// document with a moving cursor is indistinguishable from a frozen capture at
+// any sampling resolution — measured on real files, a cursor-only recording
+// scored 0.0 mean difference per pixel while a genuinely frozen capture scored
+// 0.42, because re-encoding noise outweighs a cursor. Guessing there means
+// telling people their good recordings are broken, so only the stream lengths,
+// which are a fact about the file, are checked.
 const (
-	// Samples are compared as 64x64 grayscale: small enough that re-encoding
-	// noise averages out, large enough that a moving cursor still shows.
-	frameSampleSize = 64
+	// Below this there is too little recording for the ratio to mean anything.
+	minCaptureCheckSeconds = 5
 
-	// Mean absolute difference per pixel below which two samples are the same
-	// picture. Measured on real recordings: 0.1 for a frozen capture, 6.4 for a
-	// live one, so anything near 1 separates them with room on both sides.
-	frozenFrameTolerance = 1.0
-
-	// Below this there is too little recording to judge, and a short clip of
-	// something genuinely motionless is not worth accusing.
-	minFrozenCheckSeconds = 5
+	// The share of the recording the video has to cover. Trailing loss is normal
+	// — the last audio packet outlasts the last frame — so this leaves room for
+	// it without leaving room for a capture that died.
+	minVideoCoverage = 0.9
 )
 
-// buildFrameSampleArgs takes one frame at a point in the file, downscaled to
-// grayscale, on stdout. -ss goes before -i so ffmpeg seeks instead of decoding
-// from the start for every sample.
-func buildFrameSampleArgs(inputPath string, at float64) []string {
+type streamDurations struct {
+	Video float64
+	Audio float64
+}
+
+func buildStreamDurationArgs(inputPath string) []string {
 	return []string{
 		"-v", "error",
-		"-ss", strconv.FormatFloat(at, 'f', 3, 64),
-		"-i", inputPath,
-		"-frames:v", "1",
-		"-vf", fmt.Sprintf("scale=%d:%d,format=gray", frameSampleSize, frameSampleSize),
-		"-f", "rawvideo",
-		"-",
+		"-show_entries", "stream=codec_type,duration",
+		"-of", "json",
+		inputPath,
 	}
 }
 
-// Package-level var so tests can reach the comparison without an ffmpeg binary.
-//
-// An empty sample with no error is ffmpeg reporting that there is no frame at
-// that point: the video stream ends before the recording does.
-var sampleGrayFrame = func(ctx context.Context, inputPath string, at float64) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "ffmpeg", buildFrameSampleArgs(inputPath, at)...)
+// Package-level var so tests can reach the comparison without an ffprobe binary.
+var probeStreamDurations = func(ctx context.Context, inputPath string) (streamDurations, error) {
+	cmd := exec.CommandContext(ctx, "ffprobe", buildStreamDurationArgs(inputPath)...)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("ffmpeg sample at %.3fs: %w", at, err)
+		return streamDurations{}, fmt.Errorf("ffprobe streams: %w", err)
 	}
-	return output, nil
-}
 
-// framesLookFrozen reports whether every sample shows the same picture. It needs
-// at least two comparable samples; anything else is no verdict rather than a
-// frozen one.
-func framesLookFrozen(frames [][]byte) bool {
-	if len(frames) < 2 {
-		return false
+	var parsed struct {
+		Streams []struct {
+			CodecType string `json:"codec_type"`
+			Duration  string `json:"duration"`
+		} `json:"streams"`
 	}
-	for _, frame := range frames {
-		if len(frame) == 0 || len(frame) != len(frames[0]) {
-			return false
+	if err := json.Unmarshal(output, &parsed); err != nil {
+		return streamDurations{}, fmt.Errorf("ffprobe streams parse: %w", err)
+	}
+
+	// A container can leave a stream's duration out — MediaRecorder's WebM does,
+	// having no Segment Duration at all — and an absent duration parses to zero,
+	// which reads as no verdict rather than as a stream of length zero.
+	var durations streamDurations
+	for _, stream := range parsed.Streams {
+		seconds, _ := strconv.ParseFloat(stream.Duration, 64)
+		switch stream.CodecType {
+		case "video":
+			if seconds > durations.Video {
+				durations.Video = seconds
+			}
+		case "audio":
+			if seconds > durations.Audio {
+				durations.Audio = seconds
+			}
 		}
 	}
-
-	for i := 1; i < len(frames); i++ {
-		if meanAbsDiff(frames[0], frames[i]) >= frozenFrameTolerance {
-			return false
-		}
-	}
-	return true
+	return durations, nil
 }
 
-func meanAbsDiff(a, b []byte) float64 {
-	var total int
-	for i := range a {
-		diff := int(a[i]) - int(b[i])
-		if diff < 0 {
-			diff = -diff
-		}
-		total += diff
-	}
-	return float64(total) / float64(len(a))
-}
-
-// captureLooksStalled samples the recording and reports whether the video stopped
-// carrying content while the audio ran on — either because the picture never
-// changes, or because the video stream ends before the recording does.
-//
-// Sampling failures return false: accusing a good recording is worse than
+// captureEndedEarly reports whether the video stopped well before the recording
+// did. Unknown durations are no verdict: accusing a good recording is worse than
 // missing a bad one.
-func captureLooksStalled(ctx context.Context, inputPath string, durationSeconds float64) bool {
-	if durationSeconds < minFrozenCheckSeconds {
+func captureEndedEarly(d streamDurations) bool {
+	if d.Audio < minCaptureCheckSeconds || d.Video <= 0 {
 		return false
 	}
+	return d.Video < d.Audio*minVideoCoverage
+}
 
-	frames := make([][]byte, 0, len(frameSamplePoints))
-	for _, point := range frameSamplePoints {
-		frame, err := sampleGrayFrame(ctx, inputPath, durationSeconds*point)
-		if err != nil {
-			return false
-		}
-		// No frame this far into the recording: the video ran out early, which is
-		// the truncated-capture case and needs no comparison.
-		if len(frame) == 0 {
-			return true
-		}
-		frames = append(frames, frame)
-	}
-	return framesLookFrozen(frames)
+// captureWarningFor is what the owner is told, on the video page. It names the
+// numbers because they are the evidence, and it does not assume a browser: the
+// recorders catch the stalls their browser admits to, so what reaches here is
+// whatever failed silently.
+func captureWarningFor(d streamDurations) string {
+	return fmt.Sprintf(
+		"This recording has %.0fs of sound but its picture stops after %.0fs — the browser stopped capturing partway through. Please record it again. Safari does this whenever its window is not in front; Chrome and Edge keep capturing.",
+		d.Audio, d.Video,
+	)
 }
