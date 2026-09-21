@@ -247,6 +247,7 @@ func (s *Server) routes() {
 	if s.enableDocs {
 		s.router.Get("/api/docs", docs.HandleDocs)
 		s.router.Get("/api/docs/openapi.yaml", docs.HandleSpec)
+		s.router.Get("/api/docs/scalar.js", docs.HandleScalarBundle)
 	}
 
 	if s.authHandler != nil {
