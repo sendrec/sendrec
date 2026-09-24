@@ -133,6 +133,21 @@ func main() {
 	slackClient := slackpkg.New(db.Pool)
 	webhookClient := webhookpkg.New(db.Pool)
 
+	// The operator's branding for every viewer page on this install, under any
+	// personal, workspace or per-video branding. Refuse to start on a bad value
+	// rather than render it.
+	if err := video.SetInstanceBranding(video.InstanceBranding{
+		Name:            os.Getenv("BRANDING_DEFAULT_NAME"),
+		LogoURL:         os.Getenv("BRANDING_DEFAULT_LOGO_URL"),
+		ColorBackground: os.Getenv("BRANDING_DEFAULT_COLOR_BACKGROUND"),
+		ColorSurface:    os.Getenv("BRANDING_DEFAULT_COLOR_SURFACE"),
+		ColorText:       os.Getenv("BRANDING_DEFAULT_COLOR_TEXT"),
+		ColorAccent:     os.Getenv("BRANDING_DEFAULT_COLOR_ACCENT"),
+		FooterText:      os.Getenv("BRANDING_DEFAULT_FOOTER_TEXT"),
+	}); err != nil {
+		log.Fatalf("invalid BRANDING_DEFAULT_* configuration: %v", err)
+	}
+
 	creemAPIKey := os.Getenv("CREEM_API_KEY")
 	creemWebhookSecret := os.Getenv("CREEM_WEBHOOK_SECRET")
 	// Billing enabled without a webhook secret leaves /api/webhooks/creem

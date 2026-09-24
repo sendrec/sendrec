@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -1013,6 +1014,85 @@ func TestIsValidHexColor(t *testing.T) {
 	for _, c := range invalid {
 		if isValidHexColor(c) {
 			t.Errorf("expected %q to be invalid", c)
+		}
+	}
+}
+
+// Instance branding is the operator's default for a whole self-hosted install:
+// it sits under personal, workspace and per-video branding, and over SendRec's
+// own. #260.
+func TestResolveBranding_InstanceDefaults(t *testing.T) {
+	t.Cleanup(func() { _ = SetInstanceBranding(InstanceBranding{}) })
+
+	if err := SetInstanceBranding(InstanceBranding{
+		Name:        "Acme Video",
+		LogoURL:     "https://acme.example/logo.png",
+		ColorAccent: "#ff5500",
+		FooterText:  "Hosted by Acme",
+	}); err != nil {
+		t.Fatalf("SetInstanceBranding: %v", err)
+	}
+
+	t.Run("fills in where nothing else is set", func(t *testing.T) {
+		cfg := resolveBranding(context.Background(), &mockStorage{}, brandingSettingsResponse{}, brandingSettingsResponse{})
+		if cfg.CompanyName != "Acme Video" || cfg.LogoURL != "https://acme.example/logo.png" ||
+			cfg.ColorAccent != "#ff5500" || cfg.FooterText != "Hosted by Acme" {
+			t.Errorf("instance branding not applied: %+v", cfg)
+		}
+		// Fields the operator left empty keep SendRec's own.
+		if cfg.ColorBackground != defaultColorBackground {
+			t.Errorf("unset field should keep the built-in default, got %q", cfg.ColorBackground)
+		}
+	})
+
+	t.Run("personal or workspace branding still wins", func(t *testing.T) {
+		name, accent := "User Co", "#123456"
+		cfg := resolveBranding(context.Background(), &mockStorage{},
+			brandingSettingsResponse{CompanyName: &name, ColorAccent: &accent}, brandingSettingsResponse{})
+		if cfg.CompanyName != "User Co" || cfg.ColorAccent != "#123456" {
+			t.Errorf("user branding should override instance branding: %+v", cfg)
+		}
+		if cfg.FooterText != "Hosted by Acme" {
+			t.Errorf("fields the user left empty should fall back to the instance, got %q", cfg.FooterText)
+		}
+	})
+}
+
+func TestResolveBranding_WithoutInstanceBrandingKeepsBuiltins(t *testing.T) {
+	t.Cleanup(func() { _ = SetInstanceBranding(InstanceBranding{}) })
+	if err := SetInstanceBranding(InstanceBranding{}); err != nil {
+		t.Fatalf("SetInstanceBranding: %v", err)
+	}
+
+	cfg := resolveBranding(context.Background(), &mockStorage{}, brandingSettingsResponse{}, brandingSettingsResponse{})
+	if cfg.CompanyName != defaultCompanyName || cfg.LogoURL != defaultLogoPath || cfg.ColorAccent != defaultColorAccent {
+		t.Errorf("expected SendRec's built-in branding, got %+v", cfg)
+	}
+}
+
+// Instance branding comes from the environment at startup, so a bad value is a
+// configuration error to refuse, not something to render.
+func TestSetInstanceBranding_RejectsBadValues(t *testing.T) {
+	t.Cleanup(func() { _ = SetInstanceBranding(InstanceBranding{}) })
+
+	bad := map[string]InstanceBranding{
+		"colour not hex":     {ColorAccent: "orange"},
+		"script logo":        {LogoURL: "javascript:alert(1)"},
+		"relative logo path": {LogoURL: "logo.png"},
+		"name too long":      {Name: strings.Repeat("a", 201)},
+		"footer too long":    {FooterText: strings.Repeat("a", 501)},
+	}
+	for name, b := range bad {
+		t.Run(name, func(t *testing.T) {
+			if err := SetInstanceBranding(b); err == nil {
+				t.Errorf("SetInstanceBranding(%+v) accepted, want an error", b)
+			}
+		})
+	}
+
+	for _, logo := range []string{"https://acme.example/logo.png", "http://intranet/logo.png", "/images/acme.png"} {
+		if err := SetInstanceBranding(InstanceBranding{LogoURL: logo}); err != nil {
+			t.Errorf("logo %q rejected: %v", logo, err)
 		}
 	}
 }

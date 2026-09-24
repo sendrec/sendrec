@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -179,8 +180,25 @@ func validateBrandingColors(bg, surface, text, accent *string) string {
 	return ""
 }
 
-func resolveBranding(ctx context.Context, storage ObjectStorage, userBranding brandingSettingsResponse, videoBranding brandingSettingsResponse) brandingConfig {
-	cfg := brandingConfig{
+// InstanceBranding is the branding an operator gives a whole self-hosted
+// install: the default under every personal, workspace and per-video branding,
+// in place of SendRec's own. Empty fields keep SendRec's. #260.
+type InstanceBranding struct {
+	Name            string
+	LogoURL         string
+	ColorBackground string
+	ColorSurface    string
+	ColorText       string
+	ColorAccent     string
+	FooterText      string
+}
+
+// instanceDefaults is what resolveBranding starts from. Set once at startup,
+// before the server takes requests, and read-only after.
+var instanceDefaults = builtinBranding()
+
+func builtinBranding() brandingConfig {
+	return brandingConfig{
 		CompanyName:     defaultCompanyName,
 		LogoURL:         defaultLogoPath,
 		ColorBackground: defaultColorBackground,
@@ -189,6 +207,46 @@ func resolveBranding(ctx context.Context, storage ObjectStorage, userBranding br
 		ColorAccent:     defaultColorAccent,
 		FooterText:      defaultFooterText,
 	}
+}
+
+// SetInstanceBranding validates the operator's branding and makes it the
+// default for every viewer page. It comes from the environment, so a bad value
+// is a configuration error for the caller to refuse to start over.
+func SetInstanceBranding(b InstanceBranding) error {
+	if msg := validateBrandingColors(&b.ColorBackground, &b.ColorSurface, &b.ColorText, &b.ColorAccent); msg != "" {
+		return errors.New(msg)
+	}
+	if msg := validate.CompanyName(b.Name); msg != "" {
+		return errors.New(msg)
+	}
+	if msg := validate.FooterText(b.FooterText); msg != "" {
+		return errors.New(msg)
+	}
+	// The logo goes straight into an <img src>, so only a web URL or a path on
+	// this host.
+	if b.LogoURL != "" && !strings.HasPrefix(b.LogoURL, "https://") &&
+		!strings.HasPrefix(b.LogoURL, "http://") && !strings.HasPrefix(b.LogoURL, "/") {
+		return fmt.Errorf("logo URL must start with https://, http:// or /, got %q", b.LogoURL)
+	}
+
+	cfg := builtinBranding()
+	applyOverrides(&cfg, brandingSettingsResponse{
+		CompanyName:     &b.Name,
+		ColorBackground: &b.ColorBackground,
+		ColorSurface:    &b.ColorSurface,
+		ColorText:       &b.ColorText,
+		ColorAccent:     &b.ColorAccent,
+		FooterText:      &b.FooterText,
+	})
+	if b.LogoURL != "" {
+		cfg.LogoURL = b.LogoURL
+	}
+	instanceDefaults = cfg
+	return nil
+}
+
+func resolveBranding(ctx context.Context, storage ObjectStorage, userBranding brandingSettingsResponse, videoBranding brandingSettingsResponse) brandingConfig {
+	cfg := instanceDefaults
 
 	applyOverrides(&cfg, userBranding)
 	applyOverrides(&cfg, videoBranding)
