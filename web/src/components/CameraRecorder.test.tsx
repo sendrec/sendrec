@@ -536,6 +536,29 @@ describe("CameraRecorder", () => {
       expect(screen.queryByTestId("capture-stalled-warning")).not.toBeInTheDocument();
     });
 
+    it("refuses a recording whose camera was muted from the start", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      mockStream.getVideoTracks.mockReturnValue([
+        { muted: true, addEventListener: vi.fn(), stop: vi.fn() },
+      ]);
+      const onComplete = vi.fn();
+      const onError = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<CameraRecorder onRecordingComplete={onComplete} onRecordingError={onError} />);
+
+      await vi.waitFor(() => {
+        expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+      await act(() => vi.advanceTimersByTime(4000));
+      await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+      await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+      expect(onComplete).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
     it("refuses a recording whose capture stalled", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const handlers = trackWithMuteCapture();

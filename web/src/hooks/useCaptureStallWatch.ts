@@ -31,11 +31,14 @@ export function useCaptureStallWatch() {
   /** Starts a fresh tally on a new capture. Listeners die with the track. */
   const watch = useCallback(
     (track: MediaStreamTrack | undefined) => {
-      mutedRef.current = false;
+      // Start from the track's own state: a capture that never produced a frame
+      // is muted from the outset, and a track that starts muted fires no event.
+      const startsMuted = track?.muted ?? false;
+      mutedRef.current = startsMuted;
       countingRef.current = false;
       stalledSinceRef.current = null;
       totalRef.current = 0;
-      setStalled(false);
+      setStalled(startsMuted);
       if (!track) return;
 
       track.addEventListener("mute", () => {
