@@ -111,8 +111,12 @@ func (s *spaFileServer) brandIndex(page, nonce string) string {
 		fmt.Fprintf(&meta, `<style nonce="%s">`, html.EscapeString(nonce))
 		for _, theme := range themes {
 			sh := accentShades(s.brandAccent, theme)
-			fmt.Fprintf(&meta, `%s{--color-accent:%s;--color-accent-hover:%s;--color-accent-subtle:%s;--color-drag-highlight:%s;--color-on-accent:%s;}`,
-				theme.selector, sh.accent, sh.hover, rgba(sh.accent, 0.12), rgba(sh.accent, 0.05), sh.onAccent)
+			// The --instance-* copies exist only here: spots that must look
+			// exactly as they always have without an accent fall back to their
+			// original values when these are unset.
+			fmt.Fprintf(&meta, `%s{--color-accent:%s;--color-accent-hover:%s;--color-accent-subtle:%s;--color-drag-highlight:%s;--color-on-accent:%s;--instance-accent:%s;--instance-accent-subtle:%s;--instance-on-accent:%s;}`,
+				theme.selector, sh.accent, sh.hover, rgba(sh.accent, 0.12), rgba(sh.accent, 0.05), sh.onAccent,
+				sh.accent, rgba(sh.accent, 0.12), sh.onAccent)
 		}
 		meta.WriteString("</style>\n")
 	}
@@ -147,7 +151,8 @@ const minContrast = 4.5
 // colour reads on both a near-white and a navy page, so most accents are
 // kept in one theme and shifted in the other. Button
 // text is white or black, whichever contrasts more, and hover moves away from
-// the text, so hovering can only make the label easier to read.
+// the text, so hovering can only make the label easier to read — except at
+// pure black or white, where there is no further to go.
 func accentShades(hex string, t theme) shades {
 	c := parseHex(hex)
 	towards := [3]float64{0, 0, 0}
@@ -166,7 +171,16 @@ func accentShades(hex string, t theme) shades {
 	if contrastOf(c, [3]float64{0, 0, 0}) > contrastOf(c, [3]float64{255, 255, 255}) {
 		onAccent, away = "#000000", [3]float64{255, 255, 255}
 	}
-	return shades{accent: toHex(c), hover: toHex(mix(c, away, 0.15)), onAccent: onAccent}
+	hover := toHex(mix(c, away, 0.15))
+	if hover == toHex(c) {
+		// Already as far from the text as it goes, pure black under white:
+		// move toward the text instead, which black and white can afford.
+		hover = toHex(mix(c, [3]float64{255, 255, 255}, 0.15))
+		if onAccent == "#000000" {
+			hover = toHex(mix(c, [3]float64{0, 0, 0}, 0.15))
+		}
+	}
+	return shades{accent: toHex(c), hover: hover, onAccent: onAccent}
 }
 
 func parseHex(hex string) [3]float64 {

@@ -4160,9 +4160,11 @@ textarea.form-input {
   border-radius: 3px;
   font-size: 11px;
   font-weight: 600;
-  background: var(--color-accent-subtle);
+  /* --instance-* are set only with BRANDING_DEFAULT_COLOR_ACCENT; the fallbacks
+     are SendRec's original look. */
+  background: var(--instance-accent-subtle, rgba(0, 182, 122, 0.12));
   color: var(--color-accent);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+  border: 1px solid color-mix(in srgb, var(--instance-accent, #00b67a) 25%, transparent);
 }
 
 .status-badge--processing {

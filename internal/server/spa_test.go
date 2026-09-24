@@ -123,6 +123,10 @@ func TestSPA_AppliesInstanceAccent(t *testing.T) {
 		`--color-accent-subtle:rgba(124,58,237,0.12);`,
 		`--color-drag-highlight:rgba(124,58,237,0.05);`,
 		`--color-on-accent:#ffffff;`,
+		// The spots that kept SendRec's exact look without an accent read these.
+		`--instance-accent:#7c3aed;`,
+		`--instance-accent-subtle:rgba(124,58,237,0.12);`,
+		`--instance-on-accent:#ffffff;`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("want %q in the page, got:\n%s", want, body)
@@ -152,6 +156,19 @@ func TestAccentShades_StayReadable(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+}
+
+// Hover is the only cue on a button. Where moving away from the text colour
+// has nowhere to go, pure black under white text, it moves the other way.
+func TestAccentShades_HoverAlwaysChanges(t *testing.T) {
+	for _, c := range []struct {
+		accent string
+		theme  theme
+	}{{"#000000", themes[1]}, {"#ffffff", themes[0]}, {"#0a1628", themes[1]}, {"#f8fafc", themes[0]}} {
+		if sh := accentShades(c.accent, c.theme); sh.hover == sh.accent {
+			t.Errorf("%s in the %s theme: hover %s is the accent itself", c.accent, c.theme.name, sh.hover)
 		}
 	}
 }

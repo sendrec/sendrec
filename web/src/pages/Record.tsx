@@ -253,8 +253,8 @@ export function Record() {
         <div className="share-container">
           <div className="share-checkmark">
             <svg viewBox="0 0 48 48" fill="none">
-              <circle cx="24" cy="24" r="24" style={{ fill: "var(--color-accent-subtle)" }} />
-              <path d="M15 25l6 6 12-12" style={{ stroke: "var(--color-accent)" }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="24" cy="24" r="24" style={{ fill: "var(--instance-accent-subtle, rgba(0, 182, 122, 0.12))" }} />
+              <path d="M15 25l6 6 12-12" style={{ stroke: "var(--instance-accent, #00b67a)" }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
           <h2 className="share-heading">Your video is ready!</h2>

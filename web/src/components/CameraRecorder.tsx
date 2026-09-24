@@ -246,7 +246,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
             aria-label="Start recording"
             style={{
               background: "var(--color-accent)",
-              color: "var(--color-on-accent)",
+              color: "var(--instance-on-accent, var(--color-text))",
               borderRadius: 8,
               padding: "14px 32px",
               fontSize: 16,
@@ -299,7 +299,7 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
               aria-label="Resume recording"
               style={{
                 background: "var(--color-accent)",
-                color: "var(--color-on-accent)",
+                color: "var(--instance-on-accent, var(--color-text))",
                 borderRadius: 8,
                 padding: "10px 24px",
                 fontSize: 14,

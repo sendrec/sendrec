@@ -311,7 +311,7 @@ export function TrimModal({ videoId, shareToken, duration, onClose, onTrimStarte
                     }}
                     style={{
                       padding: "4px 8px", cursor: "pointer", borderRadius: 4, fontSize: 13,
-                      background: inRange ? "var(--color-accent-subtle)" : "transparent",
+                      background: inRange ? "var(--instance-accent-subtle, rgba(0,182,122,0.1))" : "transparent",
                       opacity: inRange ? 1 : 0.4,
                     }}
                   >
