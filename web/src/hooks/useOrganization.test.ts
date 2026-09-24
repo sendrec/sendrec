@@ -53,6 +53,47 @@ describe("useOrganization", () => {
     expect(mockApiFetch).toHaveBeenCalledWith("/api/organizations");
   });
 
+  // The switcher in the layout keeps its own copy of the list; without this a
+  // renamed or re-iconed workspace looks unchanged until a reload.
+  it("refetches when a workspace is updated elsewhere", async () => {
+    mockApiFetch.mockResolvedValueOnce([makeOrg()]);
+
+    const useOrganization = await loadHook();
+    const { announceOrgUpdate } = await import("../api/orgContext");
+    const { result } = renderHook(() => useOrganization());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    mockApiFetch.mockResolvedValueOnce([makeOrg({ icon: "🚀" })]);
+    act(() => announceOrgUpdate());
+
+    await waitFor(() => expect(result.current.orgs[0].icon).toBe("🚀"));
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+  });
+
+  // A refresh is a background top-up of a list the page already relies on;
+  // dropping it on a transient error takes away the selected workspace and
+  // bounces the user out of its settings.
+  it("keeps the current list when a refresh fails", async () => {
+    mockApiFetch.mockResolvedValueOnce([makeOrg()]);
+
+    const useOrganization = await loadHook();
+    const { announceOrgUpdate } = await import("../api/orgContext");
+    const { result } = renderHook(() => useOrganization());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    mockApiFetch.mockRejectedValueOnce(new Error("503"));
+    // Let the rejected refresh settle before looking, or this passes by
+    // asserting ahead of the catch handler.
+    await act(async () => {
+      announceOrgUpdate();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+    expect(result.current.orgs).toHaveLength(1);
+    expect(result.current.orgs[0].id).toBe("org-1");
+  });
+
   it("returns empty array when fetch fails", async () => {
     mockApiFetch.mockRejectedValueOnce(new Error("network error"));
 

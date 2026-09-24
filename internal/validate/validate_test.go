@@ -324,3 +324,22 @@ func TestName(t *testing.T) {
 		}
 	}
 }
+
+// A workspace icon is an emoji or a couple of letters, not a name. Emoji are
+// several code points each — a family is seven, a flag two — so the limit is
+// counted in runes with a byte cap, not in bytes alone. #261.
+func TestOrgIcon(t *testing.T) {
+	ok := []string{"", "🚀", "AB", "👨‍👩‍👧‍👦", "🇩🇪", "1️⃣"}
+	for _, icon := range ok {
+		if msg := OrgIcon(icon); msg != "" {
+			t.Errorf("OrgIcon(%q) = %q, want ok", icon, msg)
+		}
+	}
+
+	tooLong := []string{"ABCDEFGHI", "🚀🚀🚀🚀🚀🚀🚀🚀🚀", "Acme Corporation"}
+	for _, icon := range tooLong {
+		if msg := OrgIcon(icon); msg == "" {
+			t.Errorf("OrgIcon(%q) accepted, want rejected", icon)
+		}
+	}
+}

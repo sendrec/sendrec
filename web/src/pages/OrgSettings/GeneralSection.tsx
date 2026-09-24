@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../api/client";
+import { announceOrgUpdate } from "../../api/orgContext";
 import type { OrgDetail, SharedSectionProps } from "./types";
 
 interface GeneralSectionProps extends SharedSectionProps {
@@ -26,6 +27,7 @@ export function GeneralSection({
 
   const [orgName, setOrgName] = useState(org.name);
   const [orgSlug, setOrgSlug] = useState(org.slug);
+  const [orgIcon, setOrgIcon] = useState(org.icon ?? "");
   const [nameMessage, setNameMessage] = useState("");
   const [nameError, setNameError] = useState("");
   const [savingName, setSavingName] = useState(false);
@@ -45,12 +47,23 @@ export function GeneralSection({
 
     setSavingName(true);
     try {
-      await apiFetch(`/api/organizations/${orgId}`, {
+      const saved = await apiFetch<OrgDetail>(`/api/organizations/${orgId}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: orgName.trim(), slug: orgSlug.trim() }),
+        body: JSON.stringify({ name: orgName.trim(), slug: orgSlug.trim(), icon: orgIcon.trim() }),
       });
+      // The server trims and normalises, and its idea of whitespace is wider
+      // than the browser's; show what it stored rather than what was typed.
+      const stored = {
+        name: saved?.name ?? orgName.trim(),
+        slug: saved?.slug ?? orgSlug.trim(),
+        icon: saved ? saved.icon ?? null : orgIcon.trim() || null,
+      };
       setNameMessage("Workspace updated");
-      setOrg((prev) => prev ? { ...prev, name: orgName.trim(), slug: orgSlug.trim() } : prev);
+      setOrg((prev) => (prev ? { ...prev, ...stored } : prev));
+      setOrgName(stored.name);
+      setOrgSlug(stored.slug);
+      setOrgIcon(stored.icon ?? "");
+      announceOrgUpdate();
     } catch (err) {
       setNameError(err instanceof Error ? err.message : "Failed to update workspace");
     } finally {
@@ -123,6 +136,23 @@ export function GeneralSection({
           />
         </div>
 
+        <div className="form-field">
+          <label className="form-label" htmlFor="org-icon">Icon</label>
+          <input
+            id="org-icon"
+            type="text"
+            className="form-input form-input--icon"
+            value={orgIcon}
+            onChange={(e) => setOrgIcon(e.target.value)}
+            disabled={!canManage}
+            placeholder="🚀"
+            aria-describedby="org-icon-hint"
+          />
+          <p id="org-icon-hint" className="form-hint">
+            An emoji or a couple of letters, shown next to the workspace name. Leave empty for the default.
+          </p>
+        </div>
+
         {nameError && (
           <p className="status-message status-message--error">{nameError}</p>
         )}
@@ -135,7 +165,10 @@ export function GeneralSection({
             <button
               type="submit"
               className="btn btn--primary"
-              disabled={savingName || (orgName.trim() === org.name && orgSlug.trim() === org.slug)}
+              disabled={
+                savingName ||
+                (orgName.trim() === org.name && orgSlug.trim() === org.slug && orgIcon.trim() === (org.icon ?? ""))
+              }
             >
               {savingName ? "Saving..." : "Save"}
             </button>

@@ -254,8 +254,54 @@ describe("OrgSettings", () => {
 
     expect(mockApiFetch).toHaveBeenCalledWith("/api/organizations/org-1", {
       method: "PATCH",
-      body: JSON.stringify({ name: "New Corp", slug: "acme-corp" }),
+      body: JSON.stringify({ name: "New Corp", slug: "acme-corp", icon: "" }),
     });
+  });
+
+  it("saves the workspace icon", async () => {
+    const user = userEvent.setup();
+    mockOwnerResponses();
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    await user.type(screen.getByLabelText("Icon"), "🚀");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Workspace updated")).toBeInTheDocument();
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/organizations/org-1", {
+      method: "PATCH",
+      body: JSON.stringify({ name: "Acme Corp", slug: "acme-corp", icon: "🚀" }),
+    });
+  });
+
+  // The server is the one that trims and normalises; the form shows what it
+  // actually stored rather than its own guess.
+  it("shows the icon the server saved, not the one typed", async () => {
+    const user = userEvent.setup();
+    mockOwnerResponses();
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({ ...mockOrg, icon: null });
+
+    await user.type(screen.getByLabelText("Icon"), "\u0085");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Workspace updated")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Icon")).toHaveValue("");
   });
 
   it("displays pending invites", async () => {

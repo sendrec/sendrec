@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "../api/client";
-import {
-  getCurrentOrgId,
-  setCurrentOrgId,
-  subscribeToOrgChanges,
-} from "../api/orgContext";
+import { getCurrentOrgId, setCurrentOrgId, subscribeToOrgChanges, subscribeToOrgUpdates } from "../api/orgContext";
 
 export interface Organization {
   id: string;
@@ -13,6 +9,7 @@ export interface Organization {
   subscriptionPlan: string;
   role: string;
   memberCount: number;
+  icon?: string | null;
 }
 
 export function useOrganization() {
@@ -71,8 +68,13 @@ export function useOrganization() {
           setCurrentOrgId(null);
         }
       })
-      .catch(() => setOrgs([]));
+      // A refresh tops up a list the page already relies on. On a transient
+      // error keep what is there: an empty list drops the selected workspace
+      // and sends the user out of its settings.
+      .catch(() => {});
   }, []);
+
+  useEffect(() => subscribeToOrgUpdates(refreshOrgs), [refreshOrgs]);
 
   return { orgs, selectedOrg, selectedOrgId, switchOrg, createOrg, refreshOrgs, loading };
 }

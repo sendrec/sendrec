@@ -31,25 +31,27 @@ type orgResponse struct {
 }
 
 type orgListItem struct {
-	ID               string `json:"id"`
-	Name             string `json:"name"`
-	Slug             string `json:"slug"`
-	SubscriptionPlan string `json:"subscriptionPlan"`
-	RetentionDays    int    `json:"retentionDays"`
-	Role             string `json:"role"`
-	MemberCount      int64  `json:"memberCount"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	Slug             string  `json:"slug"`
+	SubscriptionPlan string  `json:"subscriptionPlan"`
+	RetentionDays    int     `json:"retentionDays"`
+	Role             string  `json:"role"`
+	MemberCount      int64   `json:"memberCount"`
+	Icon             *string `json:"icon"`
 }
 
 type orgDetailResponse struct {
-	ID               string `json:"id"`
-	Name             string `json:"name"`
-	Slug             string `json:"slug"`
-	SubscriptionPlan string `json:"subscriptionPlan"`
-	RetentionDays    int    `json:"retentionDays"`
-	Role             string `json:"role"`
-	MemberCount      int64  `json:"memberCount"`
-	CreatedAt        string `json:"createdAt"`
-	UpdatedAt        string `json:"updatedAt"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	Slug             string  `json:"slug"`
+	SubscriptionPlan string  `json:"subscriptionPlan"`
+	RetentionDays    int     `json:"retentionDays"`
+	Role             string  `json:"role"`
+	MemberCount      int64   `json:"memberCount"`
+	Icon             *string `json:"icon"`
+	CreatedAt        string  `json:"createdAt"`
+	UpdatedAt        string  `json:"updatedAt"`
 }
 
 type createOrgRequest struct {
@@ -60,6 +62,7 @@ type updateOrgRequest struct {
 	Name          *string `json:"name"`
 	Slug          *string `json:"slug"`
 	RetentionDays *int    `json:"retentionDays"`
+	Icon          *string `json:"icon"`
 }
 
 func generateSlug(name string) string {
@@ -181,7 +184,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(r.Context(),
 		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.retention_days, om.role,
-		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND role != 'viewer') AS member_count
+		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND role != 'viewer') AS member_count,
+		        o.icon
 		 FROM organizations o
 		 JOIN organization_members om ON om.organization_id = o.id
 		 WHERE om.user_id = $1
@@ -197,7 +201,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	items := make([]orgListItem, 0)
 	for rows.Next() {
 		var item orgListItem
-		if err := rows.Scan(&item.ID, &item.Name, &item.Slug, &item.SubscriptionPlan, &item.RetentionDays, &item.Role, &item.MemberCount); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Slug, &item.SubscriptionPlan, &item.RetentionDays, &item.Role, &item.MemberCount, &item.Icon); err != nil {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to scan organization")
 			return
 		}
@@ -215,12 +219,13 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	var createdAt, updatedAt time.Time
 	err := h.db.QueryRow(r.Context(),
 		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.retention_days, o.created_at, o.updated_at, om.role,
-		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND role != 'viewer') AS member_count
+		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND role != 'viewer') AS member_count,
+		        o.icon
 		 FROM organizations o
 		 JOIN organization_members om ON om.organization_id = o.id
 		 WHERE o.id = $1 AND om.user_id = $2`,
 		orgID, userID,
-	).Scan(&resp.ID, &resp.Name, &resp.Slug, &resp.SubscriptionPlan, &resp.RetentionDays, &createdAt, &updatedAt, &resp.Role, &resp.MemberCount)
+	).Scan(&resp.ID, &resp.Name, &resp.Slug, &resp.SubscriptionPlan, &resp.RetentionDays, &createdAt, &updatedAt, &resp.Role, &resp.MemberCount, &resp.Icon)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			httputil.WriteError(w, http.StatusNotFound, "organization not found")
@@ -264,7 +269,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == nil && req.Slug == nil && req.RetentionDays == nil {
+	if req.Name == nil && req.Slug == nil && req.RetentionDays == nil && req.Icon == nil {
 		httputil.WriteError(w, http.StatusBadRequest, "nothing to update")
 		return
 	}
@@ -302,6 +307,19 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// An empty icon asks for the default back, stored as NULL.
+	var icon *string
+	if req.Icon != nil {
+		trimmed := strings.TrimSpace(*req.Icon)
+		if msg := validate.OrgIcon(trimmed); msg != "" {
+			httputil.WriteError(w, http.StatusBadRequest, msg)
+			return
+		}
+		if trimmed != "" {
+			icon = &trimmed
+		}
+	}
+
 	setClauses := []string{}
 	args := []any{}
 	paramIdx := 1
@@ -319,6 +337,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.RetentionDays != nil {
 		setClauses = append(setClauses, fmt.Sprintf("retention_days = $%d", paramIdx))
 		args = append(args, *req.RetentionDays)
+		paramIdx++
+	}
+	if req.Icon != nil {
+		setClauses = append(setClauses, fmt.Sprintf("icon = $%d", paramIdx))
+		args = append(args, icon)
 		paramIdx++
 	}
 
@@ -348,11 +371,12 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow(r.Context(),
 		`SELECT o.id, o.name, o.slug, o.subscription_plan, o.retention_days, o.created_at, o.updated_at,
 		        (SELECT role FROM organization_members WHERE organization_id = o.id AND user_id = $2) AS role,
-		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND role != 'viewer') AS member_count
+		        (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND role != 'viewer') AS member_count,
+		        o.icon
 		 FROM organizations o
 		 WHERE o.id = $1`,
 		orgID, userID,
-	).Scan(&resp.ID, &resp.Name, &resp.Slug, &resp.SubscriptionPlan, &resp.RetentionDays, &createdAt, &updatedAt, &resp.Role, &resp.MemberCount)
+	).Scan(&resp.ID, &resp.Name, &resp.Slug, &resp.SubscriptionPlan, &resp.RetentionDays, &createdAt, &updatedAt, &resp.Role, &resp.MemberCount, &resp.Icon)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to read updated organization")
 		return

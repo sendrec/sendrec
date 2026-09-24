@@ -7,6 +7,7 @@ export interface OrgDetail {
   subscriptionPlan: string;
   createdAt: string;
   retentionDays?: number;
+  icon?: string | null;
 }
 
 export interface Member {

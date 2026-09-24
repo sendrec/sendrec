@@ -281,6 +281,31 @@ describe("Layout", () => {
     expect(screen.getByText("owner")).toBeInTheDocument();
   });
 
+  // A workspace's own icon replaces the default one, in the menu and next to its
+  // name on the switcher itself. #261.
+  it("shows a workspace's icon in the switcher", async () => {
+    const user = userEvent.setup();
+    const acme = { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3, icon: "🚀" };
+    mockUseOrganization.mockReturnValue({
+      orgs: [acme, { id: "org-2", name: "Beta Inc", slug: "beta", subscriptionPlan: "free", role: "member", memberCount: 2, icon: null }],
+      selectedOrg: acme,
+      selectedOrgId: "org-1",
+      switchOrg: mockSwitchOrg,
+      createOrg: mockCreateOrg,
+      refreshOrgs: mockRefreshOrgs,
+      loading: false,
+    });
+    renderLayout();
+
+    const trigger = screen.getByRole("button", { name: "Switch workspace" });
+    expect(trigger).toHaveTextContent("🚀");
+
+    await user.click(trigger);
+    const acmeItem = screen.getByRole("option", { name: /Acme Corp/ });
+    expect(acmeItem).toHaveTextContent("🚀");
+    expect(screen.getByRole("option", { name: /Beta Inc/ })).not.toHaveTextContent("🚀");
+  });
+
   it("calls switchOrg when selecting an organization", async () => {
     const user = userEvent.setup();
     mockUseOrganization.mockReturnValue({
