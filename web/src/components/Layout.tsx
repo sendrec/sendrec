@@ -47,6 +47,10 @@ export function Layout({ children }: LayoutProps) {
   }, []);
 
   function isActive(path: string): boolean {
+    // Workspace settings are a tab of Settings, so its link lights for both.
+    if (path === "/settings") {
+      return location.pathname === "/settings" || /^\/organizations\/[^/]+\/settings$/.test(location.pathname);
+    }
     if (path === "/analytics") {
       return location.pathname === "/analytics" || location.pathname.endsWith("/analytics");
     }
@@ -300,15 +304,6 @@ export function Layout({ children }: LayoutProps) {
             Settings
           </Link>
 
-          {selectedOrg && (selectedOrg.role === "owner" || selectedOrg.role === "admin") && (
-            <Link
-              to={`/organizations/${selectedOrgId}/settings`}
-              className="nav-link"
-              onClick={handleNavClick}
-            >
-              Workspace Settings
-            </Link>
-          )}
 
           <button
             className="nav-theme-toggle"

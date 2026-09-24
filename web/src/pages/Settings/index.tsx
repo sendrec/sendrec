@@ -18,6 +18,7 @@ import { NotificationSection } from "./NotificationSection";
 import { WebhookSection } from "./WebhookSection";
 import { IntegrationSection } from "./IntegrationSection";
 import { BrandingSection } from "./BrandingSection";
+import { SettingsTabs } from "../../components/SettingsTabs";
 
 interface LoadedState {
   profile: UserProfile;
@@ -209,6 +210,7 @@ export function Settings() {
   return (
     <div className="page-container">
       <h1 className="page-title">Settings</h1>
+      <SettingsTabs />
 
       {loaded.billingEnabled && loaded.billing && (
         <BillingSection billing={loaded.billing} />
