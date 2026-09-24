@@ -1359,6 +1359,10 @@ components:
         memberCount:
           type: integer
           format: int64
+        icon:
+          type: string
+          nullable: true
+          description: Emoji or a few characters shown next to the workspace name; null means the default icon
 
     OrgDetailResponse:
       type: object
@@ -1383,6 +1387,10 @@ components:
         memberCount:
           type: integer
           format: int64
+        icon:
+          type: string
+          nullable: true
+          description: Emoji or a few characters shown next to the workspace name; null means the default icon
         createdAt:
           type: string
           format: date-time
@@ -1432,6 +1440,9 @@ components:
           type: integer
           enum: [0, 30, 60, 90, 180, 365]
           description: Auto-delete videos after this many days (0 = disabled)
+        icon:
+          type: string
+          description: Emoji or up to 8 characters shown next to the workspace name. An empty string restores the default icon.
 
     MemberResponse:
       type: object

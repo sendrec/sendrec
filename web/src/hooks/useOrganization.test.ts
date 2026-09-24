@@ -53,6 +53,23 @@ describe("useOrganization", () => {
     expect(mockApiFetch).toHaveBeenCalledWith("/api/organizations");
   });
 
+  // The switcher in the layout keeps its own copy of the list; without this a
+  // renamed or re-iconed workspace looks unchanged until a reload.
+  it("refetches when a workspace is updated elsewhere", async () => {
+    mockApiFetch.mockResolvedValueOnce([makeOrg()]);
+
+    const useOrganization = await loadHook();
+    const { announceOrgUpdate } = await import("../api/orgContext");
+    const { result } = renderHook(() => useOrganization());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    mockApiFetch.mockResolvedValueOnce([makeOrg({ icon: "🚀" })]);
+    act(() => announceOrgUpdate());
+
+    await waitFor(() => expect(result.current.orgs[0].icon).toBe("🚀"));
+    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+  });
+
   it("returns empty array when fetch fails", async () => {
     mockApiFetch.mockRejectedValueOnce(new Error("network error"));
 

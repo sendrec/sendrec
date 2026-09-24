@@ -164,6 +164,9 @@ export function Layout({ children }: LayoutProps) {
             aria-expanded={orgDropdownOpen}
             aria-label="Switch workspace"
           >
+            {selectedOrg?.icon && (
+              <span className="org-switcher-emoji" aria-hidden="true">{selectedOrg.icon}</span>
+            )}
             <span className="org-switcher-label">
               {selectedOrgId
                 ? orgs.find((o) => o.id === selectedOrgId)?.name ?? "Personal"
@@ -201,10 +204,14 @@ export function Layout({ children }: LayoutProps) {
                     aria-selected={selectedOrgId === org.id}
                     onClick={() => { switchOrg(org.id); setOrgDropdownOpen(false); }}
                   >
-                    <svg className="org-switcher-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="1" y="4" width="14" height="11" rx="1" />
-                      <path d="M4 4V2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
-                    </svg>
+                    {org.icon ? (
+                      <span className="org-switcher-icon org-switcher-emoji" aria-hidden="true">{org.icon}</span>
+                    ) : (
+                      <svg className="org-switcher-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="1" y="4" width="14" height="11" rx="1" />
+                        <path d="M4 4V2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                      </svg>
+                    )}
                     <span className="org-switcher-item-name">{org.name}</span>
                     <span className="org-switcher-role-badge">{org.role}</span>
                   </button>

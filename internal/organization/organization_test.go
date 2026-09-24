@@ -269,9 +269,9 @@ func TestList(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, om\.role`).
 		WithArgs(testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "role", "member_count"}).
-			AddRow("org-1", "Acme Corp", "acme-corp", "free", 0, "owner", int64(3)).
-			AddRow("org-2", "Beta Inc", "beta-inc", "pro", 90, "member", int64(5)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "role", "member_count", "icon"}).
+			AddRow("org-1", "Acme Corp", "acme-corp", "free", 0, "owner", int64(3), (*string)(nil)).
+			AddRow("org-2", "Beta Inc", "beta-inc", "pro", 90, "member", int64(5), (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/organizations", handler.List)
@@ -321,8 +321,8 @@ func TestGet(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, o\.created_at, o\.updated_at, om\.role`).
 		WithArgs(orgID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count"}).
-			AddRow(orgID, "Acme Corp", "acme-corp", "free", 0, now, now, "owner", int64(3)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count", "icon"}).
+			AddRow(orgID, "Acme Corp", "acme-corp", "free", 0, now, now, "owner", int64(3), (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/organizations/{orgId}", handler.Get)
@@ -412,8 +412,8 @@ func TestUpdate_AsOwner(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, o\.created_at, o\.updated_at`).
 		WithArgs(orgID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count"}).
-			AddRow(orgID, newName, "acme-corp", "free", 0, now, now, "owner", int64(1)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count", "icon"}).
+			AddRow(orgID, newName, "acme-corp", "free", 0, now, now, "owner", int64(1), (*string)(nil)))
 
 	body, _ := json.Marshal(map[string]any{"name": newName})
 
@@ -437,6 +437,133 @@ func TestUpdate_AsOwner(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func expectIconUpdate(mock pgxmock.PgxPoolIface, orgID string, icon any) {
+	now := time.Now().UTC().Truncate(time.Second)
+	mock.ExpectQuery(`SELECT role FROM organization_members WHERE organization_id = \$1 AND user_id = \$2`).
+		WithArgs(orgID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("admin"))
+	mock.ExpectExec(`UPDATE organizations SET icon = \$1, updated_at = now\(\) WHERE id = \$2`).
+		WithArgs(icon, orgID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, o\.created_at, o\.updated_at`).
+		WithArgs(orgID, testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count", "icon"}).
+			AddRow(orgID, "Acme Corp", "acme-corp", "free", 0, now, now, "admin", int64(1), icon))
+}
+
+func patchOrg(t *testing.T, handler *Handler, orgID string, body map[string]any) *httptest.ResponseRecorder {
+	t.Helper()
+	payload, _ := json.Marshal(body)
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Put("/api/organizations/{orgId}", handler.Update)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPut, "/api/organizations/"+orgID, payload))
+	return rec
+}
+
+func TestUpdate_SetsIcon(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	icon := "🚀"
+	expectIconUpdate(mock, "org-1", &icon)
+
+	rec := patchOrg(t, NewHandler(mock, testBaseURL), "org-1", map[string]any{"icon": " 🚀 "})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp orgDetailResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Icon == nil || *resp.Icon != icon {
+		t.Errorf("expected icon %q, got %v", icon, resp.Icon)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// An empty icon is a request for the default back, stored as NULL rather than
+// as an empty string the UI would have to special-case.
+func TestUpdate_ClearsIcon(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	expectIconUpdate(mock, "org-1", (*string)(nil))
+
+	rec := patchOrg(t, NewHandler(mock, testBaseURL), "org-1", map[string]any{"icon": "  "})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	var resp orgDetailResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Icon != nil {
+		t.Errorf("expected no icon, got %q", *resp.Icon)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestUpdate_RejectsLongIcon(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT role FROM organization_members WHERE organization_id = \$1 AND user_id = \$2`).
+		WithArgs("org-1", testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"role"}).AddRow("owner"))
+
+	rec := patchOrg(t, NewHandler(mock, testBaseURL), "org-1", map[string]any{"icon": "Acme Corporation"})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestList_IncludesIcon(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	icon := "🚀"
+	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, om\.role`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "role", "member_count", "icon"}).
+			AddRow("org-1", "Acme Corp", "acme-corp", "free", 0, "owner", int64(3), &icon).
+			AddRow("org-2", "Beta Inc", "beta-inc", "pro", 90, "member", int64(5), (*string)(nil)))
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Get("/api/organizations", NewHandler(mock, testBaseURL).List)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/organizations", nil))
+
+	var items []orgListItem
+	if err := json.Unmarshal(rec.Body.Bytes(), &items); err != nil {
+		t.Fatalf("failed to parse response: %v (%s)", err, rec.Body.String())
+	}
+	if len(items) != 2 || items[0].Icon == nil || *items[0].Icon != icon || items[1].Icon != nil {
+		t.Errorf("expected icon on the first workspace only, got %s", rec.Body.String())
 	}
 }
 
@@ -565,8 +692,8 @@ func TestUpdate_RetentionDays_Valid(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, o\.created_at, o\.updated_at`).
 		WithArgs(orgID, testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count"}).
-			AddRow(orgID, "Acme Corp", "acme-corp", "free", retentionDays, now, now, "owner", int64(1)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count", "icon"}).
+			AddRow(orgID, "Acme Corp", "acme-corp", "free", retentionDays, now, now, "owner", int64(1), (*string)(nil)))
 
 	body, _ := json.Marshal(map[string]any{"retentionDays": retentionDays})
 
@@ -642,8 +769,8 @@ func TestListOrganizations_ViewerExcludedFromCount(t *testing.T) {
 	// An org with 3 owners/admins/members + 2 viewers → member_count = 3.
 	mock.ExpectQuery(`SELECT o\.id, o\.name, o\.slug, o\.subscription_plan, o\.retention_days, om\.role`).
 		WithArgs(testUserID).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "role", "member_count"}).
-			AddRow("org-1", "Acme Corp", "acme-corp", "free", 0, "owner", int64(3)))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "role", "member_count", "icon"}).
+			AddRow("org-1", "Acme Corp", "acme-corp", "free", 0, "owner", int64(3), (*string)(nil)))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/organizations", handler.List)

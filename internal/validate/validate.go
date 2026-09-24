@@ -1,6 +1,9 @@
 package validate
 
-import "fmt"
+import (
+	"fmt"
+	"unicode/utf8"
+)
 
 // Text field length limits — single source of truth for backend and frontend.
 const (
@@ -19,6 +22,12 @@ const (
 	MaxAPIKeyNameLength          = 100
 	MaxOrgNameLength             = 200
 	MaxOrgSlugLength             = 100
+
+	// A workspace icon is an emoji or a couple of letters. Emoji run to several
+	// code points — a family is seven, a flag two — so it is counted in runes,
+	// with a byte cap so a long run of combining marks cannot pass as one.
+	MaxOrgIconRunes = 8
+	MaxOrgIconBytes = 32
 )
 
 func checkLen(value string, max int, field string) string {
@@ -47,6 +56,13 @@ func WebhookURL(s string) string { return checkLen(s, MaxWebhookURLLength, "webh
 func APIKeyName(s string) string { return checkLen(s, MaxAPIKeyNameLength, "API key name") }
 func OrgName(s string) string    { return checkLen(s, MaxOrgNameLength, "organization name") }
 func OrgSlug(s string) string    { return checkLen(s, MaxOrgSlugLength, "organization slug") }
+
+func OrgIcon(s string) string {
+	if utf8.RuneCountInString(s) > MaxOrgIconRunes || len(s) > MaxOrgIconBytes {
+		return "workspace icon must be a single emoji or a few characters"
+	}
+	return ""
+}
 
 var validRetentionDays = map[int]bool{0: true, 30: true, 60: true, 90: true, 180: true, 365: true}
 

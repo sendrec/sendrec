@@ -377,6 +377,22 @@ input:focus-visible {
   color: var(--color-text-secondary);
 }
 
+/* A workspace's own icon: an emoji or a couple of letters, sized to sit where
+   the 16px default icon does. */
+.org-switcher-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.form-input--icon {
+  max-width: 6rem;
+}
+
 .org-switcher-item--active .org-switcher-icon {
   color: var(--color-accent);
 }

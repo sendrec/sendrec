@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiFetch } from "../api/client";
-import {
-  getCurrentOrgId,
-  setCurrentOrgId,
-  subscribeToOrgChanges,
-} from "../api/orgContext";
+import { getCurrentOrgId, setCurrentOrgId, subscribeToOrgChanges, subscribeToOrgUpdates } from "../api/orgContext";
 
 export interface Organization {
   id: string;
@@ -13,6 +9,7 @@ export interface Organization {
   subscriptionPlan: string;
   role: string;
   memberCount: number;
+  icon?: string | null;
 }
 
 export function useOrganization() {
@@ -73,6 +70,8 @@ export function useOrganization() {
       })
       .catch(() => setOrgs([]));
   }, []);
+
+  useEffect(() => subscribeToOrgUpdates(refreshOrgs), [refreshOrgs]);
 
   return { orgs, selectedOrg, selectedOrgId, switchOrg, createOrg, refreshOrgs, loading };
 }
