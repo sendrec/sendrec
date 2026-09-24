@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError, apiFetch, setAccessToken } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import { useOrganization } from "../hooks/useOrganization";
+import { Wordmark } from "./Wordmark";
+import { brandLogoSrc } from "../utils/brand";
 
 interface BillingResponse {
   plan: string;
@@ -141,8 +143,8 @@ export function Layout({ children }: LayoutProps) {
     <>
       <nav className="nav-bar">
         <Link to="/" className="nav-logo" onClick={handleNavClick}>
-          <img src="/images/logo.png" alt="" width="48" height="48" />
-          <span className="logo-send">Send</span><span className="logo-rec">Rec</span>
+          <img src={brandLogoSrc()} alt="" width="48" height="48" />
+          <Wordmark variant="nav" />
           {plan && planBadgeEnabled && (
             <span className={`plan-badge${plan !== "free" ? " plan-badge--pro" : ""}`}>
               {plan === "business" ? "Business" : plan === "pro" ? "Pro" : "Free"}

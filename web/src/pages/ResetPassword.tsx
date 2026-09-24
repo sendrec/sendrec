@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { Wordmark } from "../components/Wordmark";
 
 export function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -15,10 +16,7 @@ export function ResetPassword() {
     return (
       <main className="auth-container">
         <div className="auth-brand">
-          <span className="auth-logo">
-            <span className="auth-logo-send">Send</span>
-            <span className="auth-logo-rec">Rec</span>
-          </span>
+          <Wordmark variant="auth" />
         </div>
         <div className="auth-card auth-centered">
           <h1>Invalid reset link</h1>
@@ -37,10 +35,7 @@ export function ResetPassword() {
     return (
       <main className="auth-container">
         <div className="auth-brand">
-          <span className="auth-logo">
-            <span className="auth-logo-send">Send</span>
-            <span className="auth-logo-rec">Rec</span>
-          </span>
+          <Wordmark variant="auth" />
         </div>
         <div className="auth-card auth-centered">
           <h1>Password updated</h1>
@@ -94,10 +89,7 @@ export function ResetPassword() {
   return (
     <main className="auth-container">
       <div className="auth-brand">
-        <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
-        </span>
+        <Wordmark variant="auth" />
       </div>
       <form onSubmit={handleSubmit} className="auth-card">
         <h1>Set new password</h1>

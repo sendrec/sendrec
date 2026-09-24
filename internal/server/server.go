@@ -42,6 +42,7 @@ type Config struct {
 	MaxPlaylists              int
 	MaxWorkspaces             int
 	BrandingLogoURL           string
+	BrandingName              string
 	S3PublicEndpoint          string
 	EnableDocs                bool
 	BrandingEnabled           bool
@@ -90,6 +91,8 @@ type Server struct {
 	registrationEnabled bool
 	planBadgeEnabled    bool
 	analyticsScript     string
+	brandingName        string
+	brandingLogoURL     string
 	version             string
 }
 
@@ -104,7 +107,7 @@ func New(cfg Config) *Server {
 		BrandingLogoURL:       cfg.BrandingLogoURL,
 	}))
 
-	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript, version: cfg.Version}
+	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript, version: cfg.Version, brandingName: cfg.BrandingName, brandingLogoURL: cfg.BrandingLogoURL}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -563,7 +566,7 @@ func (s *Server) routes() {
 	}
 
 	if s.webFS != nil {
-		spa := newSPAFileServer(s.webFS, s.analyticsScript)
+		spa := newSPAFileServer(s.webFS, s.analyticsScript, s.brandingName, s.brandingLogoURL)
 		s.router.NotFound(spa.ServeHTTP)
 	}
 }
