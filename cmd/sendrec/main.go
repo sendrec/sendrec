@@ -181,6 +181,7 @@ func main() {
 		MaxPlaylists:              int(getEnvInt64("MAX_PLAYLISTS", int64(plans.Free.MaxPlaylists))),
 		MaxWorkspaces:             int(getEnvInt64("MAX_WORKSPACES", int64(plans.Free.MaxOrgsOwned))),
 		BrandingLogoURL:           os.Getenv("BRANDING_DEFAULT_LOGO_URL"),
+		BrandingName:              os.Getenv("BRANDING_DEFAULT_NAME"),
 		S3PublicEndpoint:          os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EnableDocs:                getEnv("API_DOCS_ENABLED", "false") == "true",
 		BrandingEnabled:           getEnv("BRANDING_ENABLED", "false") == "true",

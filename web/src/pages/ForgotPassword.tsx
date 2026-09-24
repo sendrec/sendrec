@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
+import { Wordmark } from "../components/Wordmark";
 
 export function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -36,10 +37,7 @@ export function ForgotPassword() {
     return (
       <main className="auth-container">
         <div className="auth-brand">
-          <span className="auth-logo">
-            <span className="auth-logo-send">Send</span>
-            <span className="auth-logo-rec">Rec</span>
-          </span>
+          <Wordmark variant="auth" />
         </div>
         <div className="auth-card auth-centered">
           <h1>Check your email</h1>
@@ -58,10 +56,7 @@ export function ForgotPassword() {
   return (
     <main className="auth-container">
       <div className="auth-brand">
-        <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
-        </span>
+        <Wordmark variant="auth" />
       </div>
       <form onSubmit={handleSubmit} className="auth-card">
         <h1>Reset password</h1>

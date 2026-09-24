@@ -347,8 +347,8 @@ Re-measure when you change resolution limits, enable transcription or noise redu
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `BRANDING_ENABLED` | Allow users to customize watch page branding (logo, colors, footer) | `false` |
-| `BRANDING_DEFAULT_NAME` | Name shown on every watch, embed and playlist page, in place of "SendRec". Users' own branding still takes precedence. The `BRANDING_DEFAULT_*` variables apply whether or not `BRANDING_ENABLED` is on | — |
-| `BRANDING_DEFAULT_LOGO_URL` | Logo for those pages: an `https://` URL or a path on this host such as `/images/acme.png` | — |
+| `BRANDING_DEFAULT_NAME` | Name shown in place of "SendRec": on every watch, embed and playlist page, and in the app itself — the browser tab, the navigation and the sign-in pages. Users' own branding still takes precedence on viewer pages. The `BRANDING_DEFAULT_*` variables apply whether or not `BRANDING_ENABLED` is on | — |
+| `BRANDING_DEFAULT_LOGO_URL` | Logo for those same pages, and the app's favicon: an `https://` URL or a path on this host such as `/images/acme.png` | — |
 | `BRANDING_DEFAULT_COLOR_BACKGROUND` | Page background, as `#rrggbb` | — |
 | `BRANDING_DEFAULT_COLOR_SURFACE` | Card and panel colour, as `#rrggbb` | — |
 | `BRANDING_DEFAULT_COLOR_TEXT` | Text colour, as `#rrggbb` | — |

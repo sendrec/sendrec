@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch, getAccessToken, tryRefreshToken } from "../api/client";
+import { Wordmark } from "../components/Wordmark";
 
 type PageState = "checking" | "unauthenticated" | "accepting" | "success" | "error";
 
@@ -53,10 +54,7 @@ export function AcceptInvite() {
   return (
     <main className="auth-container">
       <div className="auth-brand">
-        <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
-        </span>
+        <Wordmark variant="auth" />
       </div>
       <div className="auth-card auth-centered">
         {pageState === "checking" && (

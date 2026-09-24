@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { Wordmark } from "../components/Wordmark";
 
 export function ConfirmEmail() {
   const [searchParams] = useSearchParams();
@@ -42,10 +43,7 @@ export function ConfirmEmail() {
   return (
     <main className="auth-container">
       <div className="auth-brand">
-        <span className="auth-logo">
-          <span className="auth-logo-send">Send</span>
-          <span className="auth-logo-rec">Rec</span>
-        </span>
+        <Wordmark variant="auth" />
       </div>
       <div className="auth-card auth-centered">
         {status === "loading" && (
