@@ -65,10 +65,17 @@ type updateOrgRequest struct {
 	Icon          *string `json:"icon"`
 }
 
+// The slug limit less the "-xxxx" a clash appends. A name can be twice the slug
+// limit, so the slug is cut to fit rather than rejected: the user never typed it.
+const maxGeneratedSlugLength = validate.MaxOrgSlugLength - 5
+
 func generateSlug(name string) string {
 	slug := strings.ToLower(name)
 	slug = nonAlphanumeric.ReplaceAllString(slug, "-")
 	slug = strings.Trim(slug, "-")
+	if len(slug) > maxGeneratedSlugLength {
+		slug = strings.TrimRight(slug[:maxGeneratedSlugLength], "-")
+	}
 	if slug == "" {
 		slug = "org"
 	}
