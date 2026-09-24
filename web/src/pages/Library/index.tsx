@@ -375,7 +375,7 @@ export function Library() {
                 to="/"
                 style={{
                   background: "var(--color-accent)",
-                  color: "var(--color-text)",
+                  color: "var(--color-on-accent)",
                   borderRadius: 8,
                   padding: "10px 24px",
                   fontSize: 14,

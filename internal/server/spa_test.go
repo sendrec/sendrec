@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -105,21 +106,22 @@ func serveSPAWithNonce(t *testing.T, s *spaFileServer, nonce string) string {
 }
 
 // BRANDING_DEFAULT_COLOR_ACCENT already colours the viewer pages; it colours
-// the dashboard too, in both themes. #275.
+// the dashboard too, each theme with its own readable shade of it. #275.
 func TestSPA_AppliesInstanceAccent(t *testing.T) {
 	fsys := fstest.MapFS{"index.html": {Data: []byte(brandedTestIndex)}}
-	body := serveSPAWithNonce(t, newSPAFileServer(fsys, "", "", "", "#1a237e"), "n0nce")
+	body := serveSPAWithNonce(t, newSPAFileServer(fsys, "", "", "", "#7c3aed"), "n0nce")
 
 	// The CSP only lets a <style> through with the request's nonce.
 	if !strings.Contains(body, `<style nonce="n0nce">`) {
 		t.Fatalf("want a nonced style element, got:\n%s", body)
 	}
 	for _, want := range []string{
-		`:root,[data-theme="light"]{`,
-		`--color-accent:#1a237e;`,
-		`--color-accent-hover:color-mix(in srgb,#1a237e 85%,#000);`,
-		`--color-accent-subtle:color-mix(in srgb,#1a237e 12%,transparent);`,
-		`--color-drag-highlight:color-mix(in srgb,#1a237e 5%,transparent);`,
+		// Purple reads on the light page as given; the dark theme gets its own
+		// lighter shade, checked below.
+		`:root{--color-accent:#`,
+		`[data-theme="light"]{--color-accent:#7c3aed;`,
+		`--color-accent-subtle:rgba(124,58,237,0.12);`,
+		`--color-drag-highlight:rgba(124,58,237,0.05);`,
 		`--color-on-accent:#ffffff;`,
 	} {
 		if !strings.Contains(body, want) {
@@ -128,17 +130,43 @@ func TestSPA_AppliesInstanceAccent(t *testing.T) {
 	}
 }
 
-// Text on an accent button has to stay readable whatever colour is chosen.
-func TestSPA_AccentTextContrasts(t *testing.T) {
-	for accent, want := range map[string]string{
-		"#1a237e": "#ffffff", // navy
-		"#ffee00": "#111111", // yellow
-		"#00b67a": "#111111", // SendRec's own green is light enough for dark text
-		"#d32f2f": "#ffffff", // red
-	} {
-		if got := onAccentColor(accent); got != want {
-			t.Errorf("onAccentColor(%s) = %s, want %s", accent, got, want)
+// The accent is link text, focus rings and button fill, on two backgrounds.
+// Whatever colour an operator picks, every one of those has to stay readable
+// (WCAG AA, 4.5:1), hover included. Swept across the colour cube.
+func TestAccentShades_StayReadable(t *testing.T) {
+	for r := 0; r < 256; r += 17 {
+		for g := 0; g < 256; g += 17 {
+			for b := 0; b < 256; b += 17 {
+				accent := fmt.Sprintf("#%02x%02x%02x", r, g, b)
+				for _, theme := range themes {
+					sh := accentShades(accent, theme)
+					for _, pair := range []struct{ what, fg, bg string }{
+						{"accent on background", sh.accent, theme.background},
+						{"accent on surface", sh.accent, theme.surface},
+						{"button text", sh.onAccent, sh.accent},
+						{"button text on hover", sh.onAccent, sh.hover},
+					} {
+						if c := contrast(pair.fg, pair.bg); c < 4.5 {
+							t.Fatalf("%s, %s theme: %s %s on %s is %.2f:1", accent, theme.name, pair.what, pair.fg, pair.bg, c)
+						}
+					}
+				}
+			}
 		}
+	}
+}
+
+// Only as much change as readability needs: a colour that already reads is
+// used exactly as given.
+func TestAccentShades_KeepAReadableColour(t *testing.T) {
+	if got := accentShades("#7c3aed", themes[1]).accent; got != "#7c3aed" {
+		t.Errorf("light theme changed a readable purple to %s", got)
+	}
+	if got := accentShades("#ffee00", themes[0]).accent; got != "#ffee00" {
+		t.Errorf("yellow reads on the dark theme, got %s", got)
+	}
+	if got := accentShades("#ffee00", themes[1]).accent; got == "#ffee00" {
+		t.Error("yellow cannot be link text on the light theme")
 	}
 }
 
