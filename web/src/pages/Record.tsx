@@ -46,6 +46,7 @@ export function Record() {
   const [uploadStep, setUploadStep] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [recordedVideoId, setRecordedVideoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [loadingLimits, setLoadingLimits] = useState(true);
@@ -108,6 +109,7 @@ export function Record() {
         body: JSON.stringify({ status: "ready" }),
       });
 
+      setRecordedVideoId(result.id);
       setShareUrl(`${window.location.origin}/watch/${result.shareToken}`);
     } catch (err) {
       if (videoId) {
@@ -162,6 +164,7 @@ export function Record() {
 
   function recordAnother() {
     setShareUrl(null);
+    setRecordedVideoId(null);
     setError(null);
   }
 
@@ -271,6 +274,9 @@ export function Record() {
             <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
               Watch video
             </a>
+            {recordedVideoId && (
+              <Link to={`/videos/${recordedVideoId}`} className="btn-outline">Video settings</Link>
+            )}
             <button className="btn-outline" onClick={recordAnother}>Record another</button>
             <Link to="/library" className="btn-ghost">Go to Library</Link>
           </div>

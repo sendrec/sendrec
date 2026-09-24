@@ -448,6 +448,39 @@ describe("Record", () => {
     });
   });
 
+  // Straight to the video's own page, where its title, sharing and the rest of
+  // its settings live, rather than via the library. #257.
+  it("links to the new video's settings on share page", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 0,
+      maxVideoDurationSeconds: 0,
+      videosUsedThisMonth: 0,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({
+      id: "video-9",
+      uploadUrl: "https://s3.example.com/upload",
+      shareToken: "token-settings",
+    });
+
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const blob = new Blob(["video"], { type: "video/webm" });
+    await act(async () => {
+      capturedOnRecordingComplete!(blob, 30);
+    });
+
+    await waitFor(() => {
+      const settingsLink = screen.getByText("Video settings");
+      expect(settingsLink.closest("a")).toHaveAttribute("href", "/videos/video-9");
+    });
+  });
+
   it("shows go to library link on share page", async () => {
     mockApiFetch.mockResolvedValueOnce({
       maxVideosPerMonth: 0,
