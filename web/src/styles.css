@@ -4160,9 +4160,9 @@ textarea.form-input {
   border-radius: 3px;
   font-size: 11px;
   font-weight: 600;
-  background: rgba(0, 182, 122, 0.12);
+  background: var(--color-accent-subtle);
   color: var(--color-accent);
-  border: 1px solid rgba(0, 182, 122, 0.25);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
 
 .status-badge--processing {

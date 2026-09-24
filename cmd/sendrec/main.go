@@ -182,6 +182,7 @@ func main() {
 		MaxWorkspaces:             int(getEnvInt64("MAX_WORKSPACES", int64(plans.Free.MaxOrgsOwned))),
 		BrandingLogoURL:           os.Getenv("BRANDING_DEFAULT_LOGO_URL"),
 		BrandingName:              os.Getenv("BRANDING_DEFAULT_NAME"),
+		BrandingColorAccent:       os.Getenv("BRANDING_DEFAULT_COLOR_ACCENT"),
 		S3PublicEndpoint:          os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EnableDocs:                getEnv("API_DOCS_ENABLED", "false") == "true",
 		BrandingEnabled:           getEnv("BRANDING_ENABLED", "false") == "true",
