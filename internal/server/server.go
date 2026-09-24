@@ -43,6 +43,7 @@ type Config struct {
 	MaxWorkspaces             int
 	BrandingLogoURL           string
 	BrandingName              string
+	BrandingColorAccent       string
 	S3PublicEndpoint          string
 	EnableDocs                bool
 	BrandingEnabled           bool
@@ -92,6 +93,7 @@ type Server struct {
 	planBadgeEnabled    bool
 	analyticsScript     string
 	brandingName        string
+	brandingColorAccent string
 	brandingLogoURL     string
 	version             string
 }
@@ -107,7 +109,7 @@ func New(cfg Config) *Server {
 		BrandingLogoURL:       cfg.BrandingLogoURL,
 	}))
 
-	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript, version: cfg.Version, brandingName: cfg.BrandingName, brandingLogoURL: cfg.BrandingLogoURL}
+	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript, version: cfg.Version, brandingName: cfg.BrandingName, brandingColorAccent: cfg.BrandingColorAccent, brandingLogoURL: cfg.BrandingLogoURL}
 
 	if cfg.DB != nil {
 		jwtSecret := cfg.JWTSecret
@@ -575,7 +577,7 @@ func (s *Server) routes() {
 	}
 
 	if s.webFS != nil {
-		spa := newSPAFileServer(s.webFS, s.analyticsScript, s.brandingName, s.brandingLogoURL)
+		spa := newSPAFileServer(s.webFS, s.analyticsScript, s.brandingName, s.brandingLogoURL, s.brandingColorAccent)
 		s.router.NotFound(spa.ServeHTTP)
 	}
 }

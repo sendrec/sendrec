@@ -352,7 +352,7 @@ Re-measure when you change resolution limits, enable transcription or noise redu
 | `BRANDING_DEFAULT_COLOR_BACKGROUND` | Page background, as `#rrggbb` | — |
 | `BRANDING_DEFAULT_COLOR_SURFACE` | Card and panel colour, as `#rrggbb` | — |
 | `BRANDING_DEFAULT_COLOR_TEXT` | Text colour, as `#rrggbb` | — |
-| `BRANDING_DEFAULT_COLOR_ACCENT` | Accent colour for buttons and links, as `#rrggbb` | — |
+| `BRANDING_DEFAULT_COLOR_ACCENT` | Accent colour for buttons and links, as `#rrggbb`: on viewer pages and across the app, in light and dark themes. Hover and highlight shades are mixed from it, and button text turns white or near-black, whichever reads better | — |
 | `BRANDING_DEFAULT_FOOTER_TEXT` | Footer text on those pages | — |
 
 ### Registration
