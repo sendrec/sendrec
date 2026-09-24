@@ -637,6 +637,35 @@ func TestAuthRoutesRateLimited(t *testing.T) {
 	t.Errorf("expected 429 after many rapid requests, last status was %d", lastCode)
 }
 
+// Every page load refreshes the session. Sharing the login limit meant a few
+// quick reloads, or a few colleagues behind one address, signed people out.
+// Refresh gets its own, looser bucket, and spending the login bucket leaves
+// it alone. #272.
+func TestRefreshHasItsOwnRateLimit(t *testing.T) {
+	srv, _ := newServerWithDB(t)
+
+	for i := 0; i < 10; i++ {
+		executeRequestWithBody(srv, http.MethodPost, "/api/auth/login", "{}")
+	}
+	if rec := executeRequestWithBody(srv, http.MethodPost, "/api/auth/login", "{}"); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("login should be throttled by now, got %d", rec.Code)
+	}
+
+	for i := 0; i < 15; i++ {
+		if rec := executeRequestWithBody(srv, http.MethodPost, "/api/auth/refresh", ""); rec.Code == http.StatusTooManyRequests {
+			t.Fatalf("refresh %d throttled by the login limit", i+1)
+		}
+	}
+
+	// Still limited, just not by the login budget.
+	for i := 0; i < 100; i++ {
+		if rec := executeRequestWithBody(srv, http.MethodPost, "/api/auth/refresh", ""); rec.Code == http.StatusTooManyRequests {
+			return
+		}
+	}
+	t.Error("refresh should still be rate limited")
+}
+
 // --- SPA File Server ---
 
 func TestSPAServesExistingFiles(t *testing.T) {
