@@ -41,6 +41,7 @@ type Config struct {
 	MaxVideoDurationSeconds   int
 	MaxPlaylists              int
 	MaxWorkspaces             int
+	BrandingLogoURL           string
 	S3PublicEndpoint          string
 	EnableDocs                bool
 	BrandingEnabled           bool
@@ -100,6 +101,7 @@ func New(cfg Config) *Server {
 		BaseURL:               cfg.BaseURL,
 		StorageEndpoint:       cfg.S3PublicEndpoint,
 		AllowedFrameAncestors: cfg.AllowedFrameAncestors,
+		BrandingLogoURL:       cfg.BrandingLogoURL,
 	}))
 
 	s := &Server{router: r, pinger: cfg.Pinger, db: cfg.DB, webFS: cfg.WebFS, enableDocs: cfg.EnableDocs, registrationEnabled: cfg.RegistrationEnabled, planBadgeEnabled: cfg.PlanBadgeEnabled, analyticsScript: cfg.AnalyticsScript, version: cfg.Version}

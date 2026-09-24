@@ -180,6 +180,7 @@ func main() {
 		MaxVideoDurationSeconds:   int(getEnvInt64("MAX_VIDEO_DURATION_SECONDS", int64(plans.Free.MaxVideoDurationSeconds))),
 		MaxPlaylists:              int(getEnvInt64("MAX_PLAYLISTS", int64(plans.Free.MaxPlaylists))),
 		MaxWorkspaces:             int(getEnvInt64("MAX_WORKSPACES", int64(plans.Free.MaxOrgsOwned))),
+		BrandingLogoURL:           os.Getenv("BRANDING_DEFAULT_LOGO_URL"),
 		S3PublicEndpoint:          os.Getenv("S3_PUBLIC_ENDPOINT"),
 		EnableDocs:                getEnv("API_DOCS_ENABLED", "false") == "true",
 		BrandingEnabled:           getEnv("BRANDING_ENABLED", "false") == "true",
