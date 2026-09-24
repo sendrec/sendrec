@@ -37,6 +37,7 @@ sendrec:
     maxVideosPerMonth: "0"        # per-user monthly recording quota ("" = free plan, 25)
     maxVideoDurationSeconds: "0"  # per-recording length cap ("" = free plan, 300s)
     maxPlaylists: "0"             # per-user playlist cap ("" = free plan, 3)
+    maxWorkspaces: "0"            # per-user owned-workspace cap ("" = free plan, 1)
 
     # Encodes per app process. Extra edits queue. Raise this and the measured
     # memory request together; transcription and decode-only jobs are separate.

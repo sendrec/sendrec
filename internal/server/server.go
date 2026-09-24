@@ -40,6 +40,7 @@ type Config struct {
 	MaxVideosPerMonth         int
 	MaxVideoDurationSeconds   int
 	MaxPlaylists              int
+	MaxWorkspaces             int
 	S3PublicEndpoint          string
 	EnableDocs                bool
 	BrandingEnabled           bool
@@ -121,6 +122,7 @@ func New(cfg Config) *Server {
 			s.authHandler.SetEmailSender(cfg.EmailSender, baseURL)
 		}
 		s.videoHandler = video.NewHandler(cfg.DB, cfg.Storage, baseURL, cfg.MaxUploadBytes, cfg.MaxVideosPerMonth, cfg.MaxVideoDurationSeconds, cfg.MaxPlaylists, jwtSecret, secureCookies)
+		s.videoHandler.SetMaxOrgsOwned(cfg.MaxWorkspaces)
 		if cfg.CommentNotifier != nil {
 			s.videoHandler.SetCommentNotifier(cfg.CommentNotifier)
 		}
@@ -161,6 +163,7 @@ func New(cfg Config) *Server {
 		}
 
 		s.orgHandler = organization.NewHandler(cfg.DB, baseURL)
+		s.orgHandler.SetMaxOrgsOwned(cfg.MaxWorkspaces)
 		if sender, ok := cfg.EmailSender.(organization.EmailSender); ok {
 			s.orgHandler.SetEmailSender(sender)
 		}

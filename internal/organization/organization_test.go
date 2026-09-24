@@ -136,8 +136,94 @@ func TestCreate_FreeLimitOneOrg(t *testing.T) {
 	}
 
 	errMsg := parseErrorResponse(t, rec.Body.Bytes())
-	if errMsg != "free plan allows 1 organization" {
-		t.Errorf("expected error %q, got %q", "free plan allows 1 organization", errMsg)
+	if errMsg != "free plan allows 1 workspace" {
+		t.Errorf("expected error %q, got %q", "free plan allows 1 workspace", errMsg)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+// A self-hosted install without billing can never leave the free plan, so the
+// operator has to be able to lift the cap — MAX_WORKSPACES=0, the same way
+// MAX_VIDEOS_PER_MONTH=0 lifts the video cap. #255.
+func TestCreate_UnlimitedWorkspaces(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, testBaseURL)
+	handler.SetMaxOrgsOwned(0)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	mock.ExpectQuery(`SELECT subscription_plan FROM users WHERE id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"subscription_plan"}).AddRow("free"))
+
+	// No count of owned workspaces: with no cap there is nothing to compare it to.
+	mock.ExpectQuery(`INSERT INTO organizations`).
+		WithArgs("Second Org", "second-org").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "slug", "created_at", "updated_at"}).
+			AddRow("org-2", "second-org", now, now))
+
+	mock.ExpectExec(`INSERT INTO organization_members`).
+		WithArgs("org-2", testUserID).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	body, _ := json.Marshal(createOrgRequest{Name: "Second Org"})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/organizations", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/organizations", body))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet pgxmock expectations: %v", err)
+	}
+}
+
+func TestCreate_ConfiguredWorkspaceLimit(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	handler := NewHandler(mock, testBaseURL)
+	handler.SetMaxOrgsOwned(3)
+
+	mock.ExpectQuery(`SELECT subscription_plan FROM users WHERE id = \$1`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"subscription_plan"}).AddRow("free"))
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE user_id = \$1 AND role = 'owner'`).
+		WithArgs(testUserID).
+		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(3))
+
+	body, _ := json.Marshal(createOrgRequest{Name: "Fourth Org"})
+
+	r := chi.NewRouter()
+	r.With(newAuthMiddleware()).Post("/api/organizations", handler.Create)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, authenticatedRequest(t, http.MethodPost, "/api/organizations", body))
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
+	}
+
+	// The configured number, not the free plan's default — the frontend shows this.
+	errMsg := parseErrorResponse(t, rec.Body.Bytes())
+	if errMsg != "free plan allows 3 workspaces" {
+		t.Errorf("expected error %q, got %q", "free plan allows 3 workspaces", errMsg)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

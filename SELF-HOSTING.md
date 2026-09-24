@@ -334,6 +334,7 @@ Re-measure when you change resolution limits, enable transcription or noise redu
 | `MAX_VIDEOS_PER_MONTH` | Maximum videos a user can create per month (recordings + uploads). Set to `0` for unlimited | `25` |
 | `MAX_VIDEO_DURATION_SECONDS` | Maximum recording duration in seconds. Set to `0` for unlimited | `300` (5 min) |
 | `MAX_PLAYLISTS` | Maximum playlists a free-tier user can create. Set to `0` for unlimited | `3` |
+| `MAX_WORKSPACES` | Maximum workspaces a free-tier user can own. Set to `0` for unlimited | `1` |
 
 ### API Documentation
 
@@ -439,7 +440,7 @@ Enable subscription billing with [Creem](https://creem.io) (EU merchant of recor
 
 **Creem webhook URL:** Configure `https://your-domain.com/api/webhooks/creem` in the Creem dashboard. Subscribe to all subscription events (`subscription.active`, `subscription.paid`, `subscription.canceled`, `subscription.expired`).
 
-**Self-hosters without billing:** Skip these variables entirely. Control limits with `MAX_VIDEOS_PER_MONTH` and `MAX_VIDEO_DURATION_SECONDS` (set to `0` for unlimited).
+**Self-hosters without billing:** Skip these variables entirely. Without billing every user stays on the free plan, so control limits with `MAX_VIDEOS_PER_MONTH`, `MAX_VIDEO_DURATION_SECONDS`, `MAX_PLAYLISTS` and `MAX_WORKSPACES` (set to `0` for unlimited).
 
 ### Email notifications (optional)
 
@@ -579,12 +580,14 @@ When using a managed S3 provider, you don't need the `garage` service in your Do
 
 ## Removing usage limits
 
-By default, SendRec enforces free tier limits (25 videos/month, 5 min max duration). For self-hosted instances, disable them:
+By default, SendRec enforces free tier limits (25 videos/month, 5 min max duration, 3 playlists, 1 workspace). For self-hosted instances, disable them:
 
 ```yaml
 environment:
   - MAX_VIDEOS_PER_MONTH=0        # 0 = unlimited
   - MAX_VIDEO_DURATION_SECONDS=0  # 0 = unlimited
+  - MAX_PLAYLISTS=0               # 0 = unlimited
+  - MAX_WORKSPACES=0              # 0 = unlimited
 ```
 
 ## Enabling transcription

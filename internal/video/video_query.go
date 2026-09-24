@@ -165,13 +165,13 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		userPlan = plan
 	}
 
-	maxOrgsOwned := plans.Free.MaxOrgsOwned
+	maxOrgsOwned := h.maxOrgsOwned
 	maxOrgMembers := plans.Free.MaxOrgMembers
 	var orgsUsed, orgMembersUsed int
 	if plans.IsPaid(userPlan) {
 		maxOrgsOwned = 0
 		maxOrgMembers = 0
-	} else {
+	} else if maxOrgsOwned > 0 {
 		_ = h.db.QueryRow(r.Context(),
 			`SELECT COUNT(*) FROM organization_members WHERE user_id = $1 AND role = 'owner'`,
 			userID,
