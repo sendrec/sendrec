@@ -5262,7 +5262,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-    put:
+    patch:
       tags: [Organizations]
       summary: Update an organization
       description: Updates organization settings. Only owners and admins can update.
