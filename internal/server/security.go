@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/sendrec/sendrec/internal/httputil"
@@ -12,6 +13,9 @@ type SecurityConfig struct {
 	BaseURL               string
 	StorageEndpoint       string
 	AllowedFrameAncestors string
+	// BRANDING_DEFAULT_LOGO_URL. Viewer pages render it in an <img>, so a logo
+	// on another host needs its origin in img-src or the browser blocks it.
+	BrandingLogoURL string
 }
 
 func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
@@ -20,6 +24,13 @@ func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
 	storageSuffix := ""
 	if cfg.StorageEndpoint != "" {
 		storageSuffix = " " + cfg.StorageEndpoint
+	}
+
+	// Images only, and only the origin: a logo host has no business serving
+	// media or scripts, and a same-host path is already covered by 'self'.
+	imgSuffix := storageSuffix
+	if origin := httpOrigin(cfg.BrandingLogoURL); origin != "" {
+		imgSuffix += " " + origin
 	}
 
 	frameAncestors := "'self'"
@@ -44,7 +55,7 @@ func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
 
 			csp := fmt.Sprintf(
 				"default-src 'self'; img-src 'self' data:%s; media-src 'self' data:%s; script-src 'self' 'nonce-%s'; style-src 'self' 'nonce-%s'; connect-src 'self'%s; frame-ancestors %s;",
-				storageSuffix, storageSuffix, nonce, nonce, storageSuffix, cspFrameAncestors,
+				imgSuffix, storageSuffix, nonce, nonce, storageSuffix, cspFrameAncestors,
 			)
 			w.Header().Set("Content-Security-Policy", csp)
 
@@ -59,4 +70,14 @@ func securityHeaders(cfg SecurityConfig) func(http.Handler) http.Handler {
 
 func hasHTTPS(baseURL string) bool {
 	return len(baseURL) >= 8 && baseURL[:8] == "https://"
+}
+
+// httpOrigin returns scheme://host for an absolute http(s) URL, and "" for
+// anything else, including a path on this host.
+func httpOrigin(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
 }
