@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v5"
 	"github.com/sendrec/sendrec/internal/auth"
+	"github.com/sendrec/sendrec/internal/validate"
 )
 
 const testJWTSecret = "test-secret-for-org-tests"
@@ -817,6 +819,25 @@ func TestGenerateSlug(t *testing.T) {
 		got := generateSlug(tt.name)
 		if got != tt.want {
 			t.Errorf("generateSlug(%q) = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+// Any name the name limit allows makes a slug the slug limit allows, with room
+// for the suffix a clash adds. #271.
+func TestGenerateSlug_FitsTheSlugLimit(t *testing.T) {
+	for _, name := range []string{
+		strings.Repeat("a", validate.MaxOrgNameLength),
+		strings.Repeat("ab ", validate.MaxOrgNameLength/3),
+		// Cut lands just after a separator: no trailing hyphen.
+		strings.Repeat("a", maxGeneratedSlugLength) + " tail",
+	} {
+		slug := generateSlug(name)
+		if msg := validate.OrgSlug(slug + "-ffff"); msg != "" {
+			t.Errorf("generateSlug(%d chars) = %d chars, too long with a suffix: %s", len(name), len(slug), msg)
+		}
+		if strings.HasSuffix(slug, "-") {
+			t.Errorf("generateSlug(%d chars) = %q, ends in a hyphen", len(name), slug)
 		}
 	}
 }
