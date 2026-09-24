@@ -260,17 +260,26 @@ func (s *Server) routes() {
 
 	if s.authHandler != nil {
 		authLimiter := ratelimit.NewLimiter(0.5, 5)
+		// Every page load refreshes the session, so refresh and logout get their
+		// own bucket: sharing the one above let a few reloads, or colleagues
+		// behind one address, sign people out. #272.
+		sessionLimiter := ratelimit.NewLimiter(2, 20)
 		s.router.Route("/api/auth", func(r chi.Router) {
-			r.Use(authLimiter.Middleware)
 			r.Use(maxBodySize(64 * 1024))
-			r.Post("/register", s.authHandler.Register)
-			r.Post("/login", s.authHandler.Login)
-			r.Post("/refresh", s.authHandler.Refresh)
-			r.Post("/logout", s.authHandler.Logout)
-			r.Post("/forgot-password", s.authHandler.ForgotPassword)
-			r.Post("/reset-password", s.authHandler.ResetPassword)
-			r.Post("/confirm-email", s.authHandler.ConfirmEmail)
-			r.Post("/resend-confirmation", s.authHandler.ResendConfirmation)
+			r.Group(func(r chi.Router) {
+				r.Use(sessionLimiter.Middleware)
+				r.Post("/refresh", s.authHandler.Refresh)
+				r.Post("/logout", s.authHandler.Logout)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(authLimiter.Middleware)
+				r.Post("/register", s.authHandler.Register)
+				r.Post("/login", s.authHandler.Login)
+				r.Post("/forgot-password", s.authHandler.ForgotPassword)
+				r.Post("/reset-password", s.authHandler.ResetPassword)
+				r.Post("/confirm-email", s.authHandler.ConfirmEmail)
+				r.Post("/resend-confirmation", s.authHandler.ResendConfirmation)
+			})
 		})
 
 		if s.ssoHandler != nil {

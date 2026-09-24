@@ -141,7 +141,7 @@ Set any of these to `"0"` for unlimited. The chart ships `"0"` for all three, so
 
 If you expose the Service directly (`service.type: LoadBalancer` or `NodePort`), set `trustedProxy: "false"`. The chart prints a warning on install and upgrade when it detects that combination.
 
-Rate limits are fixed per route group (token bucket, requests/second + burst): auth and watch-page auth `0.5/5`, video writes `2/10`, comment writes `0.2/3`, comment reads and watch pages `5/20`. Rejected requests get `429` with `Retry-After: 10`. Only disable rate limiting in test/e2e stacks where the whole suite shares one source IP.
+Rate limits are fixed per route group (token bucket, requests/second + burst): auth and watch-page auth `0.5/5`, session refresh and logout `2/20`, video writes `2/10`, comment writes `0.2/3`, comment reads and watch pages `5/20`. Rejected requests get `429` with `Retry-After: 10`. Only disable rate limiting in test/e2e stacks where the whole suite shares one source IP.
 
 `webhookAllowPrivateTargets` guards an SSRF surface: users configure their own webhook URLs. Left `"false"`, targets resolving to loopback, RFC1918, link-local (including the `169.254.169.254` cloud metadata endpoint), multicast or unspecified addresses are rejected, and plaintext `http://` targets are refused. Only turn it on for local development.
 
