@@ -829,8 +829,8 @@ func TestGenerateSlug_FitsTheSlugLimit(t *testing.T) {
 	for _, name := range []string{
 		strings.Repeat("a", validate.MaxOrgNameLength),
 		strings.Repeat("ab ", validate.MaxOrgNameLength/3),
-		// Cut lands just after a separator: no trailing hyphen.
-		strings.Repeat("a", maxGeneratedSlugLength) + " tail",
+		// The cut lands just after a separator: no trailing hyphen.
+		strings.Repeat("a", maxGeneratedSlugLength-1) + " tail",
 	} {
 		slug := generateSlug(name)
 		if msg := validate.OrgSlug(slug + "-ffff"); msg != "" {

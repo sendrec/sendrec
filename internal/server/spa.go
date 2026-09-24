@@ -108,11 +108,13 @@ func (s *spaFileServer) brandIndex(page, nonce string) string {
 		meta.WriteString(`<meta name="sendrec:brand-logo" content="` + logo + `">` + "\n")
 	}
 	if s.brandAccent != "" {
-		// Both themes take the one colour; the shades are mixed from it, and
-		// button text goes whichever way reads better on it.
-		a := s.brandAccent
-		fmt.Fprintf(&meta, `<style nonce="%s">:root,[data-theme="light"]{--color-accent:%s;--color-accent-hover:color-mix(in srgb,%s 85%%,#000);--color-accent-subtle:color-mix(in srgb,%s 12%%,transparent);--color-drag-highlight:color-mix(in srgb,%s 5%%,transparent);--color-on-accent:%s;}</style>`+"\n",
-			html.EscapeString(nonce), a, a, a, a, onAccentColor(a))
+		fmt.Fprintf(&meta, `<style nonce="%s">`, html.EscapeString(nonce))
+		for _, theme := range themes {
+			sh := accentShades(s.brandAccent, theme)
+			fmt.Fprintf(&meta, `%s{--color-accent:%s;--color-accent-hover:%s;--color-accent-subtle:%s;--color-drag-highlight:%s;--color-on-accent:%s;}`,
+				theme.selector, sh.accent, sh.hover, rgba(sh.accent, 0.12), rgba(sh.accent, 0.05), sh.onAccent)
+		}
+		meta.WriteString("</style>\n")
 	}
 	if meta.Len() == 0 {
 		return page
@@ -120,21 +122,97 @@ func (s *spaFileServer) brandIndex(page, nonce string) string {
 	return strings.Replace(page, "</head>", meta.String()+"</head>", 1)
 }
 
-// onAccentColor picks white or near-black text for a hex background, whichever
-// contrasts more (WCAG relative luminance).
-func onAccentColor(hex string) string {
-	channel := func(i int) float64 {
-		v, _ := strconv.ParseUint(hex[i:i+2], 16, 8)
-		c := float64(v) / 255
-		if c <= 0.03928 {
-			return c / 12.92
+// The dashboard's two themes, as styles.css defines them: the accent has to
+// read on each one's page background and card surface.
+type theme struct {
+	name, selector, background, surface string
+}
+
+var themes = []theme{
+	{"dark", ":root", "#0a1628", "#111d32"},
+	{"light", `[data-theme="light"]`, "#f8fafc", "#ffffff"},
+}
+
+type shades struct {
+	accent, hover, onAccent string
+}
+
+// minContrast is WCAG AA for normal text. The accent is link text as well as
+// button fill, so it is held to the text standard.
+const minContrast = 4.5
+
+// accentShades fits the operator's accent to a theme. The accent is moved
+// toward white or black only as far as it takes to read on the theme's
+// backgrounds, so a colour that already reads is used exactly as given. No
+// colour reads on both a near-white and a navy page, so most accents are
+// kept in one theme and shifted in the other. Button
+// text is white or black, whichever contrasts more, and hover moves away from
+// the text, so hovering can only make the label easier to read.
+func accentShades(hex string, t theme) shades {
+	c := parseHex(hex)
+	towards := [3]float64{0, 0, 0}
+	if luminance(parseHex(t.background)) < 0.5 {
+		towards = [3]float64{255, 255, 255}
+	}
+	for range 40 {
+		if contrastOf(c, parseHex(t.background)) >= minContrast && contrastOf(c, parseHex(t.surface)) >= minContrast {
+			break
 		}
-		return math.Pow((c+0.055)/1.055, 2.4)
+		// Rounded every step: the hex that is emitted is what gets checked.
+		c = parseHex(toHex(mix(c, towards, 0.05)))
 	}
-	l := 0.2126*channel(1) + 0.7152*channel(3) + 0.0722*channel(5)
-	const dark = 0.0056 // #111111
-	if (1.05)/(l+0.05) >= (l+0.05)/(dark+0.05) {
-		return "#ffffff"
+
+	onAccent, away := "#ffffff", [3]float64{0, 0, 0}
+	if contrastOf(c, [3]float64{0, 0, 0}) > contrastOf(c, [3]float64{255, 255, 255}) {
+		onAccent, away = "#000000", [3]float64{255, 255, 255}
 	}
-	return "#111111"
+	return shades{accent: toHex(c), hover: toHex(mix(c, away, 0.15)), onAccent: onAccent}
+}
+
+func parseHex(hex string) [3]float64 {
+	var c [3]float64
+	for i := range c {
+		v, _ := strconv.ParseUint(hex[1+2*i:3+2*i], 16, 8)
+		c[i] = float64(v)
+	}
+	return c
+}
+
+func toHex(c [3]float64) string {
+	return fmt.Sprintf("#%02x%02x%02x", int(math.Round(c[0])), int(math.Round(c[1])), int(math.Round(c[2])))
+}
+
+func rgba(hex string, alpha float64) string {
+	c := parseHex(hex)
+	return fmt.Sprintf("rgba(%d,%d,%d,%g)", int(c[0]), int(c[1]), int(c[2]), alpha)
+}
+
+func mix(c, towards [3]float64, amount float64) [3]float64 {
+	for i := range c {
+		c[i] += (towards[i] - c[i]) * amount
+	}
+	return c
+}
+
+// luminance is WCAG relative luminance.
+func luminance(c [3]float64) float64 {
+	var l [3]float64
+	for i, v := range c {
+		v /= 255
+		if v <= 0.03928 {
+			l[i] = v / 12.92
+		} else {
+			l[i] = math.Pow((v+0.055)/1.055, 2.4)
+		}
+	}
+	return 0.2126*l[0] + 0.7152*l[1] + 0.0722*l[2]
+}
+
+func contrastOf(a, b [3]float64) float64 {
+	la, lb := luminance(a), luminance(b)
+	return (math.Max(la, lb) + 0.05) / (math.Min(la, lb) + 0.05)
+}
+
+func contrast(a, b string) float64 {
+	return contrastOf(parseHex(a), parseHex(b))
 }
