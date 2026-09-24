@@ -47,12 +47,22 @@ export function GeneralSection({
 
     setSavingName(true);
     try {
-      await apiFetch(`/api/organizations/${orgId}`, {
+      const saved = await apiFetch<OrgDetail>(`/api/organizations/${orgId}`, {
         method: "PATCH",
         body: JSON.stringify({ name: orgName.trim(), slug: orgSlug.trim(), icon: orgIcon.trim() }),
       });
+      // The server trims and normalises, and its idea of whitespace is wider
+      // than the browser's; show what it stored rather than what was typed.
+      const stored = {
+        name: saved?.name ?? orgName.trim(),
+        slug: saved?.slug ?? orgSlug.trim(),
+        icon: saved ? saved.icon ?? null : orgIcon.trim() || null,
+      };
       setNameMessage("Workspace updated");
-      setOrg((prev) => prev ? { ...prev, name: orgName.trim(), slug: orgSlug.trim(), icon: orgIcon.trim() || null } : prev);
+      setOrg((prev) => (prev ? { ...prev, ...stored } : prev));
+      setOrgName(stored.name);
+      setOrgSlug(stored.slug);
+      setOrgIcon(stored.icon ?? "");
       announceOrgUpdate();
     } catch (err) {
       setNameError(err instanceof Error ? err.message : "Failed to update workspace");

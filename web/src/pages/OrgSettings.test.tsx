@@ -282,6 +282,28 @@ describe("OrgSettings", () => {
     });
   });
 
+  // The server is the one that trims and normalises; the form shows what it
+  // actually stored rather than its own guess.
+  it("shows the icon the server saved, not the one typed", async () => {
+    const user = userEvent.setup();
+    mockOwnerResponses();
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Acme Corp")).toBeInTheDocument();
+    });
+
+    mockApiFetch.mockResolvedValueOnce({ ...mockOrg, icon: null });
+
+    await user.type(screen.getByLabelText("Icon"), "\u0085");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Workspace updated")).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Icon")).toHaveValue("");
+  });
+
   it("displays pending invites", async () => {
     mockOwnerResponses();
     renderOrgSettings();

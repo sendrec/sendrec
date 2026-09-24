@@ -383,6 +383,10 @@ input:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* Also carries .org-switcher-icon in the menu, whose fixed 16px suits an SVG
+     glyph but not a few letters of text. */
+  width: auto;
+  height: auto;
   min-width: 16px;
   font-size: 14px;
   line-height: 1;

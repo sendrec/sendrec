@@ -68,7 +68,10 @@ export function useOrganization() {
           setCurrentOrgId(null);
         }
       })
-      .catch(() => setOrgs([]));
+      // A refresh tops up a list the page already relies on. On a transient
+      // error keep what is there: an empty list drops the selected workspace
+      // and sends the user out of its settings.
+      .catch(() => {});
   }, []);
 
   useEffect(() => subscribeToOrgUpdates(refreshOrgs), [refreshOrgs]);
