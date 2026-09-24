@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { Layout } from "./Layout";
 import { expectNoA11yViolations } from "../test-utils/a11y";
+import { ApiError } from "../api/client";
 
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -13,10 +14,14 @@ vi.mock("react-router-dom", async () => {
 
 const mockSetAccessToken = vi.fn();
 const mockApiFetch = vi.fn();
-vi.mock("../api/client", () => ({
-  setAccessToken: (...args: unknown[]) => mockSetAccessToken(...args),
-  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
-}));
+vi.mock("../api/client", async () => {
+  const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
+  return {
+    ApiError: actual.ApiError,
+    setAccessToken: (...args: unknown[]) => mockSetAccessToken(...args),
+    apiFetch: (...args: unknown[]) => mockApiFetch(...args),
+  };
+});
 
 const mockSwitchOrg = vi.fn();
 const mockCreateOrg = vi.fn();
@@ -377,16 +382,33 @@ describe("Layout", () => {
     expect(mockCreateOrg).toHaveBeenCalledWith("My Team");
   });
 
-  it("shows error when workspace creation fails", async () => {
+  // The cap is configurable on self-hosted installs (MAX_WORKSPACES), so the
+  // number shown has to come from the server rather than be written in here.
+  it("shows the server's limit when the workspace cap is reached", async () => {
     const user = userEvent.setup();
-    mockCreateOrg.mockRejectedValueOnce(new Error("limit"));
+    mockCreateOrg.mockRejectedValueOnce(new ApiError(403, "free plan allows 3 workspaces"));
     renderLayout();
     await user.click(screen.getByRole("button", { name: "Switch workspace" }));
     await user.click(screen.getByText("New Workspace"));
     await user.type(screen.getByPlaceholderText("Workspace name"), "My Team");
     await user.keyboard("{Enter}");
     await waitFor(() => {
-      expect(screen.getByText("Failed to create workspace. Free plan allows 1 workspace.")).toBeInTheDocument();
+      expect(screen.getByText("Failed to create workspace. Free plan allows 3 workspaces.")).toBeInTheDocument();
+    });
+  });
+
+  // Anything else — a dropped connection, a server error — is not a plan limit,
+  // and saying it was sends people looking for an upgrade they do not need.
+  it("does not blame the plan when creation fails for another reason", async () => {
+    const user = userEvent.setup();
+    mockCreateOrg.mockRejectedValueOnce(new Error("network down"));
+    renderLayout();
+    await user.click(screen.getByRole("button", { name: "Switch workspace" }));
+    await user.click(screen.getByText("New Workspace"));
+    await user.type(screen.getByPlaceholderText("Workspace name"), "My Team");
+    await user.keyboard("{Enter}");
+    await waitFor(() => {
+      expect(screen.getByText("Failed to create workspace. Please try again.")).toBeInTheDocument();
     });
   });
 

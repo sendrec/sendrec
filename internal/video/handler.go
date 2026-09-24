@@ -7,6 +7,7 @@ import (
 
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/email"
+	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/webhook"
 )
 
@@ -47,6 +48,7 @@ type Handler struct {
 	maxVideosPerMonth       int
 	maxVideoDurationSeconds int
 	maxPlaylists            int
+	maxOrgsOwned            int
 	hmacSecret              string
 	secureCookies           bool
 	commentNotifier         CommentNotifier
@@ -70,9 +72,16 @@ func NewHandler(db database.DBTX, s ObjectStorage, baseURL string, maxUploadByte
 		maxVideosPerMonth:       maxVideosPerMonth,
 		maxVideoDurationSeconds: maxVideoDurationSeconds,
 		maxPlaylists:            maxPlaylists,
+		maxOrgsOwned:            plans.Free.MaxOrgsOwned,
 		hmacSecret:              hmacSecret,
 		secureCookies:           secureCookies,
 	}
+}
+
+// SetMaxOrgsOwned is the workspace cap reported to the dashboard. It must match
+// the one organization.Create enforces; see organization.Handler.SetMaxOrgsOwned.
+func (h *Handler) SetMaxOrgsOwned(n int) {
+	h.maxOrgsOwned = n
 }
 
 func (h *Handler) SetCommentNotifier(n CommentNotifier) {

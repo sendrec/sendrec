@@ -16,7 +16,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
-	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/validate"
 )
 
@@ -107,7 +106,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		plan = "free"
 	}
 
-	if plan == "free" {
+	if plan == "free" && h.maxOrgsOwned > 0 {
 		var ownerCount int
 		if err := h.db.QueryRow(r.Context(),
 			`SELECT COUNT(*) FROM organization_members WHERE user_id = $1 AND role = 'owner'`,
@@ -116,8 +115,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusInternalServerError, "failed to check organization limit")
 			return
 		}
-		if ownerCount >= plans.Free.MaxOrgsOwned {
-			httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("free plan allows %d organization", plans.Free.MaxOrgsOwned))
+		if ownerCount >= h.maxOrgsOwned {
+			noun := "workspaces"
+			if h.maxOrgsOwned == 1 {
+				noun = "workspace"
+			}
+			httputil.WriteError(w, http.StatusForbidden, fmt.Sprintf("free plan allows %d %s", h.maxOrgsOwned, noun))
 			return
 		}
 	}

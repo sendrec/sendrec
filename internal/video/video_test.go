@@ -3664,6 +3664,42 @@ func TestLimits_ReturnsLimitsAndUsage(t *testing.T) {
 	}
 }
 
+// The dashboard reads the workspace cap from here, so it has to match what
+// organization.Create enforces — configured, not the free plan's default.
+func TestLimits_ReportsConfiguredWorkspaceLimit(t *testing.T) {
+	for _, configured := range []int{0, 5} {
+		mock, err := pgxmock.NewPool()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		handler := NewHandler(mock, &mockStorage{}, testBaseURL, 0, 0, 0, 0, testJWTSecret, false)
+		handler.SetMaxOrgsOwned(configured)
+
+		expectPlanQuery(mock, "free")
+		mock.ExpectQuery(`SELECT retention_days FROM users WHERE id = \$1`).
+			WithArgs(testUserID).
+			WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(90))
+
+		r := chi.NewRouter()
+		r.With(newAuthMiddleware()).Get("/api/videos/limits", handler.Limits)
+
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, authenticatedRequest(t, http.MethodGet, "/api/videos/limits", nil))
+
+		var resp struct {
+			MaxOrgsOwned int `json:"maxOrgsOwned"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to parse response: %v", err)
+		}
+		if resp.MaxOrgsOwned != configured {
+			t.Errorf("configured %d: expected maxOrgsOwned %d, got %d", configured, configured, resp.MaxOrgsOwned)
+		}
+		mock.Close()
+	}
+}
+
 func TestLimits_UnlimitedSkipsCountQuery(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {

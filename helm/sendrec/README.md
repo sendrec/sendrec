@@ -115,6 +115,7 @@ Set any of these to `"0"` for unlimited. The chart ships `"0"` for all three, so
 | `env.maxVideosPerMonth` | `MAX_VIDEOS_PER_MONTH` | Videos a user may create per month | `0` (app: free plan, `25`) |
 | `env.maxVideoDurationSeconds` | `MAX_VIDEO_DURATION_SECONDS` | Max recording length | `0` (app: free plan, `300`) |
 | `env.maxPlaylists` | `MAX_PLAYLISTS` | Playlists a free-tier user may create | `0` (app: free plan, `3`) |
+| `env.maxWorkspaces` | `MAX_WORKSPACES` | Workspaces a free-tier user may own | `0` (app: free plan, `1`) |
 | `env.maxConcurrentEncodes` | `MAX_CONCURRENT_ENCODES` | ffmpeg encodes allowed to run at once **per app process**. Extra edits queue, holding their downloaded source on disk while they wait. Raise this and the measured memory request together; other workers are outside the gate | `1` |
 
 ### Features

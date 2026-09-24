@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { apiFetch, setAccessToken } from "../api/client";
+import { ApiError, apiFetch, setAccessToken } from "../api/client";
 import { useTheme } from "../hooks/useTheme";
 import { useOrganization } from "../hooks/useOrganization";
 
@@ -70,8 +70,14 @@ export function Layout({ children }: LayoutProps) {
       setNewWorkspaceName("");
       setCreateError(null);
       setOrgDropdownOpen(false);
-    } catch {
-      setCreateError("Failed to create workspace. Free plan allows 1 workspace.");
+    } catch (err) {
+      // A 403 carries the server's limit, which self-hosters configure; anything
+      // else is not a plan limit and should not read like one.
+      const reason =
+        err instanceof ApiError && err.status === 403 && err.message
+          ? err.message.charAt(0).toUpperCase() + err.message.slice(1)
+          : "Please try again";
+      setCreateError(`Failed to create workspace. ${reason}.`);
     }
   }
 
