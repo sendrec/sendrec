@@ -1016,6 +1016,38 @@ describe("Recorder", () => {
       vi.useRealTimers();
     });
 
+    // A capture that never produces a frame is muted from the start, and a
+    // track that starts muted fires no mute event — only its state says so.
+    it("refuses a recording whose capture was muted from the start", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      mockScreenStream.getVideoTracks.mockReturnValue([
+        {
+          muted: true,
+          getSettings: () => ({ width: 1920, height: 1080 }),
+          addEventListener: vi.fn(),
+          stop: vi.fn(),
+        },
+      ]);
+      const onComplete = vi.fn();
+      const onError = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      render(
+        <Recorder onRecordingComplete={onComplete} onRecordingError={onError} />,
+      );
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+
+      expect(screen.getByTestId("capture-stalled-warning")).toBeInTheDocument();
+
+      await act(() => vi.advanceTimersByTime(4000));
+      await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+      await vi.waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+      expect(onComplete).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
     it("does not count a capture muted while the recording is paused", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const handlers = trackWithMuteCapture();
