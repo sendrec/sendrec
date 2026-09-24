@@ -32,11 +32,20 @@ const (
 	// — the last audio packet outlasts the last frame — so this leaves room for
 	// it without leaving room for a capture that died.
 	minVideoCoverage = 0.9
+
+	// And the loss has to be long enough to see. On a short clip a normal
+	// trailing gap is a large share: the largest measured on a healthy recording
+	// was 1.45s, 11% of a 13s clip.
+	minMissingVideoSeconds = 2
 )
 
 type streamDurations struct {
 	Video float64
 	Audio float64
+	// Whether the file has a video stream at all. A missing stream is a capture
+	// that never produced a frame; a stream without a duration is only a
+	// container that leaves durations out.
+	HasVideo bool
 }
 
 func buildStreamDurationArgs(inputPath string) []string {
@@ -55,7 +64,10 @@ var probeStreamDurations = func(ctx context.Context, inputPath string) (streamDu
 	if err != nil {
 		return streamDurations{}, fmt.Errorf("ffprobe streams: %w", err)
 	}
+	return parseStreamDurations(output)
+}
 
+func parseStreamDurations(output []byte) (streamDurations, error) {
 	var parsed struct {
 		Streams []struct {
 			CodecType string `json:"codec_type"`
@@ -74,6 +86,7 @@ var probeStreamDurations = func(ctx context.Context, inputPath string) (streamDu
 		seconds, _ := strconv.ParseFloat(stream.Duration, 64)
 		switch stream.CodecType {
 		case "video":
+			durations.HasVideo = true
 			if seconds > durations.Video {
 				durations.Video = seconds
 			}
@@ -93,7 +106,8 @@ func captureEndedEarly(videoSeconds, recordingSeconds float64) bool {
 	if recordingSeconds < minCaptureCheckSeconds || videoSeconds <= 0 {
 		return false
 	}
-	return videoSeconds < recordingSeconds*minVideoCoverage
+	return videoSeconds < recordingSeconds*minVideoCoverage &&
+		recordingSeconds-videoSeconds >= minMissingVideoSeconds
 }
 
 // recordingLength is what the video is measured against: the audio, or where a
@@ -119,7 +133,12 @@ func CheckCapture(ctx context.Context, db database.DBTX, videoID, path string, c
 
 	length := recordingLength(durations, clientSeconds)
 	var warning *string
-	if captureEndedEarly(durations.Video, length) {
+	switch {
+	case !durations.HasVideo && length >= minCaptureCheckSeconds:
+		message := noPictureWarningFor(length)
+		warning = &message
+		slog.Warn("capture-check: no video stream", "video_id", videoID, "recording_seconds", length)
+	case captureEndedEarly(durations.Video, length):
 		message := captureWarningFor(durations.Video, length)
 		warning = &message
 		slog.Warn("capture-check: capture ended early", "video_id", videoID,
@@ -142,5 +161,14 @@ func captureWarningFor(videoSeconds, recordingSeconds float64) string {
 	return fmt.Sprintf(
 		"This video runs %.0fs but its picture stops after %.0fs. If you recorded it here, the browser stopped capturing partway through — Safari does that whenever its window is not in front, while Chrome and Edge keep going.",
 		recordingSeconds, videoSeconds,
+	)
+}
+
+// noPictureWarningFor is the warning for a recording that has sound and no
+// video stream at all: the capture never produced a single frame.
+func noPictureWarningFor(recordingSeconds float64) string {
+	return fmt.Sprintf(
+		"This video has %.0fs of sound but no picture at all. If you recorded it here, the browser captured no frames — Safari does that whenever its window is not in front, while Chrome and Edge keep going.",
+		recordingSeconds,
 	)
 }

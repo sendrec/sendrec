@@ -26,6 +26,12 @@ func TestCaptureEndedEarly(t *testing.T) {
 		{"video a shade short", 99.2, 100, false},
 		{"video a tenth short", 89, 100, true},
 
+		// A short clip turns a normal trailing gap into a big share of it: the
+		// largest gap on a healthy recording measured 1.45s, which is 11% of a
+		// 13s clip. Past the share, the gap must also be long enough to matter.
+		{"short clip, normal trailing gap", 11.55, 13, false},
+		{"short clip that lost its tail", 9.63, 12.84, true},
+
 		// Unknown durations are no verdict. WebM from MediaRecorder carries none.
 		{"no durations at all", 0, 0, false},
 		{"video duration unknown", 0, 141.1, false},
@@ -56,6 +62,44 @@ func TestBuildStreamDurationArgs(t *testing.T) {
 	}
 }
 
+func TestParseStreamDurations(t *testing.T) {
+	tests := []struct {
+		name string
+		json string
+		want streamDurations
+	}{
+		{
+			"video and audio",
+			`{"streams":[{"codec_type":"video","duration":"15.53"},{"codec_type":"audio","duration":"141.1"}]}`,
+			streamDurations{Video: 15.53, Audio: 141.1, HasVideo: true},
+		},
+		// MediaRecorder WebM: a video stream is there, its duration is not.
+		{
+			"video stream without a duration",
+			`{"streams":[{"codec_type":"video"},{"codec_type":"audio"}]}`,
+			streamDurations{HasVideo: true},
+		},
+		// A screen recording whose capture never produced a frame.
+		{
+			"no video stream at all",
+			`{"streams":[{"codec_type":"audio","duration":"5.518"}]}`,
+			streamDurations{Audio: 5.518},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseStreamDurations([]byte(tt.json))
+			if err != nil {
+				t.Fatalf("parseStreamDurations: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRecordingLength(t *testing.T) {
 	// A screen recording only opens the microphone when system audio is on, so a
 	// silent one has no audio track to measure against — the client's own
@@ -65,6 +109,13 @@ func TestRecordingLength(t *testing.T) {
 	}
 	if got := recordingLength(streamDurations{Video: 15.53, Audio: 141.1}, 9); got != 141.1 {
 		t.Errorf("want the audio duration where there is one, got %v", got)
+	}
+}
+
+func TestNoPictureWarningFor(t *testing.T) {
+	warning := noPictureWarningFor(5.518)
+	if !strings.Contains(warning, "6s") || !strings.Contains(warning, "no picture") {
+		t.Errorf("want the length and the missing picture named, got %q", warning)
 	}
 }
 
@@ -89,7 +140,7 @@ func TestCheckCapture(t *testing.T) {
 		defer mock.Close()
 
 		probeStreamDurations = func(context.Context, string) (streamDurations, error) {
-			return streamDurations{Video: 15.53, Audio: 141.1}, nil
+			return streamDurations{Video: 15.53, Audio: 141.1, HasVideo: true}, nil
 		}
 		mock.ExpectExec(`UPDATE videos SET capture_warning`).
 			WithArgs("video-1", pgxmock.AnyArg()).
@@ -112,13 +163,57 @@ func TestCheckCapture(t *testing.T) {
 		defer mock.Close()
 
 		probeStreamDurations = func(context.Context, string) (streamDurations, error) {
-			return streamDurations{Video: 103.35, Audio: 103.42}, nil
+			return streamDurations{Video: 103.35, Audio: 103.42, HasVideo: true}, nil
 		}
 		mock.ExpectExec(`UPDATE videos SET capture_warning`).
 			WithArgs("video-1", (*string)(nil)).
 			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 
 		CheckCapture(context.Background(), mock, "video-1", "/tmp/in.mp4", 103)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("unmet expectations: %v", err)
+		}
+	})
+
+	// The most broken recording of all: sound, and no picture whatsoever.
+	t.Run("warns when a recording has no video stream", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer mock.Close()
+
+		probeStreamDurations = func(context.Context, string) (streamDurations, error) {
+			return streamDurations{Audio: 5.518}, nil
+		}
+		mock.ExpectExec(`UPDATE videos SET capture_warning`).
+			WithArgs("video-1", pgxmock.AnyArg()).
+			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+		CheckCapture(context.Background(), mock, "video-1", "/tmp/in.mp4", 5)
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("unmet expectations: %v", err)
+		}
+	})
+
+	// A video stream with no duration is WebM being WebM, not a broken capture.
+	t.Run("gives no verdict when the video stream only lacks a duration", func(t *testing.T) {
+		mock, err := pgxmock.NewPool()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer mock.Close()
+
+		probeStreamDurations = func(context.Context, string) (streamDurations, error) {
+			return streamDurations{HasVideo: true, Audio: 60}, nil
+		}
+		mock.ExpectExec(`UPDATE videos SET capture_warning`).
+			WithArgs("video-1", (*string)(nil)).
+			WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+
+		CheckCapture(context.Background(), mock, "video-1", "/tmp/in.webm", 60)
 
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Errorf("unmet expectations: %v", err)
