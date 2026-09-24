@@ -156,7 +156,7 @@ export function OrgSettings() {
   return (
     <div className="page-container">
       <h1 className="page-title">Settings</h1>
-      <SettingsTabs />
+      <SettingsTabs workspace={myOrg ?? null} />
 
       {error && (
         <p className="status-message status-message--error">{error}</p>

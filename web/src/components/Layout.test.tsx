@@ -365,6 +365,14 @@ describe("Layout", () => {
     expect(screen.getByRole("link", { name: "Settings" })).toHaveClass("nav-link--active");
   });
 
+  it.each(["/settings/", "/organizations/org-1/settings/"])(
+    "keeps Settings active behind a trailing slash at %s",
+    (path) => {
+      renderLayout(path);
+      expect(screen.getByRole("link", { name: "Settings" })).toHaveClass("nav-link--active");
+    },
+  );
+
   it("closes org dropdown on click outside", async () => {
     const user = userEvent.setup();
     renderLayout();

@@ -47,14 +47,15 @@ export function Layout({ children }: LayoutProps) {
   }, []);
 
   function isActive(path: string): boolean {
+    const pathname = location.pathname.replace(/(.)\/+$/, "$1");
     // Workspace settings are a tab of Settings, so its link lights for both.
     if (path === "/settings") {
-      return location.pathname === "/settings" || /^\/organizations\/[^/]+\/settings$/.test(location.pathname);
+      return pathname === "/settings" || /^\/organizations\/[^/]+\/settings$/.test(pathname);
     }
     if (path === "/analytics") {
-      return location.pathname === "/analytics" || location.pathname.endsWith("/analytics");
+      return pathname === "/analytics" || pathname.endsWith("/analytics");
     }
-    return location.pathname === path;
+    return pathname === path;
   }
 
   async function signOut() {

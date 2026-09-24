@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { useOrganization } from "../hooks/useOrganization";
+import type { Organization } from "../hooks/useOrganization";
 
 interface Tab {
   to: string;
@@ -11,13 +11,15 @@ interface Tab {
 // sign-in live there, so they stay reachable from inside a workspace — and the
 // selected workspace for its owners and admins. Each tab is its own route, so
 // existing links keep working. #262.
-export function SettingsTabs() {
-  const { selectedOrg } = useOrganization();
-  const { pathname } = useLocation();
+//
+// The page passes in the workspace it already loaded, so the tab bar cannot
+// disagree with the page it sits on.
+export function SettingsTabs({ workspace }: { workspace: Organization | null }) {
+  const pathname = useLocation().pathname.replace(/\/+$/, "");
 
   const tabs: Tab[] = [{ to: "/settings", label: "Account", icon: null }];
-  if (selectedOrg && (selectedOrg.role === "owner" || selectedOrg.role === "admin")) {
-    tabs.push({ to: `/organizations/${selectedOrg.id}/settings`, label: selectedOrg.name, icon: selectedOrg.icon ?? null });
+  if (workspace && (workspace.role === "owner" || workspace.role === "admin")) {
+    tabs.push({ to: `/organizations/${workspace.id}/settings`, label: workspace.name, icon: workspace.icon ?? null });
   }
 
   return (
