@@ -8,6 +8,12 @@ import { setCurrentOrgId } from "../api/orgContext";
 
 const mockApiFetch = vi.fn();
 
+// The tab bar reads the selected workspace itself; keep its fetch out of the
+// ordered API responses these tests queue.
+vi.mock("../hooks/useOrganization", () => ({
+  useOrganization: () => ({ orgs: [], selectedOrg: null, selectedOrgId: null, loading: false }),
+}));
+
 vi.mock("../api/client", () => ({
   apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));

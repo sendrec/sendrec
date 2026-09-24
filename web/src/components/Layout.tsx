@@ -47,10 +47,15 @@ export function Layout({ children }: LayoutProps) {
   }, []);
 
   function isActive(path: string): boolean {
-    if (path === "/analytics") {
-      return location.pathname === "/analytics" || location.pathname.endsWith("/analytics");
+    const pathname = location.pathname.replace(/(.)\/+$/, "$1");
+    // Workspace settings are a tab of Settings, so its link lights for both.
+    if (path === "/settings") {
+      return pathname === "/settings" || /^\/organizations\/[^/]+\/settings$/.test(pathname);
     }
-    return location.pathname === path;
+    if (path === "/analytics") {
+      return pathname === "/analytics" || pathname.endsWith("/analytics");
+    }
+    return pathname === path;
   }
 
   async function signOut() {
@@ -300,15 +305,6 @@ export function Layout({ children }: LayoutProps) {
             Settings
           </Link>
 
-          {selectedOrg && (selectedOrg.role === "owner" || selectedOrg.role === "admin") && (
-            <Link
-              to={`/organizations/${selectedOrgId}/settings`}
-              className="nav-link"
-              onClick={handleNavClick}
-            >
-              Workspace Settings
-            </Link>
-          )}
 
           <button
             className="nav-theme-toggle"

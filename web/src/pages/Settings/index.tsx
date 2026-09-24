@@ -18,6 +18,8 @@ import { NotificationSection } from "./NotificationSection";
 import { WebhookSection } from "./WebhookSection";
 import { IntegrationSection } from "./IntegrationSection";
 import { BrandingSection } from "./BrandingSection";
+import { SettingsTabs } from "../../components/SettingsTabs";
+import { useOrganization } from "../../hooks/useOrganization";
 
 interface LoadedState {
   profile: UserProfile;
@@ -51,6 +53,7 @@ interface LoadedState {
 }
 
 export function Settings() {
+  const { selectedOrg } = useOrganization();
   const [loaded, setLoaded] = useState<LoadedState | null>(null);
   const [version, setVersion] = useState("");
   // Half of this page is workspace-scoped — branding above all — and the scope
@@ -209,6 +212,7 @@ export function Settings() {
   return (
     <div className="page-container">
       <h1 className="page-title">Settings</h1>
+      <SettingsTabs workspace={selectedOrg} />
 
       {loaded.billingEnabled && loaded.billing && (
         <BillingSection billing={loaded.billing} />

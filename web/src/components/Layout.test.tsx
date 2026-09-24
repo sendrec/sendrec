@@ -346,7 +346,9 @@ describe("Layout", () => {
     expect(mockSwitchOrg).toHaveBeenCalledWith(null);
   });
 
-  it("shows Workspace Settings link when an org is selected", () => {
+  // Workspace settings are a tab of Settings now, so the nav has one link for
+  // both, lit on either page. #262.
+  it("has one Settings link, active on workspace settings too", () => {
     mockUseOrganization.mockReturnValue({
       orgs: [
         { id: "org-1", name: "Acme Corp", slug: "acme", subscriptionPlan: "free", role: "owner", memberCount: 3 },
@@ -358,15 +360,18 @@ describe("Layout", () => {
       refreshOrgs: mockRefreshOrgs,
       loading: false,
     });
-    renderLayout();
-    const orgSettingsLink = screen.getByRole("link", { name: "Workspace Settings" });
-    expect(orgSettingsLink).toHaveAttribute("href", "/organizations/org-1/settings");
+    renderLayout("/organizations/org-1/settings");
+    expect(screen.queryByRole("link", { name: "Workspace Settings" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveClass("nav-link--active");
   });
 
-  it("hides Workspace Settings link when no org is selected", () => {
-    renderLayout();
-    expect(screen.queryByRole("link", { name: "Workspace Settings" })).not.toBeInTheDocument();
-  });
+  it.each(["/settings/", "/organizations/org-1/settings/"])(
+    "keeps Settings active behind a trailing slash at %s",
+    (path) => {
+      renderLayout(path);
+      expect(screen.getByRole("link", { name: "Settings" })).toHaveClass("nav-link--active");
+    },
+  );
 
   it("closes org dropdown on click outside", async () => {
     const user = userEvent.setup();

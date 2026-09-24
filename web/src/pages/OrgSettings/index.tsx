@@ -8,6 +8,7 @@ import { GeneralSection } from "./GeneralSection";
 import { MembersSection } from "./MembersSection";
 import { BillingSection } from "./BillingSection";
 import { SSOSection } from "./SSOSection";
+import { SettingsTabs } from "../../components/SettingsTabs";
 
 export function OrgSettings() {
   const { id: orgId } = useParams<{ id: string }>();
@@ -154,7 +155,8 @@ export function OrgSettings() {
 
   return (
     <div className="page-container">
-      <h1 className="page-title">Workspace Settings</h1>
+      <h1 className="page-title">Settings</h1>
+      <SettingsTabs workspace={myOrg ?? null} />
 
       {error && (
         <p className="status-message status-message--error">{error}</p>
