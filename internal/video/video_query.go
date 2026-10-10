@@ -109,8 +109,6 @@ type limitsResponse struct {
 	PlaylistsUsed           int            `json:"playlistsUsed"`
 	MaxOrgsOwned            int            `json:"maxOrgsOwned"`
 	OrgsUsed                int            `json:"orgsUsed"`
-	MaxOrgMembers           int            `json:"maxOrgMembers"`
-	OrgMembersUsed          int            `json:"orgMembersUsed"`
 	RetentionDays           int            `json:"retentionDays"`
 	FieldLimits             map[string]int `json:"fieldLimits"`
 }
@@ -166,26 +164,14 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 	}
 
 	maxOrgsOwned := h.maxOrgsOwned
-	maxOrgMembers := plans.Free.MaxOrgMembers
-	var orgsUsed, orgMembersUsed int
+	var orgsUsed int
 	if plans.IsPaid(userPlan) {
 		maxOrgsOwned = 0
-		maxOrgMembers = 0
 	} else if maxOrgsOwned > 0 {
 		_ = h.db.QueryRow(r.Context(),
 			`SELECT COUNT(*) FROM organization_members WHERE user_id = $1 AND role = 'owner'`,
 			userID,
 		).Scan(&orgsUsed)
-	}
-
-	if orgID != "" {
-		if plans.IsPaid(plan) {
-			maxOrgMembers = 0
-		}
-		_ = h.db.QueryRow(r.Context(),
-			`SELECT COUNT(*) FROM organization_members WHERE organization_id = $1 AND role != 'viewer'`,
-			orgID,
-		).Scan(&orgMembersUsed)
 	}
 
 	var retentionDays int
@@ -211,8 +197,6 @@ func (h *Handler) Limits(w http.ResponseWriter, r *http.Request) {
 		PlaylistsUsed:           playlistsUsed,
 		MaxOrgsOwned:            maxOrgsOwned,
 		OrgsUsed:                orgsUsed,
-		MaxOrgMembers:           maxOrgMembers,
-		OrgMembersUsed:          orgMembersUsed,
 		RetentionDays:           retentionDays,
 		FieldLimits:             validate.FieldLimits(),
 	})

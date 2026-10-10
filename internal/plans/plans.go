@@ -14,7 +14,6 @@ type FreePlan struct {
 	MaxVideoDurationSeconds int `json:"maxVideoDurationSeconds"`
 	MaxPlaylists            int `json:"maxPlaylists"`
 	MaxOrgsOwned            int `json:"maxOrgsOwned"`
-	MaxOrgMembers           int `json:"maxOrgMembers"`
 }
 
 var Free FreePlan

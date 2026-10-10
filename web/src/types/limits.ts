@@ -24,7 +24,5 @@ export interface LimitsResponse {
   playlistsUsed: number;
   maxOrgsOwned: number;
   orgsUsed: number;
-  maxOrgMembers: number;
-  orgMembersUsed: number;
   fieldLimits: FieldLimits;
 }
