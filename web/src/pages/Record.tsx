@@ -46,6 +46,7 @@ export function Record() {
   const [uploadStep, setUploadStep] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [stillProcessing, setStillProcessing] = useState(false);
   const [recordedVideoId, setRecordedVideoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A take whose upload failed. Kept until it uploads or the user discards it:
@@ -114,6 +115,7 @@ export function Record() {
 
       setRecordedVideoId(result.id);
       setShareUrl(`${window.location.origin}/watch/${result.shareToken}`);
+      setStillProcessing(Boolean(webcamBlob && result.webcamUploadUrl));
       setFailedTake(null);
     } catch (err) {
       if (videoId) {
@@ -292,7 +294,12 @@ export function Record() {
               <path d="M15 25l6 6 12-12" style={{ stroke: "var(--instance-accent, #00b67a)" }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h2 className="share-heading">Your video is ready!</h2>
+          <h2 className="share-heading">Your share link is ready</h2>
+          {stillProcessing && (
+            <p className="share-subheading">
+              Your video is still being prepared. Viewers who open the link now will see it in a minute or two.
+            </p>
+          )}
           <div className="share-link-row">
             <input
               type="text"

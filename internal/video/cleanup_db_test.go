@@ -160,7 +160,7 @@ func TestResetStuckProcessing_DB_SendsVideoReadyForComposites(t *testing.T) {
 	trim := seedVideo(t, pool, user, nil, name+"-trim")
 	mustExec(t, pool, `UPDATE videos SET status = 'processing', webcam_key = NULL, processing_started_at = now() - interval '3 hours' WHERE id = $1`, trim)
 	// Dispatch to this host fails, but every attempt is logged by event name.
-	mustExec(t, pool, `INSERT INTO notification_preferences (user_id, webhook_url, webhook_secret) VALUES ($1, 'https://hooks.invalid/x', 's')`, user)
+	mustExec(t, pool, `INSERT INTO notification_preferences (user_id, webhook_url, webhook_secret) VALUES ($1, 'https://hooks.invalid/x', 's') ON CONFLICT (user_id) DO UPDATE SET webhook_url = EXCLUDED.webhook_url, webhook_secret = EXCLUDED.webhook_secret`, user)
 
 	resetStuckProcessing(context.Background(), pool, &mockStorage{}, videoReadyHook{webhook.New(pool), "https://app.example"})
 

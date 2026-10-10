@@ -1684,7 +1684,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{end}}
         </script>
         {{end}}
-        {{if or (eq .SubscriptionPlan "pro") (eq .SubscriptionPlan "business")}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}<a href="https://sendrec.eu">Recorded with SendRec</a> — free and open source</p>{{end}}
+        {{if or (eq .SubscriptionPlan "pro") (eq .SubscriptionPlan "business")}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}<a href="https://sendrec.eu/?utm_source=watch_page">Recorded with SendRec</a> · <a href="https://sendrec.eu/?utm_source=watch_page">Record your own, free</a></p>{{end}}
     </div>
 {{.AnalyticsScript}}
 </body>
@@ -1966,6 +1966,8 @@ var emailGatePageTemplate = template.Must(template.New("emailgate").Parse(`<!DOC
         h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.75rem; }
         p { color: #94a3b8; margin-bottom: 1.5rem; font-size: 0.875rem; }
         .error { color: #ef4444; font-size: 0.875rem; margin-bottom: 1rem; display: none; }
+        .gate-note { font-size: 0.75rem; margin: 1rem 0 0; }
+        .gate-note a { color: #94a3b8; }
         input[type="email"] {
             width: 100%;
             padding: 0.75rem 1rem;
@@ -2009,6 +2011,7 @@ var emailGatePageTemplate = template.Must(template.New("emailgate").Parse(`<!DOC
             <input type="email" id="email-input" placeholder="you@example.com" required maxlength="320" autofocus>
             <button type="submit" id="submit-btn">Watch Video</button>
         </form>
+        <p class="gate-note">Only the sender sees your email, next to your view. No account needed. <a href="https://sendrec.eu/privacy" target="_blank" rel="noopener">Privacy</a></p>
     </div>
     <script nonce="{{.Nonce}}">
         document.getElementById('email-gate-form').addEventListener('submit', function(e) {
