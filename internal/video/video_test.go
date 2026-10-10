@@ -6756,9 +6756,6 @@ func TestLimits_OrgProInherited(t *testing.T) {
 	// Pro plan → unlimited videos, playlists
 	// getUserPlan for org member limits
 	expectPlanQuery(mock, "free")
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
-		WithArgs(testOrgID).
-		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
 	mock.ExpectQuery(`SELECT retention_days FROM organizations WHERE id = \$1`).
 		WithArgs(testOrgID).
 		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(0))
@@ -6783,9 +6780,6 @@ func TestLimits_OrgProInherited(t *testing.T) {
 	if resp.MaxVideoDurationSeconds != 0 {
 		t.Errorf("expected unlimited duration (0), got %d", resp.MaxVideoDurationSeconds)
 	}
-	if resp.MaxOrgMembers != 0 {
-		t.Errorf("expected unlimited members (0), got %d", resp.MaxOrgMembers)
-	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet pgxmock expectations: %v", err)
@@ -6805,9 +6799,6 @@ func TestLimits_OrgProOwnSubscription(t *testing.T) {
 	expectOrgPlanQuery(mock, "pro")
 	// Pro plan → unlimited
 	expectPlanQuery(mock, "free")
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
-		WithArgs(testOrgID).
-		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
 	mock.ExpectQuery(`SELECT retention_days FROM organizations WHERE id = \$1`).
 		WithArgs(testOrgID).
 		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(0))
@@ -6856,9 +6847,6 @@ func TestLimits_OrgFree(t *testing.T) {
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE user_id`).
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id`).
-		WithArgs(testOrgID).
-		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(2))
 	mock.ExpectQuery(`SELECT retention_days FROM organizations WHERE id = \$1`).
 		WithArgs(testOrgID).
 		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(60))
@@ -6892,7 +6880,7 @@ func TestLimits_OrgFree(t *testing.T) {
 	}
 }
 
-func TestLimits_ViewerExcludedFromMemberCount(t *testing.T) {
+func TestLimits_FreeOrgHasNoMemberCap(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -6902,7 +6890,7 @@ func TestLimits_ViewerExcludedFromMemberCount(t *testing.T) {
 	storage := &mockStorage{}
 	handler := NewHandler(mock, storage, testBaseURL, 0, 25, 300, 3, testJWTSecret, false)
 
-	// Free org plan triggers member count queries
+	// Free workspaces have no member cap: "Free for teams" means any team size.
 	expectOrgPlanQuery(mock, "free")
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM videos WHERE organization_id`).
 		WithArgs(testOrgID).
@@ -6915,11 +6903,6 @@ func TestLimits_ViewerExcludedFromMemberCount(t *testing.T) {
 		WithArgs(testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(1))
 
-	// This query must contain "role != 'viewer'" to exclude viewers from the count.
-	// The org has 5 total members but only 3 non-viewer members.
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM organization_members WHERE organization_id = \$1 AND role != 'viewer'`).
-		WithArgs(testOrgID).
-		WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(3))
 	mock.ExpectQuery(`SELECT retention_days FROM organizations WHERE id = \$1`).
 		WithArgs(testOrgID).
 		WillReturnRows(pgxmock.NewRows([]string{"retention_days"}).AddRow(0))
@@ -6934,15 +6917,8 @@ func TestLimits_ViewerExcludedFromMemberCount(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 	}
 
-	var resp limitsResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
-	}
-	if resp.OrgMembersUsed != 3 {
-		t.Errorf("expected orgMembersUsed 3 (viewers excluded), got %d", resp.OrgMembersUsed)
-	}
-	if resp.MaxOrgMembers != 3 {
-		t.Errorf("expected maxOrgMembers 3 (free plan limit), got %d", resp.MaxOrgMembers)
+	if strings.Contains(rec.Body.String(), "maxOrgMembers") {
+		t.Errorf("limits response should not carry a member cap: %s", rec.Body.String())
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
