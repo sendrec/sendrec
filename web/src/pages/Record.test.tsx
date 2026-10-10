@@ -245,8 +245,10 @@ describe("Record", () => {
 
     // Verify webcam was uploaded via XHR
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
+    // Camera recordings are composited after upload, so the link works before playback does.
+    expect(screen.getByText(/still being prepared/)).toBeInTheDocument();
   });
 
   it("shows loading state initially", async () => {
@@ -333,8 +335,9 @@ describe("Record", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
+    expect(screen.queryByText(/still being prepared/)).not.toBeInTheDocument();
 
     // Share URL should be displayed in readonly input
     const shareInput = screen.getByDisplayValue(/\/watch\/share-abc/);
@@ -369,7 +372,7 @@ describe("Record", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
 
     // Auto-copy sets "Copied!" for 2s; advance past it
@@ -549,7 +552,7 @@ describe("Record", () => {
     await waitFor(() => {
       expect(screen.getByTestId("recorder")).toBeInTheDocument();
     });
-    expect(screen.queryByText("Your video is ready!")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your share link is ready")).not.toBeInTheDocument();
   });
 
   it("shows error when upload fails", async () => {
@@ -786,7 +789,7 @@ describe("Record", () => {
 
     // Wait for share card to appear (auto-copy fires via useEffect)
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
 
     // Advance past auto-copy "Copied!" timer
@@ -882,7 +885,7 @@ describe("Record", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
 
     const uploadXhr = xhrInstances.find(
@@ -920,7 +923,7 @@ describe("Record", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
 
     const patchCall = mockApiFetch.mock.calls.find(
@@ -1161,7 +1164,7 @@ describe("Record", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
 
     const uploadXhr = xhrInstances.find(
@@ -1338,7 +1341,7 @@ describe("Record", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
 
     // Advance past auto-copy "Copied!" timer
@@ -1445,7 +1448,7 @@ describe("Record", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
 
     const checkmark = document.querySelector(".share-checkmark");
@@ -1479,7 +1482,7 @@ describe("Record", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
 
     const input = screen.getByDisplayValue(/\/watch\/token-input/);
@@ -1590,7 +1593,7 @@ describe("Record", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Your video is ready!")).toBeInTheDocument();
+      expect(screen.getByText("Your share link is ready")).toBeInTheDocument();
     });
 
     expect(writeTextMock).toHaveBeenCalledWith(

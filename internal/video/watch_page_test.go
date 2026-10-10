@@ -2162,6 +2162,13 @@ func TestWatchPage_EmailGate_ShowsForm(t *testing.T) {
 	if !strings.Contains(body, "Enter your email to watch this video") {
 		t.Error("expected email gate message")
 	}
+	// Say who sees the address and that no account is needed, so viewers aren't left guessing.
+	if !strings.Contains(body, "Only the sender sees your email") {
+		t.Error("expected email gate to say who sees the address")
+	}
+	if !strings.Contains(body, `href="https://sendrec.eu/privacy"`) {
+		t.Error("expected email gate to link the privacy policy")
+	}
 	if !strings.Contains(body, `id="email-gate-form"`) {
 		t.Error("expected email gate form")
 	}
@@ -3055,11 +3062,12 @@ func TestWatchPageFreeUserAlwaysShowsSendRecBadge(t *testing.T) {
 	if !strings.Contains(body, "Recorded with SendRec") {
 		t.Error("free user with custom footer should still show 'Recorded with SendRec'")
 	}
-	if !strings.Contains(body, `href="https://sendrec.eu"`) {
-		t.Error("free user should have SendRec link in footer")
+	// Tagged so signups that come from shared videos show up in analytics.
+	if !strings.Contains(body, `href="https://sendrec.eu/?utm_source=watch_page"`) {
+		t.Error("free user should have a tagged SendRec link in footer")
 	}
-	if !strings.Contains(body, "free and open source") {
-		t.Error("free user footer should include 'free and open source'")
+	if !strings.Contains(body, "Record your own, free") {
+		t.Error("free user footer should invite the viewer to record their own")
 	}
 }
 

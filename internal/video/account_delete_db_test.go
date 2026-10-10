@@ -166,7 +166,7 @@ func TestDeleteAccount_RemovesEverythingTheUserOwns(t *testing.T) {
 	// Bob commented on Alice's video; Alice commented on Bob's.
 	mustExec(t, pool, `INSERT INTO video_comments (video_id, user_id, body) VALUES ($1, $2, 'nice')`, personal, bob)
 	mustExec(t, pool, `INSERT INTO video_comments (video_id, user_id, body) VALUES ($1, $2, 'thanks')`, bobs, alice)
-	mustExec(t, pool, `INSERT INTO notification_preferences (user_id) VALUES ($1)`, alice)
+	mustExec(t, pool, `INSERT INTO notification_preferences (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`, alice)
 	mustExec(t, pool, `INSERT INTO user_branding (user_id, logo_key) VALUES ($1, $2)`, alice, name+"/alice-brand.png")
 
 	storage := &mockStorage{deleteCalled: make(chan string, 64)}

@@ -2001,6 +2001,13 @@ textarea.form-input {
   margin-bottom: 20px;
 }
 
+.share-subheading {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: -12px 0 20px;
+  text-align: center;
+}
+
 .share-link-row {
   display: flex;
   gap: 8px;
