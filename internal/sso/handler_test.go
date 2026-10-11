@@ -1727,6 +1727,8 @@ func TestGenerateSCIMToken_RequiresBusinessPlan(t *testing.T) {
 	mock.ExpectQuery(`SELECT om\.role, o\.subscription_plan FROM organization_members om JOIN organizations o ON o\.id = om\.organization_id`).
 		WithArgs("org-1", "user-1").
 		WillReturnRows(pgxmock.NewRows([]string{"role", "subscription_plan"}).AddRow("admin", "pro"))
+	mock.ExpectQuery(`SELECT EXISTS`).WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(false))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/organizations/org-1/scim-token", nil)
 	ctx := auth.ContextWithUserID(req.Context(), "user-1")
@@ -1736,6 +1738,30 @@ func TestGenerateSCIMToken_RequiresBusinessPlan(t *testing.T) {
 
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("got status %d, want 403", rec.Code)
+	}
+}
+
+// A personal Business subscription covers the workspaces its holder owns.
+func TestGenerateSCIMToken_OwnerBusinessCoversWorkspace(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	mock.ExpectQuery(`SELECT om\.role, o\.subscription_plan FROM organization_members om JOIN organizations o ON o\.id = om\.organization_id`).
+		WithArgs("org-1", "user-1").
+		WillReturnRows(pgxmock.NewRows([]string{"role", "subscription_plan"}).AddRow("owner", "free"))
+	mock.ExpectQuery(`SELECT EXISTS`).WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectExec(`INSERT INTO organization_scim_tokens`).
+		WithArgs("org-1", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/organizations/org-1/scim-token", nil)
+	req = req.WithContext(auth.ContextWithUserID(req.Context(), "user-1"))
+
+	rec := callWithChiParam(handler.GenerateSCIMToken, http.MethodPost, "/", "orgId", "org-1", req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("got status %d, want 200; body: %s", rec.Code, rec.Body.String())
 	}
 }
 

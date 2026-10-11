@@ -422,6 +422,29 @@ describe("OrgSettings", () => {
     expect(screen.getByRole("button", { name: "Remove SSO" })).toBeInTheDocument();
   });
 
+  it("renders SSO card for a free workspace whose owner has personal Business", async () => {
+    mockUseOrganization.mockReturnValue({
+      orgs: [{ id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "free", role: "owner", memberCount: 1 }],
+      selectedOrg: { id: "org-1", name: "Acme Corp", slug: "acme-corp", subscriptionPlan: "free", role: "owner", memberCount: 1 },
+      selectedOrgId: "org-1",
+      switchOrg: vi.fn(),
+      createOrg: vi.fn(),
+      refreshOrgs: vi.fn(),
+      loading: false,
+    });
+    mockApiFetch
+      .mockResolvedValueOnce({ ...mockOrg, subscriptionPlan: "free", hasBusiness: true })
+      .mockResolvedValueOnce([ownerMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "free", subscriptionId: null, customerId: null, portalUrl: null }) // billing
+      .mockResolvedValueOnce({ configured: false, enforceSso: false }); // SSO config
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Single Sign-On")).toBeInTheDocument();
+    });
+  });
+
   it("hides SSO card for free plan", async () => {
     mockOwnerResponses();
     renderOrgSettings();

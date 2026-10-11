@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/sendrec/sendrec/internal/database"
+	"github.com/sendrec/sendrec/internal/plans"
 )
 
 func BearerAuth(db database.DBTX) func(http.Handler) http.Handler {
@@ -45,7 +46,12 @@ func BearerAuth(db database.DBTX) func(http.Handler) http.Handler {
 				writeError(w, http.StatusInternalServerError, "internal error")
 				return
 			}
-			if subscriptionPlan != "business" {
+			hasBusiness, err := plans.HasWorkspaceBusiness(r.Context(), db, orgID, subscriptionPlan)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "internal error")
+				return
+			}
+			if !hasBusiness {
 				writeError(w, http.StatusForbidden, "business plan required")
 				return
 			}

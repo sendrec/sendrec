@@ -20,6 +20,7 @@ import (
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/database"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/validate"
 )
 
@@ -433,7 +434,12 @@ func (h *Handler) ensureSCIMAdminAccess(w http.ResponseWriter, r *http.Request, 
 		httputil.WriteError(w, http.StatusForbidden, "admin or owner role required")
 		return false
 	}
-	if subscriptionPlan != "business" {
+	hasBusiness, err := plans.HasWorkspaceBusiness(r.Context(), h.db, orgID, subscriptionPlan)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to load organization access")
+		return false
+	}
+	if !hasBusiness {
 		httputil.WriteError(w, http.StatusForbidden, "business plan required")
 		return false
 	}
