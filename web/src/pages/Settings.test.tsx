@@ -1450,6 +1450,23 @@ describe("Settings", () => {
       expect(screen.getByText("Cancel subscription")).toBeInTheDocument();
     });
 
+    it("names the Business plan when cancelling it", async () => {
+      mockApiFetch
+        .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })
+        .mockResolvedValueOnce({ notificationMode: "off" })
+        .mockResolvedValueOnce({ maxVideosPerMonth: 0, maxVideoDurationSeconds: 0, videosUsedThisMonth: 0, brandingEnabled: false, aiEnabled: false })
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce({ plan: "business", subscriptionId: "sub_123", portalUrl: "https://portal.creem.io/cust_abc" });
+
+      renderSettings();
+
+      await waitFor(() => {
+        expect(screen.getByText("Cancel subscription")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByText("Cancel subscription"));
+      expect(screen.getByText(/Cancel your Business subscription\?/)).toBeInTheDocument();
+    });
+
     it("hides billing section when not configured", async () => {
       mockApiFetch
         .mockResolvedValueOnce({ name: "Alice", email: "alice@example.com" })

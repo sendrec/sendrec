@@ -1684,7 +1684,7 @@ var watchPageTemplate = template.Must(template.New("watch").Funcs(watchFuncs).Pa
         {{end}}
         </script>
         {{end}}
-        {{if or (eq .SubscriptionPlan "pro") (eq .SubscriptionPlan "business")}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}<a href="https://sendrec.eu/?utm_source=watch_page">Recorded with SendRec</a> · <a href="https://sendrec.eu/?utm_source=watch_page">Record your own, free</a></p>{{end}}
+        {{if or (eq .SubscriptionPlan "pro") (eq .SubscriptionPlan "business")}}{{if .Branding.FooterText}}<p class="branding">{{.Branding.FooterText}}</p>{{end}}{{else}}<p class="branding">{{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}<a href="https://sendrec.eu/?utm_source=watch_page">Sent with SendRec</a>{{if .InviteViewers}} · <a href="https://sendrec.eu/?utm_source=watch_page">Record your own, free</a>{{end}}</p>{{end}}
     </div>
 {{.AnalyticsScript}}
 </body>
@@ -1809,6 +1809,7 @@ type watchPageData struct {
 	HasThumbnail       bool
 	JSONLD             template.JS
 	SubscriptionPlan   string
+	InviteViewers      bool
 	VideoStatus        string
 	// Preview marks a page rendered for the branding settings iframe. It has no
 	// video, share token or comment thread behind it, so the parts that would
@@ -2214,6 +2215,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 			Chapters:         make([]Chapter, 0),
 			AnalyticsScript:  injectScriptNonce(h.analyticsScript, nonce),
 			SubscriptionPlan: subscriptionPlan,
+			InviteViewers:    h.billingEnabled,
 		}); err != nil {
 			slog.Error("watch-page: failed to render processing page", "error", err)
 		}
@@ -2305,6 +2307,7 @@ func (h *Handler) WatchPage(w http.ResponseWriter, r *http.Request) {
 		HasThumbnail:       thumbnailKey != nil,
 		JSONLD:             template.JS(jsonLD),
 		SubscriptionPlan:   subscriptionPlan,
+		InviteViewers:      h.billingEnabled,
 		VideoStatus:        status,
 	}); err != nil {
 		slog.Error("watch-page: failed to render watch page", "error", err)

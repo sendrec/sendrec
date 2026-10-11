@@ -63,6 +63,9 @@ func processOnboardingDay7(ctx context.Context, db database.DBTX, sender Onboard
 		   AND created_at < now() - interval '7 days'
 		   AND onboarding_day7_sent_at IS NULL
 		   AND subscription_plan = 'free'
+		   AND EXISTS (
+		     SELECT 1 FROM videos WHERE user_id = users.id
+		   )
 		 LIMIT 50`)
 	if err != nil {
 		slog.Error("onboarding-worker: day7 query failed", "error", err)

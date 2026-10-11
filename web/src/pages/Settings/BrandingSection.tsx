@@ -316,7 +316,7 @@ body                /* Background, font, text color */
 /* Header & Footer */
 .logo               /* Logo + name link */
 .logo img           /* Logo image */
-.branding           /* "Shared via SendRec" footer */
+.branding           /* "Sent with SendRec" footer */
 .branding a         /* Footer link */
 
 /* Video Player */

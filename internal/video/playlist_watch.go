@@ -519,7 +519,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             <input type="password" id="password-input" placeholder="Enter password" required maxlength="128" autofocus>
             <button type="submit" id="submit-btn">Continue</button>
         </form>
-        <div class="gate-branding">Powered by <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a></div>
+        <div class="gate-branding">Sent with <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a></div>
     </div>
     <script nonce="{{.Nonce}}">
         document.getElementById('password-form').addEventListener('submit', function(e) {
@@ -551,7 +551,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
             <input type="email" id="email-input" placeholder="you@example.com" required maxlength="320" autofocus>
             <button type="submit" id="submit-btn">Watch Playlist</button>
         </form>
-        <div class="gate-branding">Powered by <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a></div>
+        <div class="gate-branding">Sent with <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a></div>
     </div>
     <script nonce="{{.Nonce}}">
         document.getElementById('email-gate-form').addEventListener('submit', function(e) {
@@ -637,7 +637,7 @@ var playlistWatchTemplate = template.Must(template.New("playlist-watch").Funcs(t
                 </div>
             </div>
             <div class="branding-footer">
-                {{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Shared via <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a>
+                {{if .Branding.FooterText}}{{.Branding.FooterText}} · {{end}}Sent with <a href="https://sendrec.eu" target="_blank" rel="noopener">SendRec</a>
             </div>
 ` + safariWarningHTML + `
         </main>

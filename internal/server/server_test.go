@@ -1481,7 +1481,7 @@ func TestBrandingPreview_FooterFollowsTheAccountsPlan(t *testing.T) {
 			if !strings.Contains(body, "Acme Inc") {
 				t.Fatal("the preview dropped the footer text it was given")
 			}
-			if got := strings.Contains(body, "Recorded with SendRec"); got != wantAttribution {
+			if got := strings.Contains(body, "Sent with SendRec"); got != wantAttribution {
 				t.Errorf("on the %s plan: attribution footer present = %v, want %v", plan, got, wantAttribution)
 			}
 		})

@@ -275,7 +275,7 @@ export function Record() {
         <p className="quota-message">
           You've reached your limit of {limits!.maxVideosPerMonth} videos this month.
         </p>
-        <p className="quota-submessage">Delete unused recordings or wait until next month.</p>
+        <p className="quota-submessage">Your videos stay live and shareable. New recordings resume next month, or go unlimited with Pro.</p>
         <div className="quota-actions">
           <Link to="/library" className="btn-primary">Go to Library</Link>
           <Link to="/settings" className="btn-outline">Upgrade to Pro</Link>
@@ -349,7 +349,10 @@ export function Record() {
           Upload
         </button>
       </div>
-      {hasLimits && (
+      {hasLimits && usagePercent < 60 && (
+        <p className="usage-label">{limits.maxVideosPerMonth} free videos every month</p>
+      )}
+      {hasLimits && usagePercent >= 60 && (
         <div className="usage-section">
           <p className="usage-label">
             {limits.videosUsedThisMonth} / {limits.maxVideosPerMonth} videos this month
