@@ -344,6 +344,21 @@ describe("OrgSettings", () => {
     expect(screen.getByText("Cancel subscription")).toBeInTheDocument();
   });
 
+  it("names the Business plan when cancelling it", async () => {
+    mockApiFetch
+      .mockResolvedValueOnce(mockOrg)
+      .mockResolvedValueOnce([ownerMember, regularMember])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ plan: "business", portalUrl: "https://portal.example.com" });
+    renderOrgSettings();
+
+    await waitFor(() => {
+      expect(screen.getByText("Cancel subscription")).toBeInTheDocument();
+    });
+    await userEvent.setup().click(screen.getByText("Cancel subscription"));
+    expect(screen.getByText(/Cancel this workspace's Business subscription\?/)).toBeInTheDocument();
+  });
+
   it("renders Data Retention select", async () => {
     mockApiFetch
       .mockResolvedValueOnce({ ...mockOrg, retentionDays: 0 })

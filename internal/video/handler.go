@@ -60,6 +60,7 @@ type Handler struct {
 	slackNotifier           SlackNotifier
 	brandingEnabled         bool
 	analyticsScript         string
+	billingEnabled          bool
 	aiEnabled               bool
 	transcriptionEnabled    bool
 	noiseReductionFilter    string
@@ -103,6 +104,12 @@ func (h *Handler) SetSlackNotifier(n SlackNotifier) {
 
 func (h *Handler) SetBrandingEnabled(enabled bool) {
 	h.brandingEnabled = enabled
+}
+
+// SetBillingEnabled marks the hosted service, where free viewers can be
+// invited to sign up. Self-hosted installs leave it off.
+func (h *Handler) SetBillingEnabled(enabled bool) {
+	h.billingEnabled = enabled
 }
 
 func (h *Handler) SetAnalyticsScript(script string) {

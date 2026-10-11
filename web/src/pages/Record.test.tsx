@@ -114,6 +114,24 @@ describe("Record", () => {
       expect(screen.getByText(/reached your limit of 25 videos/i)).toBeInTheDocument();
     });
     expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
+    // Reassure rather than tell people to delete their own work.
+    expect(screen.getByText(/Your videos stay live and shareable/)).toBeInTheDocument();
+    expect(screen.queryByText(/Delete unused recordings/)).not.toBeInTheDocument();
+  });
+
+  it("hides the usage meter until the month's quota is mostly used", async () => {
+    mockApiFetch.mockResolvedValueOnce({
+      maxVideosPerMonth: 25,
+      maxVideoDurationSeconds: 300,
+      videosUsedThisMonth: 5,
+    });
+    renderRecord();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("recorder")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.getByText("25 free videos every month")).toBeInTheDocument();
   });
 
   it("shows recorder when below monthly limit", async () => {

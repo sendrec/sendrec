@@ -58,7 +58,7 @@ export function BillingSection({
 
   function handleCancelSubscription() {
     setConfirmDialog({
-      message: "Cancel this workspace's Pro subscription? Access continues until the end of the billing period.",
+      message: `Cancel this workspace's ${billing.plan === "business" ? "Business" : "Pro"} subscription? Access continues until the end of the billing period.`,
       onConfirm: async () => {
         setConfirmDialog(null);
         setCanceling(true);

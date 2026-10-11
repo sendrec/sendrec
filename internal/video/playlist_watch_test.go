@@ -399,6 +399,10 @@ func TestPlaylistWatchPage_RendersWorkspaceBranding(t *testing.T) {
 	if !strings.Contains(body, "Powered by ACME") {
 		t.Error("expected custom footer text")
 	}
+	// One attribution wording across video, playlist and gate pages.
+	if !strings.Contains(body, "Sent with") || strings.Contains(body, "Shared via") {
+		t.Error("expected the playlist footer to say 'Sent with SendRec'")
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
 	}

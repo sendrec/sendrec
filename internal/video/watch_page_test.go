@@ -3059,15 +3059,40 @@ func TestWatchPageFreeUserAlwaysShowsSendRecBadge(t *testing.T) {
 	}
 
 	body := rec.Body.String()
-	if !strings.Contains(body, "Recorded with SendRec") {
-		t.Error("free user with custom footer should still show 'Recorded with SendRec'")
+	if !strings.Contains(body, "Sent with SendRec") {
+		t.Error("free user with custom footer should still show 'Sent with SendRec'")
 	}
 	// Tagged so signups that come from shared videos show up in analytics.
 	if !strings.Contains(body, `href="https://sendrec.eu/?utm_source=watch_page"`) {
 		t.Error("free user should have a tagged SendRec link in footer")
 	}
-	if !strings.Contains(body, "Record your own, free") {
-		t.Error("free user footer should invite the viewer to record their own")
+	// Self-hosted installs (no billing) don't send their viewers to sendrec.eu sign-up.
+	if strings.Contains(body, "Record your own, free") {
+		t.Error("without billing the footer should not invite viewers to sign up")
+	}
+
+	handler.SetBillingEnabled(true)
+	mock.ExpectQuery(`SELECT v.id, v.title, v.file_key`).
+		WithArgs(shareToken).
+		WillReturnRows(pgxmock.NewRows(watchPageColumns).AddRow(
+			"video-id", "Test Video", "file.webm", "User", time.Now(), (*time.Time)(nil),
+			(*string)(nil), (*string)(nil), "anonymous",
+			(*string)(nil), (*string)(nil), "none",
+			"user-id", "user@test.com", (*string)(nil), "video/webm",
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), &customFooter, (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			(*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil), (*string)(nil),
+			true, (*string)(nil), (*string)(nil),
+			false,
+			(*string)(nil), (*string)(nil), "none",
+			0,
+			"free",
+			"ready",
+			(*string)(nil),
+		))
+	expectViewRecording(mock, "video-id")
+	if body := serveWatchPage(handler, watchPageRequest(shareToken)).Body.String(); !strings.Contains(body, "Record your own, free") {
+		t.Error("on the hosted service the footer should invite the viewer to record their own")
 	}
 }
 
@@ -3114,8 +3139,8 @@ func TestWatchPageProUserCanRemoveSendRecBadge(t *testing.T) {
 	if !strings.Contains(body, "Pro Company Footer") {
 		t.Error("pro user should see their custom footer")
 	}
-	if strings.Contains(body, "Recorded with SendRec") {
-		t.Error("pro user with custom footer should NOT show 'Recorded with SendRec'")
+	if strings.Contains(body, "Sent with SendRec") {
+		t.Error("pro user with custom footer should NOT show 'Sent with SendRec'")
 	}
 }
 
@@ -3162,8 +3187,8 @@ func TestWatchPageBusinessUserCanRemoveSendRecBadge(t *testing.T) {
 	if !strings.Contains(body, "Business Company Footer") {
 		t.Error("business user should see their custom footer")
 	}
-	if strings.Contains(body, "Recorded with SendRec") {
-		t.Error("business user with custom footer should NOT show 'Recorded with SendRec'")
+	if strings.Contains(body, "Sent with SendRec") {
+		t.Error("business user with custom footer should NOT show 'Sent with SendRec'")
 	}
 }
 

@@ -169,6 +169,7 @@ func New(cfg Config) *Server {
 			if s.videoHandler != nil {
 				// Deleting an account cancels its subscriptions first.
 				s.videoHandler.SetSubscriptionCanceler(creemClient)
+				s.videoHandler.SetBillingEnabled(true)
 			}
 			s.billingHandlers = billing.NewHandlers(cfg.DB, creemClient, baseURL, cfg.CreemProProductID, cfg.CreemOrgProProductID, cfg.CreemBusinessProductID, cfg.CreemOrgBusinessProductID, cfg.CreemWebhookSecret)
 		}
