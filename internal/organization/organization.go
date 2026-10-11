@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
+	"github.com/sendrec/sendrec/internal/plans"
 	"github.com/sendrec/sendrec/internal/validate"
 )
 
@@ -50,6 +51,7 @@ type orgDetailResponse struct {
 	Role             string  `json:"role"`
 	MemberCount      int64   `json:"memberCount"`
 	Icon             *string `json:"icon"`
+	HasBusiness      bool    `json:"hasBusiness"`
 	CreatedAt        string  `json:"createdAt"`
 	UpdatedAt        string  `json:"updatedAt"`
 }
@@ -249,6 +251,11 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resp.HasBusiness, err = plans.HasWorkspaceBusiness(r.Context(), h.db, orgID, resp.SubscriptionPlan)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to get organization")
+		return
+	}
 	resp.CreatedAt = createdAt.Format(time.RFC3339)
 	resp.UpdatedAt = updatedAt.Format(time.RFC3339)
 

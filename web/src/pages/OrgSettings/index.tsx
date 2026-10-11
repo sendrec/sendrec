@@ -85,7 +85,7 @@ export function OrgSettings() {
         setBilling(billingData as OrgBilling | null);
 
         const billingPlan = (billingData as OrgBilling | null)?.plan ?? orgData?.subscriptionPlan;
-        if (billingPlan === "business") {
+        if (billingPlan === "business" || orgData?.hasBusiness) {
           try {
             const ssoData = await apiFetch<SsoConfig>(`/api/organizations/${orgId}/sso`);
             if (ssoData) {
@@ -151,7 +151,7 @@ export function OrgSettings() {
     );
   }
 
-  const showSso = canManage && (billing?.plan === "business" || org.subscriptionPlan === "business");
+  const showSso = canManage && (billing?.plan === "business" || org.subscriptionPlan === "business" || org.hasBusiness === true);
 
   return (
     <div className="page-container">

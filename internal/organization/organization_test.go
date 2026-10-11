@@ -327,6 +327,9 @@ func TestGet(t *testing.T) {
 		WithArgs(orgID, testUserID).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "slug", "subscription_plan", "retention_days", "created_at", "updated_at", "role", "member_count", "icon"}).
 			AddRow(orgID, "Acme Corp", "acme-corp", "free", 0, now, now, "owner", int64(3), (*string)(nil)))
+	// The owner's personal Business plan covers this free workspace.
+	mock.ExpectQuery(`SELECT EXISTS`).WithArgs(orgID).
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
 
 	r := chi.NewRouter()
 	r.With(newAuthMiddleware()).Get("/api/organizations/{orgId}", handler.Get)
@@ -353,6 +356,9 @@ func TestGet(t *testing.T) {
 	}
 	if resp.MemberCount != 3 {
 		t.Errorf("expected memberCount %d, got %d", 3, resp.MemberCount)
+	}
+	if !resp.HasBusiness {
+		t.Error("expected hasBusiness when the owner holds Business")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

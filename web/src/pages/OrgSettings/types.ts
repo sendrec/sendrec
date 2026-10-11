@@ -5,6 +5,7 @@ export interface OrgDetail {
   name: string;
   slug: string;
   subscriptionPlan: string;
+  hasBusiness?: boolean;
   createdAt: string;
   retentionDays?: number;
   icon?: string | null;

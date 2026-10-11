@@ -142,6 +142,8 @@ func TestBearerAuth_RequiresBusinessPlan(t *testing.T) {
 	mock.ExpectQuery(`SELECT st\.token_hash, o\.subscription_plan FROM organization_scim_tokens st JOIN organizations o ON o\.id = st\.organization_id WHERE st\.organization_id = \$1`).
 		WithArgs("org-1").
 		WillReturnRows(pgxmock.NewRows([]string{"token_hash", "subscription_plan"}).AddRow(tokenHash, "pro"))
+	mock.ExpectQuery(`SELECT EXISTS`).WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(false))
 
 	handler := BearerAuth(mock)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called")
@@ -158,5 +160,41 @@ func TestBearerAuth_RequiresBusinessPlan(t *testing.T) {
 
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("got status %d, want 403", rec.Code)
+	}
+}
+
+// A personal Business subscription covers the workspaces its holder owns.
+func TestBearerAuth_OwnerBusinessCoversWorkspace(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	token := "scim_test_token_123"
+	hash := sha256.Sum256([]byte(token))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	mock.ExpectQuery(`SELECT st\.token_hash, o\.subscription_plan FROM organization_scim_tokens st JOIN organizations o ON o\.id = st\.organization_id WHERE st\.organization_id = \$1`).
+		WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"token_hash", "subscription_plan"}).AddRow(tokenHash, "free"))
+	mock.ExpectQuery(`SELECT EXISTS`).WithArgs("org-1").
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+
+	called := false
+	handler := BearerAuth(mock)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("orgId", "org-1")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	if !called {
+		t.Error("handler should be called when the workspace owner has Business")
 	}
 }
