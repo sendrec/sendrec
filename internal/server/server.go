@@ -65,6 +65,7 @@ type Config struct {
 	CreemBusinessProductID    string
 	CreemOrgBusinessProductID string
 	RegistrationEnabled       bool
+	SocialRegistrationEnabled bool
 	PlanBadgeEnabled          bool
 	GeoIPDBPath               string
 	GoogleClientID            string
@@ -184,7 +185,7 @@ func New(cfg Config) *Server {
 
 		encKey := integration.DeriveKey(jwtSecret)
 		s.ssoHandler = sso.NewHandler(cfg.DB, jwtSecret, baseURL, secureCookies, encKey)
-		s.ssoHandler.SetRegistrationEnabled(cfg.RegistrationEnabled)
+		s.ssoHandler.SetRegistrationEnabled(cfg.SocialRegistrationEnabled)
 		s.scimHandler = scim.NewHandler(cfg.DB, baseURL)
 
 		if cfg.GoogleClientID != "" {

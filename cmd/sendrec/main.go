@@ -182,6 +182,7 @@ func main() {
 		BaseURL:                   baseURL,
 		Version:                   version,
 		RegistrationEnabled:       registrationEnabled,
+		SocialRegistrationEnabled: socialRegistrationEnabled(registrationEnabled),
 		PlanBadgeEnabled:          planBadgeEnabled,
 		MaxUploadBytes:            getEnvInt64("MAX_UPLOAD_BYTES", 500*1024*1024),
 		MaxVideosPerMonth:         freeLimit("MAX_VIDEOS_PER_MONTH", plans.Free.MaxVideosPerMonth, billingEnabled),
@@ -304,6 +305,13 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// socialRegistrationEnabled reads SOCIAL_REGISTRATION_ENABLED: whether a
+// first-time Google, Microsoft or GitHub sign-in may create an account.
+// Unset, it follows REGISTRATION_ENABLED.
+func socialRegistrationEnabled(registrationEnabled bool) bool {
+	return getEnv("SOCIAL_REGISTRATION_ENABLED", strconv.FormatBool(registrationEnabled)) == "true"
 }
 
 // freeLimit reads a free-plan limit. Without billing, as on a self-hosted

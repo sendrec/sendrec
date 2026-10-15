@@ -48,6 +48,7 @@ sendrec:
     apiDocsEnabled: "true"        # serve the OpenAPI/Swagger docs route
     brandingEnabled: "true"       # allow custom logo/colors on watch pages
     registrationEnabled: "false"  # public sign-up; "false" makes the instance invite-only
+    socialRegistrationEnabled: ""  # first-time social sign-in creates accounts; "" follows registrationEnabled
     planBadgeEnabled: "false"     # show plan badges in the UI, only useful with billing configured
 
     # Instance branding: replaces "SendRec" on viewer pages and in the app. Applies whether or not brandingEnabled is on.

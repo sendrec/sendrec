@@ -136,6 +136,7 @@ Set any of these to `"0"` for unlimited. The chart ships `"0"` for all three, so
 | `env.apiDocsEnabled` | `API_DOCS_ENABLED` | Serve the interactive API reference at `/api/docs` | `"true"` (app: `"false"`) |
 | `env.brandingEnabled` | `BRANDING_ENABLED` | Let users customise watch-page logo, colours, footer and custom CSS | `"true"` (app: `"false"`) |
 | `env.registrationEnabled` | `REGISTRATION_ENABLED` | Allow self-signup. `"false"` hides the form *and* disables the API endpoint | `"false"` (app: `"true"`) |
+| `env.socialRegistrationEnabled` | `SOCIAL_REGISTRATION_ENABLED` | Let a first-time Google, Microsoft or GitHub sign-in create an account while the form is closed. Pair with `GOOGLE_AUTH_ALLOWED_DOMAINS` | `""` (follows `registrationEnabled`) |
 | `env.planBadgeEnabled` | `PLAN_BADGE_ENABLED` | Show the Free/Pro/Business badge next to the logo. Only useful with billing configured | `"false"` |
 | `env.brandingDefaultName` | `BRANDING_DEFAULT_NAME` | Instance name shown in place of "SendRec" on viewer pages and in the app. The `brandingDefault*` keys apply whether or not `brandingEnabled` is on; users' own branding still wins on viewer pages | `""` |
 | `env.brandingDefaultLogoUrl` | `BRANDING_DEFAULT_LOGO_URL` | Logo and favicon: an `https://` URL or a path on this host | `""` |

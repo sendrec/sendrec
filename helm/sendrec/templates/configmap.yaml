@@ -30,6 +30,7 @@ data:
   BRANDING_DEFAULT_COLOR_ACCENT: {{ .Values.sendrec.env.brandingDefaultColorAccent | quote }}
   BRANDING_DEFAULT_FOOTER_TEXT: {{ .Values.sendrec.env.brandingDefaultFooterText | quote }}
   REGISTRATION_ENABLED: {{ .Values.sendrec.env.registrationEnabled | quote }}
+  SOCIAL_REGISTRATION_ENABLED: {{ .Values.sendrec.env.socialRegistrationEnabled | quote }}
   PLAN_BADGE_ENABLED: {{ .Values.sendrec.env.planBadgeEnabled | quote }}
   TRUSTED_PROXY: {{ .Values.sendrec.env.trustedProxy | quote }}
   RATE_LIMIT_ENABLED: {{ .Values.sendrec.env.rateLimitEnabled | quote }}
