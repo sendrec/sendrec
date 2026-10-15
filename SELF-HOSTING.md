@@ -372,6 +372,7 @@ Re-measure when you change resolution limits, enable transcription or noise redu
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `REGISTRATION_ENABLED` | Allow new user signups. Set to `false` to disable the registration form and API endpoint | `true` |
+| `SOCIAL_REGISTRATION_ENABLED` | Allow a first-time Google, Microsoft or GitHub sign-in to create an account, independently of the registration form. Provider restrictions such as `GOOGLE_AUTH_ALLOWED_DOMAINS` still apply. Only Google has a domain allowlist, so with Microsoft or GitHub configured this lets any account on those services sign up | value of `REGISTRATION_ENABLED` |
 | `PLAN_BADGE_ENABLED` | Show the plan badge ("Free"/"Pro"/"Business") next to the SendRec logo. Off by default for self-hosters; set to `true` to surface upgrade tiers | `false` |
 
 ### Analytics (optional)
@@ -558,6 +559,8 @@ UPDATE users SET email_verified = true WHERE email_verified = false;
 ### Social login / SSO (optional)
 
 SendRec supports Google, Microsoft, and GitHub as social login providers via OAuth 2.0 / OIDC. Set the client ID and secret pair for each provider you want to enable; providers without credentials are simply not advertised on the login screen.
+
+To let anyone in your Google Workspace domain sign up while the registration form stays closed, set `REGISTRATION_ENABLED=false`, `SOCIAL_REGISTRATION_ENABLED=true` and `GOOGLE_AUTH_ALLOWED_DOMAINS=yourcompany.com`, and configure only Google. Microsoft and GitHub have no domain allowlist.
 
 | Variable | Description |
 |----------|-------------|

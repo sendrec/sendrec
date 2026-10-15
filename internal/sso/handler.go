@@ -32,8 +32,8 @@ type Handler struct {
 	secureCookies bool
 	providers     map[string]Provider
 	encryptionKey []byte
-	// registrationEnabled mirrors REGISTRATION_ENABLED. Off, social sign-in
-	// only creates accounts for people with a pending workspace invite.
+	// registrationEnabled mirrors SOCIAL_REGISTRATION_ENABLED. Off, social
+	// sign-in only creates accounts for people with a pending workspace invite.
 	registrationEnabled bool
 }
 
@@ -51,7 +51,8 @@ func NewHandler(db database.DBTX, jwtSecret, baseURL string, secureCookies bool,
 	}
 }
 
-// SetRegistrationEnabled applies REGISTRATION_ENABLED to social sign-in.
+// SetRegistrationEnabled applies SOCIAL_REGISTRATION_ENABLED (which defaults
+// to REGISTRATION_ENABLED) to social sign-in.
 func (h *Handler) SetRegistrationEnabled(enabled bool) {
 	h.registrationEnabled = enabled
 }

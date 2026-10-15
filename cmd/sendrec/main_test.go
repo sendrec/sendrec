@@ -63,3 +63,24 @@ func TestFreeLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestSocialRegistrationEnabled(t *testing.T) {
+	for _, c := range []struct {
+		name         string
+		env          string
+		registration bool
+		want         bool
+	}{
+		{"unset follows open registration", "", true, true},
+		{"unset follows invite-only", "", false, false},
+		{"on while the form is closed", "true", false, true},
+		{"off while the form is open", "false", true, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("SOCIAL_REGISTRATION_ENABLED", c.env)
+			if got := socialRegistrationEnabled(c.registration); got != c.want {
+				t.Errorf("socialRegistrationEnabled = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
