@@ -35,6 +35,11 @@ type Handler struct {
 	// registrationEnabled mirrors SOCIAL_REGISTRATION_ENABLED. Off, social
 	// sign-in only creates accounts for people with a pending workspace invite.
 	registrationEnabled bool
+	// displayNames labels providers whose name alone means nothing to users.
+	displayNames map[string]string
+	// defaultWorkspaces maps a provider to the workspace its users join on
+	// their first sign-in through it.
+	defaultWorkspaces map[string]string
 }
 
 // NewHandler creates a new SSO handler with the given dependencies.
@@ -48,6 +53,8 @@ func NewHandler(db database.DBTX, jwtSecret, baseURL string, secureCookies bool,
 		encryptionKey: encryptionKey,
 
 		registrationEnabled: true,
+		displayNames:        make(map[string]string),
+		defaultWorkspaces:   make(map[string]string),
 	}
 }
 
@@ -66,8 +73,20 @@ func (h *Handler) RegisterProvider(name string, provider Provider) {
 	h.providers[name] = provider
 }
 
+// SetDisplayName sets the login button label for a provider.
+func (h *Handler) SetDisplayName(provider, name string) {
+	h.displayNames[provider] = name
+}
+
+// SetDefaultWorkspace makes users join orgID as members the first time they
+// sign in through the provider.
+func (h *Handler) SetDefaultWorkspace(provider, orgID string) {
+	h.defaultWorkspaces[provider] = orgID
+}
+
 type providersResponse struct {
-	Providers []string `json:"providers"`
+	Providers    []string          `json:"providers"`
+	DisplayNames map[string]string `json:"displayNames,omitempty"`
 }
 
 // Providers returns the list of enabled SSO provider names as JSON.
@@ -77,7 +96,7 @@ func (h *Handler) Providers(w http.ResponseWriter, r *http.Request) {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	httputil.WriteJSON(w, http.StatusOK, providersResponse{Providers: names})
+	httputil.WriteJSON(w, http.StatusOK, providersResponse{Providers: names, DisplayNames: h.displayNames})
 }
 
 // clampName bounds an IdP-supplied display name to the app-wide name limit
@@ -97,7 +116,7 @@ func clampName(name string) string {
 // resolveUser maps an external identity to a local user account, creating
 // new users and identity links as needed.
 //
-// selfSignup is true for social sign-in (Google, GitHub, Microsoft), which
+// selfSignup is true for social sign-in (Google, GitHub, Microsoft, OIDC), which
 // anyone can attempt, and false for a workspace's own SSO, which its admins
 // configured to provision their people.
 func (h *Handler) resolveUser(ctx context.Context, providerName string, info *UserInfo, selfSignup bool) (string, error) {
@@ -130,6 +149,7 @@ func (h *Handler) resolveUser(ctx context.Context, providerName string, info *Us
 		); err != nil {
 			return "", fmt.Errorf("link identity: %w", err)
 		}
+		h.joinDefaultWorkspace(ctx, providerName, userID)
 		return userID, nil
 	}
 
@@ -163,8 +183,25 @@ func (h *Handler) resolveUser(ctx context.Context, providerName string, info *Us
 	); err != nil {
 		return "", fmt.Errorf("create identity: %w", err)
 	}
+	h.joinDefaultWorkspace(ctx, providerName, userID)
 
 	return userID, nil
+}
+
+// joinDefaultWorkspace adds a user to the provider's default workspace, if any.
+// It runs only when an identity is first linked, so an admin who removes the
+// member is not overruled by their next sign-in.
+func (h *Handler) joinDefaultWorkspace(ctx context.Context, providerName, userID string) {
+	orgID := h.defaultWorkspaces[providerName]
+	if orgID == "" {
+		return
+	}
+	if _, err := h.db.Exec(ctx,
+		"INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING",
+		orgID, userID,
+	); err != nil {
+		slog.Error("sso: failed to add default workspace member", "orgID", orgID, "userID", userID, "error", err)
+	}
 }
 
 func (h *Handler) redirectWithError(w http.ResponseWriter, r *http.Request, message string) {

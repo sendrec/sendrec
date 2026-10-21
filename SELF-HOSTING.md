@@ -372,7 +372,7 @@ Re-measure when you change resolution limits, enable transcription or noise redu
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `REGISTRATION_ENABLED` | Allow new user signups. Set to `false` to disable the registration form and API endpoint | `true` |
-| `SOCIAL_REGISTRATION_ENABLED` | Allow a first-time Google, Microsoft or GitHub sign-in to create an account, independently of the registration form. Provider restrictions such as `GOOGLE_AUTH_ALLOWED_DOMAINS` still apply. Only Google has a domain allowlist, so with Microsoft or GitHub configured this lets any account on those services sign up | value of `REGISTRATION_ENABLED` |
+| `SOCIAL_REGISTRATION_ENABLED` | Allow a first-time Google, Microsoft, GitHub or OIDC sign-in to create an account, independently of the registration form. Provider restrictions such as `GOOGLE_AUTH_ALLOWED_DOMAINS` and `OIDC_AUTH_ALLOWED_DOMAINS` still apply. Only Google and OIDC have a domain allowlist, so with Microsoft or GitHub configured this lets any account on those services sign up | value of `REGISTRATION_ENABLED` |
 | `PLAN_BADGE_ENABLED` | Show the plan badge ("Free"/"Pro"/"Business") next to the SendRec logo. Off by default for self-hosters; set to `true` to surface upgrade tiers | `false` |
 
 ### Analytics (optional)
@@ -558,7 +558,7 @@ UPDATE users SET email_verified = true WHERE email_verified = false;
 
 ### Social login / SSO (optional)
 
-SendRec supports Google, Microsoft, and GitHub as social login providers via OAuth 2.0 / OIDC. Set the client ID and secret pair for each provider you want to enable; providers without credentials are simply not advertised on the login screen.
+SendRec supports Google, Microsoft, GitHub and one self-hosted OpenID Connect identity provider (Authentik, Keycloak, Zitadel…) as login providers. Set the client ID and secret pair for each provider you want to enable; providers without credentials are simply not advertised on the login screen.
 
 To let anyone in your Google Workspace domain sign up while the registration form stays closed, set `REGISTRATION_ENABLED=false`, `SOCIAL_REGISTRATION_ENABLED=true` and `GOOGLE_AUTH_ALLOWED_DOMAINS=yourcompany.com`, and configure only Google. Microsoft and GitHub have no domain allowlist.
 
@@ -571,6 +571,13 @@ To let anyone in your Google Workspace domain sign up while the registration for
 | `GITHUB_SSO_CLIENT_ID` | GitHub OAuth App client ID |
 | `GITHUB_SSO_CLIENT_SECRET` | GitHub OAuth App client secret |
 | `GOOGLE_AUTH_ALLOWED_DOMAINS` | Comma-separated list of email domains permitted to sign in with Google (e.g. `example.com,partner.com`). When set, only verified Google accounts whose email domain matches one of these entries can authenticate. Exact match only — `example.com` does **not** imply `mail.example.com`. Leave unset to allow any Google account |
+| `OIDC_ISSUER_URL` | Issuer URL of your OpenID Connect provider (e.g. `https://auth.example.com/application/o/sendrec/`). Enables the OIDC button. If discovery fails at startup, the button is left out and the error is logged |
+| `OIDC_CLIENT_ID` | OIDC client ID |
+| `OIDC_CLIENT_SECRET` | OIDC client secret |
+| `OIDC_DISPLAY_NAME` | Provider name on the login button ("Continue with Authentik"). Default `SSO` |
+| `OIDC_AUTH_ALLOWED_DOMAINS` | Like `GOOGLE_AUTH_ALLOWED_DOMAINS`, for the OIDC provider. Leave unset to allow anyone your identity provider lets sign in to SendRec |
+| `OIDC_REQUIRE_EMAIL_VERIFIED` | Reject sign-in unless the identity provider sends `email_verified: true`. Default `true`. Some providers (Authentik included) send `false` unless configured otherwise; set `false` only if your identity provider controls every user's email address, since SendRec links a sign-in to the existing account with that email |
+| `OIDC_DEFAULT_WORKSPACE` | Workspace ID to add users to as members the first time they sign in with OIDC, so new colleagues need no invite. Removing someone from the workspace later is not undone by their next sign-in |
 
 Configure the following authorized redirect URIs in each provider's console (replace `<your-base-url>` with your `BASE_URL`, no trailing slash):
 
@@ -579,6 +586,7 @@ Configure the following authorized redirect URIs in each provider's console (rep
 | Google | `https://<your-base-url>/api/auth/sso/google/callback` |
 | Microsoft | `https://<your-base-url>/api/auth/sso/microsoft/callback` |
 | GitHub | `https://<your-base-url>/api/auth/sso/github/callback` |
+| OIDC | `https://<your-base-url>/api/auth/sso/oidc/callback` |
 
 For SAML / per-organization OIDC enforcement, see the in-app workspace settings.
 

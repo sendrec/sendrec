@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -75,6 +76,13 @@ type Config struct {
 	MicrosoftClientSecret     string
 	GitHubSSOClientID         string
 	GitHubSSOClientSecret     string
+	OIDCIssuerURL             string
+	OIDCClientID              string
+	OIDCClientSecret          string
+	OIDCDisplayName           string
+	OIDCAllowedDomains        []string
+	OIDCDefaultWorkspace      string
+	OIDCRequireEmailVerified  bool
 }
 
 type Server struct {
@@ -218,6 +226,25 @@ func New(cfg Config) *Server {
 				RedirectURL:  baseURL + "/api/auth/sso/github/callback",
 			})
 			s.ssoHandler.RegisterProvider("github", ghProvider)
+		}
+		if cfg.OIDCIssuerURL != "" {
+			oidcProvider, err := sso.NewOIDCProvider(context.Background(), sso.OIDCConfig{
+				IssuerURL:            cfg.OIDCIssuerURL,
+				ClientID:             cfg.OIDCClientID,
+				ClientSecret:         cfg.OIDCClientSecret,
+				RedirectURL:          baseURL + "/api/auth/sso/oidc/callback",
+				AllowedEmailDomains:  cfg.OIDCAllowedDomains,
+				RequireEmailVerified: &cfg.OIDCRequireEmailVerified,
+			})
+			if err != nil {
+				slog.Error("oidc sign-in disabled: provider discovery failed", "issuer", cfg.OIDCIssuerURL, "error", err)
+			} else {
+				s.ssoHandler.RegisterProvider("oidc", oidcProvider)
+				s.ssoHandler.SetDisplayName("oidc", cfg.OIDCDisplayName)
+				if cfg.OIDCDefaultWorkspace != "" {
+					s.ssoHandler.SetDefaultWorkspace("oidc", cfg.OIDCDefaultWorkspace)
+				}
+			}
 		}
 	}
 

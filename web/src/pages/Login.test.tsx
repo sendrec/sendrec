@@ -183,6 +183,28 @@ describe("Login", () => {
     expect(githubLink).toHaveAttribute("href", "/api/auth/sso/github");
   });
 
+  it("labels the generic OIDC button with the display name from the server", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ registrationEnabled: true }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ providers: ["oidc"], displayNames: { oidc: "Authentik" } }),
+          { status: 200 }
+        )
+      );
+    renderLogin();
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("Continue with Authentik")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Continue with Authentik").closest("a")).toHaveAttribute(
+      "href",
+      "/api/auth/sso/oidc"
+    );
+  });
+
   it("hides social login buttons when no providers", async () => {
     mockHealthAndProviders(true, []);
     renderLogin();

@@ -21,8 +21,11 @@ type OIDCConfig struct {
 	// (case-insensitive, without a leading '@'; subdomains are not implied).
 	// The provider must emit an `email_verified` claim equal to true; missing
 	// or false is rejected. Configure per provider — the field is not shared
-	// across providers and currently only Google sets it from env vars.
+	// across providers; Google and the generic OIDC provider set it from env vars.
 	AllowedEmailDomains []string
+	// RequireEmailVerified overrides when the `email_verified` claim must be
+	// true. Nil keeps the default: required only while AllowedEmailDomains is set.
+	RequireEmailVerified *bool
 }
 
 // OIDCProvider authenticates users via the OpenID Connect protocol.
@@ -31,6 +34,7 @@ type OIDCProvider struct {
 	verifier            *oidc.IDTokenVerifier
 	oauthConfig         oauth2.Config
 	allowedEmailDomains []string
+	requireVerified     bool
 }
 
 // NewOIDCProvider performs OIDC discovery on the issuer URL and returns a
@@ -69,11 +73,18 @@ func NewOIDCProvider(ctx context.Context, cfg OIDCConfig) (*OIDCProvider, error)
 
 	verifier := provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
 
+	domains := normalizeDomains(cfg.AllowedEmailDomains)
+	requireVerified := len(domains) > 0
+	if cfg.RequireEmailVerified != nil {
+		requireVerified = *cfg.RequireEmailVerified
+	}
+
 	return &OIDCProvider{
 		provider:            provider,
 		verifier:            verifier,
 		oauthConfig:         oauthCfg,
-		allowedEmailDomains: normalizeDomains(cfg.AllowedEmailDomains),
+		allowedEmailDomains: domains,
+		requireVerified:     requireVerified,
 	}, nil
 }
 
@@ -96,15 +107,14 @@ func normalizeDomains(in []string) []string {
 	return out
 }
 
-// matchAllowedDomain reports whether the email's domain is in the allowlist.
-// emailVerified must be true; the caller is responsible for surfacing an error
-// when an unverified email is presented while the allowlist is active.
+// checkEmailAllowed rejects an unverified email when verification is required,
+// then checks the email's domain against the allowlist, if any.
 func (p *OIDCProvider) checkEmailAllowed(email string, emailVerified bool) error {
+	if p.requireVerified && !emailVerified {
+		return fmt.Errorf("email %q is not verified by the identity provider", email)
+	}
 	if len(p.allowedEmailDomains) == 0 {
 		return nil
-	}
-	if !emailVerified {
-		return fmt.Errorf("email %q is not verified by the identity provider", email)
 	}
 	at := strings.LastIndex(email, "@")
 	if at < 0 || at == len(email)-1 {
