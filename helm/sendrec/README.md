@@ -136,7 +136,7 @@ Set any of these to `"0"` for unlimited. The chart ships `"0"` for all three, so
 | `env.apiDocsEnabled` | `API_DOCS_ENABLED` | Serve the interactive API reference at `/api/docs` | `"true"` (app: `"false"`) |
 | `env.brandingEnabled` | `BRANDING_ENABLED` | Let users customise watch-page logo, colours, footer and custom CSS | `"true"` (app: `"false"`) |
 | `env.registrationEnabled` | `REGISTRATION_ENABLED` | Allow self-signup. `"false"` hides the form *and* disables the API endpoint | `"false"` (app: `"true"`) |
-| `env.socialRegistrationEnabled` | `SOCIAL_REGISTRATION_ENABLED` | Let a first-time Google, Microsoft or GitHub sign-in create an account while the form is closed. Pair with `GOOGLE_AUTH_ALLOWED_DOMAINS` | `""` (follows `registrationEnabled`) |
+| `env.socialRegistrationEnabled` | `SOCIAL_REGISTRATION_ENABLED` | Let a first-time Google, Microsoft, GitHub or OIDC sign-in create an account while the form is closed. Pair with `GOOGLE_AUTH_ALLOWED_DOMAINS` or `OIDC_AUTH_ALLOWED_DOMAINS` | `""` (follows `registrationEnabled`) |
 | `env.planBadgeEnabled` | `PLAN_BADGE_ENABLED` | Show the Free/Pro/Business badge next to the logo. Only useful with billing configured | `"false"` |
 | `env.brandingDefaultName` | `BRANDING_DEFAULT_NAME` | Instance name shown in place of "SendRec" on viewer pages and in the app. The `brandingDefault*` keys apply whether or not `brandingEnabled` is on; users' own branding still wins on viewer pages | `""` |
 | `env.brandingDefaultLogoUrl` | `BRANDING_DEFAULT_LOGO_URL` | Logo and favicon: an `https://` URL or a path on this host | `""` |
@@ -220,8 +220,14 @@ Two gates apply: the filter runs only if this value is non-empty **and** the ind
 | `secrets.microsoftClientId` / `microsoftClientSecret` | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | Microsoft (Entra ID) credentials |
 | `secrets.githubSsoClientId` / `githubSsoClientSecret` | `GITHUB_SSO_CLIENT_ID` / `GITHUB_SSO_CLIENT_SECRET` | GitHub OAuth App credentials |
 | `env.googleAuthAllowedDomains` | `GOOGLE_AUTH_ALLOWED_DOMAINS` | Comma-separated email domains allowed to sign in with Google. Exact match - `example.com` does not cover `mail.example.com`. Empty allows any Google account |
+| `env.oidcIssuerUrl` | `OIDC_ISSUER_URL` | Issuer URL of a self-hosted OpenID Connect provider (Authentik, Keycloak, Zitadel…). Enables the OIDC button |
+| `secrets.oidcClientId` / `oidcClientSecret` | `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | OIDC client credentials |
+| `env.oidcDisplayName` | `OIDC_DISPLAY_NAME` | Provider name on the login button. Empty means `SSO` |
+| `env.oidcAuthAllowedDomains` | `OIDC_AUTH_ALLOWED_DOMAINS` | Like `googleAuthAllowedDomains`, for the OIDC provider |
+| `env.oidcRequireEmailVerified` | `OIDC_REQUIRE_EMAIL_VERIFIED` | `"false"` accepts emails the provider sends with `email_verified: false` (Authentik's default). Empty means `true` |
+| `env.oidcDefaultWorkspace` | `OIDC_DEFAULT_WORKSPACE` | Workspace ID that OIDC users join as members on their first sign-in |
 
-Providers without credentials are not advertised on the login screen. Register the redirect URI `<baseUrl>/api/auth/sso/{google,microsoft,github}/callback` in each provider's console. Workspace-level SAML and per-organisation OIDC are configured in-app, not here.
+Providers without credentials are not advertised on the login screen. Register the redirect URI `<baseUrl>/api/auth/sso/{google,microsoft,github,oidc}/callback` in each provider's console. Workspace-level SAML and per-organisation OIDC are configured in-app, not here.
 
 ### Email
 
@@ -272,7 +278,7 @@ All product IDs must be recurring/subscription products. They are also used in r
 
 ### Secrets
 
-Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `JWT_SECRET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `GITHUB_SSO_CLIENT_ID`, `GITHUB_SSO_CLIENT_SECRET`, `AI_API_KEY`, `TRANSCRIPTION_API_KEY`, `LISTMONK_USER`, `LISTMONK_PASSWORD`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `CREEM_API_KEY`, `CREEM_WEBHOOK_SECRET`.
+Rendered into `sendrec-secret` unless `existingSecret` is set: `DATABASE_URL`, `JWT_SECRET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `GITHUB_SSO_CLIENT_ID`, `GITHUB_SSO_CLIENT_SECRET`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `AI_API_KEY`, `TRANSCRIPTION_API_KEY`, `LISTMONK_USER`, `LISTMONK_PASSWORD`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `CREEM_API_KEY`, `CREEM_WEBHOOK_SECRET`.
 
 `jwtSecret` signs auth tokens: generate it with `openssl rand -hex 32`, and note that changing it invalidates every session. The app refuses to start without one, regardless of `BASE_URL`.
 

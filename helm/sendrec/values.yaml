@@ -86,6 +86,11 @@ sendrec:
 
     allowedFrameAncestors: ""  # extra CSP frame-ancestors origins; 'self' is always prepended by the app
     googleAuthAllowedDomains: ""  # Comma-separated email domains allowed for Google SSO, e.g. example.com,example.org
+    oidcIssuerUrl: ""             # Self-hosted OIDC provider issuer, use /api/auth/sso/oidc/callback as the redirect URI path
+    oidcDisplayName: ""           # Login button label, default SSO
+    oidcAuthAllowedDomains: ""    # Comma-separated email domains allowed for OIDC sign-in
+    oidcRequireEmailVerified: ""  # "false" accepts email_verified=false from the provider; default true
+    oidcDefaultWorkspace: ""      # Workspace ID OIDC users join as members on first sign-in
 
     # Billing (Creem). Product IDs map a Creem product to a plan; the app refuses to start when secrets.creemApiKey is set without secrets.creemWebhookSecret.
     creemProProductId: ""
@@ -127,6 +132,8 @@ sendrec:
     microsoftClientSecret: ""  # Microsoft OAuth client secret
     githubSsoClientId: ""      # GitHub SSO OAuth client ID, use /api/auth/sso/github/callback as the redirect URI path
     githubSsoClientSecret: ""  # GitHub SSO OAuth client secret
+    oidcClientId: ""           # OIDC client ID, see env.oidcIssuerUrl
+    oidcClientSecret: ""       # OIDC client secret
     aiApiKey: ""               # API key for the configured AI provider
     transcriptionApiKey: ""    # API key for cloud transcription provider (openai/deepgram)
     listmonkUsername: ""       # Listmonk API username

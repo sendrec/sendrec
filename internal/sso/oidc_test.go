@@ -519,3 +519,72 @@ func TestOIDCProvider_Exchange_AllowedDomain_UserInfoPath_Unverified(t *testing.
 		t.Fatalf("Exchange() error = %v, want 'not verified'", err)
 	}
 }
+
+func TestOIDCProvider_Exchange_RequireEmailVerified_RejectsUnverifiedWithoutAllowlist(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{email: "user@example.com", emailVerified: false})
+	defer server.Close()
+
+	require := true
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:            server.URL,
+		ClientID:             "test-client-id",
+		ClientSecret:         "test-client-secret",
+		RedirectURL:          "http://localhost/callback",
+		RequireEmailVerified: &require,
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	if _, err := provider.Exchange(context.Background(), "code"); err == nil {
+		t.Fatal("Exchange() expected error for unverified email, got nil")
+	} else if !strings.Contains(err.Error(), "not verified") {
+		t.Fatalf("Exchange() error = %v, want 'not verified'", err)
+	}
+}
+
+// Some identity providers (Authentik by default) send email_verified=false
+// for addresses they manage; an explicit opt-out still applies the allowlist.
+func TestOIDCProvider_Exchange_RequireEmailVerifiedOff_AllowsUnverifiedInAllowlist(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{email: "user@allowed.com", emailVerified: false})
+	defer server.Close()
+
+	require := false
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:            server.URL,
+		ClientID:             "test-client-id",
+		ClientSecret:         "test-client-secret",
+		RedirectURL:          "http://localhost/callback",
+		AllowedEmailDomains:  []string{"allowed.com"},
+		RequireEmailVerified: &require,
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	if _, err := provider.Exchange(context.Background(), "code"); err != nil {
+		t.Fatalf("Exchange() error: %v", err)
+	}
+}
+
+func TestOIDCProvider_Exchange_RequireEmailVerifiedOff_StillChecksDomain(t *testing.T) {
+	server := newOIDCTestServerWithEmail(t, oidcTestOpts{email: "user@blocked.com", emailVerified: false})
+	defer server.Close()
+
+	require := false
+	provider, err := NewOIDCProvider(context.Background(), OIDCConfig{
+		IssuerURL:            server.URL,
+		ClientID:             "test-client-id",
+		ClientSecret:         "test-client-secret",
+		RedirectURL:          "http://localhost/callback",
+		AllowedEmailDomains:  []string{"allowed.com"},
+		RequireEmailVerified: &require,
+	})
+	if err != nil {
+		t.Fatalf("NewOIDCProvider() error: %v", err)
+	}
+
+	if _, err := provider.Exchange(context.Background(), "code"); err == nil || !strings.Contains(err.Error(), "not in the allowed list") {
+		t.Fatalf("Exchange() error = %v, want 'not in the allowed list'", err)
+	}
+}

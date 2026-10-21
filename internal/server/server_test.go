@@ -1593,3 +1593,59 @@ func TestDeleteAccountRouteIsRegistered(t *testing.T) {
 		t.Errorf("DELETE /api/user did not reach DeleteAccount: %v", err)
 	}
 }
+
+func TestGenericOIDCProviderIsListedWithDisplayName(t *testing.T) {
+	var issuer string
+	idp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                 issuer,
+			"authorization_endpoint": issuer + "/authorize",
+			"token_endpoint":         issuer + "/token",
+			"jwks_uri":               issuer + "/jwks",
+		})
+	}))
+	defer idp.Close()
+	issuer = idp.URL
+
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("failed to create pgxmock pool: %v", err)
+	}
+	defer mock.Close()
+
+	srv := server.New(server.Config{
+		DB:               mock,
+		Pinger:           &mockPinger{},
+		Storage:          &mockStorage{},
+		JWTSecret:        "test-secret",
+		BaseURL:          "https://localhost:8080",
+		OIDCIssuerURL:    issuer,
+		OIDCClientID:     "sendrec",
+		OIDCClientSecret: "secret",
+		OIDCDisplayName:  "Authentik",
+	})
+
+	rec := executeRequest(srv, http.MethodGet, "/api/auth/sso/providers")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var resp struct {
+		Providers    []string          `json:"providers"`
+		DisplayNames map[string]string `json:"displayNames"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Providers) != 1 || resp.Providers[0] != "oidc" {
+		t.Errorf("providers = %v, want [oidc]", resp.Providers)
+	}
+	if resp.DisplayNames["oidc"] != "Authentik" {
+		t.Errorf("displayNames = %v, want oidc: Authentik", resp.DisplayNames)
+	}
+
+	rec = executeRequest(srv, http.MethodGet, "/api/auth/sso/oidc")
+	if loc := rec.Header().Get("Location"); !strings.Contains(loc, "redirect_uri=https%3A%2F%2Flocalhost%3A8080%2Fapi%2Fauth%2Fsso%2Foidc%2Fcallback") {
+		t.Errorf("Location = %q, want the oidc callback as redirect_uri", loc)
+	}
+}

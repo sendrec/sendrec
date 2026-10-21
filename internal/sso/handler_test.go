@@ -1859,3 +1859,103 @@ func TestCallback_RegistrationOff_InvitedPersonCanJoin(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+func TestProviders_IncludesDisplayNames(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("google", &mockProvider{})
+	handler.RegisterProvider("oidc", &mockProvider{})
+	handler.SetDisplayName("oidc", "Authentik")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/sso/providers", nil)
+	rec := httptest.NewRecorder()
+	handler.Providers(rec, req)
+
+	var resp providersResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got := resp.DisplayNames["oidc"]; got != "Authentik" {
+		t.Errorf("displayNames[oidc] = %q, want Authentik", got)
+	}
+	if _, ok := resp.DisplayNames["google"]; ok {
+		t.Errorf("displayNames = %v, want no entry for google", resp.DisplayNames)
+	}
+}
+
+func TestCallback_DefaultWorkspace_NewUserJoinsAsMember(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("oidc", &mockProvider{
+		userInfo: &UserInfo{ExternalID: "idp-1", Email: "new@example.com", Name: "New"},
+	})
+	handler.SetDefaultWorkspace("oidc", "org-team")
+
+	mock.ExpectQuery(`SELECT user_id FROM external_identities`).
+		WithArgs("oidc", "idp-1").
+		WillReturnError(pgx.ErrNoRows)
+	mock.ExpectQuery(`SELECT id, email_verified FROM users WHERE email = \$1`).
+		WithArgs("new@example.com").
+		WillReturnError(pgx.ErrNoRows)
+	mock.ExpectQuery(`INSERT INTO users`).
+		WithArgs("new@example.com", "", "New").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow("user-new"))
+	mock.ExpectExec(`INSERT INTO external_identities`).
+		WithArgs("user-new", "oidc", "idp-1", "new@example.com").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	mock.ExpectExec(`INSERT INTO organization_members \(organization_id, user_id, role\) VALUES \(\$1, \$2, 'member'\) ON CONFLICT DO NOTHING`).
+		WithArgs("org-team", "user-new").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	mock.ExpectExec(`INSERT INTO refresh_tokens`).
+		WithArgs(pgxmock.AnyArg(), "user-new", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	state := "state-default-ws"
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/oidc/callback?code=c&state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	rec := callWithChiParam(handler.Callback, http.MethodGet, "/api/auth/sso/{provider}/callback", "provider", "oidc", req)
+
+	if !strings.Contains(rec.Header().Get("Location"), "/login?sso_token=") {
+		t.Fatalf("Location = %q, want /login?sso_token=", rec.Header().Get("Location"))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestCallback_DefaultWorkspace_FirstLinkJoinsAsMember(t *testing.T) {
+	handler, mock := newTestHandler(t)
+	defer mock.Close()
+
+	handler.RegisterProvider("oidc", &mockProvider{
+		userInfo: &UserInfo{ExternalID: "idp-2", Email: "existing@example.com", Name: "Existing"},
+	})
+	handler.SetDefaultWorkspace("oidc", "org-team")
+
+	mock.ExpectQuery(`SELECT user_id FROM external_identities`).
+		WithArgs("oidc", "idp-2").
+		WillReturnError(pgx.ErrNoRows)
+	mock.ExpectQuery(`SELECT id, email_verified FROM users WHERE email = \$1`).
+		WithArgs("existing@example.com").
+		WillReturnRows(pgxmock.NewRows([]string{"id", "email_verified"}).AddRow("user-existing", true))
+	mock.ExpectExec(`INSERT INTO external_identities`).
+		WithArgs("user-existing", "oidc", "idp-2", "existing@example.com").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	mock.ExpectExec(`INSERT INTO organization_members`).
+		WithArgs("org-team", "user-existing").
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+	mock.ExpectExec(`INSERT INTO refresh_tokens`).
+		WithArgs(pgxmock.AnyArg(), "user-existing", pgxmock.AnyArg()).
+		WillReturnResult(pgxmock.NewResult("INSERT", 1))
+
+	state := "state-default-ws-link"
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/sso/oidc/callback?code=c&state="+state, nil)
+	req.AddCookie(&http.Cookie{Name: "sso_state", Value: state})
+	callWithChiParam(handler.Callback, http.MethodGet, "/api/auth/sso/{provider}/callback", "provider", "oidc", req)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}

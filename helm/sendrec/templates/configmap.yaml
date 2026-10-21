@@ -49,6 +49,11 @@ data:
   ANALYTICS_SCRIPT: {{ .Values.sendrec.env.analyticsScript | quote }}
   ALLOWED_FRAME_ANCESTORS: {{ .Values.sendrec.env.allowedFrameAncestors | quote }}
   GOOGLE_AUTH_ALLOWED_DOMAINS: {{ .Values.sendrec.env.googleAuthAllowedDomains | quote }}
+  OIDC_ISSUER_URL: {{ .Values.sendrec.env.oidcIssuerUrl | quote }}
+  OIDC_DISPLAY_NAME: {{ .Values.sendrec.env.oidcDisplayName | quote }}
+  OIDC_AUTH_ALLOWED_DOMAINS: {{ .Values.sendrec.env.oidcAuthAllowedDomains | quote }}
+  OIDC_REQUIRE_EMAIL_VERIFIED: {{ .Values.sendrec.env.oidcRequireEmailVerified | quote }}
+  OIDC_DEFAULT_WORKSPACE: {{ .Values.sendrec.env.oidcDefaultWorkspace | quote }}
   CREEM_PRO_PRODUCT_ID: {{ .Values.sendrec.env.creemProProductId | quote }}
   CREEM_BUSINESS_PRODUCT_ID: {{ .Values.sendrec.env.creemBusinessProductId | quote }}
   CREEM_ORG_PRO_PRODUCT_ID: {{ .Values.sendrec.env.creemOrgProProductId | quote }}

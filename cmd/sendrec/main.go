@@ -218,6 +218,13 @@ func main() {
 		MicrosoftClientSecret:     getEnv("MICROSOFT_CLIENT_SECRET", ""),
 		GitHubSSOClientID:         getEnv("GITHUB_SSO_CLIENT_ID", ""),
 		GitHubSSOClientSecret:     getEnv("GITHUB_SSO_CLIENT_SECRET", ""),
+		OIDCIssuerURL:             getEnv("OIDC_ISSUER_URL", ""),
+		OIDCClientID:              getEnv("OIDC_CLIENT_ID", ""),
+		OIDCClientSecret:          getEnv("OIDC_CLIENT_SECRET", ""),
+		OIDCDisplayName:           getEnv("OIDC_DISPLAY_NAME", "SSO"),
+		OIDCAllowedDomains:        email.ParseAllowlist(getEnv("OIDC_AUTH_ALLOWED_DOMAINS", "")),
+		OIDCDefaultWorkspace:      getEnv("OIDC_DEFAULT_WORKSPACE", ""),
+		OIDCRequireEmailVerified:  getEnv("OIDC_REQUIRE_EMAIL_VERIFIED", "true") != "false",
 	})
 
 	if creemAPIKey != "" {
@@ -308,7 +315,7 @@ func getEnv(key, fallback string) string {
 }
 
 // socialRegistrationEnabled reads SOCIAL_REGISTRATION_ENABLED: whether a
-// first-time Google, Microsoft or GitHub sign-in may create an account.
+// first-time Google, Microsoft, GitHub or OIDC sign-in may create an account.
 // Unset, it follows REGISTRATION_ENABLED.
 func socialRegistrationEnabled(registrationEnabled bool) bool {
 	return getEnv("SOCIAL_REGISTRATION_ENABLED", strconv.FormatBool(registrationEnabled)) == "true"

@@ -18,6 +18,7 @@ export function Login() {
   const registered = useLocation().state as { email?: string; justRegistered?: boolean } | null;
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [ssoProviders, setSsoProviders] = useState<string[]>([]);
+  const [ssoDisplayNames, setSsoDisplayNames] = useState<Record<string, string>>({});
   const [ssoError, setSsoError] = useState("");
   const [ssoEnforcement, setSsoEnforcement] = useState<SsoEnforcement | null>(null);
 
@@ -36,9 +37,10 @@ export function Login() {
         if (!res.ok) return;
         return res.json();
       })
-      .then((data: { providers?: string[] } | undefined) => {
+      .then((data: { providers?: string[]; displayNames?: Record<string, string> } | undefined) => {
         if (data?.providers?.length) {
           setSsoProviders(data.providers);
+          setSsoDisplayNames(data.displayNames ?? {});
         }
       })
       .catch(() => {});
@@ -126,7 +128,7 @@ export function Login() {
                 href={`/api/auth/sso/${provider}`}
                 className="btn btn--secondary btn--sso"
               >
-                Continue with {providerLabel(provider)}
+                Continue with {ssoDisplayNames[provider] ?? providerLabel(provider)}
               </a>
             ))}
           </div>
