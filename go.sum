@@ -111,8 +111,8 @@ github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJw
 github.com/opencontainers/image-spec v1.1.1/go.mod h1:qpqAh3Dmcf36wStyyWU+kCeDgrGnAve2nCC8+7h8Q0M=
 github.com/oschwald/maxminddb-golang v1.13.1 h1:G3wwjdN9JmIK2o/ermkHM+98oX5fS+k5MbwsmL4MRQE=
 github.com/oschwald/maxminddb-golang v1.13.1/go.mod h1:K4pgV9N/GcK694KSTmVSDTODk4IsCNThNdTmnaBZ/F8=
-github.com/pashagolub/pgxmock/v5 v5.2.0 h1:9MYpoUUDNGfIE72atGdztUzZ3fsCmrH0N0u5RCYLnyQ=
-github.com/pashagolub/pgxmock/v5 v5.2.0/go.mod h1:occvXk2WVNxOCPPU7bpz7GuEbFMU+rbRcfNyaLu7Y1A=
+github.com/pashagolub/pgxmock/v6 v6.0.0-beta2 h1:8nEQJ9gukk/4OcECNO+QKzJRhbzTeqCpn5MiuLSiGlc=
+github.com/pashagolub/pgxmock/v6 v6.0.0-beta2/go.mod h1:LyMChJBEOGR/xYF1K7LeUvlwddjX5V4FhhcF+YFoG+E=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=

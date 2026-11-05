@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 	"github.com/sendrec/sendrec/internal/email"
 )
 

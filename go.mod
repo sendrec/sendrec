@@ -17,7 +17,7 @@ require (
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/mssola/useragent v1.0.0
 	github.com/oschwald/maxminddb-golang v1.13.1
-	github.com/pashagolub/pgxmock/v5 v5.2.0
+	github.com/pashagolub/pgxmock/v6 v6.0.0-beta2
 	golang.org/x/crypto v0.58.0
 	golang.org/x/oauth2 v0.37.0
 )

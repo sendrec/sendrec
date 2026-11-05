@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 )
 
 func TestGenerateDocument_Success(t *testing.T) {
