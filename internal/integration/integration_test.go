@@ -16,6 +16,7 @@ import (
 )
 
 func TestJiraCreateIssue(t *testing.T) {
+	allowPrivateTargets(t)
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/rest/api/3/issue" {
@@ -57,6 +58,7 @@ func TestJiraCreateIssue(t *testing.T) {
 }
 
 func TestJiraValidateConfig(t *testing.T) {
+	allowPrivateTargets(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/rest/api/3/myself" {
 			_ = json.NewEncoder(w).Encode(map[string]any{"accountId": "123"})
@@ -73,6 +75,7 @@ func TestJiraValidateConfig(t *testing.T) {
 }
 
 func TestJiraValidateConfigBadAuth(t *testing.T) {
+	allowPrivateTargets(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
