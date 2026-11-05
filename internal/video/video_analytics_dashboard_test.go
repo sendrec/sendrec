@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 )
 
 func expectDashboardQueries(t *testing.T, mock pgxmock.PgxPoolIface, totalViews, uniqueViews, totalVideos, watchTime int64, avgCompletion float64, dailyRows *pgxmock.Rows, topVideoRows *pgxmock.Rows) {
