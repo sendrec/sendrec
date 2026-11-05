@@ -22,6 +22,7 @@ import (
 	"github.com/sendrec/sendrec/internal/ratelimit"
 	"github.com/sendrec/sendrec/internal/server"
 	slackpkg "github.com/sendrec/sendrec/internal/slack"
+	"github.com/sendrec/sendrec/internal/sso"
 	"github.com/sendrec/sendrec/internal/storage"
 	"github.com/sendrec/sendrec/internal/video"
 	webhookpkg "github.com/sendrec/sendrec/internal/webhook"
@@ -57,6 +58,7 @@ func main() {
 	// User-configured webhooks may not reach loopback or private ranges unless
 	// a developer explicitly opts in to point one at their own machine.
 	webhookpkg.AllowPrivateTargets = getEnv("WEBHOOK_ALLOW_PRIVATE_TARGETS", "false") == "true"
+	sso.AllowPrivateIssuers = getEnv("SSO_ALLOW_PRIVATE_ISSUERS", "false") == "true"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

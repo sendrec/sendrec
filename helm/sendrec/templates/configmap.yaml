@@ -35,6 +35,7 @@ data:
   TRUSTED_PROXY: {{ .Values.sendrec.env.trustedProxy | quote }}
   RATE_LIMIT_ENABLED: {{ .Values.sendrec.env.rateLimitEnabled | quote }}
   WEBHOOK_ALLOW_PRIVATE_TARGETS: {{ .Values.sendrec.env.webhookAllowPrivateTargets | quote }}
+  SSO_ALLOW_PRIVATE_ISSUERS: {{ .Values.sendrec.env.ssoAllowPrivateIssuers | quote }}
   TRANSCRIPTION_ENABLED: {{ .Values.sendrec.env.transcriptionEnabled | quote }}
   TRANSCRIPTION_PROVIDER: {{ .Values.sendrec.env.transcriptionProvider | quote }}
   TRANSCRIPTION_API_URL: {{ .Values.sendrec.env.transcriptionApiUrl | quote }}

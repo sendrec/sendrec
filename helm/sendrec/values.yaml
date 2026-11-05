@@ -64,6 +64,7 @@ sendrec:
     trustedProxy: "true"               # "true" only when an ingress controller you control always sets X-Forwarded-For; otherwise every client shares one rate-limit bucket
     rateLimitEnabled: "true"            # "false" only in test/e2e stacks
     webhookAllowPrivateTargets: "false" # "true" lets user webhooks reach loopback/private ranges: an SSRF primitive, local development only
+    ssoAllowPrivateIssuers: "false" # "true" lets workspace SSO reach an identity provider on a private network: only if you trust every workspace admin
 
     # Transcription
     transcriptionEnabled: "false"

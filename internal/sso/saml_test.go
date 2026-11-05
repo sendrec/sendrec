@@ -81,6 +81,7 @@ func TestParseSAMLMetadataFromXML_InvalidXML(t *testing.T) {
 }
 
 func TestParseSAMLMetadataFromURL(t *testing.T) {
+	allowPrivateIssuers(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
 		_, _ = w.Write([]byte(testSAMLMetadataXML))
