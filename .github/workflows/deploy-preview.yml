@@ -123,7 +123,28 @@ jobs:
               -H "Content-Type: application/json" \
               -d '{"dockerfile_location": "/Dockerfile", "custom_docker_run_options": "-v /opt/sendrec/models:/models:ro"}'
 
-            # Copy env vars from staging app, override BASE_URL for this preview
+            # Each preview gets its own Postgres. Sharing staging's let a branch's
+            # draft migration record a version staging's schema didn't match.
+            DB_PASSWORD=$(openssl rand -hex 24)
+            echo "::add-mask::$DB_PASSWORD"
+            DB_UUID=$(api -X POST "$COOLIFY_API_URL/databases/postgresql" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"project_uuid\": \"$COOLIFY_PROJECT_UUID\",
+                \"environment_name\": \"development\",
+                \"server_uuid\": \"$COOLIFY_SERVER_UUID\",
+                \"destination_uuid\": \"$COOLIFY_DESTINATION_UUID\",
+                \"name\": \"$APP_NAME-db\",
+                \"image\": \"postgres:18-alpine\",
+                \"postgres_user\": \"sendrec\",
+                \"postgres_password\": \"$DB_PASSWORD\",
+                \"postgres_db\": \"sendrec\",
+                \"instant_deploy\": true
+              }" | python3 -c "import json,sys; print(json.load(sys.stdin)['uuid'])")
+            echo "Created database: $DB_UUID"
+            PREVIEW_DATABASE_URL="postgres://sendrec:$DB_PASSWORD@$DB_UUID:5432/sendrec?sslmode=disable"
+
+            # Copy env vars from staging app, override BASE_URL and DATABASE_URL for this preview
             python3 << PYEOF
           import json, urllib.request
 
@@ -151,6 +172,8 @@ jobs:
               value = env["value"]
               if env["key"] == "BASE_URL":
                   value = f"https://{DOMAIN}"
+              if env["key"] == "DATABASE_URL":
+                  value = "$PREVIEW_DATABASE_URL"
               payload = json.dumps({"key": env["key"], "value": value, "is_preview": False}).encode()
               req = urllib.request.Request(f"{API}/applications/{APP}/envs", data=payload, headers=headers, method="POST")
               urllib.request.urlopen(req)
@@ -246,6 +269,22 @@ jobs:
             api -X DELETE "$COOLIFY_API_URL/applications/$UUID"
           else
             echo "No preview app found for $APP_NAME"
+          fi
+
+          DB_UUID=$(api "$COOLIFY_API_URL/databases" | \
+            python3 -c "
+          import json, sys
+          for d in json.load(sys.stdin):
+              if d['name'] == '$APP_NAME-db':
+                  print(d['uuid'])
+                  break
+          ")
+
+          if [ -n "$DB_UUID" ]; then
+            echo "Deleting preview database: $DB_UUID ($APP_NAME-db)"
+            api -X DELETE "$COOLIFY_API_URL/databases/$DB_UUID?delete_volumes=true"
+          else
+            echo "No preview database found for $APP_NAME-db"
           fi
 
       - name: Comment PR cleanup
