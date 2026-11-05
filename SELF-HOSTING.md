@@ -590,6 +590,8 @@ Configure the following authorized redirect URIs in each provider's console (rep
 
 For SAML / per-organization OIDC enforcement, see the in-app workspace settings.
 
+Workspace SSO refuses OIDC issuers and SAML metadata URLs that resolve to loopback, private or link-local addresses, because workspace admins choose those URLs. If your identity provider is on an internal network, set `SSO_ALLOW_PRIVATE_ISSUERS=true`, and only if you trust every workspace admin. The `OIDC_ISSUER_URL` provider above is set by you, so it isn't restricted.
+
 ## S3_PUBLIC_ENDPOINT explained
 
 Video recordings and file uploads use presigned S3 URLs. The app generates these URLs using `S3_PUBLIC_ENDPOINT` so the browser can upload directly to storage (MP4, WebM, and MOV files are supported).

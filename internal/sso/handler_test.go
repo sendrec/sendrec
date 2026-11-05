@@ -1468,6 +1468,7 @@ func TestSaveConfig_SAML_MissingMetadata(t *testing.T) {
 }
 
 func TestOrgCallback_Success(t *testing.T) {
+	allowPrivateIssuers(t)
 	server, _ := newOIDCTestServer(t)
 	defer server.Close()
 

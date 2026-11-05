@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/httputil"
@@ -283,7 +284,7 @@ func (h *Handler) InitiateOrgSSO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	provider, err := NewOIDCProvider(r.Context(), OIDCConfig{
+	provider, err := NewOIDCProvider(oidc.ClientContext(r.Context(), workspaceHTTPClient()), OIDCConfig{
 		IssuerURL:    *issuerURL,
 		ClientID:     *clientID,
 		ClientSecret: clientSecret,
@@ -393,7 +394,10 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	provider, err := NewOIDCProvider(r.Context(), OIDCConfig{
+	// The token and userinfo endpoints come from the workspace's discovery
+	// document, so the exchange needs the same guard as discovery.
+	ctx := oidc.ClientContext(r.Context(), workspaceHTTPClient())
+	provider, err := NewOIDCProvider(ctx, OIDCConfig{
 		IssuerURL:    *issuerURL,
 		ClientID:     *clientID,
 		ClientSecret: clientSecret,
@@ -405,7 +409,7 @@ func (h *Handler) OrgCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	info, err := provider.Exchange(r.Context(), code)
+	info, err := provider.Exchange(ctx, code)
 	if err != nil {
 		slog.Error("sso: org exchange failed", "orgID", orgID, "error", err)
 		h.redirectWithError(w, r, "authentication failed")

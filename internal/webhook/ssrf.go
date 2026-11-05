@@ -3,7 +3,9 @@ package webhook
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"syscall"
+	"time"
 )
 
 // AllowPrivateTargets permits webhooks to reach loopback and private addresses.
@@ -25,6 +27,18 @@ func IsBlockedIP(ip net.IP) bool {
 		ip.IsLinkLocalMulticast() ||
 		ip.IsInterfaceLocalMulticast() ||
 		ip.IsUnspecified()
+}
+
+// NewSafeTransport returns a transport for fetching user-supplied URLs. It
+// refuses to dial internal addresses, on every hop of a redirect included.
+func NewSafeTransport() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Control:   safeDialControl,
+	}).DialContext
+	return transport
 }
 
 // safeDialControl is the net.Dialer Control hook wired into the webhook client;
