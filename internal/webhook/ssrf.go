@@ -8,7 +8,8 @@ import (
 	"time"
 )
 
-// AllowPrivateTargets permits webhooks to reach loopback and private addresses.
+// AllowPrivateTargets permits webhooks and Jira integrations to reach loopback
+// and private addresses.
 // Off in production; set from WEBHOOK_ALLOW_PRIVATE_TARGETS so local development
 // can point a webhook at a listener on the developer's own machine.
 var AllowPrivateTargets bool
