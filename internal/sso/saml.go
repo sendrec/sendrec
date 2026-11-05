@@ -62,9 +62,7 @@ const metadataFetchTimeout = 30 * time.Second
 // ParseSAMLMetadataFromURL fetches SAML IdP metadata from the given URL and
 // parses it using ParseSAMLMetadataFromXML.
 func ParseSAMLMetadataFromURL(metadataURL string) (*SAMLConfig, error) {
-	client := &http.Client{Timeout: metadataFetchTimeout}
-
-	resp, err := client.Get(metadataURL)
+	resp, err := workspaceHTTPClient().Get(metadataURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch SAML metadata: %w", err)
 	}

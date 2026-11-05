@@ -9,7 +9,16 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/sendrec/sendrec/internal/webhook"
 )
+
+// jiraHTTPClient refuses internal addresses because users supply the base URL.
+var jiraHTTPClient = &http.Client{
+	Timeout:   30 * time.Second,
+	Transport: webhook.NewSafeTransport(),
+}
 
 // JiraClient implements IssueCreator for Jira Cloud using the REST API v3.
 type JiraClient struct {
@@ -49,7 +58,7 @@ func (c *JiraClient) CreateIssue(ctx context.Context, req CreateIssueRequest) (*
 	c.setAuth(httpReq)
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	resp, err := jiraHTTPClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to Jira")
 	}
@@ -80,7 +89,7 @@ func (c *JiraClient) ValidateConfig(ctx context.Context) error {
 	}
 	c.setAuth(req)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := jiraHTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not connect to Jira")
 	}

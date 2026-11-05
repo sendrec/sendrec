@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -43,7 +45,7 @@ func (db *DB) Migrate(databaseURL string) error {
 		return fmt.Errorf("create migration source: %w", err)
 	}
 
-	m, err := migrate.NewWithSourceInstance("iofs", source, databaseURL)
+	m, err := migrate.NewWithSourceInstance("iofs", source, migrationURL(databaseURL))
 	if err != nil {
 		return fmt.Errorf("create migrator: %w", err)
 	}
@@ -54,4 +56,21 @@ func (db *DB) Migrate(databaseURL string) error {
 	}
 
 	return nil
+}
+
+// migrationURL drops pgxpool's own settings, which the migrator would otherwise
+// send to the server as runtime parameters and fail on.
+func migrationURL(databaseURL string) string {
+	parsed, err := url.Parse(databaseURL)
+	if err != nil {
+		return databaseURL
+	}
+	query := parsed.Query()
+	for key := range query {
+		if strings.HasPrefix(key, "pool_") {
+			query.Del(key)
+		}
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }

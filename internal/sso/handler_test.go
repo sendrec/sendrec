@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
-	"github.com/pashagolub/pgxmock/v5"
+	"github.com/pashagolub/pgxmock/v6"
 	"github.com/sendrec/sendrec/internal/auth"
 	"github.com/sendrec/sendrec/internal/integration"
 	"github.com/sendrec/sendrec/internal/validate"
@@ -1468,6 +1468,7 @@ func TestSaveConfig_SAML_MissingMetadata(t *testing.T) {
 }
 
 func TestOrgCallback_Success(t *testing.T) {
+	allowPrivateIssuers(t)
 	server, _ := newOIDCTestServer(t)
 	defer server.Close()
 
