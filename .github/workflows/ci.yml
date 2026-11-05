@@ -13,6 +13,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:18-alpine
@@ -84,6 +85,7 @@ jobs:
       # was present in the command line and inert, so it has to run here rather
       # than skip on a runner that happens to lack the binary.
       - name: Install ffmpeg
+        timeout-minutes: 5
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Run Go tests
