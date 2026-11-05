@@ -204,7 +204,9 @@ func New(cfg Config) *Server {
 				RedirectURL:         baseURL + "/api/auth/sso/google/callback",
 				AllowedEmailDomains: cfg.GoogleAllowedDomains,
 			})
-			if err == nil {
+			if err != nil {
+				slog.Error("google sign-in disabled: provider discovery failed", "error", err)
+			} else {
 				s.ssoHandler.RegisterProvider("google", googleProvider)
 			}
 		}
@@ -215,7 +217,9 @@ func New(cfg Config) *Server {
 				ClientSecret: cfg.MicrosoftClientSecret,
 				RedirectURL:  baseURL + "/api/auth/sso/microsoft/callback",
 			})
-			if err == nil {
+			if err != nil {
+				slog.Error("microsoft sign-in disabled: provider discovery failed", "error", err)
+			} else {
 				s.ssoHandler.RegisterProvider("microsoft", msProvider)
 			}
 		}
