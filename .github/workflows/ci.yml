@@ -122,7 +122,21 @@ jobs:
         run: go mod verify
 
       - name: Check Go vulnerabilities
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
+        # GO-2026-6909 (crewjam/saml, no fix released): both bugs need an assertion
+        # signed by the org's own configured IdP, which can already assert any
+        # identity for that org; the nil-Issuer panic is caught by chi's Recoverer.
+        # Remove the ignore once a fixed crewjam/saml ships.
+        env:
+          IGNORED_VULNS: GO-2026-6909
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck -format json ./... > govulncheck.json
+          found=$(jq -r 'select(.finding.trace[0].function) | .finding.osv' govulncheck.json | sort -u | grep -vxF -f <(tr ' ' '\n' <<< "$IGNORED_VULNS") || true)
+          if [ -n "$found" ]; then
+            govulncheck ./... || true
+            echo "::error::Reachable vulnerabilities: $found"
+            exit 1
+          fi
 
       - name: Build Go binary
         run: go build -o bin/sendrec ./cmd/sendrec
