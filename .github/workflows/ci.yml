@@ -122,10 +122,9 @@ jobs:
         run: go mod verify
 
       - name: Check Go vulnerabilities
-        # GO-2026-6909 (crewjam/saml, no fix released): both bugs need an assertion
-        # signed by the org's own configured IdP, which can already assert any
-        # identity for that org; the nil-Issuer panic is caught by chi's Recoverer.
-        # Remove the ignore once a fixed crewjam/saml ships.
+        # GO-2026-6909 (crewjam/saml): the advisory lists no fixed version, but
+        # v0.6.3 already rejects both bugs; internal/sso/saml_exchange_test.go
+        # checks this. Remove the ignore once the advisory names a fixed version.
         env:
           IGNORED_VULNS: GO-2026-6909
         run: |
