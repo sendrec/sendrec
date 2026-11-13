@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { CameraRecorder } from "../components/CameraRecorder";
 import { Recorder } from "../components/Recorder";
+import { type RecordingMode, RecordingModePicker, readRecordingMode, saveRecordingMode } from "../components/RecordingModePicker";
 import { LimitsResponse } from "../types/limits";
 import { Upload } from "./Upload";
 
@@ -54,6 +55,8 @@ export function Record() {
   const [failedTake, setFailedTake] = useState<{ blob: Blob; duration: number; webcamBlob?: Blob } | null>(null);
   const [limits, setLimits] = useState<LimitsResponse | null>(null);
   const [loadingLimits, setLoadingLimits] = useState(true);
+  const [mode, setMode] = useState<RecordingMode>(readRecordingMode);
+  const [recorderIdle, setRecorderIdle] = useState(true);
 
   useEffect(() => {
     async function fetchLimits() {
@@ -245,8 +248,19 @@ export function Record() {
     typeof navigator.mediaDevices?.getDisplayMedia === "function";
   const cameraSupported =
     typeof navigator.mediaDevices?.getUserMedia === "function";
-  const preferredMode = localStorage.getItem("recording-mode") || "screen";
-  const useCameraOnly = preferredMode === "camera" && cameraSupported;
+  const availableModes = ([
+    cameraSupported && "camera",
+    screenRecordingSupported && "screen",
+    screenRecordingSupported && cameraSupported && "screen-camera",
+  ] as const).filter((m): m is RecordingMode => !!m);
+  const activeMode: RecordingMode = availableModes.includes(mode)
+    ? mode
+    : screenRecordingSupported ? "screen" : "camera";
+
+  function chooseMode(m: RecordingMode) {
+    setMode(m);
+    saveRecordingMode(m);
+  }
 
   const quotaReached =
     limits !== null &&
@@ -377,7 +391,7 @@ export function Record() {
           <div className="onboarding-steps">
             <div className="onboarding-step">
               <span className="onboarding-step-num">1.</span>
-              <span className="onboarding-step-text">Record your screen or upload a video</span>
+              <span className="onboarding-step-text">Record your screen or camera, or upload a video</span>
             </div>
             <div className="onboarding-step">
               <span className="onboarding-step-num">2.</span>
@@ -390,17 +404,28 @@ export function Record() {
           </div>
         </div>
       )}
+      {tab === "record" && recorderIdle && availableModes.length > 1 && (
+        <RecordingModePicker
+          value={activeMode}
+          onChange={chooseMode}
+          modes={availableModes}
+          className="btn-row record-mode-picker"
+        />
+      )}
       {tab === "record" ? (
-        screenRecordingSupported && !useCameraOnly ? (
-          <Recorder
-            onRecordingComplete={handleRecordingComplete}
-            onRecordingError={handleRecordingError}
-            maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
-          />
-        ) : (
+        activeMode === "camera" ? (
           <CameraRecorder
             onRecordingComplete={handleRecordingComplete}
             onRecordingError={handleRecordingError}
+            onIdleChange={setRecorderIdle}
+            maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
+          />
+        ) : (
+          <Recorder
+            withCamera={activeMode === "screen-camera"}
+            onRecordingComplete={handleRecordingComplete}
+            onRecordingError={handleRecordingError}
+            onIdleChange={setRecorderIdle}
             maxDurationSeconds={limits?.maxVideoDurationSeconds ?? 0}
           />
         )

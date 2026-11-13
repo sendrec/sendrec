@@ -4,6 +4,7 @@ import { useTheme } from "../../hooks/useTheme";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import { TRANSCRIPTION_LANGUAGES } from "../../constants/languages";
 import { UserProfile } from "./types";
+import { type RecordingMode, RecordingModePicker, readRecordingMode, saveRecordingMode } from "../../components/RecordingModePicker";
 
 interface ProfileSectionProps {
   profile: UserProfile;
@@ -246,20 +247,14 @@ export function ProfileSection({
   );
 }
 
-type RecordingMode = "camera" | "screen" | "screen-camera";
-
 function RecordingDefaults() {
-  const [mode, setModeState] = useState<RecordingMode>(() => {
-    const stored = localStorage.getItem("recording-mode");
-    if (stored === "camera" || stored === "screen" || stored === "screen-camera") return stored;
-    return "screen";
-  });
+  const [mode, setModeState] = useState<RecordingMode>(readRecordingMode);
   const [countdown, setCountdownState] = useState(() => localStorage.getItem("recording-countdown") !== "false");
   const [systemAudio, setSystemAudioState] = useState(() => localStorage.getItem("recording-audio") !== "false");
 
   function setMode(m: RecordingMode) {
     setModeState(m);
-    localStorage.setItem("recording-mode", m);
+    saveRecordingMode(m);
   }
   function setCountdown(v: boolean) {
     setCountdownState(v);
@@ -270,12 +265,6 @@ function RecordingDefaults() {
     localStorage.setItem("recording-audio", String(v));
   }
 
-  const modes: { value: RecordingMode; label: string }[] = [
-    { value: "camera", label: "Camera" },
-    { value: "screen", label: "Screen" },
-    { value: "screen-camera", label: "Screen + Camera" },
-  ];
-
   return (
     <div className="card settings-section">
       <h2>Recording Defaults</h2>
@@ -285,25 +274,7 @@ function RecordingDefaults() {
 
       <div className="form-field">
         <label className="form-label">Default recording mode</label>
-        <fieldset className="btn-row" style={{ border: "none", padding: 0, margin: 0 }}>
-          <legend className="sr-only">Recording mode</legend>
-          {modes.map((m) => (
-            <label
-              key={m.value}
-              className={`theme-option${mode === m.value ? " theme-option--active" : ""}`}
-            >
-              <input
-                type="radio"
-                name="recording-mode"
-                value={m.value}
-                checked={mode === m.value}
-                onChange={() => setMode(m.value)}
-                className="sr-only"
-              />
-              {m.label}
-            </label>
-          ))}
-        </fieldset>
+        <RecordingModePicker value={mode} onChange={setMode} />
       </div>
 
       <div className="form-field" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>

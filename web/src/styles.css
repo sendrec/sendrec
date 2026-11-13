@@ -1238,6 +1238,11 @@ textarea.form-input {
   transition: all 0.15s ease;
 }
 
+.theme-option:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .theme-option:hover {
   border-color: var(--color-text-secondary);
   color: var(--color-text);
@@ -1625,6 +1630,11 @@ textarea.form-input {
 }
 
 /* Record tabs */
+.record-mode-picker {
+  justify-content: center;
+  margin-bottom: var(--space-4);
+}
+
 .record-tabs {
   display: flex;
   gap: var(--space-1);

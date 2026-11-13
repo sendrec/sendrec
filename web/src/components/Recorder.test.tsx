@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -98,6 +99,10 @@ class MockMediaRecorder {
     this.state = "recording";
   });
 }
+
+// Lets a pending webcam open (or failure) settle.
+const flushWebcam = () => act(async () => {});
+const webcamPreview = () => document.querySelector("video.pip-preview");
 
 beforeEach(() => {
   mockDrawMode = false;
@@ -256,16 +261,19 @@ describe("Recorder", () => {
     expect(screen.queryByText(/Maximum recording length/)).not.toBeInTheDocument();
   });
 
-  it("shows Camera Off button in idle state", () => {
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    expect(screen.getByText("Camera Off")).toBeInTheDocument();
+  it("reports when it leaves and returns to idle", async () => {
+    const onIdleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<Recorder onRecordingComplete={vi.fn()} onIdleChange={onIdleChange} />);
+    expect(onIdleChange).toHaveBeenLastCalledWith(true);
+
+    await user.click(screen.getByRole("button", { name: "Start recording" }));
+    expect(onIdleChange).toHaveBeenLastCalledWith(false);
   });
 
-  it("shows camera toggle button with Enable camera aria-label in idle state", () => {
+  it("has no camera toggle; the Record page mode picker owns the camera", () => {
     render(<Recorder onRecordingComplete={vi.fn()} />);
-    expect(
-      screen.getByRole("button", { name: "Enable camera" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /camera/i })).not.toBeInTheDocument();
   });
 
   it("calls getDisplayMedia when starting recording", async () => {
@@ -397,28 +405,28 @@ describe("Recorder", () => {
     expect(stopTrack).toHaveBeenCalled();
   });
 
-  it("toggles webcam on when Enable camera is clicked", async () => {
-    const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Enable camera" }));
+  it("opens the webcam when withCamera is set", async () => {
+    render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+    await flushWebcam();
 
     expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
       video: { width: 320, height: 240, facingMode: "user" },
       audio: false,
     });
-    expect(screen.getByText("Camera On")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Disable camera" }),
-    ).toBeInTheDocument();
+    expect(webcamPreview()).not.toBeNull();
   });
 
-  it("toggles webcam off when Disable camera is clicked", async () => {
-    const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Enable camera" }));
-    await user.click(screen.getByRole("button", { name: "Disable camera" }));
+  it("closes the webcam when withCamera is turned off", async () => {
+    const stop = vi.fn();
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue({
+      getTracks: () => [{ stop }],
+    });
+    const { rerender } = render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+    await flushWebcam();
+    rerender(<Recorder onRecordingComplete={vi.fn()} />);
 
-    expect(screen.getByText("Camera Off")).toBeInTheDocument();
+    expect(stop).toHaveBeenCalled();
+    expect(webcamPreview()).toBeNull();
   });
 
   it("shows inline error when webcam access fails", async () => {
@@ -427,8 +435,8 @@ describe("Recorder", () => {
     );
 
     const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Enable camera" }));
+    render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+    await flushWebcam();
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByText("Could not access your camera. Please allow camera access and try again.")).toBeInTheDocument();
@@ -615,11 +623,11 @@ describe("Recorder", () => {
 
     it("shows the cameras once the camera is on", async () => {
       const user = userEvent.setup();
-      render(<Recorder onRecordingComplete={vi.fn()} />);
+      const { rerender } = render(<Recorder onRecordingComplete={vi.fn()} />);
       await screen.findByRole("combobox", { name: "Microphone" });
       expect(screen.queryByRole("combobox", { name: "Camera" })).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Enable camera" }));
+      rerender(<Recorder withCamera onRecordingComplete={vi.fn()} />);
 
       const select = await screen.findByRole("combobox", { name: "Camera" });
       const options = Array.from((select as HTMLSelectElement).options).map((o) => o.text);
@@ -628,8 +636,8 @@ describe("Recorder", () => {
 
     it("switches to the chosen camera and remembers it", async () => {
       const user = userEvent.setup();
-      render(<Recorder onRecordingComplete={vi.fn()} />);
-      await user.click(screen.getByRole("button", { name: "Enable camera" }));
+      render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+      await flushWebcam();
       await user.selectOptions(await screen.findByRole("combobox", { name: "Camera" }), "obs");
 
       await vi.waitFor(() => {
@@ -639,7 +647,7 @@ describe("Recorder", () => {
         });
       });
       expect(localStorage.getItem("recording-camera")).toBe("obs");
-      expect(screen.getByRole("button", { name: "Disable camera" })).toBeInTheDocument();
+      await vi.waitFor(() => expect(webcamPreview()).not.toBeNull());
     });
 
     it("keeps the picker reachable when the saved camera fails to open", async () => {
@@ -647,10 +655,10 @@ describe("Recorder", () => {
       (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
         new DOMException("busy", "NotReadableError"),
       );
-      const user = userEvent.setup();
-      render(<Recorder onRecordingComplete={vi.fn()} />);
+      const { rerender } = render(<Recorder onRecordingComplete={vi.fn()} />);
       await screen.findByRole("combobox", { name: "Microphone" });
-      await user.click(screen.getByRole("button", { name: "Enable camera" }));
+      rerender(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+      await flushWebcam();
 
       expect(screen.getByText(/Could not access your camera/)).toBeInTheDocument();
       expect(screen.getByRole("combobox", { name: "Camera" })).toBeInTheDocument();
@@ -665,26 +673,24 @@ describe("Recorder", () => {
           pending.push(() => { opened.push(track); resolve({ getTracks: () => [track] }); });
         }),
       );
-      render(<Recorder onRecordingComplete={vi.fn()} />);
-      await act(async () => { screen.getByRole("button", { name: "Enable camera" }).click(); });
-      await act(async () => { screen.getByRole("button", { name: "Enable camera" }).click(); });
-      await act(async () => { pending[0](); pending[1](); });
+      render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+      await act(async () => { pending[0](); });
       const select = await screen.findByRole("combobox", { name: "Camera" });
       fireEvent.change(select, { target: { value: "obs" } });
       fireEvent.change(select, { target: { value: "cam" } });
-      await act(async () => { pending.slice(2).forEach((open) => open()); });
+      await act(async () => { pending.slice(1).forEach((open) => open()); });
 
       const live = opened.filter((t) => t.stop.mock.calls.length === 0);
       expect(live.map((t) => t.label)).toEqual(["cam"]);
-      expect(screen.getByRole("button", { name: "Disable camera" })).toBeInTheDocument();
+      expect(webcamPreview()).not.toBeNull();
     });
 
     it("opens the saved camera when the camera is turned on", async () => {
       localStorage.setItem("recording-camera", "obs");
-      const user = userEvent.setup();
-      render(<Recorder onRecordingComplete={vi.fn()} />);
+      const { rerender } = render(<Recorder onRecordingComplete={vi.fn()} />);
       await screen.findByRole("combobox", { name: "Microphone" });
-      await user.click(screen.getByRole("button", { name: "Enable camera" }));
+      rerender(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+      await flushWebcam();
 
       expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
         video: { deviceId: { exact: "obs" }, width: 320, height: 240 },
@@ -699,8 +705,8 @@ describe("Recorder", () => {
     );
 
     const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Enable camera" }));
+    render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+    await flushWebcam();
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Dismiss error" }));
@@ -713,8 +719,8 @@ describe("Recorder", () => {
     );
 
     const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Enable camera" }));
+    render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+    await flushWebcam();
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start recording" }));
@@ -762,8 +768,8 @@ describe("Recorder", () => {
     (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>)
       .mockResolvedValue(webcamStream);
     const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Enable camera" }));
+    render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+    await flushWebcam();
     await user.click(screen.getByRole("button", { name: "Start recording" }));
     await user.click(screen.getByTestId("countdown-overlay"));
     await user.click(screen.getByRole("button", { name: "Pause recording" }));
@@ -809,8 +815,8 @@ describe("Recorder", () => {
 
   it("shows webcam preview when camera is enabled in idle state", async () => {
     const user = userEvent.setup();
-    render(<Recorder onRecordingComplete={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Enable camera" }));
+    render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+    await flushWebcam();
 
     // Webcam preview video should appear (the pip-preview class video)
     const videos = document.querySelectorAll("video.pip-preview");
@@ -827,15 +833,13 @@ describe("Recorder", () => {
 
     const onComplete = vi.fn();
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<Recorder onRecordingComplete={onComplete} />);
-
-    // Enable webcam first
-    await user.click(screen.getByRole("button", { name: "Enable camera" }));
-    expect(screen.getByText("Camera On")).toBeInTheDocument();
+    render(<Recorder withCamera onRecordingComplete={onComplete} />);
+    await flushWebcam();
+    expect(webcamPreview()).not.toBeNull();
 
     // Start recording with webcam enabled
     await user.click(screen.getByRole("button", { name: "Start recording" }));
-    await user.click(screen.getByTestId("countdown-overlay"));
+    await user.click(await screen.findByTestId("countdown-overlay"));
 
     // Should be in recording state with webcam active
     expect(
@@ -857,6 +861,84 @@ describe("Recorder", () => {
       expect.any(Blob),
     );
     vi.useRealTimers();
+  });
+
+  describe("Screen + Camera on mount", () => {
+    it("opens the webcam on mount without a click", async () => {
+      render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+
+      await vi.waitFor(() => {
+        expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+          video: { width: 320, height: 240, facingMode: "user" },
+          audio: false,
+        });
+      });
+      await vi.waitFor(() => expect(webcamPreview()).not.toBeNull());
+    });
+
+    it("keeps one webcam open under StrictMode double mount", async () => {
+      const tracks: { stop: ReturnType<typeof vi.fn> }[] = [];
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        const track = { stop: vi.fn() };
+        tracks.push(track);
+        return { getTracks: () => [track] };
+      });
+      render(<StrictMode><Recorder withCamera onRecordingComplete={vi.fn()} /></StrictMode>);
+
+      await vi.waitFor(() => expect(webcamPreview()).not.toBeNull());
+      expect(tracks.length).toBe(2);
+      expect(tracks.filter((t) => t.stop.mock.calls.length === 0)).toHaveLength(1);
+    });
+
+    it("does not open the webcam without withCamera", async () => {
+      render(<Recorder onRecordingComplete={vi.fn()} />);
+      await flushWebcam();
+
+      expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalledWith(
+        expect.objectContaining({ video: expect.anything() }),
+      );
+    });
+
+    it("records the webcam without toggling the camera", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const mockWebcamStream = new MockMediaStream();
+      mockWebcamStream.getTracks.mockReturnValue([{ stop: vi.fn() }]);
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue(mockWebcamStream);
+
+      const onComplete = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<Recorder withCamera onRecordingComplete={onComplete} />);
+      await vi.waitFor(() => {
+        expect(document.querySelector("video.pip-preview")).not.toBeNull();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(await screen.findByTestId("countdown-overlay"));
+      await act(() => { vi.advanceTimersByTime(1500); });
+      await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+      await vi.waitFor(() => {
+        expect(onComplete).toHaveBeenCalledTimes(1);
+      });
+      expect(onComplete).toHaveBeenCalledWith(
+        expect.any(Blob),
+        expect.any(Number),
+        expect.any(Blob),
+      );
+      vi.useRealTimers();
+    });
+
+    it("shows no preview when the webcam fails to open on mount", async () => {
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("Permission denied"),
+      );
+      render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+
+      expect(
+        await screen.findByText("Could not access your camera. Please allow camera access and try again."),
+      ).toBeInTheDocument();
+      expect(webcamPreview()).toBeNull();
+    });
   });
 
   it("stops recording when screen share track ends", async () => {

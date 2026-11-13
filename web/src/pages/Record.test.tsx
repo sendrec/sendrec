@@ -15,14 +15,16 @@ vi.mock("../api/client", () => ({
 // Store the onRecordingComplete and onRecordingError callbacks so tests can trigger them
 let capturedOnRecordingComplete: ((blob: Blob, duration: number, webcamBlob?: Blob) => void) | null = null;
 let capturedOnRecordingError: ((message: string) => void) | null = null;
+let capturedOnIdleChange: ((idle: boolean) => void) | null = null;
 
 // Mock Recorder to avoid browser API dependencies
 vi.mock("../components/Recorder", () => ({
-  Recorder: ({ maxDurationSeconds, onRecordingComplete, onRecordingError }: { maxDurationSeconds?: number; onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void; onRecordingError?: (message: string) => void }) => {
+  Recorder: ({ maxDurationSeconds, withCamera, onIdleChange, onRecordingComplete, onRecordingError }: { maxDurationSeconds?: number; withCamera?: boolean; onIdleChange?: (idle: boolean) => void; onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void; onRecordingError?: (message: string) => void }) => {
     capturedOnRecordingComplete = onRecordingComplete;
     capturedOnRecordingError = onRecordingError ?? null;
+    capturedOnIdleChange = onIdleChange ?? null;
     return (
-      <div data-testid="recorder" data-max-duration={maxDurationSeconds ?? ""}>
+      <div data-testid="recorder" data-max-duration={maxDurationSeconds ?? ""} data-with-camera={String(!!withCamera)}>
         Mock Recorder
       </div>
     );
@@ -34,9 +36,10 @@ let capturedCameraOnRecordingComplete: ((blob: Blob, duration: number) => void) 
 let capturedCameraOnRecordingError: ((message: string) => void) | null = null;
 
 vi.mock("../components/CameraRecorder", () => ({
-  CameraRecorder: ({ maxDurationSeconds, onRecordingComplete, onRecordingError }: { maxDurationSeconds?: number; onRecordingComplete: (blob: Blob, duration: number) => void; onRecordingError?: (message: string) => void }) => {
+  CameraRecorder: ({ maxDurationSeconds, onIdleChange, onRecordingComplete, onRecordingError }: { maxDurationSeconds?: number; onIdleChange?: (idle: boolean) => void; onRecordingComplete: (blob: Blob, duration: number) => void; onRecordingError?: (message: string) => void }) => {
     capturedCameraOnRecordingComplete = onRecordingComplete;
     capturedCameraOnRecordingError = onRecordingError ?? null;
+    capturedOnIdleChange = onIdleChange ?? null;
     return (
       <div data-testid="camera-recorder" data-max-duration={maxDurationSeconds ?? ""}>
         Mock Camera Recorder
@@ -93,7 +96,104 @@ describe("Record", () => {
 
   afterEach(() => {
     globalThis.XMLHttpRequest = originalXHR;
+    localStorage.removeItem("recording-mode");
     vi.restoreAllMocks();
+  });
+
+  describe("recording mode", () => {
+    const limits = { maxVideosPerMonth: 25, maxVideoDurationSeconds: 300, videosUsedThisMonth: 10 };
+
+    it("selects Screen when nothing is saved", async () => {
+      mockApiFetch.mockResolvedValueOnce(limits);
+      renderRecord();
+
+      const group = await screen.findByRole("group", { name: "Recording mode" });
+      expect(group).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Screen" })).toBeChecked();
+      expect(screen.getByTestId("recorder")).toHaveAttribute("data-with-camera", "false");
+    });
+
+    it("selects the saved mode", async () => {
+      localStorage.setItem("recording-mode", "camera");
+      mockApiFetch.mockResolvedValueOnce(limits);
+      renderRecord();
+
+      expect(await screen.findByRole("radio", { name: "Camera" })).toBeChecked();
+      expect(screen.getByTestId("camera-recorder")).toBeInTheDocument();
+      expect(screen.queryByTestId("recorder")).not.toBeInTheDocument();
+    });
+
+    it("falls back to Screen for an unknown saved value", async () => {
+      localStorage.setItem("recording-mode", "bogus");
+      mockApiFetch.mockResolvedValueOnce(limits);
+      renderRecord();
+
+      expect(await screen.findByRole("radio", { name: "Screen" })).toBeChecked();
+    });
+
+    it("switches recorder and remembers the choice", async () => {
+      mockApiFetch.mockResolvedValueOnce(limits);
+      const user = userEvent.setup();
+      renderRecord();
+
+      await user.click(await screen.findByRole("radio", { name: "Camera" }));
+      expect(screen.getByTestId("camera-recorder")).toBeInTheDocument();
+      expect(localStorage.getItem("recording-mode")).toBe("camera");
+
+      await user.click(screen.getByRole("radio", { name: "Screen + Camera" }));
+      expect(screen.getByTestId("recorder")).toHaveAttribute("data-with-camera", "true");
+      expect(localStorage.getItem("recording-mode")).toBe("screen-camera");
+
+      await user.click(screen.getByRole("radio", { name: "Screen" }));
+      expect(screen.getByTestId("recorder")).toHaveAttribute("data-with-camera", "false");
+      expect(localStorage.getItem("recording-mode")).toBe("screen");
+    });
+
+    it("hides the mode control while recording", async () => {
+      mockApiFetch.mockResolvedValueOnce(limits);
+      renderRecord();
+      await screen.findByRole("group", { name: "Recording mode" });
+
+      act(() => capturedOnIdleChange?.(false));
+      expect(screen.queryByRole("group", { name: "Recording mode" })).not.toBeInTheDocument();
+
+      act(() => capturedOnIdleChange?.(true));
+      expect(screen.getByRole("group", { name: "Recording mode" })).toBeInTheDocument();
+    });
+
+    it("offers no mode control without screen capture", async () => {
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: { getUserMedia: vi.fn() },
+        writable: true,
+        configurable: true,
+      });
+      mockApiFetch.mockResolvedValueOnce(limits);
+      renderRecord();
+
+      await screen.findByTestId("camera-recorder");
+      expect(screen.queryByRole("group", { name: "Recording mode" })).not.toBeInTheDocument();
+    });
+
+    it("offers no mode control without camera access", async () => {
+      localStorage.setItem("recording-mode", "screen-camera");
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: { getDisplayMedia: vi.fn() },
+        writable: true,
+        configurable: true,
+      });
+      mockApiFetch.mockResolvedValueOnce(limits);
+      renderRecord();
+
+      expect(await screen.findByTestId("recorder")).toHaveAttribute("data-with-camera", "false");
+      expect(screen.queryByRole("group", { name: "Recording mode" })).not.toBeInTheDocument();
+    });
+
+    it("mentions camera recording in onboarding", async () => {
+      mockApiFetch.mockResolvedValueOnce({ ...limits, videosUsedThisMonth: 0 });
+      renderRecord();
+
+      expect(await screen.findByText("Record your screen or camera, or upload a video")).toBeInTheDocument();
+    });
   });
 
   it("has no accessibility violations", async () => {
