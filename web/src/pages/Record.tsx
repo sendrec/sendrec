@@ -405,12 +405,9 @@ export function Record() {
         </div>
       )}
       {tab === "record" && recorderIdle && availableModes.length > 1 && (
-        <RecordingModePicker
-          value={activeMode}
-          onChange={chooseMode}
-          modes={availableModes}
-          className="btn-row record-mode-picker"
-        />
+        <div className="record-mode-picker">
+          <RecordingModePicker value={activeMode} onChange={chooseMode} modes={availableModes} />
+        </div>
       )}
       {tab === "record" ? (
         activeMode === "camera" ? (

@@ -21,13 +21,12 @@ interface RecordingModePickerProps {
   value: RecordingMode;
   onChange: (mode: RecordingMode) => void;
   modes?: RecordingMode[];
-  className?: string;
 }
 
-export function RecordingModePicker({ value, onChange, modes, className = "btn-row" }: RecordingModePickerProps) {
+export function RecordingModePicker({ value, onChange, modes }: RecordingModePickerProps) {
   const options = modes ? RECORDING_MODES.filter((m) => modes.includes(m.value)) : RECORDING_MODES;
   return (
-    <fieldset className={className} style={{ border: "none", padding: 0, margin: 0 }}>
+    <fieldset className="btn-row" style={{ border: "none", padding: 0, margin: 0 }}>
       <legend className="sr-only">Recording mode</legend>
       {options.map((m) => (
         <label
