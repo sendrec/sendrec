@@ -634,6 +634,20 @@ describe("Recorder", () => {
       expect(options).toEqual(["Browser default", "Integrated Webcam", "OBS Virtual Camera"]);
     });
 
+    it("places the camera picker under the preview, not in the controls row", async () => {
+      const user = userEvent.setup();
+      render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+      await flushWebcam();
+
+      const select = await screen.findByRole("combobox", { name: "Camera" });
+      expect(select.closest(".record-controls")).toBeNull();
+      expect(select.closest(".pip-block")?.querySelector("video.pip-preview")).not.toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(await screen.findByTestId("countdown-overlay"));
+      expect(screen.queryByRole("combobox", { name: "Camera" })).not.toBeInTheDocument();
+    });
+
     it("switches to the chosen camera and remembers it", async () => {
       const user = userEvent.setup();
       render(<Recorder withCamera onRecordingComplete={vi.fn()} />);

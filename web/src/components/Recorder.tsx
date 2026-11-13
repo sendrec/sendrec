@@ -646,10 +646,6 @@ export function Recorder({ onRecordingComplete, onRecordingError, onIdleChange, 
             </p>
           )}
           <div className="record-controls">
-            {/* A chosen camera stays switchable even after it failed to open. */}
-            {withCamera && (
-              <DevicePicker label="Camera" devices={cameras.devices} value={cameras.selectedId} onChange={switchCamera} />
-            )}
             <button
               onClick={() => setSystemAudioEnabled((prev) => !prev)}
               aria-label={systemAudioEnabled ? "Disable system audio" : "Enable system audio"}
@@ -781,15 +777,23 @@ export function Recorder({ onRecordingComplete, onRecordingError, onIdleChange, 
         </div>
       )}
 
-      {webcamEnabled && (
-        <video
-          ref={webcamVideoCallbackRef}
-          autoPlay
-          muted
-          playsInline
-          className="pip-preview"
-          style={{ width: 160, height: 120 }}
-        />
+      {/* A chosen camera stays switchable even after it failed to open. */}
+      {(webcamEnabled || (isIdle && withCamera)) && (
+        <div className="pip-block">
+          {webcamEnabled && (
+            <video
+              ref={webcamVideoCallbackRef}
+              autoPlay
+              muted
+              playsInline
+              className="pip-preview"
+              style={{ width: 160, height: 120 }}
+            />
+          )}
+          {isIdle && withCamera && (
+            <DevicePicker label="Camera" devices={cameras.devices} value={cameras.selectedId} onChange={switchCamera} />
+          )}
+        </div>
       )}
     </div>
   );
