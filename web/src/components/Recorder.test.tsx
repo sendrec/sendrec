@@ -839,7 +839,7 @@ describe("Recorder", () => {
 
     // Start recording with webcam enabled
     await user.click(screen.getByRole("button", { name: "Start recording" }));
-    await user.click(screen.getByTestId("countdown-overlay"));
+    await user.click(await screen.findByTestId("countdown-overlay"));
 
     // Should be in recording state with webcam active
     expect(
@@ -913,7 +913,7 @@ describe("Recorder", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "Start recording" }));
-      await user.click(screen.getByTestId("countdown-overlay"));
+      await user.click(await screen.findByTestId("countdown-overlay"));
       await act(() => { vi.advanceTimersByTime(1500); });
       await user.click(screen.getByRole("button", { name: "Stop recording" }));
 
