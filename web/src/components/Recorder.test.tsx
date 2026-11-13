@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -857,6 +858,93 @@ describe("Recorder", () => {
       expect.any(Blob),
     );
     vi.useRealTimers();
+  });
+
+  describe("saved Screen + Camera mode", () => {
+    afterEach(() => {
+      localStorage.removeItem("recording-mode");
+    });
+
+    it("opens the webcam on mount without a click", async () => {
+      localStorage.setItem("recording-mode", "screen-camera");
+      render(<Recorder onRecordingComplete={vi.fn()} />);
+
+      await vi.waitFor(() => {
+        expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+          video: { width: 320, height: 240, facingMode: "user" },
+          audio: false,
+        });
+      });
+      expect(await screen.findByText("Camera On")).toBeInTheDocument();
+    });
+
+    it("keeps one webcam open under StrictMode double mount", async () => {
+      localStorage.setItem("recording-mode", "screen-camera");
+      const tracks: { stop: ReturnType<typeof vi.fn> }[] = [];
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        const track = { stop: vi.fn() };
+        tracks.push(track);
+        return { getTracks: () => [track] };
+      });
+      render(<StrictMode><Recorder onRecordingComplete={vi.fn()} /></StrictMode>);
+
+      await screen.findByText("Camera On");
+      expect(tracks.length).toBe(2);
+      expect(tracks.filter((t) => t.stop.mock.calls.length === 0)).toHaveLength(1);
+    });
+
+    it("does not open the webcam on mount for other modes", async () => {
+      localStorage.setItem("recording-mode", "screen");
+      render(<Recorder onRecordingComplete={vi.fn()} />);
+      await screen.findByText("Camera Off");
+
+      expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalledWith(
+        expect.objectContaining({ video: expect.anything() }),
+      );
+    });
+
+    it("records the webcam without toggling the camera", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      localStorage.setItem("recording-mode", "screen-camera");
+      const mockWebcamStream = new MockMediaStream();
+      mockWebcamStream.getTracks.mockReturnValue([{ stop: vi.fn() }]);
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValue(mockWebcamStream);
+
+      const onComplete = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<Recorder onRecordingComplete={onComplete} />);
+      await vi.waitFor(() => {
+        expect(document.querySelector("video.pip-preview")).not.toBeNull();
+      });
+
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(screen.getByTestId("countdown-overlay"));
+      await act(() => { vi.advanceTimersByTime(1500); });
+      await user.click(screen.getByRole("button", { name: "Stop recording" }));
+
+      await vi.waitFor(() => {
+        expect(onComplete).toHaveBeenCalledTimes(1);
+      });
+      expect(onComplete).toHaveBeenCalledWith(
+        expect.any(Blob),
+        expect.any(Number),
+        expect.any(Blob),
+      );
+      vi.useRealTimers();
+    });
+
+    it("shows Camera Off when the webcam fails to open on mount", async () => {
+      localStorage.setItem("recording-mode", "screen-camera");
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("Permission denied"),
+      );
+      render(<Recorder onRecordingComplete={vi.fn()} />);
+
+      expect(
+        await screen.findByText("Could not access your camera. Please allow camera access and try again."),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Camera Off")).toBeInTheDocument();
+    });
   });
 
   it("stops recording when screen share track ends", async () => {

@@ -20,7 +20,7 @@ interface RecorderProps {
 }
 
 export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSeconds = 0 }: RecorderProps) {
-  const [webcamEnabled, setWebcamEnabled] = useState(() => localStorage.getItem("recording-mode") === "screen-camera");
+  const [webcamEnabled, setWebcamEnabled] = useState(false);
   const [captureWidth, setCaptureWidth] = useState(1920);
   const [captureHeight, setCaptureHeight] = useState(1080);
   const [previewExpanded, setPreviewExpanded] = useState(false);
@@ -459,6 +459,13 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
       stopAllStreams();
     };
   }, [stopAllStreams]);
+
+  // A saved Screen + Camera default opens the webcam up front; the button only reads "Camera On" once it is live.
+  // shortcut: opens the browser-default camera because saved devices are not enumerated yet; the picker switches it.
+  useEffect(() => {
+    if (localStorage.getItem("recording-mode") === "screen-camera") void startWebcam("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
+  }, []);
 
   useEffect(() => {
     if (previewExpanded) {
