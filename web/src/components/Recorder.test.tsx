@@ -699,6 +699,49 @@ describe("Recorder", () => {
       expect(webcamPreview()).not.toBeNull();
     });
 
+    it("switches to the saved camera once devices are listed in Screen + Camera", async () => {
+      localStorage.setItem("recording-camera", "obs");
+      const tracks: { label: string; stop: ReturnType<typeof vi.fn> }[] = [];
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockImplementation(
+        async (c: { video: { deviceId?: { exact: string } } }) => {
+          const track = { label: c.video.deviceId?.exact ?? "default", stop: vi.fn() };
+          tracks.push(track);
+          return { getTracks: () => [track] };
+        },
+      );
+      render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+
+      await vi.waitFor(() => {
+        expect(navigator.mediaDevices.getUserMedia).toHaveBeenLastCalledWith({
+          video: { deviceId: { exact: "obs" }, width: 320, height: 240 },
+          audio: false,
+        });
+      });
+      await flushWebcam();
+      expect(tracks.filter((t) => t.stop.mock.calls.length === 0).map((t) => t.label)).toEqual(["obs"]);
+    });
+
+    it("does not swap the camera when devices are listed mid-recording", async () => {
+      localStorage.setItem("recording-camera", "obs");
+      const pendingLists: ((devices: unknown[]) => void)[] = [];
+      Object.assign(navigator.mediaDevices, {
+        enumerateDevices: vi.fn().mockImplementation(() => new Promise((resolve) => { pendingLists.push(resolve); })),
+      });
+      const user = userEvent.setup();
+      render(<Recorder withCamera onRecordingComplete={vi.fn()} />);
+      await flushWebcam();
+      await user.click(screen.getByRole("button", { name: "Start recording" }));
+      await user.click(await screen.findByTestId("countdown-overlay"));
+      const callsBefore = (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mock.calls.length;
+
+      await act(async () => {
+        pendingLists.forEach((list) => list([{ kind: "videoinput", deviceId: "obs", label: "OBS Virtual Camera" }]));
+      });
+
+      const later = (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mock.calls.slice(callsBefore);
+      expect(later.filter(([c]) => c.video)).toHaveLength(0);
+    });
+
     it("opens the saved camera when the camera is turned on", async () => {
       localStorage.setItem("recording-camera", "obs");
       const { rerender } = render(<Recorder onRecordingComplete={vi.fn()} />);
