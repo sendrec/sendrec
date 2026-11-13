@@ -16,10 +16,12 @@ import { DevicePicker } from "./DevicePicker";
 interface RecorderProps {
   onRecordingComplete: (blob: Blob, duration: number, webcamBlob?: Blob) => void;
   onRecordingError?: (message: string) => void;
+  onIdleChange?: (idle: boolean) => void;
   maxDurationSeconds?: number;
+  withCamera?: boolean;
 }
 
-export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSeconds = 0 }: RecorderProps) {
+export function Recorder({ onRecordingComplete, onRecordingError, onIdleChange, maxDurationSeconds = 0, withCamera = false }: RecorderProps) {
   const [webcamEnabled, setWebcamEnabled] = useState(false);
   const [captureWidth, setCaptureWidth] = useState(1920);
   const [captureHeight, setCaptureHeight] = useState(1080);
@@ -187,19 +189,9 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     webcamBlobPromiseRef.current = null;
   }, [dispatch, stopAllStreams]);
 
-  async function toggleWebcam() {
-    setMediaError(null);
-    if (webcamEnabled) {
-      stopWebcamStream();
-      setWebcamEnabled(false);
-      return;
-    }
-    await startWebcam(cameras.selectedId);
-  }
-
   async function switchCamera(deviceId: string) {
     cameras.select(deviceId);
-    if (webcamEnabled) await startWebcam(deviceId);
+    if (withCamera) await startWebcam(deviceId);
   }
 
   async function startWebcam(deviceId: string) {
@@ -460,12 +452,18 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     };
   }, [stopAllStreams]);
 
-  // A saved Screen + Camera default opens the webcam up front; the button only reads "Camera On" once it is live.
-  // shortcut: opens the browser-default camera because saved devices are not enumerated yet; the picker switches it.
+  // Screen + Camera opens the webcam up front, so the recording includes it without another click.
+  // shortcut: on first mount saved devices are not enumerated yet, so the browser-default camera opens; the camera picker switches it.
   useEffect(() => {
-    if (localStorage.getItem("recording-mode") === "screen-camera") void startWebcam("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only
-  }, []);
+    setMediaError(null);
+    if (withCamera) {
+      void startWebcam(cameras.selectedId);
+    } else {
+      stopWebcamStream();
+      setWebcamEnabled(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to the mode only
+  }, [withCamera]);
 
   useEffect(() => {
     if (previewExpanded) {
@@ -481,6 +479,10 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
     remaining,
   } = recording.snapshot;
   const isIdle = state === "idle";
+
+  useEffect(() => {
+    onIdleChange?.(isIdle);
+  }, [isIdle, onIdleChange]);
   const isCountdown = state === "countdown";
   const isPaused = state === "paused";
   const isActive = state !== "idle" && state !== "stopped";
@@ -644,15 +646,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, maxDurationSec
             </p>
           )}
           <div className="record-controls">
-            <button
-              onClick={toggleWebcam}
-              aria-label={webcamEnabled ? "Disable camera" : "Enable camera"}
-              className={`btn-secondary${webcamEnabled ? " btn-secondary--active" : ""}`}
-            >
-              {webcamEnabled ? "Camera On" : "Camera Off"}
-            </button>
             {/* A chosen camera stays switchable even after it failed to open. */}
-            {(webcamEnabled || cameras.selectedId) && (
+            {withCamera && (
               <DevicePicker label="Camera" devices={cameras.devices} value={cameras.selectedId} onChange={switchCamera} />
             )}
             <button

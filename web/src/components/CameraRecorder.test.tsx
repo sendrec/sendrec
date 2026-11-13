@@ -74,6 +74,16 @@ describe("CameraRecorder", () => {
     });
   });
 
+  it("reports when it leaves idle", async () => {
+    const onIdleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<CameraRecorder onRecordingComplete={vi.fn()} onIdleChange={onIdleChange} />);
+    expect(onIdleChange).toHaveBeenLastCalledWith(true);
+
+    await user.click(await screen.findByRole("button", { name: "Start recording" }));
+    expect(onIdleChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("renders flip camera button", async () => {
     render(<CameraRecorder onRecordingComplete={vi.fn()} />);
 

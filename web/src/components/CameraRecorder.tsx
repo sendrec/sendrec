@@ -13,10 +13,11 @@ import { DevicePicker } from "./DevicePicker";
 interface CameraRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void;
   onRecordingError?: (message: string) => void;
+  onIdleChange?: (idle: boolean) => void;
   maxDurationSeconds?: number;
 }
 
-export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurationSeconds = 0 }: CameraRecorderProps) {
+export function CameraRecorder({ onRecordingComplete, onRecordingError, onIdleChange, maxDurationSeconds = 0 }: CameraRecorderProps) {
   const countdownEnabled = useRef(localStorage.getItem("recording-countdown") !== "false");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -173,6 +174,10 @@ export function CameraRecorder({ onRecordingComplete, onRecordingError, maxDurat
     remaining,
   } = recording.snapshot;
   const isIdle = state === "idle";
+
+  useEffect(() => {
+    onIdleChange?.(isIdle);
+  }, [isIdle, onIdleChange]);
   const isCountdown = state === "countdown";
   const isPaused = state === "paused";
   const isActive = state !== "idle" && state !== "stopped";
