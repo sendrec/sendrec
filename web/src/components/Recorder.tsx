@@ -47,6 +47,8 @@ export function Recorder({ onRecordingComplete, onRecordingError, onIdleChange, 
   const mimeTypeRef = useRef("");
   // Only the latest camera request may become the preview; older ones are stopped.
   const webcamRequestRef = useRef(0);
+  // Device the open (or opening) webcam was asked for; null when none is.
+  const requestedCameraRef = useRef<string | null>(null);
   const webcamVideoRef = useRef<HTMLVideoElement | null>(null);
   const webcamVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
     webcamVideoRef.current = node;
@@ -77,6 +79,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, onIdleChange, 
 
   const stopWebcamStream = useCallback(() => {
     webcamRequestRef.current++;
+    requestedCameraRef.current = null;
     if (webcamStreamRef.current) {
       webcamStreamRef.current.getTracks().forEach((track) => track.stop());
       webcamStreamRef.current = null;
@@ -196,6 +199,7 @@ export function Recorder({ onRecordingComplete, onRecordingError, onIdleChange, 
 
   async function startWebcam(deviceId: string) {
     const request = ++webcamRequestRef.current;
+    requestedCameraRef.current = deviceId;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: deviceId
@@ -452,18 +456,23 @@ export function Recorder({ onRecordingComplete, onRecordingError, onIdleChange, 
     };
   }, [stopAllStreams]);
 
+  const recordingState = recording.snapshot.state;
   // Screen + Camera opens the webcam up front, so the recording includes it without another click.
-  // shortcut: on first mount saved devices are not enumerated yet, so the browser-default camera opens; the camera picker switches it.
+  // The saved camera is only selectable once devices are listed, so the browser default may open
+  // first and is swapped for the saved one when it appears.
   useEffect(() => {
-    setMediaError(null);
-    if (withCamera) {
-      void startWebcam(cameras.selectedId);
-    } else {
+    if (!withCamera) {
+      setMediaError(null);
       stopWebcamStream();
       setWebcamEnabled(false);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to the mode only
-  }, [withCamera]);
+    // Never swap the camera under a running take.
+    if (recordingState !== "idle" || requestedCameraRef.current === cameras.selectedId) return;
+    setMediaError(null);
+    void startWebcam(cameras.selectedId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to the mode and chosen camera only
+  }, [withCamera, cameras.selectedId, recordingState]);
 
   useEffect(() => {
     if (previewExpanded) {
